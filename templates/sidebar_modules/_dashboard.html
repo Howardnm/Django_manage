@@ -1,0 +1,9 @@
+<!-- 首页模块 -->
+<li class="nav-item">
+    <a class="nav-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}" href="{% url 'home' %}">
+        <span class="nav-link-icon"><i class="ti ti-dashboard"></i></span>
+        <span class="nav-link-title">概览面板</span>
+    </a>
+</li>
+
+

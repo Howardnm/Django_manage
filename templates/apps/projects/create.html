@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block title %}新增项目{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">所有项目</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'project_list' %}" class="btn btn-danger">取消</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 具体的form表单 -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                {{ form }}
+                <br>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+{% endblock %}

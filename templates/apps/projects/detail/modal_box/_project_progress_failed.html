@@ -1,0 +1,18 @@
+<div class="modal-header">
+    <h5 class="modal-title text-danger">申报不合格</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<form hx-post="{% url 'node_failed' node.id %}" hx-swap="none">
+    {% csrf_token %}
+    <div class="modal-body">
+        <p class="text-secondary">确认 {{ node.get_stage_display }} 未通过吗？这将触发新一轮迭代。</p>
+        <div class="mb-3">
+            <label class="form-label">失败原因</label>
+            <textarea name="remark" class="form-control" rows="3" required></textarea>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-danger">确认不合格</button>
+    </div>
+</form>

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}项目管理{% endblock %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">所有项目</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'project_create' %}" class="btn btn-primary">新建</a>
+            </div>
+        </div>
+    </div>
+
+    <!-- 具体的表格内容 -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <table class="table table-hover">
+                <thead>
+                <tr>
+                    <th>name</th>
+                    <th>manager</th>
+                    <th>进度</th>
+                    <th>项目描述</th>
+                    <th>更新时间</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for project in projects %}
+                    <tr>
+                        <td>{{ project.name }}</td>
+                        <td>{{ project.manager }}</td>
+                        <td>
+                            <div class="d-flex mb-2">
+                                <div>{{ project.get_current_stage_label }}</div>
+                                <div class="ms-auto">{{ project.get_progress_percent }}%</div>
+                            </div>
+                            <div class="progress progress-sm">
+                                {% if project.get_progress_percent == 100 %}
+                                <div class="progress-bar bg-success" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
+                                {% elif project.get_current_stage_status == 'TERMINATED' %}
+                                <div class="progress-bar bg-danger" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
+                                {% else %}
+                                <div class="progress-bar bg-primary" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>{{ project.get_current_stage_remark }}</td>
+                        <td>{{ project.get_current_stage_updated_time }}</td>
+                        <td>
+                            <a href="{% url 'project_detail' project.pk %}">详细</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock %}

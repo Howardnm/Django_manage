@@ -1,0 +1,120 @@
+<div class="col-lg-8">
+
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">执行进度追踪</h3>
+        </div>
+        <div class="card-body">
+            <ul class="steps steps-vertical">
+
+                {% for node in nodes %}
+                    <!-- 垂直进度条，根据状态动态改变 class: step-item -->
+                    <!-- 除了“已完成”，都加 active -->
+                    <!-- 如果是客户意见，给个特殊的背景色 bg-yellow-lt -->
+                    <li class="step-item
+                                {% if node.status != 'DONE' and node.status != 'FAILED' %}active{% endif %}
+                                {% if node.stage == 'FEEDBACK' %}step-item-warning{% endif %}">
+
+                        <div class="h4 m-0 d-flex align-items-center justify-content-between">
+                            <!-- 阶段名称 -->
+                            <!-- forloop.counter 是一个内置变量：遍历输出1.2.3.4  -->
+                            <span>
+                                {% if node.status != 'PENDING' %}
+                                    <span class="text-primary">{{ forloop.counter }}、{{ node.get_stage_display }}</span>
+
+                                {% else %}
+                                    <span>{{ forloop.counter }}、{{ node.get_stage_display }}</span>
+                                {% endif %}
+                                {% if node.round > 1 %}
+                                    <span class="badge bg-secondary-lt">第{{ node.round }}轮</span>
+                                {% endif %}
+                            </span>
+                            <!-- 状态标签 -->
+                            {% if node.status == 'TERMINATED' %}
+                                <span class="badge bg-red text-white">项目终止</span>
+                            {% elif node.stage == 'FEEDBACK' %}
+                                <span class="badge bg-yellow text-white">客户意见</span>
+                            {% elif node.status == 'DONE' %}
+                                <span class="badge bg-green-lt">已完成</span>
+                            {% elif node.status == 'FAILED' %}
+                                <span class="badge bg-red-lt">不合格/返工</span>
+                            {% elif node.status == 'DOING' %}
+                                <span class="badge bg-blue-lt">进行中</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">待处理</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="text-secondary mt-1">
+                            {% if node.remark %}
+                                <i class="ti ti-note me-1"></i> {{ node.remark }}
+                            {% else %}
+                                <span class="small text-muted">暂无备注</span>
+                            {% endif %}
+                        </div>
+
+                        {% if node.status != 'PENDING' %}
+                            <div class="text-muted small mt-1 primary">
+                                更新于: {{ node.updated_at|date:"Y-m-d H:i" }}
+                            </div>
+                        {% endif %}
+
+                        <!-- 【核心修改区域】操作按钮列表 -->
+                        <div class="mt-2 btn-list">
+                            <!-- 1. 常规更新 -->
+                            {% if node.can_update_status %}
+                                <button class="btn btn-sm btn-outline-secondary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modal-generic"
+                                        hx-get="{% url 'node_update' node.id %}"
+                                        hx-target="#modal-content-placeholder">
+                                    更新状态
+                                </button>
+                            {% endif %}
+
+                            <!-- 2. 申报不合格 -->
+                            {% if node.can_report_failure %}
+                                <!-- 条件保持不变 -->
+                                <button class="btn btn-sm btn-outline-danger"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modal-generic"
+                                        hx-get="{% url 'node_failed' node.id %}"
+                                        hx-target="#modal-content-placeholder">
+                                    申报不合格
+                                </button>
+                            {% endif %}
+
+                            <!-- 3. 客户反馈 -->
+                            {% if node.can_add_feedback %}
+                                <button class="btn btn-sm btn-outline-warning"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#modal-generic"
+                                        hx-get="{% url 'node_feedback' node.id %}"
+                                        hx-target="#modal-content-placeholder">
+                                    客户意见
+                                </button>
+                            {% endif %}
+                        </div>
+                    </li>
+                {% endfor %}
+
+            </ul>
+        </div>
+    </div>
+</div>
+
+
+
+<!-- 【HTMX 专用通用模态框容器】 -->
+<!-- 整个页面只需要这一个 Modal HTML -->
+<div class="modal modal-blur fade" id="modal-generic" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" id="modal-content-placeholder">
+            <!-- HTMX 会把后端返回的表单 HTML 塞到这里面 -->
+            <!-- 加载中... -->
+            <div class="p-3 text-center">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        </div>
+    </div>
+</div>

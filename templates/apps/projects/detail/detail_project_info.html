@@ -1,0 +1,37 @@
+<!-- 项目详情页面，左侧：项目基本信息 -->
+<div class="col-lg-4">
+    <div class="card">
+        <div class="card-body">
+            <div class="d-flex align-items-center mb-3">
+                <span class="avatar me-3 rounded">{{ project.manager.username|slice:":1" }}</span>
+                <div>
+                    <div class="font-weight-medium">{{ project.manager.username }}</div>
+                    <div class="text-secondary small">项目负责人</div>
+                </div>
+            </div>
+            <div class="datagrid">
+                <div class="datagrid-item">
+                    <div class="datagrid-title">创建时间</div>
+                    <div class="datagrid-content">{{ project.created_at|date:"Y-m-d H:m:s" }}</div>
+                </div>
+                <div class="datagrid-item">
+                    <div class="datagrid-title">当前阶段</div>
+                    <div class="datagrid-content text-primary">{{ project.get_current_stage_label }}</div>
+                </div>
+            </div>
+            <div class="hr-text">描述</div>
+            <p class="text-secondary">{{ project.description|default:"暂无描述" }}</p>
+        </div>
+
+        <!-- 总进度条 -->
+        <div class="card-footer">
+            <div class="d-flex mb-2">
+                <div>总进度</div>
+                <div class="ms-auto">{{ project.get_progress_percent }}%</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-primary" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
+            </div>
+        </div>
+    </div>
+</div>

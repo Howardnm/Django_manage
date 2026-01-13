@@ -1,0 +1,41 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}Tabler系统{% endblock %}</title>
+    <!-- 引入 CSS (Tabler & Icons) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css"/>
+    <!-- Tabler Icons Webfont -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+    <!-- 引入 HTMX, 建议放在 <head> 中 -->
+    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+</head>
+<body>
+<div class="page">
+    <!-- 1. 引入侧边栏容器 -->
+    {% include "includes/sidebar.html" %}
+
+    <div class="page-wrapper">
+        <!-- 2. 引入顶部 Header -->
+        {% include "includes/header.html" %}
+
+        <!-- 3. 页面内容占位符 -->
+        <div class="page-body">
+            <div class="container-xl">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 引入 JS -->
+<!-- 2. 配置 Django CSRF (放在 body 标签最底部) -->
+<script>
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+    });
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
+</body>
+</html>

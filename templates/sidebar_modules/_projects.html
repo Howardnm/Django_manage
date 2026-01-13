@@ -1,0 +1,34 @@
+<!-- 项目管理模块 -->
+<!-- 定义该模块包含的所有 URL name -->
+{% with route_names='project_list project_create project_detail' %}
+
+<li class="nav-item dropdown">
+    <!-- 父级菜单高亮逻辑 -->
+    <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name in route_names %}active{% endif %}"
+       href="#navbar-projects" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button"
+       aria-expanded="{% if request.resolver_match.url_name in route_names %}true{% else %}false{% endif %}">
+
+        <span class="nav-link-icon"><i class="ti ti-package"></i></span>
+        <span class="nav-link-title">项目中心</span>
+    </a>
+
+    <!-- 下拉展开逻辑 -->
+    <div class="dropdown-menu {% if request.resolver_match.url_name in route_names %}show{% endif %}">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'project_list' %}active{% endif %}"
+                   href="{% url 'project_list' %}">
+                   项目列表
+                </a>
+
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'project_create' %}active{% endif %}"
+                   href="{% url 'project_create' %}">
+                   新建项目
+                </a>
+
+            </div>
+        </div>
+    </div>
+</li>
+{% endwith %}

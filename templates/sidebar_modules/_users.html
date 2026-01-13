@@ -1,0 +1,36 @@
+<!-- 系统管理员模块 -->
+<!-- 定义该模块包含的所有 URL name -->
+{% with route_names='index login logout' %}
+
+<li class="nav-item dropdown">
+    <!-- 父级菜单高亮逻辑 -->
+    <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name in route_names %}active{% endif %}"
+       href="#navbar-projects" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button"
+       aria-expanded="{% if request.resolver_match.url_name in route_names %}true{% else %}false{% endif %}">
+
+        <span class="nav-link-icon"><i class="ti ti-package"></i></span>
+        <span class="nav-link-title">后台管理面板</span>
+    </a>
+
+    <!-- 下拉展开逻辑 -->
+    <div class="dropdown-menu {% if request.resolver_match.url_name in route_names %}show{% endif %}">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'index' %}active{% endif %}"
+                   href="{% url 'admin:index' %}">
+                   后台首页
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'login' %}active{% endif %}"
+                   href="{% url 'admin:login' %}">
+                   后台登录
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'logout' %}active{% endif %}"
+                   href="{% url 'admin:logout' %}">
+                   退出登录
+                </a>
+            </div>
+        </div>
+    </div>
+</li>
+{% endwith %}

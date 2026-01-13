@@ -1,0 +1,41 @@
+<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+    <div class="container-fluid">
+        <!-- 手机端打开菜单按钮 -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <!-- Logo -->
+        <h1 class="navbar-brand mt-4">
+            <a href="/static">项目管理系统</a>
+        </h1>
+
+        <hr class="my-4 mb-2"/>
+
+        <div class="collapse navbar-collapse" id="sidebar-menu">
+            <ul class="navbar-nav pt-lg-3">
+
+                <!-- 【模块 1：仪表盘】 -->
+                {% include "sidebar_modules/_dashboard.html" %}
+
+                <!-- 【模块 2：项目管理】 -->
+                <!-- 可以加权限判断，比如只有员工能看 -->
+                {% include "sidebar_modules/_projects.html" %}
+
+                <!-- 【模块 3：用户管理】 -->
+                <!-- 比如只有管理员能看 -->
+                {% if user.is_staff %}
+                    {% include "sidebar_modules/_users.html" %}
+                {% endif %}
+
+            </ul>
+        </div>
+
+        <!-- 底部用户菜单 (可以单独拆分，也可以写在这里) -->
+        <div class="mt-auto">
+            <ul class="navbar-nav">
+                {% include "sidebar_modules/_dashboard.html" %}
+            </ul>
+        </div>
+    </div>
+</aside>
