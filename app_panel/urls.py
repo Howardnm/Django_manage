@@ -1,6 +1,6 @@
 from django.urls import path
-from app_panel.views import *
+from .views import PanelIndexView
 
 urlpatterns = [
-    path('', IndexView.as_view(), name='home'),
+    path('', PanelIndexView.as_view(), name='panel_index'),
 ]

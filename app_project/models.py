@@ -76,7 +76,9 @@ class Project(models.Model):
             'current_label': self._format_stage_label(current_node),
             'current_remark': current_remark,
             'last_updated': last_updated,
-            'is_terminated': is_terminated
+            'is_terminated': is_terminated,
+            # 【新增】返回原始对象，供仪表盘 View 做逻辑判断
+            'current_node_obj': current_node
         }
 
     def _format_stage_label(self, node):

@@ -1,0 +1,55 @@
+<!-- 4. 部门/分组统计卡片 -->
+
+<div class="card" style="height: 100%"> <!-- 高度撑满，对齐其他卡片 -->
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-3">
+            <div class="subheader">团队效能分布</div>
+        </div>
+
+
+        <!-- 循环显示每个组 -->
+        <!-- 如果组太多，建议只显示前4-5个，或者加个 style="overflow-y:auto; max-height:..." -->
+        <div class="space-y-3">
+            {% for group_name, data in stats.group_stats.items %}
+                <div>
+                    <!-- 组名 + 总数 -->
+                    <div class="d-flex mb-1 align-items-center">
+                        <div class="text-truncate fw-bold" style="max-width: 120px;" title="{{ group_name }}">
+                            {{ group_name }}
+                        </div>
+                        <div class="ms-auto text-muted small">
+                            共 {{ data.total }} 项
+                        </div>
+                    </div>
+
+                    <!-- 堆叠进度条：视觉核心 -->
+                    <div class="progress progress-sm">
+                        <!-- 1. 已完成 (绿色) -->
+                        <div class="progress-bar bg-success" style="width: {% widthratio data.completed data.total 100 %}%"
+                             title="已完成: {{ data.completed }}"></div>
+
+                        <!-- 2. 进行中 (蓝色) -->
+                        <div class="progress-bar bg-primary" style="width: {% widthratio data.active data.total 100 %}%"
+                             title="进行中: {{ data.active }}"></div>
+
+                        <!-- 3. 已终止 (红色) -->
+                        <div class="progress-bar bg-danger" style="width: {% widthratio data.terminated data.total 100 %}%"
+                             title="已终止: {{ data.terminated }}"></div>
+                    </div>
+
+                    <!-- 底部微型图例/数据文字 -->
+                    <div class="d-flex justify-content-between text-muted small mt-1" style="font-size: 0.65rem;">
+                        <span class="text-success" title="已完成">✓已完成 {{ data.completed }}</span>
+                        <span class="text-primary" title="进行中">▶进行中 {{ data.active }}</span>
+                        <span class="text-danger" title="已终止">✕已终止 {{ data.terminated }}</span>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="text-muted text-center py-4">
+                    暂无分组数据
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>

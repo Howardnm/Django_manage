@@ -1,0 +1,57 @@
+<!-- 2. 进度停滞监控卡片 (合并了原来的14天和30天) -->
+
+<div class="card">
+    <div class="card-body">
+        <!-- 头部：样式对齐 -->
+        <div class="d-flex align-items-center mb-2">
+            <div class="subheader">进度预警</div>
+            <div class="ms-auto lh-1 text-muted small">
+                <!-- 这里加个图标点缀，与第一个卡片呼应 -->
+                <span class="text-orange d-inline-flex align-items-center lh-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-inline me-1" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                             fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M12 9v4"/><path
+                                d="M10.363 3.591l-8.106 13.534a1.914 1.914 0 0 0 1.636 2.871h16.214a1.914 1.914 0 0 0 1.636 -2.87l-8.106 -13.536a1.914 1.914 0 0 0 -3.274 0z"/><path
+                                d="M12 16h.01"/></svg>
+                        需关注
+                    </span>
+            </div>
+        </div>
+
+        <!-- 大数字：两者之和 -->
+        <div class="d-flex align-items-baseline">
+            <!-- 使用 Django 模板的 add 过滤器计算总和 -->
+            <div class="h1 mb-3 me-2">
+                {{ stats.stagnant_30d|length|add:stats.stagnant_14d|length }}
+            </div>
+            <div class="me-auto text-muted">
+                个项目停滞
+            </div>
+        </div>
+
+        <!-- 进度条组 -->
+
+        <!-- 1. 严重停滞 (>30天) - 红色 - 优先级最高放在最上面 -->
+        <div class="mb-2">
+            <div class="d-flex mb-1">
+                <div class="text-muted">严重停滞 (>30天)</div>
+                <div class="ms-auto fw-bold">{{ stats.stagnant_30d|length }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <!-- 分母使用 total_active，展示占活跃项目的比例，更有意义 -->
+                <div class="progress-bar bg-red" style="width: {% widthratio stats.stagnant_30d|length stats.total_active 100 %}%"></div>
+            </div>
+        </div>
+
+        <!-- 2. 中度停滞 (>14天) - 黄色 -->
+        <div class="mb-0">
+            <div class="d-flex mb-1">
+                <div class="text-muted">中度停滞 (>14天)</div>
+                <div class="ms-auto fw-bold">{{ stats.stagnant_14d|length }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-yellow" style="width: {% widthratio stats.stagnant_14d|length stats.total_active 100 %}%"></div>
+            </div>
+        </div>
+
+    </div>
+</div>

@@ -1,0 +1,63 @@
+<!-- 1. 全局概览卡片 (项目数量：进行中、已完成、已终止) -->
+
+<div class="card">
+    <div class="card-body">
+        <div class="d-flex align-items-center mb-2">
+            <div class="subheader">项目总览</div>
+            <div class="ms-auto lh-1 text-muted small">
+                涉及成员: {{ user_count }} 人
+            </div>
+        </div>
+
+        <!-- 总数大字 -->
+        <div class="d-flex align-items-baseline">
+            <div class="h1 mb-3 me-2">{{ stats.total_all }}</div>
+            <div class="me-auto">
+                    <span class="text-green inline-block">
+                        <!-- 这里可以放同比环比，暂时留空 -->
+                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-inline" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                             fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path
+                                d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></svg>
+                        All Projects
+                    </span>
+            </div>
+        </div>
+
+        <!-- 进度条组 -->
+
+        <!-- 1. 进行中 (Active) - 蓝色 -->
+        <div class="mb-2">
+            <div class="d-flex mb-1">
+                <div class="text-muted">进行中</div>
+                <!-- 使用 widthratio 计算百分比: (数值 / 总数) * 100 -->
+                <div class="ms-auto fw-bold">{{ stats.total_active }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-primary" style="width: {% widthratio stats.total_active stats.total_all 100 %}%"></div>
+            </div>
+        </div>
+
+        <!-- 2. 已完成 (Completed) - 绿色 -->
+        <div class="mb-2">
+            <div class="d-flex mb-1">
+                <div class="text-muted">已完成</div>
+                <div class="ms-auto fw-bold">{{ stats.total_completed }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-success" style="width: {% widthratio stats.total_completed stats.total_all 100 %}%"></div>
+            </div>
+        </div>
+
+        <!-- 3. 已终止 (Terminated) - 红色 -->
+        <div class="mb-0">
+            <div class="d-flex mb-1">
+                <div class="text-muted">已终止</div>
+                <div class="ms-auto fw-bold">{{ stats.total_terminated }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-danger" style="width: {% widthratio stats.total_terminated stats.total_all 100 %}%"></div>
+            </div>
+        </div>
+
+    </div>
+</div>

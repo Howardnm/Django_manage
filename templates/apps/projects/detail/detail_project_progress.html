@@ -1,15 +1,14 @@
-<div class="col-lg-8">
-    <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">执行进度追踪</h3>
-        </div>
-        <div class="card-body">
-            <ul class="steps steps-vertical">
-                {% for node in nodes %}
-                    <!-- 垂直进度条：使用 models 中的 row_active_class -->
-                    <li class="step-item {{ node.row_active_class }} {% if node.is_feedback_stage %}step-item-warning{% endif %}">
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">执行进度追踪</h3>
+    </div>
+    <div class="card-body">
+        <ul class="steps steps-vertical">
+            {% for node in nodes %}
+                <!-- 垂直进度条：使用 models 中的 row_active_class -->
+                <li class="step-item {{ node.row_active_class }} {% if node.is_feedback_stage %}step-item-warning{% endif %}">
 
-                        <div class="h4 m-0 d-flex align-items-center justify-content-between">
+                    <div class="h4 m-0 d-flex align-items-center justify-content-between">
                             <span>
                                 <!-- 使用 models 中的 title_status_css_class -->
                                 <span class="{{ node.title_status_css_class }}">
@@ -20,59 +19,58 @@
                                 {% endif %}
                             </span>
 
-                            <!-- 【优化】直接调用 Model 属性获取样式类 -->
-                            <span class="badge {{ node.status_css_class }}">
+                        <!-- 【优化】直接调用 Model 属性获取样式类 -->
+                        <span class="badge {{ node.status_css_class }}">
                                 {{ node.get_status_display }}
                             </span>
-                        </div>
+                    </div>
 
-                        <div class="text-secondary mt-1">
-                            <i class="ti ti-note me-1"></i>
-                            <span class="small text-muted">{% if node.remark %}{{ node.remark }}{% else %}暂无备注{% endif %}</span>
-                        </div>
+                    <div class="text-secondary mt-1">
+                        <i class="ti ti-note me-1"></i>
+                        <span class="small text-muted">{% if node.remark %}{{ node.remark }}{% else %}暂无备注{% endif %}</span>
+                    </div>
 
-                        {% if node.status != 'PENDING' %}
-                            <div class="text-muted small mt-1 primary">
-                                更新于: {{ node.updated_at|date:"Y-m-d H:i" }}
-                            </div>
+                    {% if node.status != 'PENDING' %}
+                        <div class="text-muted small mt-1 primary">
+                            更新于: {{ node.updated_at|date:"Y-m-d H:i" }}
+                        </div>
+                    {% endif %}
+
+                    <!-- 按钮组保持不变，依然使用 node.can_xxx 属性 -->
+                    <div class="mt-2 btn-list">
+                        {% if node.can_update_status %}
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-generic"
+                                    hx-get="{% url 'node_update' node.id %}"
+                                    hx-target="#modal-content-placeholder">
+                                更新状态
+                            </button>
                         {% endif %}
 
-                        <!-- 按钮组保持不变，依然使用 node.can_xxx 属性 -->
-                        <div class="mt-2 btn-list">
-                            {% if node.can_update_status %}
-                                <button class="btn btn-sm btn-outline-secondary"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modal-generic"
-                                        hx-get="{% url 'node_update' node.id %}"
-                                        hx-target="#modal-content-placeholder">
-                                    更新状态
-                                </button>
-                            {% endif %}
+                        {% if node.can_report_failure %}
+                            <button class="btn btn-sm btn-outline-danger"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-generic"
+                                    hx-get="{% url 'node_failed' node.id %}"
+                                    hx-target="#modal-content-placeholder">
+                                申报异常
+                            </button>
+                        {% endif %}
 
-                            {% if node.can_report_failure %}
-                                <button class="btn btn-sm btn-outline-danger"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modal-generic"
-                                        hx-get="{% url 'node_failed' node.id %}"
-                                        hx-target="#modal-content-placeholder">
-                                    申报异常
-                                </button>
-                            {% endif %}
-
-                            {% if node.can_add_feedback %}
-                                <button class="btn btn-sm btn-outline-warning"
-                                        data-bs-toggle="modal"
-                                        data-bs-target="#modal-generic"
-                                        hx-get="{% url 'node_feedback' node.id %}"
-                                        hx-target="#modal-content-placeholder">
-                                    客户意见
-                                </button>
-                            {% endif %}
-                        </div>
-                    </li>
-                {% endfor %}
-            </ul>
-        </div>
+                        {% if node.can_add_feedback %}
+                            <button class="btn btn-sm btn-outline-warning"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-generic"
+                                    hx-get="{% url 'node_feedback' node.id %}"
+                                    hx-target="#modal-content-placeholder">
+                                客户意见
+                            </button>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
     </div>
 </div>
 

@@ -1,0 +1,91 @@
+<!-- 甘特图卡片 -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">项目时间线 (Gantt)</h3>
+        <div class="card-actions">
+            <!-- 这里可以放一些图例说明 -->
+            <span class="badge bg-green-lt me-2">已完成</span>
+            <span class="badge bg-blue-lt me-2">进行中</span>
+            <span class="badge bg-yellow-lt">客户意见</span>
+            <span class="badge bg-red-lt">异常/终止</span>
+        </div>
+    </div>
+    <div class="card-body">
+        <!-- 图表容器 -->
+        <div id="chart-gantt" style="min-height: 250px;"></div>
+    </div>
+</div>
+
+
+<!-- 引入脚本 -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // 1. 获取后端传来的数据
+        var seriesData = JSON.parse('{{ gantt_data_json|safe }}');
+
+        // 如果没有数据（项目刚建，全是 PENDING），显示提示或隐藏
+        if (seriesData.length === 0) {
+            document.getElementById('chart-gantt').innerHTML =
+                '<div class="text-center text-muted py-5">暂无进度数据，开始推进项目后将显示甘特图</div>';
+            return;
+        }
+
+        // 2. 初始化图表
+        var options = {
+            series: [
+                {
+                    data: seriesData
+                }
+            ],
+            chart: {
+                height: 300,
+                type: 'rangeBar', // 【关键】区间条形图
+                fontFamily: 'inherit',
+                toolbar: {show: false},
+                animations: {enabled: true}
+            },
+            plotOptions: {
+                bar: {
+                    horizontal: true, // 横向
+                    barHeight: '60%', // 条形高度
+                    rangeBarGroupRows: true // 允许同一行显示多个条形（如果阶段名相同）
+                }
+            },
+            xaxis: {
+                type: 'datetime', // X轴是时间格式
+                labels: {
+                    datetimeFormatter: {
+                        year: 'yyyy',
+                        month: 'MMM \'yy',
+                        day: 'dd MMM',
+                        hour: 'HH:mm'
+                    }
+                }
+            },
+            tooltip: {
+                custom: function ({series, seriesIndex, dataPointIndex, w}) {
+                    var data = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
+                    var start = new Date(data.y[0]).toLocaleDateString();
+                    var end = new Date(data.y[1]).toLocaleDateString();
+                    return '<div class="arrow_box" style="padding:10px;">' +
+                        '<b>' + data.x + '</b><br>' +
+                        '<span class="text-muted">状态: ' + data.status + '</span><br>' +
+                        '<span class="text-muted">' + start + ' - ' + end + '</span>' +
+                        '</div>';
+                }
+            },
+            grid: {
+                xaxis: {
+                    lines: {show: true}
+                },
+                yaxis: {
+                    lines: {show: false}
+                },
+            }
+        };
+
+        var chart = new ApexCharts(document.querySelector("#chart-gantt"), options);
+        chart.render();
+    });
+</script>

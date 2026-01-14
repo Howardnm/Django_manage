@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}仪表盘{% endblock %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">Overview</div>
+                <h2 class="page-title">项目全景看板</h2>
+            </div>
+        </div>
+    </div>
+
+    <!-- 外层使用 row，但不使用 row-deck，允许左右高度不一致 -->
+    <div class="row row-cards mt-2">
+
+        <!-- ========================================== -->
+        <!-- 左侧主操作区 (占据 9/12 宽度) -->
+        <!-- ========================================== -->
+        <div class="col-lg-9">
+
+            <!-- 第一排：3个核心指标卡片 -->
+            <!-- 这里内部使用 row-deck 保证这3个卡片高度一致 -->
+            <div class="row row-deck row-cards">
+                <div class="col-sm-6 col-lg-4">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_number.html' %}
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_Stagnation.html' %}
+                </div>
+                <div class="col-sm-6 col-lg-4">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_PILOT_warning.html' %}
+                </div>
+            </div>
+
+            <!-- 第二排：图表 + 成员负载 -->
+            <div class="row row-deck row-cards mt-2">
+                <!-- 阶段分布图表 (稍微宽一点) -->
+                <div class="col-lg-5">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_stage_charts_Donut.html' %}
+                </div>
+
+                <!-- 成员负载统计 -->
+                <div class="col-lg-7">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_DOING_manager.html' %}
+                </div>
+            </div>
+
+            <!-- 第三排：风险预警表格 (全宽) -->
+            <div class="row row-cards mt-2">
+                <div class="col-12">
+                    {% include 'apps/app_panel/index_panel_card/panel_card_project_Stagnation_table.html' %}
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ========================================== -->
+        <!-- 右侧侧边栏 (占据 3/12 宽度) -->
+        <!-- ========================================== -->
+        <div class="col-lg-3">
+            <!-- 组统计列表：让它在右侧自然延伸 -->
+            <!-- 建议在 html 内部给这个卡片的 list 加一个 max-height 限制，防止无限长 -->
+            {% include 'apps/app_panel/index_panel_card/panel_card_project_groups.html' %}
+        </div>
+
+    </div>
+
+{% endblock %}

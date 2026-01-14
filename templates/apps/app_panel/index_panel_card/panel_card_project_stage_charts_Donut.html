@@ -1,0 +1,108 @@
+<div class="card" style="min-height: 380px;"> <!-- 给个最小高度，防止图表没加载出来时塌陷 -->
+    <div class="card-header">
+        <h3 class="card-title">各阶段项目分布</h3>
+    </div>
+    <div class="card-body">
+        <div id="chart-stages-donut" class="chart-lg"></div>
+    </div>
+</div>
+
+<!-- 引入 ApexCharts 脚本 -->
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // 准备数据
+        var stageLabels = [{% for k, v in stats.stage_counts.items %}"{{ k }}",{% endfor %}];
+        var stageData = [{% for k, v in stats.stage_counts.items %}{{ v }}, {% endfor %}];
+
+        window.ApexCharts && (new ApexCharts(document.getElementById('chart-stages-donut'), {
+            chart: {
+                type: "donut", // 【关键】改为环形图
+                fontFamily: 'inherit',
+                height: 320,   // 高度稍微调大一点以容纳图例
+                sparkline: {
+                    enabled: false
+                },
+                animations: {
+                    enabled: true
+                },
+            },
+            fill: {
+                opacity: 1,
+            },
+            series: stageData, // 环形图的 series 直接传数据数组
+            labels: stageLabels, // 对应的标签
+
+            // 提示框样式
+            tooltip: {
+                theme: 'dark'
+            },
+
+            // 网格配置
+            grid: {
+                strokeDashArray: 4,
+            },
+
+            // 颜色序列 (保持与之前一致的 Tabler 风格)
+            colors: ['#206bc4', '#4299e1', '#4263eb', '#ae3ec9', '#d6336c', '#f76707', '#74b816'],
+
+            // 图例配置 (放在底部，防止挤占左右空间)
+            legend: {
+                show: true,
+                position: 'bottom',
+                offsetY: 8,
+                markers: {
+                    width: 10,
+                    height: 10,
+                    radius: 100,
+                },
+                itemMargin: {
+                    horizontal: 8,
+                    vertical: 4
+                },
+            },
+
+            // 环形图中间显示总数 (可选，很帅)
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: '65%',
+                        labels: {
+                            show: true,
+                            name: {
+                                show: true,
+                                fontSize: '20px',
+                                fontFamily: 'inherit',
+                                color: undefined,
+                                offsetY: -10
+                            },
+                            value: {
+                                show: true,
+                                fontSize: '30px',
+                                fontFamily: 'inherit',
+                                color: undefined,
+                                offsetY: 16,
+                                formatter: function (val) {
+                                    return val
+                                }
+                            },
+                            total: {
+                                show: true,
+                                label: '活跃总数',
+                                showAlways: false,
+                                fontSize: '14px',
+                                fontFamily: 'inherit',
+                                color: 'inherit',
+                                formatter: function (w) {
+                                    return w.globals.seriesTotals.reduce((a, b) => {
+                                        return a + b
+                                    }, 0)
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+        })).render();
+    });
+</script>

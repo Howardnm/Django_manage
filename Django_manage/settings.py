@@ -127,7 +127,7 @@ STATICFILES_DIRS = (
 
 # 【新增配置】登录/注销后的跳转地址
 LOGIN_URL = 'login'          # 没登录时自动跳到这里
-LOGIN_REDIRECT_URL = 'user_profile' # 登录成功后跳到这里
+LOGIN_REDIRECT_URL = 'panel_index' # 登录成功后跳到这里
 LOGOUT_REDIRECT_URL = 'login'  # 注销后跳到这里
 
 ADMIN_URL = '/admin'

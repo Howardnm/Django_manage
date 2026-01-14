@@ -1,0 +1,37 @@
+<!-- 3. 中间：成员负载统计 -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">成员项目负载</h3>
+    </div>
+    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+        <table class="table table-vcenter card-table">
+            <thead>
+            <tr>
+                <th>成员</th>
+                <th>负责项目数</th>
+                <th>主要项目</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for member in member_stats_list %}
+                <tr>
+                    <td>
+                        <div class="d-flex py-1 align-items-center">
+                            <span class="avatar me-2">{{ member.avatar }}</span>
+                            <div class="flex-fill">
+                                <div class="font-weight-medium">{{ member.name }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td>
+                        <span class="badge bg-blue-lt">{{ member.project_count }}</span>
+                    </td>
+                    <td class="text-muted small">
+                        {{ member.projects|join:", " }}, ...
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
