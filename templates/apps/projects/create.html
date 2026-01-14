@@ -6,7 +6,7 @@
     <div class="page-header">
         <div class="row align-items-center">
             <div class="col">
-                <h2 class="page-title">所有项目</h2>
+                <h2 class="page-title">新增项目</h2>
             </div>
             <div class="col-auto ms-auto">
                 <a href="{% url 'project_list' %}" class="btn btn-danger">取消</a>
@@ -21,7 +21,7 @@
                 {% csrf_token %}
                 {{ form }}
                 <br>
-                <button type="submit" class="btn btn-primary">Submit</button>
+                <button type="submit" class="btn btn-primary">新增</button>
             </form>
         </div>
     </div>

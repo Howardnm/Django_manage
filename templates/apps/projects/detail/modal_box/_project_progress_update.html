@@ -14,7 +14,7 @@
                 <!-- 循环 View 传过来的 choices -->
                 {% for code, label in status_choices %}
                     <!-- 过滤掉特殊状态 -->
-                    {% if code != 'FAILED' and code != 'TERMINATED' %}
+                    {% if code != 'FAILED' and code != 'TERMINATED' and code != 'FEEDBACK' %}
                         <option value="{{ code }}" {% if node.status == code %}selected{% endif %}>
                             {{ label }}
                         </option>

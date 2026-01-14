@@ -1,57 +1,86 @@
 {% extends "base.html" %}
-
-{% block title %}项目管理{% endblock %}
+{% load project_extras %} <!-- 加载刚才写的 tag -->
 
 {% block content %}
-    <div class="page-header">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">所有项目</h2>
-            </div>
-            <div class="col-auto ms-auto">
-                <a href="{% url 'project_create' %}" class="btn btn-primary">新建</a>
-            </div>
-        </div>
-    </div>
-
-    <!-- 具体的表格内容 -->
+    {% include 'apps/projects/list_modules/header.html' %}
+    <!-- 工具栏：搜索与筛选 -->
+    {% include 'apps/projects/list_modules/tools_search_filter.html' %}
     <div class="card mt-3">
-        <div class="card-body">
-            <table class="table table-hover">
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
                 <tr>
-                    <th>name</th>
-                    <th>manager</th>
-                    <th>进度</th>
-                    <th>项目描述</th>
-                    <th>更新时间</th>
+                    <!-- 排序表头：点击切换排序 -->
+                    <!-- 逻辑：如果当前是 name，下次点就是 -name；否则默认 name -->
+                    <th>
+                        <a href="?{% url_replace sort='name'|default:current_sort %}{% if current_sort == 'name' %}&sort=-name{% endif %}" class="table-sort-header text-reset">
+                            项目名称{% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% url_replace sort='manager'|default:current_sort %}{% if current_sort == 'manager' %}&sort=-manager{% endif %}" class="table-sort-header text-reset">
+                            负责人{% if current_sort == 'manager' %}▲{% elif current_sort == '-manager' %}▼{% endif %}
+                        </a>
+                    </th>
+                    <th>进度概览</th> <!-- 计算字段，不支持数据库排序 -->
+                    <th>当前阶段</th>
+                    <th>
+                        <a href="?{% url_replace sort='created_at'|default:current_sort %}{% if current_sort == 'created_at' %}&sort=-created_at{% endif %}" class="table-sort-header text-reset">
+                            创建时间{% if current_sort == 'created_at' %}▲{% elif current_sort == '-created_at' %}▼{% endif %}
+                        </a>
+                    </th>
                     <th>操作</th>
                 </tr>
                 </thead>
                 <tbody>
-                {% for project in projects %}
+                {% for project in page_obj %}
+                    {% with info=project.get_progress_info %}
+                        <tr>
+                            <td><a href="{% url 'project_detail' project.pk %}" class="text-reset" tabindex="-1">{{ project.name }}</a></td>
+                            <td>
+                                <span class="avatar avatar-xs rounded me-1">{{ project.manager.username|slice:":1" }}</span>
+                                {{ project.manager.username }}
+                            </td>
+                            <td style="width: 20%">
+                                <div class="d-flex align-items-center mb-1">
+                                    <div>
+                                        <span class="text-secondary">{{ info.current_label }}</span>
+                                    </div>
+                                    <div class="ms-auto subheader me-2">{{ info.percent }}%</div>
+                                </div>
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar {% if info.is_terminated %}bg-danger{% elif info.percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                         style="width: {{ info.percent }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-muted text-wrap" style="max-width: 200px;">
+                                {{ info.current_remark|truncatechars:20 }}
+                            </td>
+                            <td class="text-muted">{{ project.created_at|date:"Y-m-d H:m" }}</td>
+                            <td>
+                                <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-outline-primary">管理</a>
+                            </td>
+                        </tr>
+                    {% endwith %}
+                {% empty %}
                     <tr>
-                        <td>{{ project.name }}</td>
-                        <td>{{ project.manager }}</td>
-                        <td>
-                            <div class="d-flex mb-2">
-                                <div>{{ project.get_current_stage_label }}</div>
-                                <div class="ms-auto">{{ project.get_progress_percent }}%</div>
+                        <td colspan="6" class="text-center py-4">
+                            <div class="empty">
+                                <div class="empty-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
+                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+                                        <circle cx="12" cy="12" r="9"/>
+                                        <line x1="9" y1="10" x2="9.01" y2="10"/>
+                                        <line x1="15" y1="10" x2="15.01" y2="10"/>
+                                        <path d="M9.5 15.25a3.5 3.5 0 0 1 5 0"/>
+                                    </svg>
+                                </div>
+                                <p class="empty-title">没有找到项目</p>
+                                <p class="empty-subtitle text-muted">
+                                    尝试更换搜索关键词或筛选条件
+                                </p>
                             </div>
-                            <div class="progress progress-sm">
-                                {% if project.get_progress_percent == 100 %}
-                                <div class="progress-bar bg-success" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
-                                {% elif project.get_current_stage_status == 'TERMINATED' %}
-                                <div class="progress-bar bg-danger" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
-                                {% else %}
-                                <div class="progress-bar bg-primary" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
-                                {% endif %}
-                            </div>
-                        </td>
-                        <td>{{ project.get_current_stage_remark }}</td>
-                        <td>{{ project.get_current_stage_updated_time }}</td>
-                        <td>
-                            <a href="{% url 'project_detail' project.pk %}">详细</a>
                         </td>
                     </tr>
                 {% endfor %}
@@ -59,4 +88,6 @@
             </table>
         </div>
     </div>
+    <br>
+    {% include 'apps/projects/list_modules/paginator.html' %}
 {% endblock %}

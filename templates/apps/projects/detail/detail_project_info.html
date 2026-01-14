@@ -16,7 +16,7 @@
                 </div>
                 <div class="datagrid-item">
                     <div class="datagrid-title">当前阶段</div>
-                    <div class="datagrid-content text-primary">{{ project.get_current_stage_label }}</div>
+                    <div class="datagrid-content text-primary">{{ project.get_progress_info.current_label }}</div>
                 </div>
             </div>
             <div class="hr-text">描述</div>
@@ -27,10 +27,10 @@
         <div class="card-footer">
             <div class="d-flex mb-2">
                 <div>总进度</div>
-                <div class="ms-auto">{{ project.get_progress_percent }}%</div>
+                <div class="ms-auto">{{ project.get_progress_info.percent }}%</div>
             </div>
             <div class="progress progress-sm">
-                <div class="progress-bar bg-primary" style="width: {{ project.get_progress_percent }}%" role="progressbar"></div>
+                <div class="progress-bar bg-primary" style="width: {{ project.get_progress_info.percent }}%" role="progressbar"></div>
             </div>
         </div>
     </div>
