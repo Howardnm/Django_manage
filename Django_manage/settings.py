@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'app_panel.apps.AppPanelConfig',
-    'app_project.apps.AppProjectConfig'
+    'app_project.apps.AppProjectConfig',
+    'app_user.apps.AppUserConfig'
 ]
 
 MIDDLEWARE = [
@@ -124,4 +125,9 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),  # 记得加“,”号
 )
 
-LOGIN_URL = '/admin/login'
+# 【新增配置】登录/注销后的跳转地址
+LOGIN_URL = 'login'          # 没登录时自动跳到这里
+LOGIN_REDIRECT_URL = 'user_profile' # 登录成功后跳到这里
+LOGOUT_REDIRECT_URL = 'login'  # 注销后跳到这里
+
+ADMIN_URL = '/admin'

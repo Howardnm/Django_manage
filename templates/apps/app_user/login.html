@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8"/>
+    <title>登录 - 项目管理系统</title>
+    <!-- 引入 Tabler CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0/dist/css/tabler.min.css">
+</head>
+<body class="d-flex flex-column">
+<div class="page page-center">
+    <div class="container container-tight py-4">
+        <div class="text-center mb-4">
+            <h2>🚀 项目进度管理系统</h2>
+        </div>
+        <div class="card card-md">
+            <div class="card-body">
+                <h2 class="h2 text-center mb-4">请登录您的账户</h2>
+                <form method="post" autocomplete="off">
+                    {% csrf_token %}
+
+                    <!-- 错误提示 -->
+                    {% if form.errors %}
+                        <div class="alert alert-danger">用户名或密码错误</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label">用户名</label>
+                        {{ form.username }}
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label">密码</label>
+                        {{ form.password }}
+                    </div>
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        <div class="text-center text-muted mt-3">
+            还没有账号? <a href="{% url 'register' %}" tabindex="-1">立即注册</a>
+        </div>
+    </div>
+</div>
+</body>
+</html>

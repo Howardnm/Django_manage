@@ -1,86 +1,36 @@
-    <header class="navbar navbar-expand-md d-print-none">
-        <div class="container-xl">
+<header class="navbar navbar-expand-md d-print-none">
+    <div class="container-xl">
 
-            <!-- 1. 手机端汉堡按钮 (虽然侧边栏已有，但Tabler标准布局通常保留一个以防万一，或者可以去掉) -->
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false"
-                    aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+        <!-- 1. 手机端汉堡按钮 (虽然侧边栏已有，但Tabler标准布局通常保留一个以防万一，或者可以去掉) -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu" aria-controls="navbar-menu" aria-expanded="false"
+                aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
 
-            <!-- 2. 左侧：全局搜索框 (项目管理系统必备) -->
-            <div class="collapse navbar-collapse" id="navbar-menu">
-                <div>
-                    <form action="../apps/app_panel" method="get" autocomplete="off" novalidate>
-                        <div class="input-icon">
+        <!-- 2. 左侧：全局搜索框 (项目管理系统必备) -->
+        <div class="collapse navbar-collapse" id="navbar-menu">
+            <div>
+                <form action="../apps/app_panel" method="get" autocomplete="off" novalidate>
+                    <div class="input-icon">
                         <span class="input-icon-addon">
                             <!-- Icon: Search -->
                             <i class="ti ti-search"></i>
                         </span>
-                            <input type="text" value="" class="form-control" placeholder="搜索项目、任务或成员..." aria-label="Search in website">
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            <!-- 3. 右侧：工具图标区 -->
-            <div class="navbar-nav flex-row order-md-last">
-
-                <!-- 深色/浅色模式切换 -->
-                <div class="d-none d-md-flex">
-                    <a href="?theme=dark" class="nav-link px-0 hide-theme-dark" data-bs-toggle="tooltip" data-bs-placement="bottom" aria-label="Enable dark mode"
-                       data-bs-original-title="Enable dark mode">
-                        <i class="ti ti-moon fs-2"></i>
-                    </a>
-                    <a href="?theme=light" class="nav-link px-0 hide-theme-light" data-bs-toggle="tooltip" data-bs-placement="bottom" aria-label="Enable light mode"
-                       data-bs-original-title="Enable light mode">
-                        <i class="ti ti-sun fs-2"></i>
-                    </a>
-                </div>
-
-                <!-- 消息通知 (Notifications) -->
-                <div class="nav-item dropdown d-none d-md-flex me-3">
-                    <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications" aria-expanded="false">
-                        <i class="ti ti-bell fs-2"></i>
-                        <!-- 红点提醒 -->
-                        <span class="badge bg-red"></span>
-                    </a>
-
-                    <!-- 通知下拉面板 -->
-                    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
-                        <div class="card">
-                            <div class="card-header">
-                                <h3 class="card-title">最近消息</h3>
-                                <div class="btn-close ms-auto" data-bs-dismiss="dropdown"></div>
-                            </div>
-                            <div class="list-group list-group-flush list-group-hoverable">
-                                <!-- 消息项 1 -->
-                                <div class="list-group-item">
-                                    <div class="row align-items-center">
-                                        <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
-                                        <div class="col text-truncate">
-                                            <a href="#" class="text-body d-block">系统警告</a>
-                                            <div class="d-block text-secondary text-truncate mt-n1">服务器负载过高，请检查...</div>
-                                        </div>
-                                        <div class="col-auto">
-                                            <a href="#" class="list-group-item-actions"><i class="ti ti-star text-muted"></i></a>
-                                        </div>
-                                    </div>
-                                </div>
-                                <!-- 消息项 2 -->
-                                <div class="list-group-item">
-                                    <div class="row align-items-center">
-                                        <div class="col-auto"><span class="status-dot d-block"></span></div>
-                                        <div class="col text-truncate">
-                                            <a href="#" class="text-body d-block">新任务分配</a>
-                                            <div class="d-block text-secondary text-truncate mt-n1">张三 给您分配了 "重构首页" 任务</div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <input type="text" value="" class="form-control" placeholder="搜索项目、任务或成员..." aria-label="Search in website">
                     </div>
-                </div>
-
+                </form>
             </div>
         </div>
-    </header>
+
+        <!-- 3. 右侧：工具图标区 -->
+        <div class="navbar-nav flex-row order-md-last">
+
+            <!-- 深色/浅色模式切换 -->
+            {% include 'includes/header_modules/header_dark_light.html' %}
+            <!-- 消息通知 (Notifications) -->
+            {% include 'includes/header_modules/header_notifictions.html' %}
+            <!-- 用户中心 -->
+            {% include 'includes/header_modules/header_user.html' %}
+        </div>
+    </div>
+</header>

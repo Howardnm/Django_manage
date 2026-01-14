@@ -13,7 +13,7 @@ from .mixins import ProjectPermissionMixin
 # 1. 项目列表 (查询与展示)
 # ==========================================
 class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
-    # 记得继承 ProjectPermissionMixin
+    # 指定权限：<app_label>.add_<model_name>
     permission_required = 'app_project.view_project'
 
     def get(self, request):
@@ -60,7 +60,12 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
 # ==========================================
 # 2. 项目创建
 # ==========================================
-class ProjectCreateView(LoginRequiredMixin, View):
+class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    # 指定权限：<app_label>.add_<model_name>
+    permission_required = 'app_project.view_project'
+    # 4. 如果没权限，直接抛出 403 错误（而不是跳回登录页）
+    raise_exception = True
+
     template_name = 'apps/projects/create.html'
 
     def get(self, request):

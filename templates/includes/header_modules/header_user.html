@@ -1,0 +1,21 @@
+<!-- 用户中心 -->
+<div class="nav-item dropdown">
+    <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown">
+        <!-- 显示用户首字母 -->
+        <span class="avatar avatar-sm">{{ request.user.username|slice:":1"|upper }}</span>
+        <div class="d-none d-xl-block ps-2">
+            <div>{{ request.user.username }}</div>
+            <div class="mt-1 small text-muted">{{ request.user.profile.department|default:"普通成员" }}</div>
+        </div>
+    </a>
+    <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+        <a href="{% url 'user_profile' %}" class="dropdown-item">个人中心</a>
+        <div class="dropdown-divider"></div>
+
+        <!-- 注销按钮 (Django 5.0 需要用 form post 提交，或者用简单的 js 提交) -->
+        <form action="{% url 'logout' %}" method="post" id="logout-form">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item">退出登录</button>
+        </form>
+    </div>
+</div>
