@@ -3,58 +3,42 @@ from django.http import HttpResponse
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.db.models import Q
 from .models import Project, ProjectNode, ProjectStage
 from .forms import ProjectForm, ProjectNodeUpdateForm
 from .mixins import ProjectPermissionMixin
-import json # 记得引入 json
-from django.core.serializers.json import DjangoJSONEncoder # 用于处理 datetime
+from .utils.calculate_project_gantt import get_project_gantt_data # 【关键】导入甘特图工具函数
+from .utils.filters import ProjectFilter # 导入刚才定义的类
 
 
 # ==========================================
 # 1. 项目列表 (查询与展示)
 # ==========================================
 class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
-    # 指定权限：<app_label>.add_<model_name>
     permission_required = 'app_project.view_project'
 
     def get(self, request):
-        # 1. 构建基础查询集 (预加载)
-        queryset = Project.objects.prefetch_related('nodes')
+        # 1. 基础数据 + 权限控制 (这部分是你的核心业务，不能动)
+        base_qs = Project.objects.prefetch_related('nodes')
+        base_qs = self.get_permitted_queryset(base_qs)
 
-        # 2. 【核心修改】调用 Mixin 进行权限隔离
-        queryset = self.get_permitted_queryset(queryset)
+        # 2. 【核心修改】使用 django-filter
+        # 语法: FilterSet(GET参数, queryset=基础集, request=请求对象)
+        # 传入 request 是为了在 filter 类里能用 self.request.user
+        filter_set = ProjectFilter(request.GET, queryset=base_qs, request=request)
 
-        # 3. 搜索功能 (在已有权限范围内搜索)
-        search_query = request.GET.get('q', '').strip()
-        if search_query:
-            queryset = queryset.filter(
-                Q(name__icontains=search_query) |
-                Q(manager__username__icontains=search_query) |
-                Q(description__icontains=search_query)
-            )
+        # 获取过滤后的结果 (filter_set.qs 自动执行了所有逻辑)
+        queryset = filter_set.qs
 
-        # 4. 筛选功能
-        manager_filter = request.GET.get('manager', '')
-        if manager_filter == 'me':
-            queryset = queryset.filter(manager=request.user)
-
-        # 5. 排序功能
-        sort_by = request.GET.get('sort', '-created_at')
-        allowed_sorts = ['name', '-name', 'created_at', '-created_at', 'manager', '-manager']
-        if sort_by not in allowed_sorts:
-            sort_by = '-created_at'
-        queryset = queryset.order_by(sort_by)
-
-        # 6. 分页
+        # 3. 分页 (代码不变)
         paginator = Paginator(queryset, 10)
         page_obj = paginator.get_page(request.GET.get('page'))
 
         context = {
             'page_obj': page_obj,
-            'search_query': search_query,
-            'current_manager': manager_filter,
-            'current_sort': sort_by,
+            'filter': filter_set,  # 【关键】把 filter 对象传给前端
+            # 【额外好处】filter_set.form 可以直接在模板里渲染出表单（如果你想用 Django Form 的话）
+            # 但你用的是 Tabler 手写 HTML，所以依然回显参数：
+            'current_sort': request.GET.get('sort', ''),
         }
         return render(request, 'apps/projects/list.html', context)
 
@@ -89,54 +73,24 @@ class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 # ==========================================
 class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, View):
     def get(self, request, pk):
-        # 1. 获取项目
+        # 1. 获取数据 & 权限检查
         project = get_object_or_404(Project.objects.prefetch_related('nodes'), pk=pk)
-
-        # 2. 【安全】行级权限检查
         self.check_project_permission(project)
 
         nodes = project.cached_nodes
+        # 3. 【核心调用】一行代码搞定甘特图数据
+        gantt_data_json = get_project_gantt_data(project)
 
-        # --- 甘特图数据准备 ---
-        gantt_data = []
-        # 起始时间默认为项目创建时间
-        start_time = project.created_at
-
-        for node in nodes:
-            # 只有已完成、进行中、终止、失败的节点才有明确的时间段意义
-            # 未开始的节点不画甘特图
-            if node.status == 'PENDING':
-                continue
-
-            end_time = node.updated_at
-
-            # 构造 ApexCharts 需要的数据格式
-            # 颜色逻辑：完成=绿色，进行中=蓝色，终止/失败=红色
-            color = '#2fb344'  # green
-            if node.status == 'DOING': color = '#206bc4'  # blue
-            if node.status in ['TERMINATED', 'FAILED']: color = '#d6336c'  # red
-            if node.stage == 'FEEDBACK': color = '#f59f00'  # yellow
-
-            gantt_data.append({
-                'x': node.get_stage_display(),  # 阶段名作为 Y 轴
-                'y': [
-                    int(start_time.timestamp() * 1000),  # JS 需要毫秒级时间戳
-                    int(end_time.timestamp() * 1000)
-                ],
-                'fillColor': color,
-                'status': node.get_status_display()  # 传给前端做 Tooltip
-            })
-
-            # 下一个节点的开始时间 = 当前节点的结束时间
-            start_time = end_time
-
+        # 2. 组装 Context
         context = {
             'project': project,
-            'nodes': nodes,  # 使用 Model 中的缓存属性
-            # 将数据转为 JSON 字符串传给前端
-            'gantt_data_json': json.dumps(gantt_data, cls=DjangoJSONEncoder)
+            'nodes': nodes,
+            'gantt_data_json': gantt_data_json
         }
+
         return render(request, 'apps/projects/detail.html', context)
+
+
 
 
 # ==========================================

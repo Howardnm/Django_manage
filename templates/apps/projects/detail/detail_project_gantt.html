@@ -1,91 +1,194 @@
-<!-- 甘特图卡片 -->
+<!-- 卡片容器 -->
 <div class="card">
     <div class="card-header">
-        <h3 class="card-title">项目时间线 (Gantt)</h3>
-        <div class="card-actions">
-            <!-- 这里可以放一些图例说明 -->
-            <span class="badge bg-green-lt me-2">已完成</span>
-            <span class="badge bg-blue-lt me-2">进行中</span>
-            <span class="badge bg-yellow-lt">客户意见</span>
-            <span class="badge bg-red-lt">异常/终止</span>
-        </div>
+        <h3 class="card-title">项目进度甘特图</h3>
     </div>
-    <div class="card-body">
-        <!-- 图表容器 -->
-        <div id="chart-gantt" style="min-height: 250px;"></div>
+    <div class="card-body p-0">
+        <!-- 图表挂载点：设置 overflow hidden 防止多余滚动条 -->
+        <div id="project-gantt" style="width:100%; overflow: hidden"></div>
     </div>
 </div>
 
-
-<!-- 引入脚本 -->
-<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
+    // 等待 DOM 加载完成再执行，防止找不到 id="project-gantt" 的元素
     document.addEventListener("DOMContentLoaded", function () {
-        // 1. 获取后端传来的数据
-        var seriesData = JSON.parse('{{ gantt_data_json|safe }}');
 
-        // 如果没有数据（项目刚建，全是 PENDING），显示提示或隐藏
-        if (seriesData.length === 0) {
-            document.getElementById('chart-gantt').innerHTML =
-                '<div class="text-center text-muted py-5">暂无进度数据，开始推进项目后将显示甘特图</div>';
+        // 1. 获取后端 Django 传过来的 JSON 数据
+        // |safe 过滤器防止 Django 对引号进行转义
+        var projectData = JSON.parse('{{ gantt_data_json|safe }}');
+
+        // 2. 数据判空处理
+        if (!projectData || projectData.length === 0) {
+            document.getElementById('project-gantt').innerHTML =
+                '<div class="text-center text-muted py-5">暂无进度数据</div>';
             return;
         }
 
-        // 2. 初始化图表
-        var options = {
-            series: [
-                {
-                    data: seriesData
-                }
-            ],
-            chart: {
-                height: 300,
-                type: 'rangeBar', // 【关键】区间条形图
-                fontFamily: 'inherit',
-                toolbar: {show: false},
-                animations: {enabled: true}
-            },
-            plotOptions: {
-                bar: {
-                    horizontal: true, // 横向
-                    barHeight: '60%', // 条形高度
-                    rangeBarGroupRows: true // 允许同一行显示多个条形（如果阶段名相同）
-                }
-            },
-            xaxis: {
-                type: 'datetime', // X轴是时间格式
-                labels: {
-                    datetimeFormatter: {
-                        year: 'yyyy',
-                        month: 'MMM \'yy',
-                        day: 'dd MMM',
-                        hour: 'HH:mm'
-                    }
-                }
-            },
-            tooltip: {
-                custom: function ({series, seriesIndex, dataPointIndex, w}) {
-                    var data = w.globals.initialSeries[seriesIndex].data[dataPointIndex];
-                    var start = new Date(data.y[0]).toLocaleDateString();
-                    var end = new Date(data.y[1]).toLocaleDateString();
-                    return '<div class="arrow_box" style="padding:10px;">' +
-                        '<b>' + data.x + '</b><br>' +
-                        '<span class="text-muted">状态: ' + data.status + '</span><br>' +
-                        '<span class="text-muted">' + start + ' - ' + end + '</span>' +
-                        '</div>';
-                }
-            },
-            grid: {
-                xaxis: {
-                    lines: {show: true}
-                },
-                yaxis: {
-                    lines: {show: false}
-                },
-            }
-        };
+        // 3. 动态高度计算逻辑
+        // =======================================================
+        var rowHeight = 24;      // 【配置】每一行内容的高度 (像素)
+        var minRows = 5;         // 【配置】最少显示几行 (防止数据太少时图表太扁)
 
-        var chart = new ApexCharts(document.querySelector("#chart-gantt"), options);
-        chart.render();
+        // 【关键修改】头部预留高度
+        // 之前是 100，现在头部变窄了，改为 65 左右即可
+        var headerHeight = 65;
+
+        // 计算可见行数：取实际数据长度和最小行数中的最大值
+        var visibleRows = Math.max(projectData.length, minRows);
+
+        // 计算总高度：行数 * 行高 + 头部高度
+        var calculatedHeight = (visibleRows * rowHeight) + headerHeight;
+
+        // 设置最大高度限制 (例如 300px)，超过则内部滚动，防止占满屏幕
+        var maxHeight = 280;
+
+        // 最终决定图表容器的高度
+        var chartHeight = Math.min(calculatedHeight, maxHeight);
+
+
+        // 4. 初始化 Highcharts Gantt
+        Highcharts.ganttChart('project-gantt', {
+
+            // --- 图表基础配置 ---
+            chart: {
+                height: chartHeight, // 应用上面计算出来的动态高度
+                style: {
+                    fontFamily: 'inherit' // 继承网页字体 (Tabler 风格)
+                },
+                plotBackgroundColor: 'rgba(128,128,128,0.02)', // 绘图区背景色 (极淡的灰)
+                plotBorderColor: 'rgba(128,128,128,0.1)',      // 绘图区边框色
+                plotBorderWidth: 1,                            // 绘图区边框宽度
+            },
+
+            // --- 隐藏图表自带标题 (使用卡片标题) ---
+            title: {text: null},
+
+            // --- 全局绘图选项 ---
+            plotOptions: {
+                series: {
+                    borderRadius: 5,        // 条形图圆角半径 (5px)
+                    groupPadding: 0,        // 去除分组间的间距 (让条形更紧凑)
+                    borderWidth: 0,         // 去除条形图边框
+                    shadow: false,          // 关闭阴影
+
+                    // 数据标签 (显示在条形图上的文字)
+                    dataLabels: [{
+                        enabled: true,          // 开启左侧标签
+                        align: 'left',          // 文字左对齐
+                        // 【关键修改】使用 Highcharts 模板语法
+                        // 逻辑：如果 node_round 大于 1，就显示 (第x轮)，否则只显示名字
+                        format: '{point.name}-{point.node_round}',
+                        padding: 0,             // 内边距 0
+                        y: 0,                   // 垂直偏移量
+                        style: {
+                            fontWeight: 'normal',   // 字体粗细
+                            textOutline: 'none',    // 去除文字描边
+                            fontSize: '11px'        // 字体大小
+                        }
+                    }]
+                }
+            },
+
+            // --- 数据源 ---
+            series: [{
+                name: 'Project',
+                data: projectData // 填入后端数据
+            }],
+
+            // --- 提示框配置 (鼠标悬停) ---
+            tooltip: {
+                // 头部显示内容
+                headerFormat: '<span style="font-size: 10px">{point.key}</span><br/>',
+                // 具体的提示内容：显示状态、开始时间、结束时间
+                pointFormat: '<b>{point.status_label}</b><br/>{point.start:%Y-%m-%d} → {point.end:%Y-%m-%d}'
+            },
+
+            // --- Y轴配置 (左侧阶段名称列表) ---
+            yAxis: {
+                type: 'treegrid',       // 树形表格模式
+                uniqueNames: true,      // 允许同名节点
+                staticScale: rowHeight, // 【关键】固定行高，与上面计算的高度一致
+                minTickInterval: 1,     // 刻度间隔
+                grid: {
+                    borderColor: 'rgba(128,128,128,0.1)', // 网格线颜色
+                    borderWidth: 1,                       // 网格线宽度
+                    columns: [{
+                        // 左侧第一列配置
+                        title: {
+                            text: '阶段流程',         // 列标题
+                            style: {fontSize: '12px'} // 标题字体变小
+                        },
+                        labels: {
+                            align: 'left',            // 标签左对齐
+                            style: {
+                                color: '#1d273b',     // 字体颜色
+                                fontSize: '12px',     // 【修改】字体改小
+                                fontWeight: '500'     // 字体字重
+                            },
+                            x: 15                     // 向右偏移 15px
+                        }
+                    }]
+                }
+            },
+
+            // --- X轴配置 (顶部时间轴) ---
+            xAxis: [{
+                // 当前时间指示线 (竖虚线)
+                currentDateIndicator: {
+                    color: '#2caffe',       // 线的颜色
+                    dashStyle: 'ShortDot',  // 虚线样式
+                    width: 2,               // 线宽
+                    label: {format: ''}     // 不显示 label 文字
+                },
+
+                // 网格线配置
+                grid: {
+                    borderWidth: 1,
+                    borderColor: 'rgba(128,128,128,0.1)',
+
+                    // 【核心修改】这里控制头部时间轴的高度！
+                    cellHeight: 25  // 强制将表头单元格高度设为 25px (之前默认大概是 40-50px)
+                },
+
+                tickPixelInterval: 150, // 时间刻度密度 (越小越密)
+
+                // 时间标签显示格式
+                dateTimeLabelFormats: {
+                    day: {list: ['%d', '%a']},      // 日模式显示：日期 + 星期
+                    week: {list: ['%m-%d', '%W周']}, // 周模式显示：月-日 + 周数
+                    month: {list: ['%Y-%m', '%Q']}   // 月模式
+                },
+
+                // 轴标签样式 (时间文字)
+                labels: {
+                    style: {
+                        fontSize: '10px' // 【修改】时间文字改小，适应变矮的高度
+                    },
+                    y: -5 // 【修改】微调文字位置，让它在变矮的格子里居中
+                }
+            }],
+
+            // --- 底部导航器 (缩略图) ---
+            navigator: {
+                enabled: true,  // 开启
+                height: 15,     // 【修改】导航器高度也改小一点
+                series: {
+                    type: 'gantt',
+                    pointPadding: 0
+                },
+                yAxis: {
+                    min: 0,
+                    max: 7,
+                    reversed: true,
+                    categories: []
+                }
+            },
+
+            // --- 滚动条 ---
+            scrollbar: {enabled: true},
+
+            // --- 版权信息 ---
+            credits: {enabled: false} // 隐藏 Highcharts.com 字样
+        });
     });
 </script>

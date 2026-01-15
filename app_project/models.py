@@ -25,7 +25,7 @@ class ProjectStage(models.TextChoices):
     MID_TEST = 'MID_TEST', '⑦ 客户中试'  # 可能多次
     MASS_PROD = 'MASS_PROD', '⑧ 客户量产意向'
     ORDER = 'ORDER', '⑨ 客户下单情况'
-    FEEDBACK = 'FEEDBACK', '客户意见'
+    FEEDBACK = 'FEEDBACK', '🎗️客户意见'
 
 
 # 2. 项目主体模型

@@ -1,36 +1,41 @@
 <div class="card-body border-bottom py-3">
-    <!-- 工具栏：搜索与筛选 -->
-    <!-- 使用 GET 方法提交表单，参数会自动拼接到 URL -->
-    <form method="GET" class="d-flex">
-        <!-- 隐藏域：保留当前的排序参数，防止搜索后排序重置 -->
-        {% if current_sort %}
-            <input type="hidden" name="sort" value="{{ current_sort }}">
-        {% endif %}
+    <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
 
-        <div class="text-muted">
-            筛选:
-            <div class="d-inline-block">
-                <select name="manager" class="form-select form-select-sm" onchange="this.form.submit()">
-                    <option value="">所有负责人</option>
-                    <option value="me" {% if current_manager == 'me' %}selected{% endif %}>我的项目</option>
-                </select>
-            </div>
-        </div>
+        {% for field in filter.form %}
+            <!-- 1. 隐藏字段直接渲染 -->
+            {% if field.is_hidden %}
+                {{ field }}
 
-        <div class="ms-auto text-muted">
-            搜索:
-            <div class="ms-2 d-inline-block">
-                <div class="input-icon">
+                <!-- 2. 搜索框：带图标 -->
+            {% elif field.name == 'q' %}
+                <div class="d-inline-block">
+                    <div class="input-icon">
                         <span class="input-icon-addon">
-                            <!-- Icon -->
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                                 stroke-linecap="round" stroke-linejoin="round">
-                                <path stroke="none" d="M0 0h24v24H0z" fill="none"/><circle cx="10" cy="10" r="7"/><line x1="21" y1="21" x2="15" y2="15"/></svg>
+                            <!-- 【修改】替换为 Class 写法 -->
+                            <i class="ti ti-search"></i>
                         </span>
-                    <input type="text" name="q" value="{{ search_query|default:'' }}" class="form-control form-control-sm" placeholder="搜索项目名称/人员...">
+                        {{ field }}
+                    </div>
                 </div>
-            </div>
-            <button type="submit" class="btn btn-sm btn-ghost-secondary">查询</button>
+
+                <!-- 3. 其他字段 -->
+            {% else %}
+                <div class="d-inline-block">
+                    {{ field }}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <div class="ms-auto">
+            <!-- 查询按钮图标 -->
+            <button type="submit" class="btn btn-primary btn-icon" aria-label="Search">
+                <!-- 【修改】替换为 Class 写法 -->
+                <i class="ti ti-search"></i>
+            </button>
+
+            {% if request.GET.q or request.GET.manager %}
+                <a href="{% url 'project_list' %}" class="btn btn-ghost-danger ms-2">重置</a>
+            {% endif %}
         </div>
     </form>
 </div>

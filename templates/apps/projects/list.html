@@ -10,25 +10,46 @@
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
                 <tr>
-                    <!-- 排序表头：点击切换排序 -->
-                    <!-- 逻辑：如果当前是 name，下次点就是 -name；否则默认 name -->
+                    <!-- 1. 项目名称 -->
                     <th>
-                        <a href="?{% url_replace sort='name'|default:current_sort %}{% if current_sort == 'name' %}&sort=-name{% endif %}" class="table-sort-header text-reset">
-                            项目名称{% if current_sort == 'name' %}▲{% elif current_sort == '-name' %}▼{% endif %}
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            项目名称
+                            <!-- 【修改】使用 ti-arrow-up / ti-arrow-down -->
+                            {% if current_sort == 'name' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
                         </a>
                     </th>
+
+                    <!-- 2. 负责人 -->
                     <th>
-                        <a href="?{% url_replace sort='manager'|default:current_sort %}{% if current_sort == 'manager' %}&sort=-manager{% endif %}" class="table-sort-header text-reset">
-                            负责人{% if current_sort == 'manager' %}▲{% elif current_sort == '-manager' %}▼{% endif %}
+                        <a href="?{% url_replace sort='manager'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            负责人
+                            {% if current_sort == 'manager' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-manager' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
                         </a>
                     </th>
-                    <th>进度概览</th> <!-- 计算字段，不支持数据库排序 -->
+
+                    <th>进度概览</th>
                     <th>当前阶段</th>
+
+                    <!-- 3. 创建时间 -->
                     <th>
-                        <a href="?{% url_replace sort='created_at'|default:current_sort %}{% if current_sort == 'created_at' %}&sort=-created_at{% endif %}" class="table-sort-header text-reset">
-                            创建时间{% if current_sort == 'created_at' %}▲{% elif current_sort == '-created_at' %}▼{% endif %}
+                        <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            创建时间
+                            {% if current_sort == 'created_at' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-created_at' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
                         </a>
                     </th>
+
                     <th>操作</th>
                 </tr>
                 </thead>

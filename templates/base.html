@@ -5,13 +5,13 @@
     <meta charset="UTF-8">
     <title>{% block title %}Tabler系统{% endblock %}</title>
     <!-- 引入 CSS (Tabler & Icons) -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/css/tabler.min.css"/>
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
     <!-- Tabler Icons Webfont -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css"/>
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
     <!-- apexcharts -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/apexcharts@5.3.6/dist/apexcharts.min.css">
+    <link rel="stylesheet" href="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"/>
     <!-- 引入 HTMX, 建议放在 <head> 中 -->
-    <script src="https://cdn.jsdelivr.net/npm/htmx.org@2.0.8/dist/htmx.min.js"></script>
+    <script src="{% static 'htmx.org/core-2.0.8/dist/htmx.min.js' %}"></script>
 </head>
 <body>
 <div class="page">
@@ -38,7 +38,9 @@
         event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
     });
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.4.0/dist/js/tabler.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/apexcharts@5.3.6/dist/apexcharts.min.js"></script>
+<script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+<script src="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"></script>
+<script src="{% static 'highcharts/core-12.5.0/highcharts-gantt.js' %}"></script>
+<script src="{% static 'highcharts/core-12.5.0/modules/exporting.js' %}"></script>
 </body>
 </html>

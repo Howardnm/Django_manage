@@ -3,6 +3,7 @@ from urllib.parse import urlencode
 
 register = template.Library()
 
+
 @register.simple_tag(takes_context=True)
 def url_replace(context, **kwargs):
     """
@@ -12,3 +13,18 @@ def url_replace(context, **kwargs):
     query = context['request'].GET.dict()
     query.update(kwargs)
     return urlencode(query)
+
+
+@register.filter
+def sort_toggle(field_name, current_sort):
+    """
+    生成反转排序的参数值
+    如果当前是 name，返回 -name
+    如果当前是 -name，返回 name
+    如果当前是其他，返回 name (默认正序)
+    """
+    if current_sort == field_name:
+        return f"-{field_name}"
+    else:
+        # 包括 current_sort == f"-{field_name}" 的情况，也返回正序
+        return field_name
