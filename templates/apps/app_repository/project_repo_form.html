@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header">
+    <div class="page-header d-print-none">
         <div class="row align-items-center">
             <div class="col">
                 <div class="page-pretitle">档案管理</div>
                 <h2 class="page-title">编辑项目档案: {{ project.name }}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'project_detail' project.id %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i> 返回详情
+                </a>
             </div>
         </div>
     </div>
@@ -13,78 +18,135 @@
     <form method="post" class="mt-3">
         {% csrf_token %}
 
+        <!-- 显示表单错误 (防呆设计) -->
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger" role="alert">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
         <div class="row row-cards">
-            <!-- 卡片1: 商业与关系 -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">1. 商业关系关联</h3>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">直接客户 (Tier 1)</label>
-                        {{ form.customer }}
-                    </div>
 
-                    <!-- 【新增】业务员 -->
-                    <div class="mb-3">
-                        <label class="form-label">我司业务员</label>
-                        {{ form.salesperson }}
+            <!-- ======================================================= -->
+            <!-- 左侧：商业与关系 (蓝色系) -->
+            <!-- ======================================================= -->
+            <div class="col-lg-6">
+                <div class="card h-100">
+                    <!-- 顶部蓝色状态条 -->
+                    <div class="card-status-top bg-blue"></div>
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-building-store me-2 text-blue"></i>商业关系关联
+                        </h3>
                     </div>
+                    <div class="card-body">
 
-                    <div class="mb-3">
-                        <label class="form-label">终端主机厂 (OEM)</label>
-                        {{ form.oem }}
+                        <!-- 客户区块 -->
+                        <div class="mb-3">
+                            <label class="form-label required">直接客户 (Tier 1)</label>
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-user"></i></span>
+                                {{ form.customer }}
+                            </div>
+                            <small class="form-hint">指直接向我司下达订单的客户方。</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">终端主机厂 (OEM)</label>
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-car"></i></span>
+                                {{ form.oem }}
+                            </div>
+                            <small class="form-hint">产品的最终应用品牌（如比亚迪、特斯拉）。</small>
+                        </div>
+
+                        <div class="hr-text">内部归属</div>
+
+                        <!-- 业务员区块 -->
+                        <div class="mb-3">
+                            <label class="form-label">我司跟进业务员</label>
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-id-badge-2"></i></span>
+                                {{ form.salesperson }}
+                            </div>
+                        </div>
+
                     </div>
                 </div>
             </div>
 
-            <!-- 卡片2: 产品与成本 -->
+            <!-- ======================================================= -->
+            <!-- 右侧：产品与成本 (绿色系) -->
+            <!-- ======================================================= -->
             <div class="col-lg-6">
-                <div class="card">
+                <div class="card h-100">
+                    <!-- 顶部绿色状态条 -->
+                    <div class="card-status-top bg-green"></div>
                     <div class="card-header">
-                        <h3 class="card-title">2. 产品与成本定义</h3>
+                        <h3 class="card-title">
+                            <i class="ti ti-package me-2 text-green"></i>产品与成本定义
+                        </h3>
                     </div>
                     <div class="card-body">
+
+                        <!-- 产品信息 -->
                         <div class="row">
-                            <div class="col-6 mb-3">
-                                <label class="form-label">产品名称</label>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">客户产品名称</label>
                                 {{ form.product_name }}
                             </div>
-                            <div class="col-6 mb-3">
-                                <label class="form-label">产品代码</label>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">产品代码 / 零件号</label>
                                 {{ form.product_code }}
                             </div>
                         </div>
 
-                        <div class="mb-3">
+                        <div class="mb-4">
                             <label class="form-label">选用材料</label>
-                            {{ form.material }}
+                            <div class="input-icon">
+                                <span class="input-icon-addon"><i class="ti ti-flask"></i></span>
+                                {{ form.material }}
+                            </div>
                         </div>
 
-                        <div class="row">
-                            <div class="col-6 mb-3">
-                                <label class="form-label">目标成本 (RMB/kg)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">¥</span>
-                                    {{ form.target_cost }}
+                        <!-- 成本信息 (带背景强调) -->
+                        <div class="bg-light-lt p-3 rounded border border-yellow">
+                            <label class="form-label mb-2 fw-bold text-yellow">财务指标</label>
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">目标成本 (Cost)</label>
+                                    <div class="input-group input-group-flat">
+                                        <span class="input-group-text text-green">¥</span>
+                                        {{ form.target_cost }}
+                                        <span class="input-group-text">/kg</span>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="col-6 mb-3">
-                                <label class="form-label">竞品售价 (RMB/kg)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">¥</span>
-                                    {{ form.competitor_price }}
+                                <div class="col-md-6">
+                                    <label class="form-label small text-muted">竞品售价 (Price)</label>
+                                    <div class="input-group input-group-flat">
+                                        <span class="input-group-text text-orange">¥</span>
+                                        {{ form.competitor_price }}
+                                        <span class="input-group-text">/kg</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
+
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="d-flex mt-3">
-            <a href="{% url 'project_detail' project.id %}" class="btn btn-link link-secondary">返回详情</a>
-            <button type="submit" class="btn btn-primary ms-auto">保存信息</button>
+        <!-- 底部操作栏 -->
+        <div class="card mt-3">
+            <div class="card-body">
+                <div class="d-flex">
+                    <a href="{% url 'project_detail' project.id %}" class="btn btn-link link-secondary">取消</a>
+                    <button type="submit" class="btn btn-primary ms-auto">
+                        <i class="ti ti-device-floppy me-2"></i> 保存档案信息
+                    </button>
+                </div>
+            </div>
         </div>
     </form>
 {% endblock %}

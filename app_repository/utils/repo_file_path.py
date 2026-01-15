@@ -13,7 +13,7 @@ def repo_file_path(instance, filename):
 
     # 获取当前年月日，避免单文件夹文件过多
     from django.utils import timezone
-    date_path = timezone.now().strftime("%Y%m%d")
+    date_path = timezone.now().strftime("%Y-%m-%d")
 
     # instance._meta.model_name 会自动获取 model 的类名小写 (e.g., 'materiallibrary')
     return os.path.join('repository', instance._meta.model_name, date_path, filename)
