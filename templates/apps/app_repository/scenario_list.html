@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">应用场景配置</h2>
+            <div class="text-muted mt-1">定义产品应用领域及技术要求</div>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'repo_scenario_add' %}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> 新增场景
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body border-bottom py-3">
+        <form method="GET" class="d-flex">
+            <div class="input-icon">
+                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="搜索场景...">
+            </div>
+            <button type="submit" class="btn btn-ghost-secondary ms-2">查询</button>
+        </form>
+    </div>
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap">
+            <thead>
+                <tr>
+                    <th class="w-1">ID</th>
+                    <th>场景名称</th>
+                    <th>技术要求</th>
+                    <th class="w-1">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for scenario in scenarios %}
+                <tr>
+                    <td><span class="text-muted">{{ scenario.id }}</span></td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="avatar avatar-xs bg-green-lt me-2 rounded">
+                                <i class="ti ti-car"></i>
+                            </span>
+                            <div class="fw-bold">{{ scenario.name }}</div>
+                        </div>
+                    </td>
+                    <td class="text-muted text-wrap" style="max-width: 400px;">
+                        {{ scenario.requirements|default:"-" }}
+                    </td>
+                    <td>
+                        <a href="{% url 'repo_scenario_edit' scenario.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="4" class="text-center py-4 text-muted">暂无场景数据</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

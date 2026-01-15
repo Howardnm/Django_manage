@@ -1,0 +1,46 @@
+<div class="card-body border-bottom py-3">
+    <!-- Action 指向当前 URL (为空即可)，Method GET -->
+    <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
+
+        {% for field in filter.form %}
+            <!-- 1. 隐藏字段直接渲染 (如 sort, page 等) -->
+            {% if field.is_hidden %}
+                {{ field }}
+
+            <!-- 2. 搜索框：特殊处理，带放大镜图标 -->
+            {% elif field.name == 'q' %}
+                <div class="d-inline-block">
+                    <div class="input-icon">
+                        <span class="input-icon-addon">
+                            <i class="ti ti-search"></i>
+                        </span>
+                        {{ field }}
+                    </div>
+                </div>
+
+            <!-- 3. 其他字段 (各种下拉筛选框)：自动渲染 -->
+            {% else %}
+                <div class="d-inline-block">
+                    {{ field }}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <div class="ms-auto">
+            <!-- 查询按钮 -->
+            <button type="submit" class="btn btn-primary btn-icon" aria-label="Search" title="点击查询" data-bs-toggle="tooltip">
+                <i class="ti ti-search"></i>
+            </button>
+
+            <!-- 重置按钮 -->
+            <!-- 逻辑优化：只要 URL 里有任何 GET 参数 (request.GET)，就显示重置按钮 -->
+            {% if request.GET %}
+                <!-- href="{{ request.path }}" 表示当前页面的纯路径 (不带问号后面的参数) -->
+                <!-- 这样无论你在哪个 App (项目、材料、客户)，它都能正确重置回当前列表的初始状态 -->
+                <a href="{{ request.path }}" class="btn btn-ghost-danger ms-2" title="清除所有筛选与排序" data-bs-toggle="tooltip">
+                    重置
+                </a>
+            {% endif %}
+        </div>
+    </form>
+</div>

@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">{% if is_edit %}Edit Material{% else %}New Material{% endif %}</div>
+            <h2 class="page-title">{{ page_title }}</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data" class="mt-3">
+    {% csrf_token %}
+
+    <!-- 全局错误提示 -->
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger" role="alert">
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- 板块 1：核心身份信息 (Card) -->
+    <!-- ============================================================ -->
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">1. 基础档案</h3>
+        </div>
+        <div class="card-body">
+            <div class="row">
+                <!-- 第一行：牌号 (重点) + 厂家 -->
+                <div class="col-md-6 mb-3">
+                    <label class="form-label required">材料牌号 (Grade Name)</label>
+                    {{ form.grade_name }}
+                    {% if form.grade_name.errors %}<div class="invalid-feedback d-block">{{ form.grade_name.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">生产厂家 (Manufacturer)</label>
+                    {{ form.manufacturer }}
+                </div>
+
+                <!-- 第二行：分类 + 场景 + 阻燃 -->
+                <div class="col-md-4 mb-3">
+                    <label class="form-label required">所属类型</label>
+                    {{ form.category }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">主要应用场景</label>
+                    {{ form.scenario }}
+                </div>
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">阻燃等级</label>
+                    {{ form.flammability }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 板块 2：物性参数录入 (Grid Layout) -->
+    <!-- ============================================================ -->
+    <div class="row row-cards">
+
+        <!-- A. 物理性能 (蓝色系) -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-status-top bg-blue"></div>
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue"><i class="ti ti-microscope me-2"></i>物理性能</h3>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">密度</label>
+                        <div class="input-group">
+                            {{ form.density }}
+                            <span class="input-group-text">g/cm³</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">熔融指数 (M.I)</label>
+                        <div class="input-group">
+                            {{ form.melt_index }}
+                            <span class="input-group-text">g/10min</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">灰分 (Ash)</label>
+                        <div class="input-group">
+                            {{ form.ash_content }}
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label small">收缩率 (MD)</label>
+                            <div class="input-group input-group-flat">
+                                {{ form.shrinkage_md }}
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label small">收缩率 (TD)</label>
+                            <div class="input-group input-group-flat">
+                                {{ form.shrinkage_td }}
+                                <span class="input-group-text">%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- B. 机械性能 (橙色系) -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-status-top bg-orange"></div>
+                <div class="card-header bg-orange-lt">
+                    <h3 class="card-title text-orange"><i class="ti ti-hammer me-2"></i>机械性能</h3>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-3">
+                        <label class="form-label">拉伸强度</label>
+                        <div class="input-group">
+                            {{ form.tensile_strength }}
+                            <span class="input-group-text">MPa</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">断裂伸长率</label>
+                        <div class="input-group">
+                            {{ form.elongation_break }}
+                            <span class="input-group-text">%</span>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label small">弯曲强度</label>
+                            <div class="input-group input-group-flat">
+                                {{ form.flexural_strength }}
+                                <span class="input-group-text">MPa</span>
+                            </div>
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label small">弯曲模量</label>
+                            <div class="input-group input-group-flat">
+                                {{ form.flexural_modulus }}
+                                <span class="input-group-text">MPa</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Izod 冲击强度</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text bg-white text-muted" style="min-width: 60px;">23℃</span>
+                            {{ form.izod_impact_23 }}
+                            <span class="input-group-text">kJ/m²</span>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-muted" style="min-width: 60px;">-30℃</span>
+                            {{ form.izod_impact_minus_30 }}
+                            <span class="input-group-text">kJ/m²</span>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- C. 热学与其他 (红色系) -->
+        <div class="col-lg-4">
+            <div class="card h-100">
+                <div class="card-status-top bg-red"></div>
+                <div class="card-header bg-red-lt">
+                    <h3 class="card-title text-red"><i class="ti ti-flame me-2"></i>热学与文档</h3>
+                </div>
+                <div class="card-body">
+
+                    <div class="mb-4">
+                        <label class="form-label">热变形温度 (HDT)</label>
+                        <div class="input-group mb-2">
+                            <span class="input-group-text bg-white text-muted">0.45 MPa</span>
+                            {{ form.hdt_045 }}
+                            <span class="input-group-text">℃</span>
+                        </div>
+                        <div class="input-group">
+                            <span class="input-group-text bg-white text-muted">1.80 MPa</span>
+                            {{ form.hdt_180 }}
+                            <span class="input-group-text">℃</span>
+                        </div>
+                    </div>
+
+                    <div class="hr-text text-muted">文件上传</div>
+
+                    <div class="mb-3">
+                        <label class="form-label small">TDS 物性表</label>
+                        {{ form.file_tds }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">MSDS 报告</label>
+                        {{ form.file_msds }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label small">RoHS 报告</label>
+                        {{ form.file_rohs }}
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 板块 3：备注与提交 -->
+    <!-- ============================================================ -->
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="mb-3">
+                <label class="form-label">详细特性描述</label>
+                {{ form.description }}
+                <small class="form-hint">请填写材料的特性关键词，如：高流动、抗紫外线、耐水解等。</small>
+            </div>
+        </div>
+        <div class="card-footer text-end">
+            <a href="javascript:history.back()" class="btn btn-link link-secondary">取消</a>
+            <button type="submit" class="btn btn-primary ms-2">
+                <i class="ti ti-check me-1"></i> 保存数据
+            </button>
+        </div>
+    </div>
+
+</form>
+{% endblock %}

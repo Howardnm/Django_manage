@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% load project_extras %} <!-- 必须加载这个 tag -->
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">客户资料库</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'repo_customer_add' %}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> 新增客户
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <!-- 引入通用搜索栏 -->
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap datatable">
+            <thead>
+                <tr>
+                    <!-- 排序表头: 公司名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='company_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            公司名称
+                            {% if current_sort == 'company_name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-company_name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <!-- 排序表头: 联系人 -->
+                    <th>
+                        <a href="?{% url_replace sort='contact_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            联系人
+                            {% if current_sort == 'contact_name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-contact_name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>电话 / 邮箱</th>
+                    <th>技术对接</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for customer in page_obj %}
+                <tr>
+                    <td>
+                        <div class="fw-bold">{{ customer.company_name }}</div>
+                        {% if customer.short_name %}
+                            <div class="text-muted small">{{ customer.short_name }}</div>
+                        {% endif %}
+                    </td>
+                    <td>{{ customer.contact_name }}</td>
+                    <td>
+                        <div>{{ customer.phone }}</div>
+                        <div class="text-muted small">{{ customer.email }}</div>
+                    </td>
+                    <td>
+                        {{ customer.tech_contact }}
+                        {% if customer.tech_phone %}
+                            <span class="text-muted small">({{ customer.tech_phone }})</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'repo_customer_edit' customer.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-4">
+                        <!-- 复用你的 Empty State 样式 -->
+                        <div class="empty">
+                            <div class="empty-icon"><i class="ti ti-database-off fs-1"></i></div>
+                            <p class="empty-title">暂无客户数据</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<br>
+<!-- 复用通用的分页组件 (假设路径是公共的，或者复用 project 的) -->
+{% include 'apps/list_modules/paginator.html' %}
+
+{% endblock %}

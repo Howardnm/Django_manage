@@ -1,0 +1,26 @@
+<div class="card mb-3">
+    <!-- 【关键】链接指向 repo_project_edit，并传入 project.id -->
+    <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-outline-primary">
+        <i class="ti ti-edit me-1"></i> 编辑档案
+    </a>
+</div>
+<!-- 3. 图纸与应用 -->
+<div class="list-group-item">
+    <div class="mb-1">
+        <span class="text-muted">应用场景:</span>
+
+        <!-- 【核心修改】数据源变更 -->
+        {% if repo.material and repo.material.scenario %}
+            <span class="badge bg-blue-lt ms-1">{{ repo.material.scenario.name }}</span>
+        {% else %}
+            <span class="text-muted small">（需先关联材料以查看场景）</span>
+        {% endif %}
+
+    </div>
+    <div class="mb-1">
+        <span class="text-muted">产品制件:</span>
+        {{ repo.product_name|default:"-" }}
+    </div>
+
+    <!-- ... 下载按钮不变 ... -->
+</div>

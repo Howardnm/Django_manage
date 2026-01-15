@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">Material Specification</div>
+                <h2 class="page-title">{{ material.grade_name }}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <div class="btn-list">
+                    <a href="{% url 'repo_material_list' %}" class="btn btn-ghost-secondary">
+                        <i class="ti ti-arrow-left"></i> 返回列表
+                    </a>
+                    <a href="{% url 'repo_material_edit' material.pk %}" class="btn btn-primary">
+                        <i class="ti ti-edit"></i> 编辑资料
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cards mt-3">
+
+        <!-- ======================================================= -->
+        <!-- 左侧栏：基础档案 (33% 宽度) -->
+        <!-- ======================================================= -->
+        <div class="col-lg-4">
+
+            <!-- 1. 基础信息卡片 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">基础档案</h3>
+                </div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">生产厂家</div>
+                            <div class="datagrid-content fw-bold">{{ material.manufacturer }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">所属类型</div>
+                            <div class="datagrid-content">
+                                <span class="badge bg-blue-lt">{{ material.category.name }}</span>
+                            </div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">适用场景</div>
+                            <div class="datagrid-content">
+                                {% if material.scenario %}
+                                    <span class="badge bg-green-lt">{{ material.scenario.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">阻燃等级</div>
+                            <div class="datagrid-content">
+                                {% if material.flammability %}
+                                    <!-- 高阻燃显示红色，普通显示橙色 -->
+                                    <span class="badge {% if 'V-0' in material.flammability or '5V' in material.flammability %}bg-red text-white{% else %}bg-orange-lt{% endif %}">
+                                    {{ material.flammability }}
+                                </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 描述卡片 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">材料描述</h3>
+                </div>
+                <div class="card-body">
+                    <div class="text-secondary">
+                        {{ material.description|default:"暂无详细描述"|linebreaks }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. 文档下载卡片 -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">技术文档</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    <!-- TDS -->
+                    <div class="list-group-item d-flex align-items-center">
+                        <span class="avatar bg-blue-lt me-3"><i class="ti ti-file-text"></i></span>
+                        <div class="flex-fill">
+                            <div class="font-weight-medium">TDS 物性表</div>
+                            <div class="text-muted small">Technical Data Sheet</div>
+                        </div>
+                        <div>
+                            {% if material.file_tds %}
+                                <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_tds' %}" target="_blank"
+                                   class="btn btn-icon btn-ghost-secondary" title="下载"><i class="ti ti-download"></i></a>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">未上传</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <!-- MSDS -->
+                    <div class="list-group-item d-flex align-items-center">
+                        <span class="avatar bg-red-lt me-3"><i class="ti ti-flask"></i></span>
+                        <div class="flex-fill">
+                            <div class="font-weight-medium">MSDS 报告</div>
+                            <div class="text-muted small">Safety Data Sheet</div>
+                        </div>
+                        <div>
+                            {% if material.file_msds %}
+                                <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_msds' %}" target="_blank"
+                                   class="btn btn-icon btn-ghost-secondary" title="下载"><i class="ti ti-download"></i></a>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">未上传</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <!-- RoHS -->
+                    <div class="list-group-item d-flex align-items-center">
+                        <span class="avatar bg-green-lt me-3"><i class="ti ti-leaf"></i></span>
+                        <div class="flex-fill">
+                            <div class="font-weight-medium">RoHS 报告</div>
+                            <div class="text-muted small">Environmental Report</div>
+                        </div>
+                        <div>
+                            {% if material.file_rohs %}
+                                <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_rohs' %}" target="_blank"
+                                   class="btn btn-icon btn-ghost-secondary" title="下载"><i class="ti ti-download"></i></a>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">未上传</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ======================================================= -->
+        <!-- 右侧栏：详细性能指标 (66% 宽度) -->
+        <!-- ======================================================= -->
+        <div class="col-lg-8">
+
+            <!-- A. 物理性能 (蓝色系) -->
+            <div class="card mb-3">
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue">
+                        <i class="ti ti-microscope me-2"></i>物理性能 (Physical)
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row row-cards">
+                        <!-- 密度 -->
+                        <div class="col-sm-6 col-lg-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>密度 <small class="text-muted">g/cm³</small></span>
+                                <span class="fw-bold">{{ material.density|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 2.5 -->
+                                <div class="progress-bar bg-blue" style="width: {% widthratio material.density|default:0 2.5 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 熔融指数 -->
+                        <div class="col-sm-6 col-lg-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>熔融指数 (M.I) <small class="text-muted">g/10min</small></span>
+                                <span class="fw-bold">{{ material.melt_index|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 100 -->
+                                <div class="progress-bar bg-cyan" style="width: {% widthratio material.melt_index|default:0 100 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 灰分 -->
+                        <div class="col-sm-6 col-lg-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>灰分 (Ash) <small class="text-muted">%</small></span>
+                                <span class="fw-bold">{{ material.ash_content|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 60% -->
+                                <div class="progress-bar bg-secondary" style="width: {% widthratio material.ash_content|default:0 60 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 收缩率 (复合展示) -->
+                        <div class="col-sm-6 col-lg-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>收缩率 (MD / TD) <small class="text-muted">%</small></span>
+                                <span class="fw-bold">{{ material.shrinkage_md|default:"-" }} / {{ material.shrinkage_td|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 1.0%，两个条并排展示 -->
+                                <div class="progress-bar bg-primary" style="width: {% widthratio material.shrinkage_md|default:0 1.0 50 %}%" title="MD (横向)"></div>
+                                <div class="progress-bar bg-info" style="width: {% widthratio material.shrinkage_td|default:0 1.0 50 %}%" title="TD (纵向)"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- B. 机械性能 (橙色系 - 代表力) -->
+            <div class="card mb-3">
+                <div class="card-header bg-orange-lt">
+                    <h3 class="card-title text-orange">
+                        <i class="ti ti-hammer me-2"></i>机械性能 (Mechanical)
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row row-cards">
+                        <!-- 拉伸强度 -->
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>拉伸强度 <small class="text-muted">MPa</small></span>
+                                <span class="fw-bold">{{ material.tensile_strength|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 250 -->
+                                <div class="progress-bar bg-orange" style="width: {% widthratio material.tensile_strength|default:0 250 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 断裂伸长率 -->
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>断裂伸长率 <small class="text-muted">%</small></span>
+                                <span class="fw-bold">{{ material.elongation_break|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 100% -->
+                                <div class="progress-bar bg-yellow" style="width: {% widthratio material.elongation_break|default:0 100 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 弯曲强度 -->
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>弯曲强度 <small class="text-muted">MPa</small></span>
+                                <span class="fw-bold">{{ material.flexural_strength|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 300 -->
+                                <div class="progress-bar bg-orange" style="width: {% widthratio material.flexural_strength|default:0 300 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 弯曲模量 (深色，区分强度) -->
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>弯曲模量 <small class="text-muted">MPa</small></span>
+                                <span class="fw-bold">{{ material.flexural_modulus|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 15000 -->
+                                <div class="progress-bar bg-dark" style="width: {% widthratio material.flexural_modulus|default:0 15000 100 %}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- 冲击强度 (特殊布局：左右对比) -->
+                        <div class="col-12 mt-2">
+                            <div class="hr-text text-muted my-2 small">Izod 缺口冲击强度 (kJ/m²)</div>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-body">23℃ (常温)</span>
+                                        <span class="fw-bold">{{ material.izod_impact_23|default:"-" }}</span>
+                                    </div>
+                                    <div class="progress progress-sm">
+                                        <!-- 基准 80 -->
+                                        <div class="progress-bar bg-purple" style="width: {% widthratio material.izod_impact_23|default:0 80 100 %}%"></div>
+                                    </div>
+                                </div>
+                                <div class="col-6 border-start">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span class="text-body">-30℃ (低温)</span>
+                                        <span class="fw-bold">{{ material.izod_impact_minus_30|default:"-" }}</span>
+                                    </div>
+                                    <div class="progress progress-sm">
+                                        <div class="progress-bar bg-purple" style="width: {% widthratio material.izod_impact_minus_30|default:0 80 100 %}%"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- C. 热学性能 (红色系 - 代表热) -->
+            <div class="card">
+                <div class="card-header bg-red-lt">
+                    <h3 class="card-title text-red">
+                        <i class="ti ti-flame me-2"></i>热学性能 (Thermal)
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row row-cards">
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>HDT (0.45 MPa) <small class="text-muted">℃</small></span>
+                                <span class="fw-bold">{{ material.hdt_045|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 300 -->
+                                <div class="progress-bar bg-red" style="width: {% widthratio material.hdt_045|default:0 300 100 %}%"></div>
+                            </div>
+                        </div>
+                        <div class="col-sm-6">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span>HDT (1.80 MPa) <small class="text-muted">℃</small></span>
+                                <span class="fw-bold">{{ material.hdt_180|default:"-" }}</span>
+                            </div>
+                            <div class="progress progress-sm">
+                                <!-- 基准 300 -->
+                                <div class="progress-bar bg-red" style="width: {% widthratio material.hdt_180|default:0 300 100 %}%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. 【新增】关联项目应用记录 (移至右侧，宽幅展示) -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ti ti-briefcase me-2"></i>应用此材料的项目
+                    </h3>
+                    <div class="card-actions">
+                        <span class="badge bg-blue-lt">{{ related_projects|length }} 个项目</span>
+                    </div>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap datatable">
+                        <thead>
+                        <tr>
+                            <th>项目名称</th>
+                            <th>负责人</th>
+                            <th>执行进度</th>
+                            <th>当前阶段</th>
+                            <th>创建日期</th>
+                            <th></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for project in related_projects %}
+                            {% with info=project.get_progress_info %}
+                                <tr>
+                                    <!-- 项目名称 -->
+                                    <td>
+                                        <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold">
+                                            {{ project.name }}
+                                        </a>
+                                    </td>
+
+                                    <!-- 负责人 (带头像) -->
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-xs rounded me-2">{{ project.manager.username|slice:":1"|upper }}</span>
+                                            {{ project.manager.username }}
+                                        </div>
+                                    </td>
+
+                                    <!-- 进度条 (复用 list 样式) -->
+                                    <td style="width: 120px">
+                                        <div class="d-flex align-items-center mb-1">
+                                            <div class="text-muted small">进度</div>
+                                            <div class="ms-auto font-weight-medium small">{{ info.percent }}%</div>
+                                        </div>
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar {% if info.is_terminated %}bg-danger{% elif info.percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                                 style="width: {{ info.percent }}%"></div>
+                                        </div>
+                                    </td>
+
+                                    <!-- 当前阶段 -->
+                                    <td>
+                                        <span class="badge bg-blue-lt">{{ info.current_label }}</span>
+                                    </td>
+
+                                    <!-- 日期 -->
+                                    <td class="text-muted">
+                                        {{ project.created_at|date:"Y-m-d" }}
+                                    </td>
+
+                                    <!-- 操作 -->
+                                    <td class="text-end">
+                                        <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="查看详情">
+                                            <i class="ti ti-arrow-right"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% endwith %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-5">
+                                    <div class="empty">
+                                        <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-50"></i></div>
+                                        <p class="mb-0">暂无项目使用此材料</p>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </div>
+    </div>
+{% endblock %}

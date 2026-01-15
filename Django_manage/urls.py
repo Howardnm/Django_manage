@@ -22,4 +22,5 @@ urlpatterns = [
     path('', include('app_panel.urls')),
     path('project/', include('app_project.urls')),
     path('user/', include('app_user.urls')),
+    path('repository/', include('app_repository.urls')),
 ]

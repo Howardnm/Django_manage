@@ -28,7 +28,11 @@
                 {% endif %}
 
 
-                <!-- 【模块 3：用户管理】 -->
+                <!-- 【模块 3：项目资料库】 -->
+                {% include "sidebar_modules/_repository.html" %}
+
+
+                <!-- 【模块 4：用户管理】 -->
                 <!-- 逻辑：通常只有能查看 User 表的人或者是 Staff 才能看到这个菜单 -->
                 <!-- perms.auth.view_user 是 Django 内置 User 表的查看权限 -->
                 <!-- 或者用 user.is_staff 也行 -->

@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">公共材料库</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'repo_material_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> 录入新材料
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+                <thead>
+                <tr>
+                    <!-- 1. 基础信息 (固定左侧) -->
+                    <th>
+                        <a href="?{% url_replace sort='grade_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            材料名称
+                            {% if current_sort == 'grade_name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-grade_name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>类型</th>
+                    <th>应用场景</th>
+
+                    <!-- 2. 物理性能 (青色) -->
+                    <th style="width: 80px;" title="熔融指数 g/10min">
+                        <a href="?{% url_replace sort='melt_index'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            M.I
+                            {% if current_sort == 'melt_index' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-melt_index' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+
+                    <!-- 3. 机械性能 (橙黄色) -->
+                    <th style="width: 80px;" title="拉伸强度 MPa">
+                        <a href="?{% url_replace sort='tensile'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            拉伸
+                            {% if current_sort == 'tensile' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-tensile' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th style="width: 80px;" title="弯曲强度 MPa">
+                        <a href="?{% url_replace sort='flex_strength'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            弯强
+                            {% if current_sort == 'flex_strength' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-flex_strength' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th style="width: 80px;" title="弯曲模量 MPa">
+                        <a href="?{% url_replace sort='flex_modulus'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            弯模
+                            {% if current_sort == 'flex_modulus' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-flex_modulus' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th style="width: 80px;" title="Izod缺口冲击 23℃ kJ/m²">
+                        <a href="?{% url_replace sort='impact_23'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            冲击(23℃)
+                            {% if current_sort == 'impact_23' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-impact_23' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+
+                    <!-- 4. 热学性能 (红色 - 合并列) -->
+                    <th style="width: 90px;" title="热变形温度 ℃ (上:0.45 / 下:1.8)">
+                        <a href="?{% url_replace sort='hdt_045'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            HDT (℃)
+                            {% if current_sort == 'hdt_045' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-hdt_045' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+
+                    <!-- 5. 阻燃 -->
+                    <th>
+                        <a href="?{% url_replace sort='flammability'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            阻燃
+                            {% if current_sort == 'flammability' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-flammability' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+
+                    <!-- 6. 其他 -->
+                    <th>文档</th>
+                    <!-- 【新增列】录入时间 -->
+                    <th style="width: 100px;">
+                        <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            录入时间
+                            {% if current_sort == 'created_at' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-created_at' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th></th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for mat in page_obj %}
+                    <tr>
+                        <!-- 1. 名称 -->
+                        <td>
+                            <a href="{% url 'repo_material_detail' mat.pk %}" class="text-reset fw-bold text-primary">
+                                {{ mat.grade_name }}
+                            </a>
+                        </td>
+
+                        <!-- 2. 类型 -->
+                        <td>
+                            <span class="badge bg-purple-lt">{{ mat.category.name }}</span>
+                        </td>
+
+                        <!-- 3. 场景 -->
+                        <td class="text-muted">
+                            <span class="badge bg-green-lt">{{ mat.scenario.name|default:"-" }}</span>
+                        </td>
+
+                        <!-- === 物理性能 === -->
+                        <!-- M.I (熔融指数) -->
+                        <td>
+                            {% if mat.melt_index %}
+                                <div class="fw-bold">{{ mat.melt_index }}</div>
+                                <div class="progress progress-sm" style="height: 3px;">
+                                    <div class="progress-bar bg-cyan" style="width: {% widthratio mat.melt_index 100 100 %}%"></div>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- === 机械性能 === -->
+                        <!-- 拉伸强度 -->
+                        <td>
+                            {% if mat.tensile_strength %}
+                                <div class="fw-bold">{{ mat.tensile_strength }}</div>
+                                <div class="progress progress-sm" style="height: 3px;">
+                                    <div class="progress-bar bg-orange" style="width: {% widthratio mat.tensile_strength 250 100 %}%"></div>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- 弯曲强度 -->
+                        <td>
+                            {% if mat.flexural_strength %}
+                                <div class="fw-bold">{{ mat.flexural_strength }}</div>
+                                <div class="progress progress-sm" style="height: 3px;">
+                                    <div class="progress-bar bg-orange" style="width: {% widthratio mat.flexural_strength 300 100 %}%"></div>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- 弯曲模量 -->
+                        <td>
+                            {% if mat.flexural_modulus %}
+                                <div class="fw-bold">{{ mat.flexural_modulus }}</div>
+                                <div class="progress progress-sm" style="height: 3px;">
+                                    <div class="progress-bar bg-dark" style="width: {% widthratio mat.flexural_modulus 15000 100 %}%"></div>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- Izod 冲击 (23度) -->
+                        <td>
+                            {% if mat.izod_impact_23 %}
+                                <div class="fw-bold">{{ mat.izod_impact_23 }}</div>
+                                <div class="progress progress-sm" style="height: 3px;">
+                                    <div class="progress-bar bg-purple" style="width: {% widthratio mat.izod_impact_23 100 100 %}%"></div>
+                                </div>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- === 热学性能 (合并列) === -->
+                        <!-- HDT: 0.45在上，1.8在下 -->
+                        <td>
+                            <div class="d-flex flex-column" style="gap: 4px;">
+                                <!-- 0.45 MPa -->
+                                {% if mat.hdt_045 %}
+                                    <div class="d-flex align-items-center" style="line-height: 1;">
+                                        <span class="badge badge-sm bg-red-lt me-1" style="font-size: 8px; padding: 2px;">0.45</span>
+                                        <span class="fw-bold small">{{ mat.hdt_045 }}</span>
+                                    </div>
+                                {% endif %}
+
+                                <!-- 1.80 MPa -->
+                                {% if mat.hdt_180 %}
+                                    <div class="d-flex align-items-center" style="line-height: 1;">
+                                        <span class="badge badge-sm bg-red-lt me-1" style="font-size: 8px; padding: 2px;">1.80</span>
+                                        <span class="fw-bold small text-muted">{{ mat.hdt_180 }}</span>
+                                    </div>
+                                {% endif %}
+
+                                {% if not mat.hdt_045 and not mat.hdt_180 %}<span class="text-muted">-</span>{% endif %}
+                            </div>
+                        </td>
+
+                        <!-- === 阻燃 === -->
+                        <td>
+                            {% if mat.flammability %}
+                                <span class="badge {% if 'V-0' in mat.flammability or '5V' in mat.flammability %}bg-red-lt{% else %}bg-orange-lt{% endif %}">
+                            {{ mat.flammability }}
+                        </span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+
+                        <!-- 文档 -->
+                        <td>
+                            <div class="d-flex gap-1">
+                                {% if mat.file_tds %}
+                                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' mat.pk 'file_tds' %}" target="_blank" class="text-azure" title="TDS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
+                                {% endif %}
+                                {% if mat.file_msds %}
+                                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' mat.pk 'file_msds' %}" target="_blank" class="text-red" title="MSDS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
+                                {% endif %}
+                                {% if mat.file_rohs %}
+                                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' mat.pk 'file_rohs' %}" target="_blank" class="text-green" title="RoHS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- 【新增内容】 -->
+                        <td class="text-muted small">
+                            {{ mat.created_at|date:"Y-m-d" }}
+                        </td>
+
+                        <!-- 操作 -->
+                        <td>
+                            <a href="{% url 'repo_material_detail' mat.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="查看详情">
+                                <i class="ti ti-chevron-right"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center py-4 text-muted">暂无材料数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
+
+{% endblock %}

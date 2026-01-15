@@ -1,0 +1,54 @@
+<!-- 资料主数据模块 -->
+<!-- 定义该模块包含的所有 URL name (包括列表、新增、编辑) -->
+{% with route_names='repo_customer_list repo_customer_add repo_customer_edit repo_material_list repo_material_add repo_material_edit repo_type_list repo_type_add repo_type_edit repo_scenario_list repo_scenario_add repo_scenario_edit' %}
+
+<li class="nav-item dropdown">
+    <!-- 父级菜单高亮逻辑 -->
+    <!-- 只要当前 URL 在上面的 route_names 里，就加 active -->
+    <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name in route_names %}active{% endif %}"
+       href="#navbar-repo" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button"
+       aria-expanded="{% if request.resolver_match.url_name in route_names %}true{% else %}false{% endif %}">
+
+        <span class="nav-link-icon"><i class="ti ti-database"></i></span>
+        <span class="nav-link-title">项目资料库</span>
+    </a>
+
+    <!-- 下拉展开逻辑 -->
+    <!-- 只要当前 URL 在 route_names 里，就加 show (展开) -->
+    <div class="dropdown-menu {% if request.resolver_match.url_name in route_names %}show{% endif %}">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+
+                <!-- 1. 客户库 -->
+                <!-- 逻辑：当前URL包含 'repo_customer' 时高亮 (涵盖 list/add/edit) -->
+                <a class="dropdown-item {% if 'repo_customer' in request.resolver_match.url_name %}active{% endif %}"
+                   href="{% url 'repo_customer_list' %}">
+                   客户库管理
+                </a>
+
+                <!-- 2. 材料库 -->
+                <a class="dropdown-item {% if 'repo_material' in request.resolver_match.url_name %}active{% endif %}"
+                   href="{% url 'repo_material_list' %}">
+                   材料库管理
+                </a>
+
+                <div class="dropdown-divider"></div>
+                <span class="dropdown-header">基础配置</span>
+
+                <!-- 3. 材料类型 -->
+                <a class="dropdown-item {% if 'repo_type' in request.resolver_match.url_name %}active{% endif %}"
+                   href="{% url 'repo_type_list' %}">
+                   材料类型配置
+                </a>
+
+                <!-- 4. 应用场景 -->
+                <a class="dropdown-item {% if 'repo_scenario' in request.resolver_match.url_name %}active{% endif %}"
+                   href="{% url 'repo_scenario_list' %}">
+                   应用场景配置
+                </a>
+
+            </div>
+        </div>
+    </div>
+</li>
+{% endwith %}

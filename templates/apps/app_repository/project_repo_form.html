@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">档案管理</div>
+            <h2 class="page-title">编辑项目档案: {{ project.name }}</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    
+    <div class="row row-cards">
+        <!-- 左侧：基础选型 -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">1. 基础信息关联</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">所属客户</label>
+                        {{ form.customer }}
+                        <small class="form-hint">选择已有的客户信息，如不存在请先去<a href="{% url 'repo_customer_list' %}" target="_blank">客户库</a>添加。</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">选用材料</label>
+                        {{ form.material }}
+                        <small class="form-hint">关联公共材料库，自动获取 TDS/MSDS。</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：专属文件 -->
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">2. 项目专属资料</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-6 mb-3">
+                            <label class="form-label">产品名称</label>
+                            {{ form.product_name }}
+                        </div>
+                        <div class="col-6 mb-3">
+                            <label class="form-label">产品代码</label>
+                            {{ form.product_code }}
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">2D 图纸 (PDF/DWG)</label>
+                        {{ form.file_drawing_2d }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">3D 图纸 (STEP)</label>
+                        {{ form.file_drawing_3d }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">技术标准书</label>
+                        {{ form.file_standard }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">专用测试报告</label>
+                        {{ form.file_inspection }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex mt-3">
+        <a href="{% url 'project_detail' project.id %}" class="btn btn-link link-secondary">返回项目详情</a>
+        <button type="submit" class="btn btn-primary ms-auto">保存档案</button>
+    </div>
+</form>
+{% endblock %}

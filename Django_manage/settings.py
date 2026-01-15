@@ -38,7 +38,8 @@ INSTALLED_APPS = [
     'django_filters', # django 列表搜索筛选器
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
-    'app_user.apps.AppUserConfig'
+    'app_user.apps.AppUserConfig',
+    'app_repository.apps.AppRepositoryConfig'
 ]
 
 MIDDLEWARE = [

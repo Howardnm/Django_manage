@@ -2,9 +2,9 @@
 {% load project_extras %} <!-- 加载刚才写的 tag -->
 
 {% block content %}
-    {% include 'apps/projects/list_modules/header.html' %}
+    {% include 'apps/list_modules/header.html' %}
     <!-- 工具栏：搜索与筛选 -->
-    {% include 'apps/projects/list_modules/tools_search_filter.html' %}
+    {% include 'apps/list_modules/tools_search_filter.html' %}
     <div class="card mt-3">
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable">
@@ -110,5 +110,5 @@
         </div>
     </div>
     <br>
-    {% include 'apps/projects/list_modules/paginator.html' %}
+    {% include 'apps/list_modules/paginator.html' %}
 {% endblock %}
