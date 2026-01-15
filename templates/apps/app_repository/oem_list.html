@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">主机厂库 (OEM)</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'repo_oem_add' %}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> 新增主机厂
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <!-- 引入通用搜索栏 -->
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap table-hover">
+            <thead>
+                <tr>
+                    <!-- 排序: 名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            主机厂名称
+                            {% if current_sort == 'name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <!-- 排序: 简称 -->
+                    <th>
+                        <a href="?{% url_replace sort='short_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            简称
+                            {% if current_sort == 'short_name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-short_name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>描述</th>
+                    <th class="w-1">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for oem in oems %}
+                <tr>
+                    <td>
+                        <div class="fw-bold">{{ oem.name }}</div>
+                    </td>
+                    <td>
+                        {% if oem.short_name %}
+                            <span class="badge bg-blue-lt">{{ oem.short_name }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted text-wrap" style="max-width: 400px;">
+                        {{ oem.description|default:"-" }}
+                    </td>
+                    <td>
+                        <a href="{% url 'repo_oem_edit' oem.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center py-4">
+                        <div class="empty">
+                            <div class="empty-icon"><i class="ti ti-database-off fs-1"></i></div>
+                            <p class="empty-title">暂无主机厂数据</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<br>
+{% include 'apps/list_modules/paginator.html' %}
+
+{% endblock %}

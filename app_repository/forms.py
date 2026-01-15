@@ -1,5 +1,5 @@
 from django import forms
-from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario
+from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
 
 
 class TablerFormMixin:
@@ -15,15 +15,17 @@ class TablerFormMixin:
             else:
                 field.widget.attrs.update({'class': 'form-control'})
 
-
+# ==============================================================================
 # 1. 客户表单
+# ==============================================================================
 class CustomerForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Customer
         fields = '__all__'
 
-
+# ==============================================================================
 # 2. 材料表单
+# ==============================================================================
 class MaterialForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialLibrary
@@ -35,21 +37,49 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             'flammability': forms.Select(attrs={'class': 'form-select'}),
         }
 
+# ==============================================================================
+# 3. 项目档案表单 (主表)
+# ==============================================================================
 
-# 3. 项目档案表单 (核心)
 class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = ProjectRepository
-        # 排除不需要用户填写的字段
-        # 注意：因为 models.py 里已经删除了 scenario 字段，这里不需要特意排除它，它自动就不存在了
         exclude = ['project', 'updated_at']
-
         widgets = {
             'customer': forms.Select(attrs={'class': 'form-select'}),
+            'oem': forms.Select(attrs={'class': 'form-select'}), # 新增 OEM
             'material': forms.Select(attrs={'class': 'form-select'}),
+            # 价格字段不需要特殊 widget，TablerFormMixin 会加上 form-control
         }
 
+# 4. 【新增】项目文件上传表单
+class ProjectFileForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = ProjectFile
+        fields = ['file_type', 'file', 'description']
+        widgets = {
+            'file_type': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.TextInput(attrs={'placeholder': '例如：V1.0版本图纸'}),
+        }
+
+# 【新增】业务员管理表单
+class SalespersonForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = Salesperson
+        fields = ['name', 'phone', 'email']
+
+# 6. 主机厂表单
+class OEMForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = OEM
+        fields = ['name', 'short_name', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '备注信息...'}),
+        }
+
+# ==============================================================================
 # 4. 材料类型表单
+# ==============================================================================
 class MaterialTypeForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialType
@@ -58,7 +88,9 @@ class MaterialTypeForm(TablerFormMixin, forms.ModelForm):
             'description': forms.Textarea(attrs={'rows': 3}),
         }
 
+# ==============================================================================
 # 5. 应用场景表单
+# ==============================================================================
 class ApplicationScenarioForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = ApplicationScenario

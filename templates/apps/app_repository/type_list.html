@@ -1,59 +1,64 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <h2 class="page-title">材料类型配置</h2>
-            <div class="text-muted mt-1">定义基础材料大类 (如 PA66, ABS)</div>
-        </div>
-        <div class="col-auto ms-auto">
-            <a href="{% url 'repo_type_add' %}" class="btn btn-primary">
-                <i class="ti ti-plus"></i> 新增类型
-            </a>
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-body border-bottom py-3">
-        <form method="GET" class="d-flex">
-            <div class="input-icon">
-                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="搜索类型...">
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">材料类型配置</h2>
+                <div class="text-muted mt-1">定义基础材料大类 (如 PA66, ABS)</div>
             </div>
-            <button type="submit" class="btn btn-ghost-secondary ms-2">查询</button>
-        </form>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'repo_type_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> 新增类型
+                </a>
+            </div>
+        </div>
     </div>
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap">
-            <thead>
+
+    <div class="card">
+        <div class="card-body border-bottom py-3">
+            <form method="GET" class="d-flex">
+                <div class="input-icon">
+                    <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                    <input type="text" name="q" value="{{ request.GET.q|default:'' }}" class="form-control" placeholder="搜索类型...">
+                </div>
+                <button type="submit" class="btn btn-ghost-secondary ms-2">查询</button>
+            </form>
+        </div>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap">
+                <thead>
                 <tr>
                     <th class="w-1">ID</th>
                     <th>类型名称</th>
                     <th>描述</th>
                     <th class="w-1">操作</th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% for type in types %}
-                <tr>
-                    <td><span class="text-muted">{{ type.id }}</span></td>
-                    <td>
-                        <span class="badge bg-blue-lt">{{ type.name }}</span>
-                    </td>
-                    <td class="text-muted text-wrap" style="max-width: 400px;">
-                        {{ type.description|default:"-" }}
-                    </td>
-                    <td>
-                        <a href="{% url 'repo_type_edit' type.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
-                    </td>
-                </tr>
+                    <tr>
+                        <td><span class="text-muted">{{ type.id }}</span></td>
+                        <td>
+                            <span class="badge bg-blue-lt">{{ type.name }}</span>
+                        </td>
+                        <td class="text-muted text-wrap" style="max-width: 400px;">
+                            {{ type.description|default:"-" }}
+                        </td>
+                        <td>
+                            <a href="{% url 'repo_type_edit' type.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
+                        </td>
+                    </tr>
                 {% empty %}
-                <tr><td colspan="4" class="text-center py-4 text-muted">暂无类型数据</td></tr>
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">暂无类型数据</td>
+                    </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
 {% endblock %}

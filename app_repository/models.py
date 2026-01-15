@@ -1,3 +1,5 @@
+import os
+
 from django.db import models
 from django.core.validators import FileExtensionValidator
 from app_project.models import Project
@@ -32,6 +34,44 @@ class ApplicationScenario(models.Model):
     class Meta:
         verbose_name = "应用场景"
         verbose_name_plural = "应用场景库"
+
+
+# ==========================================
+# 新增：主机厂 (OEM) 主数据
+# ==========================================
+class OEM(models.Model):
+    """主机厂 (如：比亚迪、特斯拉、吉利)"""
+    name = models.CharField("主机厂名称", max_length=100, unique=True)
+    short_name = models.CharField("简称", max_length=20, blank=True)
+    description = models.TextField("描述/备注", blank=True)
+
+    def __str__(self):
+        return self.short_name or self.name
+
+    class Meta:
+        verbose_name = "主机厂"
+        verbose_name_plural = "主机厂库"
+
+
+# ==========================================
+# 新增：内部业务员主数据
+# ==========================================
+class Salesperson(models.Model):
+    """我司销售/业务人员库"""
+    name = models.CharField("姓名", max_length=50)
+    phone = models.CharField("手机号", max_length=20, blank=True)
+    email = models.EmailField("邮箱", blank=True)
+
+    # 可选：关联系统账号 (如果业务员也是系统登录用户)
+    # user = models.OneToOneField('auth.User', on_delete=models.SET_NULL, null=True, blank=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "业务员"
+        verbose_name_plural = "业务员库"
+        ordering = ['name']
 
 
 class MaterialLibrary(models.Model):
@@ -91,7 +131,7 @@ class MaterialLibrary(models.Model):
     class Meta:
         verbose_name = "材料库"
         verbose_name_plural = "材料库"
-        ordering = ['-created_at'] # 默认按创建时间倒序排列 (最新的在最前)
+        ordering = ['-created_at']  # 默认按创建时间倒序排列 (最新的在最前)
 
 
 # ==============================================================================
@@ -126,41 +166,64 @@ class Customer(models.Model):
 # ==============================================================================
 
 class ProjectRepository(models.Model):
-    """
-    项目专属资料箱
-    OneToOne 关联 Project，确保一个项目只有一个档案
-    """
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='repository', verbose_name="关联项目")
 
-    # 1. 引用基础数据 (指针)
-        # 客户库 (CRM Lite) - 客户信息管理
-    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所属客户")
-        # 材料库
-    material = models.ForeignKey(MaterialLibrary, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用材料")
-
-    # 2. 项目专属文件 (这些文件只属于这个项目，换个项目图纸就不一样了)
+    # 1. 商业与基础信息
+    customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户 (Tier1)")
+    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="终端主机厂 (OEM)")
+    # 【新增】关联业务员
+    salesperson = models.ForeignKey(Salesperson, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="项目业务员")
+    # 2. 产品与材料
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
+    material = models.ForeignKey('MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用材料")
 
-    file_drawing_2d = models.FileField("2D图纸 (PDF/DWG)", upload_to=repo_file_path, blank=True, null=True)
-    file_drawing_3d = models.FileField(
-        "3D图纸 (STEP/PRT)",
-        upload_to=repo_file_path,
-        blank=True, null=True,
-        validators=[FileExtensionValidator(['stp', 'step', 'prt', 'igs', 'x_t', 'zip', '7z'])]
-    )
-    file_standard = models.FileField("产品技术标准书", upload_to=repo_file_path, blank=True, null=True)
+    # 3. 成本与价格 (新增)
+    competitor_price = models.DecimalField("竞品售价 (RMB/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    target_cost = models.DecimalField("目标成本 (RMB/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
 
-    # 3. 项目专用报告
-    file_inspection = models.FileField("专用检查/测试报告", upload_to=repo_file_path, blank=True, null=True)
+    # 4. 旧的文件字段全部删除 (file_drawing_2d, file_standard 等)
+    # 改为使用下方的 ProjectFile 子表
 
-    updated_at = models.DateTimeField("最后更新时间", auto_now=True)
+    updated_at = models.DateTimeField("最后更新", auto_now=True)
 
     def __str__(self):
-        return f"{self.project.name} - 资料档案"
+        return f"{self.project.name} 档案"
 
     class Meta:
         verbose_name = "项目档案"
         verbose_name_plural = "项目档案"
 
 
+# ==========================================
+# 新增：项目资料文件库 (多文件支持)
+# ==========================================
+class ProjectFile(models.Model):
+    """
+    项目专属文件库 (一对多)
+    """
+    FILE_TYPE_CHOICES = [
+        ('DRAWING_2D', '2D图纸'),
+        ('DRAWING_3D', '3D数模'),
+        ('STANDARD', '技术标准'),
+        ('REPORT', '检测/测试报告'),
+        ('QUOTE', '报价/商务'),
+        ('OTHER', '其他资料'),
+    ]
+
+    repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='files', verbose_name="所属档案")
+    file = models.FileField("文件附件", upload_to=repo_file_path)
+    file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
+    description = models.CharField("文件说明", max_length=100, blank=True)
+    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+
+    def filename(self):
+        return os.path.basename(self.file.name)
+
+    def __str__(self):
+        return self.description or self.filename()
+
+    class Meta:
+        verbose_name = "项目文件"
+        verbose_name_plural = "项目文件库"
+        ordering = ['-uploaded_at']

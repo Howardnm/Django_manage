@@ -17,6 +17,9 @@ urlpatterns = [
 
     # 项目档案 (入口是 project_id)
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
+    # 【新增】文件管理路由
+    path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
+    path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
 
     # 材料类型
     path('types/', MaterialTypeListView.as_view(), name='repo_type_list'),
@@ -30,4 +33,14 @@ urlpatterns = [
 
     # 通用下载路由
     path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
+
+    # 业务员库
+    path('sales/', SalespersonListView.as_view(), name='repo_sales_list'),
+    path('sales/add/', SalespersonCreateView.as_view(), name='repo_sales_add'),
+    path('sales/<int:pk>/edit/', SalespersonUpdateView.as_view(), name='repo_sales_edit'),
+
+    # 主机厂 (OEM)
+    path('oems/', OEMListView.as_view(), name='repo_oem_list'),
+    path('oems/add/', OEMCreateView.as_view(), name='repo_oem_add'),
+    path('oems/<int:pk>/edit/', OEMUpdateView.as_view(), name='repo_oem_edit'),
 ]

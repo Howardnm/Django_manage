@@ -7,11 +7,10 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q
 from app_project.models import Project
-from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario
-from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm
-from .utils.filters import CustomerFilter, MaterialFilter
+from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
+from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm, ProjectFileForm, SalespersonForm, OEMForm
+from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter
 from django.apps import apps
-import os
 
 
 # ==========================================
@@ -69,7 +68,7 @@ class CustomerUpdateView(LoginRequiredMixin, UpdateView):
 
 class MaterialListView(LoginRequiredMixin, ListView):
     model = MaterialLibrary
-    template_name = 'apps/app_repository/material_list.html'
+    template_name = 'apps/app_repository/material/material_list.html'
     context_object_name = 'materials'  # 统一变量名
     paginate_by = 10
 
@@ -87,7 +86,7 @@ class MaterialListView(LoginRequiredMixin, ListView):
 
 class MaterialDetailView(LoginRequiredMixin, DetailView):
     model = MaterialLibrary
-    template_name = 'apps/app_repository/material_detail.html'
+    template_name = 'apps/app_repository/material/material_detail.html'
     context_object_name = 'material'  # 模板里用 material 调用
 
     def get_context_data(self, **kwargs):
@@ -103,11 +102,12 @@ class MaterialDetailView(LoginRequiredMixin, DetailView):
         context['related_projects'] = [repo.project for repo in related_repos]
         return context
 
+
 class MaterialCreateView(LoginRequiredMixin, CreateView):
     model = MaterialLibrary
     form_class = MaterialForm
     # 【修改】指向专用模板
-    template_name = 'apps/app_repository/material_form.html'
+    template_name = 'apps/app_repository/material/material_form.html'
     success_url = reverse_lazy('repo_material_list')
 
     def get_context_data(self, **kwargs):
@@ -116,11 +116,12 @@ class MaterialCreateView(LoginRequiredMixin, CreateView):
         context['is_edit'] = False
         return context
 
+
 class MaterialUpdateView(LoginRequiredMixin, UpdateView):
     model = MaterialLibrary
     form_class = MaterialForm
     # 【修改】指向专用模板
-    template_name = 'apps/app_repository/material_form.html'
+    template_name = 'apps/app_repository/material/material_form.html'
     success_url = reverse_lazy('repo_material_list')
 
     def get_context_data(self, **kwargs):
@@ -135,36 +136,63 @@ class MaterialUpdateView(LoginRequiredMixin, UpdateView):
 # 这是一个特殊的视图，它是从“项目详情页”跳转过来的
 # ==========================================
 
+# 1. 档案基本信息编辑 (UpdateView)
 class ProjectRepositoryUpdateView(LoginRequiredMixin, UpdateView):
-    """
-    编辑指定项目的档案信息。
-    如果该项目还没有档案，会自动创建一个。
-    """
     model = ProjectRepository
     form_class = ProjectRepositoryForm
     template_name = 'apps/app_repository/project_repo_form.html'
 
-    # 这里的 object 是通过 project_id 获取的，而不是 repo_id
     def get_object(self, queryset=None):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, pk=project_id)
-
-        # get_or_create: 如果存在就获取，不存在就创建
         repo, created = ProjectRepository.objects.get_or_create(project=project)
         return repo
 
     def form_valid(self, form):
-        messages.success(self.request, "项目档案已更新")
+        messages.success(self.request, "项目档案基础信息已更新")
         return super().form_valid(form)
 
     def get_success_url(self):
-        # 保存成功后，跳回项目详情页
         return reverse('project_detail', kwargs={'pk': self.object.project.id})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self.object.project
         return context
+
+
+# 2. 【新增】文件上传视图
+class ProjectFileUploadView(LoginRequiredMixin, CreateView):
+    model = ProjectFile
+    form_class = ProjectFileForm
+    template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单模板即可
+
+    def form_valid(self, form):
+        # 自动关联到对应的 Repository
+        repo_id = self.kwargs.get('repo_id')
+        repo = get_object_or_404(ProjectRepository, pk=repo_id)
+        form.instance.repository = repo
+        messages.success(self.request, "文件上传成功")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '上传项目资料'
+        return context
+
+    def get_success_url(self):
+        # 回到项目详情页
+        return reverse('project_detail', kwargs={'pk': self.object.repository.project.id})
+
+
+# 3. 【新增】文件删除视图
+class ProjectFileDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        file_obj = get_object_or_404(ProjectFile, pk=pk)
+        project_id = file_obj.repository.project.id
+        file_obj.delete()
+        messages.success(request, "文件已删除")
+        return redirect('project_detail', pk=project_id)
 
 
 # ==========================================
@@ -292,3 +320,91 @@ class SecureFileDownloadView(LoginRequiredMixin, View):
             return response
         except FileNotFoundError:
             raise Http404("物理文件丢失")
+
+
+# ==========================================
+# 6. 业务员管理 (Salesperson)
+# ==========================================
+
+class SalespersonListView(LoginRequiredMixin, ListView):
+    model = Salesperson
+    template_name = 'apps/app_repository/salesperson_list.html'
+    context_object_name = 'salespersons'  # 命名
+    paginate_by = 10
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        q = self.request.GET.get('q')
+        if q:
+            qs = qs.filter(Q(name__icontains=q) | Q(phone__icontains=q))
+        return qs
+
+
+class SalespersonCreateView(LoginRequiredMixin, CreateView):
+    model = Salesperson
+    form_class = SalespersonForm
+    template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单
+    success_url = reverse_lazy('repo_sales_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '新增业务员'
+        return context
+
+
+class SalespersonUpdateView(LoginRequiredMixin, UpdateView):
+    model = Salesperson
+    form_class = SalespersonForm
+    template_name = 'apps/app_repository/form_generic.html'
+    success_url = reverse_lazy('repo_sales_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f'编辑业务员: {self.object.name}'
+        return context
+
+
+# ==========================================
+# 7. 主机厂管理 (OEM)
+# ==========================================
+
+class OEMListView(LoginRequiredMixin, ListView):
+    model = OEM
+    template_name = 'apps/app_repository/oem_list.html'
+    context_object_name = 'oems'
+    paginate_by = 10
+
+    def get_queryset(self):
+        qs = super().get_queryset().order_by('name')
+        self.filterset = OEMFilter(self.request.GET, queryset=qs)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
+        return context
+
+
+class OEMCreateView(LoginRequiredMixin, CreateView):
+    model = OEM
+    form_class = OEMForm
+    template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单
+    success_url = reverse_lazy('repo_oem_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '新增主机厂 (OEM)'
+        return context
+
+
+class OEMUpdateView(LoginRequiredMixin, UpdateView):
+    model = OEM
+    form_class = OEMForm
+    template_name = 'apps/app_repository/form_generic.html'
+    success_url = reverse_lazy('repo_oem_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f'编辑主机厂: {self.object.name}'
+        return context

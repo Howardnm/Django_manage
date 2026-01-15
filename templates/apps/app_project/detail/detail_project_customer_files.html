@@ -1,81 +1,184 @@
 <div class="card mb-3">
+    <!-- 头部：标题与编辑 -->
     <div class="card-header">
-        <h3 class="card-title">项目档案 & 客户</h3>
+        <h3 class="card-title">项目档案 & 资料库</h3>
         <div class="card-actions">
-            <!-- 跳转到档案编辑页 -->
-            <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="编辑档案">
+            <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-icon btn-ghost-primary" title="编辑基础信息">
                 <i class="ti ti-edit"></i>
             </a>
         </div>
     </div>
 
     {% if repo %}
-    <div class="list-group list-group-flush">
+        <div class="card-body p-0">
 
-        <!-- 1. 客户信息 -->
-        <div class="list-group-item">
-            <div class="d-flex align-items-center mb-2">
-                <span class="avatar avatar-sm bg-blue-lt me-2">客</span>
-                <div class="text-truncate">
-                    <div class="fw-bold text-primary">{{ repo.customer.company_name|default:"未关联客户" }}</div>
-                    {% if repo.product_name %}
-                    <div class="text-muted small">制件: {{ repo.product_name }}</div>
-                    {% endif %}
+            <!-- 1. 核心信息区 -->
+            <div class="p-3 border-bottom">
+                <div class="row g-3">
+
+                    <!-- 左上：直接客户 -->
+                    <div class="col-6">
+                        <div class="text-secondary small fw-bold mb-1">
+                            直接客户 (Tier 1)
+                        </div>
+
+                        {% if repo.customer %}
+                            <!-- 有客户：显示链接 -->
+                            <!-- text-decoration-none: 去掉下划线 -->
+                            <!-- d-block: 让点击区域撑满整行 -->
+                            <a href="{% url 'repo_customer_edit' repo.customer.pk %}"
+                               target="_blank"
+                               class="h3 m-0 fw-bold text-primary text-truncate d-block text-decoration-none"
+                               title="点击查看/编辑客户信息">
+                                {{ repo.customer.company_name }}
+                            </a>
+                        {% else %}
+                            <!-- 无客户：显示占位符 -->
+                            <div class="h3 m-0 fw-bold text-muted">-</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 右上：主机厂 -->
+                    <div class="col-6">
+                        <div class="text-secondary small fw-bold mb-1">
+                            终端主机厂 (OEM)
+                        </div>
+
+                        {% if repo.oem %}
+                            <!-- 有主机厂：显示链接 (使用 text-body 保持深色，或者 text-reset) -->
+                            <a href="{% url 'repo_oem_edit' repo.oem.pk %}"
+                               target="_blank"
+                               class="h3 m-0 fw-bold text-body text-truncate d-block text-decoration-none"
+                               title="点击查看/编辑主机厂信息">
+                                {{ repo.oem.name }}
+                            </a>
+                        {% else %}
+                            <div class="h3 m-0 fw-bold text-muted">-</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 左下：目标成本 -->
+                    <div class="col-6">
+                        <div class="text-secondary small fw-bold mb-1">
+                            目标成本 (RMB)
+                        </div>
+                        <div class="h2 m-0 fw-bold text-green">
+                            {% if repo.target_cost %}
+                                <small class="fs-4">¥</small>{{ repo.target_cost }}
+                            {% else %}
+                                <span class="text-muted fs-4">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- 右下：竞品售价 -->
+                    <div class="col-6">
+                        <div class="text-secondary small fw-bold mb-1">
+                            竞品售价 (RMB)
+                        </div>
+                        <div class="h2 m-0 fw-bold text-orange">
+                            {% if repo.competitor_price %}
+                                <small class="fs-4">¥</small>{{ repo.competitor_price }}
+                            {% else %}
+                                <span class="text-muted fs-4">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
                 </div>
-            </div>
-            {% if repo.customer %}
-            <div class="row g-2 small text-muted">
-                <div class="col-6">
-                    <i class="ti ti-user me-1"></i> {{ repo.customer.contact_name }}
-                </div>
-                <div class="col-6">
-                    <i class="ti ti-phone me-1"></i> {{ repo.customer.phone }}
-                </div>
-                {% if repo.customer.qa_contact %}
-                <div class="col-12">
-                    <i class="ti ti-shield-check me-1"></i> QA: {{ repo.customer.qa_contact }}
-                </div>
+
+                <!-- 业务员微型条 (恢复蓝色背景样式) -->
+                {% if repo.salesperson %}
+                    <div class="mt-3 d-flex align-items-center p-2 rounded bg-azure-lt">
+                        <!-- 头像 -->
+                        <span class="avatar avatar-xs rounded me-2 bg-white text-azure fw-bold">
+                    {{ repo.salesperson.name|slice:":1" }}
+                </span>
+
+                        <!-- 姓名与职位 -->
+                        <div class="flex-fill small lh-1">
+                            <div class="fw-bold text-blue mb-1">{{ repo.salesperson.name }}</div>
+                            <div class="text-blue opacity-75" style="font-size: 10px;">项目跟进-业务员</div>
+                        </div>
+
+                        <!-- 电话按钮 -->
+                        {% if repo.salesperson.phone %}
+                            <a href="tel:{{ repo.salesperson.phone }}" class="text-blue ms-2" title="拨打: {{ repo.salesperson.phone }}">
+                                <i class="ti ti-phone"></i>
+                            </a>
+                        {% endif %}
+                    </div>
                 {% endif %}
             </div>
-            {% endif %}
+
+            <!-- 2. 文件资料区 -->
+            <!-- 头部：标题+上传按钮 -->
+            <div class="d-flex align-items-center justify-content-between p-3 pb-2 bg-light-lt">
+                <div class="small fw-bold text-muted text-uppercase">
+                    <i class="ti ti-folder me-1"></i> 文件资料 ({{ repo.files.count }})
+                </div>
+                <a href="{% url 'repo_file_add' repo.id %}" class="btn btn-xs btn-white">
+                    <i class="ti ti-upload me-1"></i> 上传
+                </a>
+            </div>
+
+            <!-- 文件网格：使用 row + col-6 实现双列布局 -->
+            <div class="p-2 bg-light-lt">
+                <div class="row g-2"> <!-- g-2 控制间距更紧凑 -->
+                    {% for file in repo.files.all %}
+                        <div class="col-lg-6 col-12">
+                            <!-- 文件胶囊卡片 -->
+                            <div class="card card-sm border hover-shadow-sm h-100">
+                                <div class="card-body p-2 d-flex align-items-center">
+                                    <!-- 图标 -->
+                                    <div class="me-2">
+                                        {% if file.file_type == 'DRAWING_2D' %}<span class="avatar avatar-xs bg-azure-lt rounded">2D</span>
+                                        {% elif file.file_type == 'DRAWING_3D' %}<span class="avatar avatar-xs bg-orange-lt rounded">3D</span>
+                                        {% elif file.file_type == 'STANDARD' %}<span class="avatar avatar-xs bg-green-lt rounded"><i class="ti ti-book"></i></span>
+                                        {% elif file.file_type == 'QUOTE' %}<span class="avatar avatar-xs bg-yellow-lt rounded"><i class="ti ti-currency-yen"></i></span>
+                                        {% elif file.file_type == 'REPORT' %}<span class="avatar avatar-xs bg-purple-lt rounded"><i class="ti ti-report"></i></span>
+                                        {% else %}<span class="avatar avatar-xs bg-secondary-lt rounded"><i class="ti ti-file"></i></span>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- 文件名与信息 -->
+                                    <div class="flex-fill overflow-hidden">
+                                        <a href="{% url 'secure_download' 'app_repository' 'projectfile' file.pk 'file' %}" target="_blank"
+                                           class="text-reset d-block text-truncate small fw-bold" title="{{ file.description|default:file.filename }}">
+                                            {{ file.description|default:file.filename }}
+                                        </a>
+                                        <div class="text-muted" style="font-size: 10px;">
+                                            {{ file.uploaded_at|date:"m-d" }} · {{ file.get_file_type_display }}
+                                        </div>
+                                    </div>
+
+                                    <!-- 删除按钮 -->
+                                    <form action="{% url 'repo_file_delete' file.pk %}" method="POST" onsubmit="return confirm('确定删除此文件吗？');" class="ms-1">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-link btn-sm text-muted p-0" title="删除">
+                                            <i class="ti ti-x fs-4"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12">
+                            <div class="text-center text-muted small py-3">
+                                <i class="ti ti-file-upload mb-1 d-block opacity-50"></i>
+                                暂无文件
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
         </div>
-
-        <!-- 2. 专属文件下载 -->
-        <div class="list-group-item bg-light-lt">
-            <div class="small fw-bold text-muted mb-2">项目专属图纸/报告</div>
-            <div class="btn-list">
-                <!-- 2D 图纸 -->
-                {% if repo.file_drawing_2d %}
-                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_drawing_2d' %}" class="btn btn-sm btn-white w-100 text-start">
-                        <i class="ti ti-photo me-2 text-azure"></i> 2D 图纸
-                    </a>
-                {% endif %}
-
-                <!-- 3D 图纸 -->
-                {% if repo.file_drawing_3d %}
-                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_drawing_3d' %}" class="btn btn-sm btn-white w-100 text-start">
-                        <i class="ti ti-box-model-2 me-2 text-orange"></i> 3D 模型
-                    </a>
-                {% endif %}
-
-                <!-- 标准书 -->
-                {% if repo.file_standard %}
-                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_standard' %}" class="btn btn-sm btn-white w-100 text-start">
-                        <i class="ti ti-book me-2 text-green"></i> 规格书
-                    </a>
-                {% endif %}
-
-                {% if not repo.file_drawing_2d and not repo.file_drawing_3d and not repo.file_standard %}
-                    <span class="text-muted small fst-italic">暂无图纸上传</span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
     {% else %}
-    <div class="card-body text-center text-muted">
-        <i class="ti ti-folder-off fs-2 mb-2"></i>
-        <p>暂无档案信息</p>
-        <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-primary">立即建立</a>
-    </div>
+        <div class="card-body text-center py-4">
+            <div class="empty-icon"><i class="ti ti-folder-plus fs-2 text-muted"></i></div>
+            <p class="text-muted small">尚未建立项目档案</p>
+            <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-primary">立即初始化</a>
+        </div>
     {% endif %}
 </div>

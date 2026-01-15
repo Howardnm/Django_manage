@@ -1,7 +1,7 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from app_repository.models import Customer, MaterialLibrary, MaterialType, ApplicationScenario
+from app_repository.models import Customer, MaterialLibrary, MaterialType, ApplicationScenario, OEM
 
 
 class TablerFilterMixin:
@@ -67,7 +67,7 @@ class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
         fields=(
             ('grade_name', 'grade_name'),
             ('category__name', 'category_name'),
-            ('scenario__name', 'scenario_name'), # 如果想按场景排
+            ('scenario__name', 'scenario_name'),  # 如果想按场景排
             # 物理
             ('melt_index', 'melt_index'),
             # 机械
@@ -76,7 +76,7 @@ class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
             ('flexural_modulus', 'flex_modulus'),
             ('izod_impact_23', 'impact_23'),
             # 热学
-            ('hdt_045', 'hdt_045'), # HDT 主要按这个排
+            ('hdt_045', 'hdt_045'),  # HDT 主要按这个排
             ('hdt_180', 'hdt_180'),
             # 阻燃
             ('flammability', 'flammability'),
@@ -94,4 +94,28 @@ class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
         return queryset.filter(
             Q(grade_name__icontains=value) |
             Q(manufacturer__icontains=value)
+        )
+
+
+# 3. 主机厂过滤器
+class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('name', 'name'),
+            ('short_name', 'short_name'),
+            ('id', 'id'),
+        ),
+        widget=forms.HiddenInput
+    )
+
+    class Meta:
+        model = OEM
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(short_name__icontains=value)
         )
