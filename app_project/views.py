@@ -40,7 +40,7 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
             # 但你用的是 Tabler 手写 HTML，所以依然回显参数：
             'current_sort': request.GET.get('sort', ''),
         }
-        return render(request, 'apps/projects/list.html', context)
+        return render(request, 'apps/app_project/list.html', context)
 
 
 # ==========================================
@@ -52,7 +52,7 @@ class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
     # 4. 如果没权限，直接抛出 403 错误（而不是跳回登录页）
     raise_exception = True
 
-    template_name = 'apps/projects/create.html'
+    template_name = 'apps/app_project/create.html'
 
     def get(self, request):
         return render(request, self.template_name, {'form': ProjectForm()})
@@ -73,23 +73,34 @@ class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
 # ==========================================
 class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, View):
     def get(self, request, pk):
-        # 1. 获取数据 & 权限检查
-        project = get_object_or_404(Project.objects.prefetch_related('nodes'), pk=pk)
+        # 1. 获取数据 & 优化查询
+        # 使用 select_related 一次性把 档案、客户、材料、材料分类 全部抓取出来
+        project = get_object_or_404(
+            Project.objects.select_related(
+                'manager',
+                'repository',
+                'repository__customer',
+                'repository__material',
+                'repository__material__category',
+                'repository__material__scenario'
+            ).prefetch_related('nodes'),
+            pk=pk
+        )
+
         self.check_project_permission(project)
 
         nodes = project.cached_nodes
-        # 3. 【核心调用】一行代码搞定甘特图数据
         gantt_data_json = get_project_gantt_data(project)
 
-        # 2. 组装 Context
         context = {
             'project': project,
             'nodes': nodes,
-            'gantt_data_json': gantt_data_json
+            'gantt_data_json': gantt_data_json,
+            # 将 repository 单独提出来传给模板，方便调用 (虽然 project.repository 也能用)
+            'repo': getattr(project, 'repository', None)
         }
 
-        return render(request, 'apps/projects/detail.html', context)
-
+        return render(request, 'apps/app_project/detail.html', context)
 
 
 
@@ -97,7 +108,7 @@ class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, View):
 # 4. 节点操作：常规更新
 # ==========================================
 class ProjectNodeUpdateView(LoginRequiredMixin, ProjectPermissionMixin, View):
-    template_name = 'apps/projects/detail/modal_box/_project_progress_update.html'
+    template_name = 'apps/app_project/detail/modal_box/_project_progress_update.html'
 
     def get_node_and_check_perm(self, pk):
         """辅助方法：获取节点并检查权限"""
@@ -131,7 +142,7 @@ class ProjectNodeUpdateView(LoginRequiredMixin, ProjectPermissionMixin, View):
 # 5. 节点操作：申报不合格 (失败重开)
 # ==========================================
 class NodeFailedView(LoginRequiredMixin, ProjectPermissionMixin, View):
-    template_name = 'apps/projects/detail/modal_box/_project_progress_failed.html'
+    template_name = 'apps/app_project/detail/modal_box/_project_progress_failed.html'
 
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
@@ -154,7 +165,7 @@ class NodeFailedView(LoginRequiredMixin, ProjectPermissionMixin, View):
 # 6. 节点操作：客户干预/反馈
 # ==========================================
 class InsertFeedbackView(LoginRequiredMixin, ProjectPermissionMixin, View):
-    template_name = 'apps/projects/detail/modal_box/_project_progress_feedback.html'
+    template_name = 'apps/app_project/detail/modal_box/_project_progress_feedback.html'
 
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)

@@ -1,0 +1,81 @@
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">项目档案 & 客户</h3>
+        <div class="card-actions">
+            <!-- 跳转到档案编辑页 -->
+            <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="编辑档案">
+                <i class="ti ti-edit"></i>
+            </a>
+        </div>
+    </div>
+
+    {% if repo %}
+    <div class="list-group list-group-flush">
+
+        <!-- 1. 客户信息 -->
+        <div class="list-group-item">
+            <div class="d-flex align-items-center mb-2">
+                <span class="avatar avatar-sm bg-blue-lt me-2">客</span>
+                <div class="text-truncate">
+                    <div class="fw-bold text-primary">{{ repo.customer.company_name|default:"未关联客户" }}</div>
+                    {% if repo.product_name %}
+                    <div class="text-muted small">制件: {{ repo.product_name }}</div>
+                    {% endif %}
+                </div>
+            </div>
+            {% if repo.customer %}
+            <div class="row g-2 small text-muted">
+                <div class="col-6">
+                    <i class="ti ti-user me-1"></i> {{ repo.customer.contact_name }}
+                </div>
+                <div class="col-6">
+                    <i class="ti ti-phone me-1"></i> {{ repo.customer.phone }}
+                </div>
+                {% if repo.customer.qa_contact %}
+                <div class="col-12">
+                    <i class="ti ti-shield-check me-1"></i> QA: {{ repo.customer.qa_contact }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 2. 专属文件下载 -->
+        <div class="list-group-item bg-light-lt">
+            <div class="small fw-bold text-muted mb-2">项目专属图纸/报告</div>
+            <div class="btn-list">
+                <!-- 2D 图纸 -->
+                {% if repo.file_drawing_2d %}
+                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_drawing_2d' %}" class="btn btn-sm btn-white w-100 text-start">
+                        <i class="ti ti-photo me-2 text-azure"></i> 2D 图纸
+                    </a>
+                {% endif %}
+
+                <!-- 3D 图纸 -->
+                {% if repo.file_drawing_3d %}
+                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_drawing_3d' %}" class="btn btn-sm btn-white w-100 text-start">
+                        <i class="ti ti-box-model-2 me-2 text-orange"></i> 3D 模型
+                    </a>
+                {% endif %}
+
+                <!-- 标准书 -->
+                {% if repo.file_standard %}
+                    <a href="{% url 'secure_download' 'app_repository' 'projectrepository' repo.pk 'file_standard' %}" class="btn btn-sm btn-white w-100 text-start">
+                        <i class="ti ti-book me-2 text-green"></i> 规格书
+                    </a>
+                {% endif %}
+
+                {% if not repo.file_drawing_2d and not repo.file_drawing_3d and not repo.file_standard %}
+                    <span class="text-muted small fst-italic">暂无图纸上传</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="card-body text-center text-muted">
+        <i class="ti ti-folder-off fs-2 mb-2"></i>
+        <p>暂无档案信息</p>
+        <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-primary">立即建立</a>
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,190 @@
+{% if repo.material %}
+<div class="card mb-3">
+    <!-- ============================================================ -->
+    <!-- 上半部分：材料身份信息 (Identity & Documents) -->
+    <!-- ============================================================ -->
+    <div class="card-body border-bottom bg-light-lt">
+        <div class="row align-items-center">
+            <!-- 左侧：牌号与厂商 -->
+            <div class="col">
+                <div class="d-flex align-items-center mb-1">
+                    <span class="avatar bg-blue-lt rounded me-2">
+                        {{ repo.material.grade_name|slice:":1" }}
+                    </span>
+                    <div>
+                        <h3 class="card-title m-0">
+                            <a href="{% url 'repo_material_detail' repo.material.pk %}" target="_blank" class="text-blue" title="点击查看详情">
+                                {{ repo.material.grade_name }}
+                            </a>
+                        </h3>
+                        <div class="text-muted small">{{ repo.material.manufacturer }}</div>
+                    </div>
+                </div>
+            </div>
+            <!-- 右侧：标签与阻燃 -->
+            <div class="col-auto text-end">
+                <span class="badge bg-purple-lt">{{ repo.material.category.name }}</span>
+                {% if repo.material.flammability %}
+                    <span class="badge {% if 'V-0' in repo.material.flammability %}bg-red{% else %}bg-orange{% endif %} ms-1">
+                        <span class="text-white">{{ repo.material.flammability }}</span>
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="mt-3">
+            <div class="text-secondary small mb-2 text-truncate">
+                <i class="ti ti-info-circle me-1"></i>
+                {{ repo.material.description|default:"暂无特性描述" }}
+            </div>
+            <!-- 文档下载按钮组 -->
+            <div class="btn-list">
+                {% if repo.material.file_tds %}
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_tds' %}" target="_blank" class="btn btn-sm btn-pill btn-outline-primary">
+                        <i class="ti ti-file-text me-1"></i> TDS
+                    </a>
+                {% endif %}
+                {% if repo.material.file_msds %}
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_msds' %}" target="_blank" class="btn btn-sm btn-pill btn-outline-danger">
+                        <i class="ti ti-flask me-1"></i> MSDS
+                    </a>
+                {% endif %}
+                {% if repo.material.file_rohs %}
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_rohs' %}" target="_blank" class="btn btn-sm btn-pill btn-outline-success">
+                        <i class="ti ti-leaf me-1"></i> RoHS
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 下半部分：全维物性指标 (Performance Matrix) -->
+    <!-- ============================================================ -->
+    <div class="card-body p-0">
+
+        <!-- A. 物理性能区域 (蓝色) -->
+        <div class="p-3 border-bottom">
+            <div class="text-uppercase text-muted font-weight-bold small mb-3 text-blue">
+                <i class="ti ti-microscope me-1"></i> 物理性能 (Physical)
+            </div>
+            <div class="row row-cards">
+                <!-- 密度 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>密度 (g/cm³)</span>
+                        <span class="fw-bold">{{ repo.material.density|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-blue" style="width: {% widthratio repo.material.density|default:0 2.5 100 %}%"></div></div>
+                </div>
+                <!-- M.I -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>熔融指数 (g/10min)</span>
+                        <span class="fw-bold">{{ repo.material.melt_index|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-cyan" style="width: {% widthratio repo.material.melt_index|default:0 100 100 %}%"></div></div>
+                </div>
+                <!-- 灰分 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>灰分 Ash (%)</span>
+                        <span class="fw-bold">{{ repo.material.ash_content|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-azure" style="width: {% widthratio repo.material.ash_content|default:0 60 100 %}%"></div></div>
+                </div>
+                <!-- 收缩率 (MD/TD) -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>收缩率 MD/TD (%)</span>
+                        <span class="fw-bold">{{ repo.material.shrinkage_md|default:"-" }}/{{ repo.material.shrinkage_td|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm">
+                        <div class="progress-bar bg-primary" style="width: {% widthratio repo.material.shrinkage_md|default:0 3.0 50 %}%"></div>
+                        <div class="progress-bar bg-primary-lt" style="width: {% widthratio repo.material.shrinkage_td|default:0 3.0 50 %}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- B. 机械性能区域 (橙色) -->
+        <div class="p-3 border-bottom">
+            <div class="text-uppercase text-muted font-weight-bold small mb-3 text-orange">
+                <i class="ti ti-hammer me-1"></i> 机械性能 (Mechanical)
+            </div>
+            <div class="row row-cards">
+                <!-- 拉伸强度 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>拉伸强度 (MPa)</span>
+                        <span class="fw-bold">{{ repo.material.tensile_strength|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-orange" style="width: {% widthratio repo.material.tensile_strength|default:0 250 100 %}%"></div></div>
+                </div>
+                <!-- 断裂伸长率 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>断裂伸长率 (%)</span>
+                        <span class="fw-bold">{{ repo.material.elongation_break|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-yellow" style="width: {% widthratio repo.material.elongation_break|default:0 100 100 %}%"></div></div>
+                </div>
+                <!-- 弯曲强度 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>弯曲强度 (MPa)</span>
+                        <span class="fw-bold">{{ repo.material.flexural_strength|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-orange" style="width: {% widthratio repo.material.flexural_strength|default:0 300 100 %}%"></div></div>
+                </div>
+                <!-- 弯曲模量 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>弯曲模量 (MPa)</span>
+                        <span class="fw-bold">{{ repo.material.flexural_modulus|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-dark" style="width: {% widthratio repo.material.flexural_modulus|default:0 15000 100 %}%"></div></div>
+                </div>
+                <!-- 冲击 (23度/低温) -->
+                <div class="col-12">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>Izod 缺口冲击 23℃ / -30℃</span>
+                        <span class="fw-bold">{{ repo.material.izod_impact_23|default:"-" }} / {{ repo.material.izod_impact_minus_30|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm">
+                        <!-- 常温紫色，低温浅紫 -->
+                        <div class="progress-bar bg-purple" style="width: {% widthratio repo.material.izod_impact_23|default:0 100 50 %}%" title="23℃"></div>
+                        <div class="progress-bar bg-purple-lt" style="width: {% widthratio repo.material.izod_impact_minus_30|default:0 100 50 %}%" title="-30℃"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- C. 热学性能区域 (红色) -->
+        <div class="p-3">
+            <div class="text-uppercase text-muted font-weight-bold small mb-3 text-red">
+                <i class="ti ti-flame me-1"></i> 热学性能 (Thermal)
+            </div>
+            <div class="row row-cards">
+                <!-- HDT 0.45 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>HDT 0.45MPa (℃)</span>
+                        <span class="fw-bold">{{ repo.material.hdt_045|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-red" style="width: {% widthratio repo.material.hdt_045|default:0 300 100 %}%"></div></div>
+                </div>
+                <!-- HDT 1.80 -->
+                <div class="col-6">
+                    <div class="d-flex justify-content-between small mb-1">
+                        <span>HDT 1.80MPa (℃)</span>
+                        <span class="fw-bold">{{ repo.material.hdt_180|default:"-" }}</span>
+                    </div>
+                    <div class="progress progress-sm"><div class="progress-bar bg-red-lt" style="width: {% widthratio repo.material.hdt_180|default:0 300 100 %}%"></div></div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endif %}

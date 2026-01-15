@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% include 'apps/app_project/detail/detail_project_header.html' %}
+
+    <div class="row row-cards mt-3">
+
+        <!-- =================================================== -->
+        <!-- 左侧栏 (静态档案区) - 占据 50% 宽度 -->
+        <!-- =================================================== -->
+        <div class="col-lg-6">
+
+            <!-- 1. 项目基本信息 -->
+            {% include 'apps/app_project/detail/detail_project_info.html' %}
+
+            <!-- 2. 客户与专属文件 -->
+            {% include 'apps/app_project/detail/detail_project_customer_files.html' %}
+
+            <!-- 3. 【移动至此】材料全性能卡片 -->
+            {% include 'apps/app_project/detail/detail_project_material.html' %}
+            <!-- 1. 顶部：甘特图 -->
+            {% include 'apps/app_project/detail/detail_project_gantt.html' %}
+
+        </div>
+
+        <!-- =================================================== -->
+        <!-- 右侧栏 (动态进度区) - 占据 50% 宽度 -->
+        <!-- =================================================== -->
+        <div class="col-lg-6">
+            <div class="row row-cards">
+
+
+                <!-- 2. 下部：垂直进度时间轴 -->
+                {% include 'apps/app_project/detail/detail_project_progress.html' %}
+
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}
