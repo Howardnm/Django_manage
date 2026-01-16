@@ -1,8 +1,11 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import HttpResponse
+from django.urls import reverse
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.views.generic import UpdateView, CreateView
+
 from .models import Project, ProjectNode, ProjectStage
 from .forms import ProjectForm, ProjectNodeUpdateForm
 from .mixins import ProjectPermissionMixin
@@ -43,29 +46,41 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
         return render(request, 'apps/app_project/list.html', context)
 
 
-# ==========================================
 # 2. 项目创建
-# ==========================================
-class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    # 指定权限：<app_label>.add_<model_name>
-    permission_required = 'app_project.view_project'
-    # 4. 如果没权限，直接抛出 403 错误（而不是跳回登录页）
+class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    # 建议将权限改为 add_project，这更符合 Django 规范，当然用 view_project 也能跑
+    permission_required = 'app_project.add_project'
     raise_exception = True
 
-    template_name = 'apps/app_project/create.html'
+    model = Project
+    form_class = ProjectForm
+    # 【关键】指向通用模板
+    template_name = 'apps/app_project/project_form.html'
 
-    def get(self, request):
-        return render(request, self.template_name, {'form': ProjectForm()})
+    def form_valid(self, form):
+        # 相当于你原来 post 方法里的 project.manager = request.user
+        form.instance.manager = self.request.user
+        return super().form_valid(form)
 
-    def post(self, request):
-        form = ProjectForm(request.POST)
-        if form.is_valid():
-            project = form.save(commit=False)
-            project.manager = request.user
-            project.save()  # 触发 signals 生成节点
-            return redirect('project_list')
+    def get_success_url(self):
+        # 创建成功后跳转到列表
+        return reverse('project_list')
 
-        return render(request, self.template_name, {'form': form})
+
+# 2. 编辑项目视图 (新增)
+class ProjectUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    # 编辑权限通常是 change_project
+    permission_required = 'app_project.change_project'
+    raise_exception = True
+
+    model = Project
+    form_class = ProjectForm
+    # 【关键】指向同一个通用模板
+    template_name = 'apps/app_project/project_form.html'
+
+    def get_success_url(self):
+        # 编辑成功后，跳回该项目的详情页
+        return reverse('project_detail', kwargs={'pk': self.object.pk})
 
 
 # ==========================================

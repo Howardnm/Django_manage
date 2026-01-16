@@ -163,3 +163,49 @@ class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
             Q(name__icontains=value) |
             Q(short_name__icontains=value)
         )
+
+
+# 1. 材料类型过滤器
+class MaterialTypeFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('name', 'name'),
+            ('id', 'id'),
+        ),
+        widget=forms.HiddenInput
+    )
+
+    class Meta:
+        model = MaterialType
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(description__icontains=value)
+        )
+
+
+# 2. 应用场景过滤器
+class ScenarioFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('name', 'name'),
+            ('id', 'id'),
+        ),
+        widget=forms.HiddenInput
+    )
+
+    class Meta:
+        model = ApplicationScenario
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(requirements__icontains=value)
+        )

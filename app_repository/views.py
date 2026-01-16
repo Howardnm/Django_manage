@@ -7,9 +7,9 @@ from django.urls import reverse_lazy, reverse
 from django.contrib import messages
 from django.db.models import Q
 from app_project.models import Project
-from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
-from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm, ProjectFileForm, SalespersonForm, OEMForm
-from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter, ProjectRepositoryFilter
+from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson, MaterialFile
+from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm, ProjectFileForm, SalespersonForm, OEMForm, MaterialFileForm
+from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter, ProjectRepositoryFilter, MaterialTypeFilter, ScenarioFilter
 from django.apps import apps
 
 
@@ -139,7 +139,10 @@ class MaterialCreateView(LoginRequiredMixin, CreateView):
     form_class = MaterialForm
     # 【修改】指向专用模板
     template_name = 'apps/app_repository/material/material_form.html'
-    success_url = reverse_lazy('repo_material_list')
+    # 【新增】动态跳转到详情页
+    def get_success_url(self):
+        # self.object 就是刚刚创建好的材料对象
+        return reverse('repo_material_detail', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -153,13 +156,54 @@ class MaterialUpdateView(LoginRequiredMixin, UpdateView):
     form_class = MaterialForm
     # 【修改】指向专用模板
     template_name = 'apps/app_repository/material/material_form.html'
-    success_url = reverse_lazy('repo_material_list')
+    # 【新增】动态跳转到详情页
+    def get_success_url(self):
+        # self.object 就是刚刚修改好的材料对象
+        return reverse('repo_material_detail', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'编辑材料: {self.object.grade_name}'
         context['is_edit'] = True
         return context
+
+
+# ==========================================
+# 9. 材料附件管理 (新增)
+# ==========================================
+
+class MaterialFileUploadView(LoginRequiredMixin, CreateView):
+    model = MaterialFile
+    form_class = MaterialFileForm
+    template_name = 'apps/app_repository/material_info/material_file_form.html'  # 专用模板
+
+    def form_valid(self, form):
+        # 关联到指定的材料
+        material_id = self.kwargs.get('material_id')
+        material = get_object_or_404(MaterialLibrary, pk=material_id)
+        form.instance.material = material
+        messages.success(self.request, "附件上传成功")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        material_id = self.kwargs.get('material_id')
+        context['material'] = get_object_or_404(MaterialLibrary, pk=material_id)
+        context['page_title'] = '上传材料附件'
+        return context
+
+    def get_success_url(self):
+        # 返回材料详情页
+        return reverse('repo_material_detail', kwargs={'pk': self.object.material.id})
+
+
+class MaterialFileDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        file_obj = get_object_or_404(MaterialFile, pk=pk)
+        material_id = file_obj.material.id
+        file_obj.delete()
+        messages.success(request, "附件已删除")
+        return redirect('repo_material_detail', pk=material_id)
 
 
 # ==========================================
@@ -236,18 +280,28 @@ class ProjectFileDeleteView(LoginRequiredMixin, View):
 # 4. 材料类型管理 (MaterialType)
 # ==========================================
 
+# 1. 材料类型列表
 class MaterialTypeListView(LoginRequiredMixin, ListView):
     model = MaterialType
-    template_name = 'apps/app_repository/material _info/type_list.html'
+    # 注意：建议检查路径是否有空格，通常是 material_info
+    template_name = 'apps/app_repository/material_info/type_list.html'
     context_object_name = 'types'
-    ordering = ['name']
+    paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        q = self.request.GET.get('q')
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(description__icontains=q))
-        return qs
+        # 基础查询集
+        qs = super().get_queryset().order_by('name')
+        # 接入 Filter
+        self.filterset = MaterialTypeFilter(self.request.GET, queryset=qs)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
+        # 页面标题，方便模板调用
+        context['page_title'] = '材料类型管理'
+        return context
 
 
 class MaterialTypeCreateView(LoginRequiredMixin, CreateView):
@@ -278,18 +332,24 @@ class MaterialTypeUpdateView(LoginRequiredMixin, UpdateView):
 # 5. 应用场景管理 (ApplicationScenario)
 # ==========================================
 
+# 2. 应用场景列表
 class ScenarioListView(LoginRequiredMixin, ListView):
     model = ApplicationScenario
-    template_name = 'apps/app_repository/material _info/scenario_list.html'
+    template_name = 'apps/app_repository/material_info/scenario_list.html'
     context_object_name = 'scenarios'
-    ordering = ['name']
+    paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        q = self.request.GET.get('q')
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(requirements__icontains=q))
-        return qs
+        qs = super().get_queryset().order_by('name')
+        self.filterset = ScenarioFilter(self.request.GET, queryset=qs)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
+        context['page_title'] = '应用场景管理'
+        return context
 
 
 class ScenarioCreateView(LoginRequiredMixin, CreateView):

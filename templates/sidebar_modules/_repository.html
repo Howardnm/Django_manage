@@ -1,6 +1,6 @@
 <!-- 资料主数据模块 -->
 <!-- 定义该模块包含的所有 URL name (包括列表、新增、编辑) -->
-{% with route_names='repo_customer_list repo_customer_add repo_customer_edit repo_material_list repo_material_add repo_material_edit repo_type_list repo_type_add repo_type_edit repo_scenario_list repo_scenario_add repo_scenario_edit repo_sales_list repo_sales_add repo_sales_edit repo_oem_list repo_oem_add repo_oem_edit' %}
+{% with route_names='repo_customer_list repo_customer_add repo_customer_edit repo_material_list repo_material_add repo_material_edit repo_type_list repo_type_add repo_type_edit repo_scenario_list repo_scenario_add repo_scenario_edit repo_sales_list repo_sales_add repo_sales_edit repo_oem_list repo_oem_add repo_oem_edit repo_list repo_project_edit repo_file_add repo_file_delete' %}
 
     <li class="nav-item dropdown">
         <!-- 父级菜单高亮逻辑 -->
@@ -19,10 +19,32 @@
             <div class="dropdown-menu-columns">
                 <div class="dropdown-menu-column">
 
-
+                    <div class="dropdown-divider"></div>
+                    <span class="dropdown-header">档案库</span>
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'repo_list' %}active{% endif %}"
                        href="{% url 'repo_list' %}">
                         项目档案库
+                    </a>
+
+                    <div class="dropdown-divider"></div>
+                    <span class="dropdown-header">商务信息</span>
+
+                    <!-- 2. 客户库 -->
+                    <!-- 逻辑：当前URL包含 'repo_customer' 时高亮 (涵盖 list/add/edit) -->
+                    <a class="dropdown-item {% if 'repo_customer' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'repo_customer_list' %}">
+                        客户库管理
+                    </a>
+
+                    <!-- 在 客户库 下方/上方添加 -->
+                    <a class="dropdown-item {% if 'repo_oem' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'repo_oem_list' %}">
+                        主机厂管理
+                    </a>
+
+                    <a class="dropdown-item {% if 'repo_sales' in request.resolver_match.url_name %}active{% endif %}"
+                       href="{% url 'repo_sales_list' %}">
+                        业务员管理
                     </a>
 
                     <div class="dropdown-divider"></div>
@@ -48,26 +70,7 @@
                         应用场景配置
                     </a>
 
-                    <div class="dropdown-divider"></div>
-                    <span class="dropdown-header">商务信息</span>
 
-                    <!-- 2. 客户库 -->
-                    <!-- 逻辑：当前URL包含 'repo_customer' 时高亮 (涵盖 list/add/edit) -->
-                    <a class="dropdown-item {% if 'repo_customer' in request.resolver_match.url_name %}active{% endif %}"
-                       href="{% url 'repo_customer_list' %}">
-                        客户库管理
-                    </a>
-
-                    <!-- 在 客户库 下方/上方添加 -->
-                    <a class="dropdown-item {% if 'repo_oem' in request.resolver_match.url_name %}active{% endif %}"
-                       href="{% url 'repo_oem_list' %}">
-                        主机厂管理
-                    </a>
-
-                    <a class="dropdown-item {% if 'repo_sales' in request.resolver_match.url_name %}active{% endif %}"
-                       href="{% url 'repo_sales_list' %}">
-                        业务员管理
-                    </a>
 
 
                 </div>

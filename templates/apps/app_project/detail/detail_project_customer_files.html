@@ -23,9 +23,8 @@
                 </div>
             </div>
 
-            <!-- 编辑按钮：放入 card-actions 确保不歪 -->
-            <div class="card-actions">
-                <a href="{% url 'repo_project_edit' project.id %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
+            <div class="ms-auto">
+                <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-ghost-primary" title="编辑">
                     <i class="ti ti-edit"></i>
                 </a>
             </div>
@@ -105,11 +104,11 @@
             <!-- ============================================================ -->
             <!-- 2. 文件资料区 (高度压缩版) -->
             <!-- ============================================================ -->
-            <div class="d-flex align-items-center justify-content-between px-3 py-1 bg-light-lt border-bottom" style="min-height: 32px;">
+            <div class="d-flex align-items-center justify-content-between px-3 py-1 bg-light-lt border-bottom">
 
                 <!-- 标题：字号微调到 11px 以匹配窄行 -->
                 <div class="font-weight-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">
-                    <i class="ti ti-folder me-1"></i> 文件资料 ({{ repo.files.count }})
+                    <i class="ti ti-folder me-1"></i>文件资料 ({{ repo.files.count }})
                 </div>
 
                 <!-- 按钮修改：

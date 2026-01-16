@@ -134,6 +134,39 @@ class MaterialLibrary(models.Model):
         ordering = ['-created_at']  # 默认按创建时间倒序排列 (最新的在最前)
 
 
+# 【新增】材料额外文件子表
+class MaterialFile(models.Model):
+    """
+    材料的额外附件库 (一对多)
+    用于存储除了 TDS/MSDS/RoHS 之外的其他文件，如 UL黄卡、COC、REACH报告等
+    """
+    FILE_TYPE_CHOICES = [
+        ('UL', 'UL黄卡/认证'),
+        ('REACH', 'REACH报告'),
+        ('COC', 'COC/出厂报告'),
+        ('SPEC', '详细规格书'),
+        ('OTHER', '其他资料'),
+    ]
+
+    material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files', verbose_name="所属材料")
+    file = models.FileField("文件附件", upload_to=repo_file_path)
+    file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
+    description = models.CharField("文件说明", max_length=100, blank=True)
+    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+
+    def filename(self):
+        import os
+        return os.path.basename(self.file.name)
+
+    def __str__(self):
+        return self.description or self.filename()
+
+    class Meta:
+        verbose_name = "材料附件"
+        verbose_name_plural = "材料附件库"
+        ordering = ['-uploaded_at']
+
+
 # ==============================================================================
 # 板块二：客户库 (CRM Lite) - 客户信息管理
 # ==============================================================================

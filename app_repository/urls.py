@@ -18,10 +18,13 @@ urlpatterns = [
     # 【新增】详情页 (注意放在 edit 之前或者之后都可以，只要不冲突)
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='repo_material_detail'),
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='repo_material_edit'),
+    # 【新增】材料文件管理路由
+    path('material/<int:material_id>/file/add/', MaterialFileUploadView.as_view(), name='repo_material_file_add'),
+    path('material/file/<int:pk>/delete/', MaterialFileDeleteView.as_view(), name='repo_material_file_delete'),
 
     # 项目档案 (入口是 project_id)
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
-    # 【新增】文件管理路由
+    # 【新增】档案文件管理路由
     path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
     path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
 

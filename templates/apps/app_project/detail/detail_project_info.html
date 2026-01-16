@@ -1,35 +1,72 @@
-<!-- 项目详情页面，左侧：项目基本信息 -->
 <div class="card mb-3">
-    <div class="card-body">
-        <div class="d-flex align-items-center mb-3">
-            <span class="avatar me-3 rounded">{{ project.manager.username|slice:":1" }}</span>
-            <div>
-                <div class="font-weight-medium">{{ project.manager.username }}</div>
-                <div class="text-secondary small">项目负责人</div>
+    <!-- 1. 顶部：负责人信息 + 编辑操作 -->
+    <div class="card-header">
+            <!-- 头像 -->
+            <span class="avatar avatar-md bg-blue-lt rounded me-3 font-weight-bold">
+                {{ project.manager.username|slice:":1"|upper }}
+            </span>
+            <!-- 信息区 -->
+            <div class="flex-fill overflow-hidden">
+                <div class="fw-bold text-body text-truncate">{{ project.name }}</div>
+                <div class="text-secondary small text-truncate">项目负责人：{{ project.manager.username }}</div>
+            </div>
+
+            <!-- 操作区：编辑按钮 -->
+            <div class="ms-auto">
+                <!-- 假设你有一个 project_edit 的 URL，如果没有请创建 -->
+                <!-- 或者使用模态框 data-bs-toggle="modal" -->
+                <a href="{% url 'project_edit' project.pk %}" class="btn btn-icon btn-ghost-primary" title="编辑项目信息">
+                    <i class="ti ti-edit"></i>
+                </a>
+            </div>
+    </div>
+    <div class="card-body p-3">
+        <!-- 描述区：紧贴负责人下方，使用分割线隔开 -->
+        <div class="">
+            <div class="small text-secondary" style="line-height: 1.6;">
+                {% if project.description %}
+                    {{ project.description }}
+                {% else %}
+                    <span class="fst-italic opacity-50">暂无项目描述...</span>
+                {% endif %}
             </div>
         </div>
-        <div class="datagrid">
-            <div class="datagrid-item">
-                <div class="datagrid-title">创建时间</div>
-                <div class="datagrid-content">{{ project.created_at|date:"Y-m-d H:m:s" }}</div>
-            </div>
-            <div class="datagrid-item">
-                <div class="datagrid-title">当前阶段</div>
-                <div class="datagrid-content text-primary">{{ project.get_progress_info.current_label }}</div>
-            </div>
-        </div>
-        <div class="hr-text">描述</div>
-        <p class="text-secondary">{{ project.description|default:"暂无描述" }}</p>
     </div>
 
-    <!-- 总进度条 -->
-    <div class="card-footer">
-        <div class="d-flex mb-2">
-            <div>总进度</div>
-            <div class="ms-auto">{{ project.get_progress_info.percent }}%</div>
+    <!-- 2. 中间：关键指标 (数据条带) -->
+    <!-- 使用 bg-light-lt 区分背景，border-top/bottom 形成腰带效果 -->
+    <div class="card-body p-0 border-top border-bottom bg-light-lt">
+        <div class="row g-0">
+            <!-- 创建时间 -->
+            <div class="col-6 border-end p-2 text-center">
+                <div class="text-uppercase text-muted text-truncate mb-1" style="font-size: 10px;">创建时间</div>
+                <div class="font-weight-medium small text-primary">{{ project.created_at|date:"Y-m-d" }}</div>
+            </div>
+            <!-- 当前阶段 -->
+            <div class="col-6 p-2 text-center">
+                <div class="text-uppercase text-muted text-truncate mb-1" style="font-size: 10px;">当前阶段</div>
+                <div class="font-weight-medium small text-primary">
+                    {{ project.get_progress_info.current_label }}
+                </div>
+            </div>
         </div>
-        <div class="progress progress-sm">
-            <div class="progress-bar bg-primary" style="width: {{ project.get_progress_info.percent }}%" role="progressbar"></div>
+    </div>
+
+    <!-- 3. 底部：进度条 (无 Footer 设计) -->
+    <div class="card-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="text-muted small fw-bold">总体进度</span>
+            <span class="ms-auto fw-bold small">{{ project.get_progress_info.percent }}%</span>
+        </div>
+
+        <div class="progress progress-sm" style="height: 6px;">
+            <div class="progress-bar bg-primary"
+                 style="width: {{ project.get_progress_info.percent }}%"
+                 role="progressbar"
+                 aria-valuenow="{{ project.get_progress_info.percent }}"
+                 aria-valuemin="0"
+                 aria-valuemax="100">
+            </div>
         </div>
     </div>
 </div>

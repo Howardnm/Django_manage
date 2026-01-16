@@ -1,5 +1,5 @@
 from django import forms
-from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
+from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson, MaterialFile
 
 
 class TablerFormMixin:
@@ -68,6 +68,15 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             'flammability': forms.Select(attrs={'class': 'form-select'}),
         }
 
+# 【新增】材料附件上传表单
+class MaterialFileForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = MaterialFile
+        fields = ['file_type', 'file', 'description']
+        widgets = {
+            'file_type': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.TextInput(attrs={'placeholder': '例如：2024年最新UL黄卡'}),
+        }
 
 # ==============================================================================
 # 3. 项目档案表单 (主表)

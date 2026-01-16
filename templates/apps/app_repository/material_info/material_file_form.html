@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">File Manager</div>
+            <h2 class="page-title">为材料上传附件: {{ material.grade_name }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-6">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="card">
+                <div class="card-status-top bg-green"></div>
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-upload me-2 text-green"></i> 添加新文件</h3>
+                </div>
+
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label required">文件类型</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-tag"></i></span>
+                            {{ form.file_type }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required">选择文件</label>
+                        {{ form.file }}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">文件说明</label>
+                        {{ form.description }}
+                    </div>
+                </div>
+
+                <div class="card-footer text-end">
+                    <a href="{% url 'repo_material_detail' material.id %}" class="btn btn-link link-secondary">取消</a>
+                    <button type="submit" class="btn btn-green ms-auto">开始上传</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
