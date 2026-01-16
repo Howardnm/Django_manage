@@ -9,7 +9,7 @@ from django.db.models import Q
 from app_project.models import Project
 from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson, MaterialFile
 from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm, ProjectFileForm, SalespersonForm, OEMForm, MaterialFileForm
-from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter, ProjectRepositoryFilter, MaterialTypeFilter, ScenarioFilter
+from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter, ProjectRepositoryFilter, MaterialTypeFilter, ScenarioFilter, SalespersonFilter
 from django.apps import apps
 
 
@@ -104,7 +104,7 @@ class MaterialListView(LoginRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('category', 'scenario').order_by('-created_at')
+        qs = super().get_queryset().prefetch_related('category', 'scenarios').order_by('-created_at')
         self.filterset = MaterialFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
@@ -383,15 +383,20 @@ class ScenarioUpdateView(LoginRequiredMixin, UpdateView):
 class SalespersonListView(LoginRequiredMixin, ListView):
     model = Salesperson
     template_name = 'apps/app_repository/project_repo_info/salesperson_list.html'
-    context_object_name = 'salespersons'  # 命名
+    context_object_name = 'salespersons' # 统一改为 page_obj 配合分页组件
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        q = self.request.GET.get('q')
-        if q:
-            qs = qs.filter(Q(name__icontains=q) | Q(phone__icontains=q))
-        return qs
+        qs = super().get_queryset().order_by('name')
+        # 【修改】接入 FilterSet
+        self.filterset = SalespersonFilter(self.request.GET, queryset=qs)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # 【关键】把 filter 传给模板，搜索框才会显示！
+        context['filter'] = self.filterset
+        return context
 
 
 class SalespersonCreateView(LoginRequiredMixin, CreateView):

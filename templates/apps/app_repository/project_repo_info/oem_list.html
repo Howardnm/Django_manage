@@ -2,28 +2,27 @@
 {% load project_extras %}
 
 {% block content %}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <h2 class="page-title">主机厂库 (OEM)</h2>
-        </div>
-        <div class="col-auto ms-auto">
-            <a href="{% url 'repo_oem_add' %}" class="btn btn-primary">
-                <i class="ti ti-plus"></i> 新增主机厂
-            </a>
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">主机厂库 (OEM)</h2>
+                <div class="text-muted mt-1">管理终端汽车品牌/主机厂信息</div>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'repo_oem_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> 新增主机厂
+                </a>
+            </div>
         </div>
     </div>
-</div>
 
-<div class="card mt-3">
-    <!-- 引入通用搜索栏 -->
-    {% include 'apps/list_modules/tools_search_filter.html' %}
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
 
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap table-hover">
-            <thead>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover">
+                <thead>
                 <tr>
-                    <!-- 排序: 名称 -->
                     <th>
                         <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             主机厂名称
@@ -32,7 +31,6 @@
                             {% endif %}
                         </a>
                     </th>
-                    <!-- 排序: 简称 -->
                     <th>
                         <a href="?{% url_replace sort='short_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             简称
@@ -41,46 +39,48 @@
                             {% endif %}
                         </a>
                     </th>
-                    <th>描述</th>
+                    <th>备注描述</th>
                     <th class="w-1">操作</th>
                 </tr>
-            </thead>
-            <tbody>
-                {% for oem in oems %}
-                <tr>
-                    <td>
-                        <div class="fw-bold">{{ oem.name }}</div>
-                    </td>
-                    <td>
-                        {% if oem.short_name %}
-                            <span class="badge bg-blue-lt">{{ oem.short_name }}</span>
-                        {% else %}
-                            <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-muted text-wrap" style="max-width: 400px;">
-                        {{ oem.description|default:"-" }}
-                    </td>
-                    <td>
-                        <a href="{% url 'repo_oem_edit' oem.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
-                    </td>
-                </tr>
+                </thead>
+                <tbody>
+                {% for oem in page_obj %}
+                    <tr>
+                        <td>
+                            <div class="fw-bold">{{ oem.name }}</div>
+                        </td>
+                        <td>
+                            {% if oem.short_name %}
+                                <span class="badge bg-blue-lt">{{ oem.short_name }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted text-wrap" style="max-width: 400px;">
+                            {{ oem.description|default:"-" }}
+                        </td>
+                        <td>
+                            <a href="{% url 'repo_oem_edit' oem.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="4" class="text-center py-4">
-                        <div class="empty">
-                            <div class="empty-icon"><i class="ti ti-database-off fs-1"></i></div>
-                            <p class="empty-title">暂无主机厂数据</p>
-                        </div>
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="4" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                                <p class="empty-title">暂无主机厂数据</p>
+                            </div>
+                        </td>
+                    </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 
-<br>
-{% include 'apps/list_modules/paginator.html' %}
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
 
 {% endblock %}

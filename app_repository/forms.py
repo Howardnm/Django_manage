@@ -63,7 +63,8 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
         fields = '__all__'
         widgets = {
             'description': forms.Textarea(attrs={'rows': 4, 'placeholder': '请输入材料特性描述...'}),
-            'scenario': forms.Select(attrs={'class': 'form-select'}),
+            # 'scenario': forms.Select(attrs={'class': 'form-select'}),
+            'scenarios': forms.SelectMultiple(attrs={'class': 'form-select'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'flammability': forms.Select(attrs={'class': 'form-select'}),
         }

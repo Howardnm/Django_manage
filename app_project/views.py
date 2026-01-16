@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.views.generic import UpdateView, CreateView
+from django.views.generic import UpdateView, CreateView, DetailView
 
 from .models import Project, ProjectNode, ProjectStage
 from .forms import ProjectForm, ProjectNodeUpdateForm
@@ -86,36 +86,46 @@ class ProjectUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
 # ==========================================
 # 3. 项目详情
 # ==========================================
-class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, View):
-    def get(self, request, pk):
-        # 1. 获取数据 & 优化查询
-        # 使用 select_related 一次性把 档案、客户、材料、材料分类 全部抓取出来
-        project = get_object_or_404(
-            Project.objects.select_related(
-                'manager',
-                'repository',
-                'repository__customer',
-                'repository__material',
-                'repository__material__category',
-                'repository__material__scenario'
-            ).prefetch_related('nodes'),
-            pk=pk
-        )
+class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, DetailView):
+    model = Project
+    template_name = 'apps/app_project/detail.html'
+    context_object_name = 'project'
 
-        self.check_project_permission(project)
+    # 1. 【核心精简】直接定义查询集，自动处理 N+1 问题
+    # DetailView 会自动使用这个 queryset 来查找 pk=pk 的对象
+    queryset = Project.objects.select_related(
+        'manager',
+        'repository',
+        'repository__customer',
+        'repository__oem',
+        'repository__salesperson',
+        'repository__material',
+        'repository__material__category',
+    ).prefetch_related(
+        'nodes',
+        'repository__files',
+        'repository__material__scenarios',       # 多对多必须用 prefetch
+        'repository__material__additional_files'
+    )
 
-        nodes = project.cached_nodes
-        gantt_data_json = get_project_gantt_data(project)
+    # 2. 【权限精简】重写 get_object 自动注入权限检查
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        self.check_project_permission(obj) # 利用 Mixin 检查权限
+        return obj
 
-        context = {
-            'project': project,
-            'nodes': nodes,
-            'gantt_data_json': gantt_data_json,
-            # 将 repository 单独提出来传给模板，方便调用 (虽然 project.repository 也能用)
-            'repo': getattr(project, 'repository', None)
-        }
+    # 3. 【逻辑精简】只关注额外的 Context 数据
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self.object  # DetailView 已经帮你取到了对象
 
-        return render(request, 'apps/app_project/detail.html', context)
+        # 补充额外数据
+        context.update({
+            'nodes': project.cached_nodes,
+            'repo': getattr(project, 'repository', None),
+            'gantt_data_json': get_project_gantt_data(project)
+        })
+        return context
 
 
 

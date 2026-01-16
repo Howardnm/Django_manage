@@ -6,16 +6,19 @@
 </div>
 <!-- 3. 图纸与应用 -->
 <div class="list-group-item">
-    <div class="mb-1">
-        <span class="text-muted">应用场景:</span>
+    <div class="flex-fill text-truncate">
+        <!-- ... 标题 ... -->
+        <div class="text-muted small mt-1 text-truncate">
+            {{ repo.material.manufacturer }}
+            <span class="mx-1">|</span>
 
-        <!-- 【核心修改】数据源变更 -->
-        {% if repo.material and repo.material.scenario %}
-            <span class="badge bg-blue-lt ms-1">{{ repo.material.scenario.name }}</span>
-        {% else %}
-            <span class="text-muted small">（需先关联材料以查看场景）</span>
-        {% endif %}
-
+            <!-- 【修改】循环显示场景 -->
+            {% for s in repo.material.scenarios.all %}
+                {{ s.name }}{% if not forloop.last %}、{% endif %}
+            {% empty %}
+                通用
+            {% endfor %}
+        </div>
     </div>
     <div class="mb-1">
         <span class="text-muted">产品制件:</span>

@@ -120,9 +120,22 @@
                             <span class="badge bg-purple-lt">{{ mat.category.name }}</span>
                         </td>
 
-                        <!-- 3. 场景 -->
-                        <td class="text-muted">
-                            <span class="badge bg-green-lt">{{ mat.scenario.name|default:"-" }}</span>
+                        <!-- 3. 应用场景 -->
+                        <td>
+                            {% if mat.scenarios.exists %}
+                                <div class="d-flex flex-wrap gap-1">
+                                    {% for s in mat.scenarios.all %}
+                                        <!-- 只显示前两个，防止撑破表格，其余显示 +N -->
+                                        {% if forloop.counter <= 3 %}
+                                            <span class="badge bg-blue-lt" style="font-size: 10px;">{{ s.name }}</span>
+                                        {% elif forloop.counter == 4 %}
+                                            <span class="badge bg-secondary-lt" style="font-size: 10px;" title="更多...">...</span>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
                         </td>
 
                         <!-- === 物理性能 === -->

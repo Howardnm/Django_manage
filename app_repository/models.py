@@ -85,7 +85,10 @@ class MaterialLibrary(models.Model):
     # 关联到《材料类型models》
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
     # 关联到《应用场景库》
-    scenario = models.ForeignKey(ApplicationScenario, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="应用场景")
+    # scenario = models.ForeignKey(ApplicationScenario, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="应用场景")
+    # 【新增】关联到《应用场景库》多对多字段
+    scenarios = models.ManyToManyField(ApplicationScenario,blank=True,verbose_name="适用场景",related_name="materials",help_text="该材料可用于多个场景")
+    # related_name="materials" --> 反向查询名：scenario.materials.all()
 
     # --- 2. 物理性能 (Physical Properties) ---
     density = models.FloatField("密度 (g/cm³)", blank=True, null=True)

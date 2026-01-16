@@ -47,8 +47,13 @@
                         <div class="datagrid-item">
                             <div class="datagrid-title">适用场景</div>
                             <div class="datagrid-content">
-                                {% if material.scenario %}
-                                    <span class="badge bg-green-lt">{{ material.scenario.name }}</span>
+                                {% if material.scenarios.exists %}
+                                    <div class="d-flex flex-wrap gap-2">
+                                        {% for s in material.scenarios.all %}
+                                            <!-- 使用绿色徽章，带一点间隔 -->
+                                            <span class="badge bg-green-lt">{{ s.name }}</span>
+                                        {% endfor %}
+                                    </div>
                                 {% else %}
                                     <span class="text-muted">-</span>
                                 {% endif %}

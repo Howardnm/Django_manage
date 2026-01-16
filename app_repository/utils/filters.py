@@ -99,19 +99,22 @@ class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 筛选：按场景
-    scenario = django_filters.ModelChoiceFilter(
+    # 筛选：按应用场景
+    # 【修改】使用 ModelMultipleChoiceFilter 支持多选筛选
+    # conjoined=False 表示“或者”关系（包含 A 或 B 均可）
+    # conjoined=True 表示“并且”关系（必须同时包含 A 和 B）
+    # 这里通常用 False，即筛选出“适用于汽车”的所有材料
+    scenarios = django_filters.ModelMultipleChoiceFilter(
         queryset=ApplicationScenario.objects.all(),
         label='应用场景',
-        empty_label="所有场景",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.SelectMultiple(attrs={'class': 'form-select form-select-search'}),
+        conjoined=False
     )
 
     sort = django_filters.OrderingFilter(
         fields=(
             ('grade_name', 'grade_name'),
             ('category__name', 'category_name'),
-            ('scenario__name', 'scenario_name'),  # 如果想按场景排
             # 物理
             ('melt_index', 'melt_index'),
             # 机械
@@ -132,7 +135,7 @@ class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
 
     class Meta:
         model = MaterialLibrary
-        fields = ['q', 'category', 'scenario']
+        fields = ['q', 'category', 'scenarios']
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
@@ -208,4 +211,20 @@ class ScenarioFilter(TablerFilterMixin, django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value) |
             Q(requirements__icontains=value)
+        )
+
+
+# 【新增】业务员过滤器
+class SalespersonFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    class Meta:
+        model = Salesperson
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(name__icontains=value) |
+            Q(phone__icontains=value) |
+            Q(email__icontains=value)
         )
