@@ -1,6 +1,6 @@
 import django_filters
 from django.db.models import Q
-from app_project.models import Project, ProjectNode
+from app_project.models import Project, ProjectNode, ProjectStage
 from django import forms  # 引入 forms 用于定义 widget
 
 
@@ -31,7 +31,7 @@ class ProjectFilter(django_filters.FilterSet):
         },
         # 加上这句，它在模版 for field in filter.form 循环时，就会渲染成 <input type="hidden">
         # 这样既不会在界面上显示下拉框，提交表单时又能带上当前的 sort 值
-        widget = forms.HiddenInput
+        widget=forms.HiddenInput
     )
 
     # 3. 负责人筛选 (Manager 参数)
@@ -46,12 +46,11 @@ class ProjectFilter(django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 4. (未来扩展) 比如按状态筛选，一行代码搞定：
-    # 3. 以后如果你想加“状态”筛选，只需要解开这行注释，HTML页面会自动出现下拉框
-    status = django_filters.ChoiceFilter(
-        choices=ProjectNode.STATUS_CHOICES,
-        field_name='nodes__status',
-        label='状态',
+    # 4. 阶段筛选
+    stage = django_filters.ChoiceFilter(
+        field_name='current_stage',  # 直接指数据库字段
+        choices=ProjectStage.choices,
+        label='当前阶段',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 

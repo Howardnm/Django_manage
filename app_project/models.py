@@ -7,7 +7,7 @@ from django.db import models
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils.text import Truncator  # 导入文字截断器
 from django.db import transaction  # 用于事务处理，保证排序修改的安全性
@@ -34,6 +34,8 @@ class Project(models.Model):
     manager = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="项目负责人")
     description = models.TextField("项目描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    # 【新增】当前阶段字段 (冗余字段，用于加速查询和筛选)
+    current_stage = models.CharField("当前阶段", max_length=20, choices=ProjectStage.choices, default=ProjectStage.INIT)
 
     class Meta:
         verbose_name = "项目"  # 给这个模型起一个名称。
@@ -310,3 +312,27 @@ def create_project_nodes(sender, instance, created, **kwargs):
                 )
         # 批量创建，性能更好（创建9个进度节点到ProjectNode）
         ProjectNode.objects.bulk_create(nodes_to_create)
+
+
+# 信号量：每当 ProjectNode 发生变化（更新状态、插入新节点）时，自动重新计算并更新父级 Project 的 current_stage。
+@receiver([post_save, post_delete], sender=ProjectNode)
+def update_project_current_stage(sender, instance, **kwargs):
+    """
+    当节点发生变化时，自动更新 Project 的 current_stage 字段
+    """
+    project = instance.project
+
+    # 重新计算当前阶段的逻辑 (复用你 Model 里的思维，但在这里查库)
+    # 找第一个不是 DONE/FAILED/TERMINATED 的节点
+    current_node = project.nodes.exclude(status__in=['DONE', 'FAILED', 'TERMINATED','FEEDBACK']).order_by('order').first()
+
+    if current_node:
+        new_stage = current_node.stage
+    else:
+        # 如果都完成了，或者没有节点，可视情况设为 DONE 或最后一个阶段
+        new_stage = ProjectStage.FEEDBACK  # 或者其他完结状态
+
+    # 如果状态变了，保存
+    if project.current_stage != new_stage:
+        project.current_stage = new_stage
+        project.save(update_fields=['current_stage'])
