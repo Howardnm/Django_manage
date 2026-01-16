@@ -19,6 +19,13 @@
             <div class="dropdown-menu-columns">
                 <div class="dropdown-menu-column">
 
+
+                    <a class="dropdown-item {% if request.resolver_match.url_name == 'repo_list' %}active{% endif %}"
+                       href="{% url 'repo_list' %}">
+                        项目档案库
+                    </a>
+
+                    <div class="dropdown-divider"></div>
                     <span class="dropdown-header">材料库</span>
                     <!-- 1. 材料库 -->
                     <a class="dropdown-item {% if 'repo_material' in request.resolver_match.url_name %}active{% endif %}"

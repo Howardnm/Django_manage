@@ -1,7 +1,7 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from app_repository.models import Customer, MaterialLibrary, MaterialType, ApplicationScenario, OEM
+from app_repository.models import Customer, MaterialLibrary, MaterialType, ApplicationScenario, OEM, Salesperson, ProjectRepository
 
 
 class TablerFilterMixin:
@@ -15,6 +15,50 @@ class TablerFilterMixin:
                 'class': 'form-control',
                 'placeholder': '输入关键字搜索...'
             })
+
+
+# 1. 项目档案列表过滤器
+class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    # 支持按业务员筛选
+    customer = django_filters.ModelChoiceFilter(
+        queryset=Customer.objects.all(),
+        label='客户',
+        empty_label="所有客户",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    # 支持按业务员筛选
+    salesperson = django_filters.ModelChoiceFilter(
+        queryset=Salesperson.objects.all(),
+        label='业务员',
+        empty_label="所有业务员",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('project__name', 'project'),
+            ('updated_at', 'updated_at'),
+            ('customer__company_name', 'customer'),
+            ('material__grade_name', 'material'),
+        ),
+        widget=forms.HiddenInput
+    )
+
+    class Meta:
+        model = ProjectRepository
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(
+            Q(project__name__icontains=value) |
+            Q(customer__company_name__icontains=value) |
+            Q(oem__name__icontains=value) |
+            Q(material__grade_name__icontains=value) |
+            Q(product_name__icontains=value)
+        )
 
 
 # 1. 客户过滤器

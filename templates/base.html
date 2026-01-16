@@ -6,6 +6,8 @@
     <title>{% block title %}Tabler系统{% endblock %}</title>
     <!-- 引入 CSS (Tabler & Icons) -->
     <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <!-- 1. 引入 Tom Select 专用 CSS (适配 Bootstrap 5) -->
+    <link rel="stylesheet" href="{% static 'tom-select/core-2.2.2/dist/css/tom-select.bootstrap5.min.css' %}">
     <!-- Tabler Icons Webfont -->
     <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
     <!-- apexcharts -->
@@ -39,8 +41,34 @@
     });
 </script>
 <script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+<script src="{% static 'tom-select/core-2.2.2/dist/js/tom-select.complete.min.js' %}"></script>
 <script src="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"></script>
 <script src="{% static 'highcharts/core-12.5.0/highcharts-gantt.js' %}"></script>
 <script src="{% static 'highcharts/core-12.5.0/modules/exporting.js' %}"></script>
+<!-- ======================================================= -->
+<!-- Tom Select 集成 (实现下拉搜索) 在base引入tom-select.complete.min.js -->
+<!-- ======================================================= -->
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        var selects = document.querySelectorAll('.form-select-search');
+
+        if (window.TomSelect) {
+            selects.forEach(function (el) {
+                new TomSelect(el, {
+                    copyClassesToDropdown: false,
+                    {#dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡#}
+                    controlInput: '<input>',
+                    create: false,
+                    placeholder: '点击搜索...',
+                    render: {
+                        no_results: function (data, escape) {
+                            return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                        }
+                    }
+                });
+            });
+        }
+    });
+</script>
 </body>
 </html>

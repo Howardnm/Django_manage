@@ -3,17 +3,47 @@ from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, 
 
 
 class TablerFormMixin:
-    """混入类：自动给所有字段添加 Tabler 样式类"""
+    """
+    混入类：
+    1. 自动给普通字段添加 form-control
+    2. 自动给 Checkbox 添加 form-check-input
+    3. 自动给 Select 添加 form-select 和 form-select-search (启用 Tom Select)
+    """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         for field_name, field in self.fields.items():
-            # Checkbox 需要特殊的 class
-            if isinstance(field.widget, forms.CheckboxInput):
-                field.widget.attrs.update({'class': 'form-check-input'})
-            # FileInput 需要 form-control (Tabler 支持)
+            # 获取该字段原本可能已经在 widgets 里定义的 class，避免覆盖
+            attrs = field.widget.attrs
+            existing_class = attrs.get('class', '')
+            # -----------------------------------------------------------
+            # 情况 1: 下拉选择框 (Select / SelectMultiple)
+            # -----------------------------------------------------------
+            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
+                # Tabler 标准样式是 form-select，而不是 form-control
+                # 追加 form-select-search 以启用我们刚才写的 Tom Select JS
+                # 使用 strip() 去除可能产生的多余空格
+                if 'form-select' not in existing_class:
+                    existing_class += ' form-select'
+                if 'form-select-search' not in existing_class:
+                    existing_class += ' form-select-search'
+                attrs['class'] = existing_class.strip()
+            # -----------------------------------------------------------
+            # 情况 2: 复选框 (Checkbox)
+            # -----------------------------------------------------------
+            elif isinstance(field.widget, forms.CheckboxInput):
+                if 'form-check-input' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-check-input".strip()
+            # -----------------------------------------------------------
+            # 情况 3: 其他输入框 (Text, Number, Email, Date, File, Password...)
+            # -----------------------------------------------------------
             else:
-                field.widget.attrs.update({'class': 'form-control'})
+                # 排除 HiddenInput，不需要样式
+                if not isinstance(field.widget, forms.HiddenInput):
+                    if 'form-control' not in existing_class:
+                        attrs['class'] = f"{existing_class} form-control".strip()
+
 
 # ==============================================================================
 # 1. 客户表单
@@ -22,6 +52,7 @@ class CustomerForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Customer
         fields = '__all__'
+
 
 # ==============================================================================
 # 2. 材料表单
@@ -37,6 +68,7 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             'flammability': forms.Select(attrs={'class': 'form-select'}),
         }
 
+
 # ==============================================================================
 # 3. 项目档案表单 (主表)
 # ==============================================================================
@@ -45,12 +77,7 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = ProjectRepository
         exclude = ['project', 'updated_at']
-        widgets = {
-            'customer': forms.Select(attrs={'class': 'form-select'}),
-            'oem': forms.Select(attrs={'class': 'form-select'}), # 新增 OEM
-            'material': forms.Select(attrs={'class': 'form-select'}),
-            # 价格字段不需要特殊 widget，TablerFormMixin 会加上 form-control
-        }
+
 
 # 4. 【新增】项目文件上传表单
 class ProjectFileForm(TablerFormMixin, forms.ModelForm):
@@ -62,11 +89,13 @@ class ProjectFileForm(TablerFormMixin, forms.ModelForm):
             'description': forms.TextInput(attrs={'placeholder': '例如：V1.0版本图纸'}),
         }
 
+
 # 【新增】业务员管理表单
 class SalespersonForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Salesperson
         fields = ['name', 'phone', 'email']
+
 
 # 6. 主机厂表单
 class OEMForm(TablerFormMixin, forms.ModelForm):
@@ -76,6 +105,7 @@ class OEMForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '备注信息...'}),
         }
+
 
 # ==============================================================================
 # 4. 材料类型表单
@@ -87,6 +117,7 @@ class MaterialTypeForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
 
 # ==============================================================================
 # 5. 应用场景表单

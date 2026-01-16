@@ -35,7 +35,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_filters', # django 列表搜索筛选器
+    'django_filters',  # django 列表搜索筛选器
+    'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',

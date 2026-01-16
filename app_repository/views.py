@@ -9,8 +9,39 @@ from django.db.models import Q
 from app_project.models import Project
 from .models import Customer, MaterialLibrary, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
 from .forms import CustomerForm, MaterialForm, ProjectRepositoryForm, MaterialTypeForm, ApplicationScenarioForm, ProjectFileForm, SalespersonForm, OEMForm
-from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter
+from .utils.filters import CustomerFilter, MaterialFilter, OEMFilter, ProjectRepositoryFilter
 from django.apps import apps
+
+
+# ==========================================
+# 8. 项目档案总览列表
+# ==========================================
+
+class ProjectRepositoryListView(LoginRequiredMixin, ListView):
+    model = ProjectRepository
+    template_name = 'apps/app_repository/project_repo/repo_list.html'
+    context_object_name = 'repos'  # 业务变量名
+    paginate_by = 10
+
+    def get_queryset(self):
+        # 【性能优化】一次性抓取所有关联表
+        qs = super().get_queryset().select_related(
+            'project',
+            'project__manager',
+            'customer',
+            'oem',
+            'material',
+            'salesperson'
+        ).prefetch_related('files').order_by('-updated_at')
+
+        self.filterset = ProjectRepositoryFilter(self.request.GET, queryset=qs)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
+        return context
 
 
 # ==========================================
@@ -19,7 +50,7 @@ from django.apps import apps
 
 class CustomerListView(LoginRequiredMixin, ListView):
     model = Customer
-    template_name = 'apps/app_repository/customer_list.html'
+    template_name = 'apps/app_repository/project_repo_info/customer_list.html'
     context_object_name = 'customers'  # 随便起一个名方便复用分页模板，但不能为 page_obj
     paginate_by = 10
 
@@ -140,7 +171,7 @@ class MaterialUpdateView(LoginRequiredMixin, UpdateView):
 class ProjectRepositoryUpdateView(LoginRequiredMixin, UpdateView):
     model = ProjectRepository
     form_class = ProjectRepositoryForm
-    template_name = 'apps/app_repository/project_repo_form.html'
+    template_name = 'apps/app_repository/project_repo/project_repo_form.html'
 
     def get_object(self, queryset=None):
         project_id = self.kwargs.get('project_id')
@@ -165,24 +196,30 @@ class ProjectRepositoryUpdateView(LoginRequiredMixin, UpdateView):
 class ProjectFileUploadView(LoginRequiredMixin, CreateView):
     model = ProjectFile
     form_class = ProjectFileForm
-    template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单模板即可
+    # 【修改 1】指向专用模板
+    template_name = 'apps/app_repository/project_repo/project_file_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # 【修改 2】获取 repo 对象传给模板，用于生成“取消”按钮的链接
+        repo_id = self.kwargs.get('repo_id')
+        repo = get_object_or_404(ProjectRepository, pk=repo_id)
+
+        context['repo'] = repo
+        context['page_title'] = '上传项目资料'
+        return context
 
     def form_valid(self, form):
-        # 自动关联到对应的 Repository
         repo_id = self.kwargs.get('repo_id')
         repo = get_object_or_404(ProjectRepository, pk=repo_id)
         form.instance.repository = repo
         messages.success(self.request, "文件上传成功")
         return super().form_valid(form)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['page_title'] = '上传项目资料'
-        return context
-
     def get_success_url(self):
-        # 回到项目详情页
-        return reverse('project_detail', kwargs={'pk': self.object.repository.project.id})
+        # 【修改 3】保存成功后，跳转回“档案编辑页” (repo_project_edit)
+        # 注意：repo_project_edit 需要参数 project_id
+        return reverse('repo_project_edit', kwargs={'project_id': self.object.repository.project.id})
 
 
 # 3. 【新增】文件删除视图
@@ -201,7 +238,7 @@ class ProjectFileDeleteView(LoginRequiredMixin, View):
 
 class MaterialTypeListView(LoginRequiredMixin, ListView):
     model = MaterialType
-    template_name = 'apps/app_repository/type_list.html'
+    template_name = 'apps/app_repository/material _info/type_list.html'
     context_object_name = 'types'
     ordering = ['name']
 
@@ -243,7 +280,7 @@ class MaterialTypeUpdateView(LoginRequiredMixin, UpdateView):
 
 class ScenarioListView(LoginRequiredMixin, ListView):
     model = ApplicationScenario
-    template_name = 'apps/app_repository/scenario_list.html'
+    template_name = 'apps/app_repository/material _info/scenario_list.html'
     context_object_name = 'scenarios'
     ordering = ['name']
 
@@ -279,56 +316,13 @@ class ScenarioUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
 
-class SecureFileDownloadView(LoginRequiredMixin, View):
-    """
-    通用安全文件下载视图
-    URL格式: /repository/download/<app_label>/<model_name>/<pk>/<field_name>/
-    """
-
-    def get(self, request, app_label, model_name, pk, field_name):
-        # 1. 动态获取模型
-        try:
-            model = apps.get_model(app_label, model_name)
-        except LookupError:
-            raise Http404("模型不存在")
-
-        # 2. 获取对象
-        try:
-            obj = model.objects.get(pk=pk)
-        except model.DoesNotExist:
-            raise Http404("文件记录不存在")
-
-        # 3. 权限检查 (可选：更细粒度的检查)
-        # 例如：如果是 'app_project' 下的文件，检查用户是否属于该项目组
-        # if app_label == 'app_project' and not request.user.has_perm(...):
-        #     return HttpResponseForbidden("您无权下载此文件")
-
-        # 4. 获取文件字段
-        if not hasattr(obj, field_name):
-            raise Http404("字段不存在")
-
-        file_field = getattr(obj, field_name)
-
-        # 5. 检查文件是否存在
-        if not file_field:
-            raise Http404("未上传文件")
-
-        try:
-            # 6. 返回文件流 (FileResponse 会自动处理断点续传和 Content-Type)
-            # as_attachment=False 表示尝试在浏览器内预览(如PDF)，True表示强制下载
-            response = FileResponse(file_field.open('rb'), as_attachment=False)
-            return response
-        except FileNotFoundError:
-            raise Http404("物理文件丢失")
-
-
 # ==========================================
 # 6. 业务员管理 (Salesperson)
 # ==========================================
 
 class SalespersonListView(LoginRequiredMixin, ListView):
     model = Salesperson
-    template_name = 'apps/app_repository/salesperson_list.html'
+    template_name = 'apps/app_repository/project_repo_info/salesperson_list.html'
     context_object_name = 'salespersons'  # 命名
     paginate_by = 10
 
@@ -370,7 +364,7 @@ class SalespersonUpdateView(LoginRequiredMixin, UpdateView):
 
 class OEMListView(LoginRequiredMixin, ListView):
     model = OEM
-    template_name = 'apps/app_repository/oem_list.html'
+    template_name = 'apps/app_repository/project_repo_info/oem_list.html'
     context_object_name = 'oems'
     paginate_by = 10
 
@@ -408,3 +402,49 @@ class OEMUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'编辑主机厂: {self.object.name}'
         return context
+
+
+# ==========================================
+# 10. 通用下载接口
+# ==========================================
+class SecureFileDownloadView(LoginRequiredMixin, View):
+    """
+    通用安全文件下载视图
+    URL格式: /repository/download/<app_label>/<model_name>/<pk>/<field_name>/
+    """
+
+    def get(self, request, app_label, model_name, pk, field_name):
+        # 1. 动态获取模型
+        try:
+            model = apps.get_model(app_label, model_name)
+        except LookupError:
+            raise Http404("模型不存在")
+
+        # 2. 获取对象
+        try:
+            obj = model.objects.get(pk=pk)
+        except model.DoesNotExist:
+            raise Http404("文件记录不存在")
+
+        # 3. 权限检查 (可选：更细粒度的检查)
+        # 例如：如果是 'app_project' 下的文件，检查用户是否属于该项目组
+        # if app_label == 'app_project' and not request.user.has_perm(...):
+        #     return HttpResponseForbidden("您无权下载此文件")
+
+        # 4. 获取文件字段
+        if not hasattr(obj, field_name):
+            raise Http404("字段不存在")
+
+        file_field = getattr(obj, field_name)
+
+        # 5. 检查文件是否存在
+        if not file_field:
+            raise Http404("未上传文件")
+
+        try:
+            # 6. 返回文件流 (FileResponse 会自动处理断点续传和 Content-Type)
+            # as_attachment=False 表示尝试在浏览器内预览(如PDF)，True表示强制下载
+            response = FileResponse(file_field.open('rb'), as_attachment=False)
+            return response
+        except FileNotFoundError:
+            raise Http404("物理文件丢失")

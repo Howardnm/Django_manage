@@ -3,6 +3,10 @@ from .views import *
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
+
+    # 档案总览列表
+    path('list/', ProjectRepositoryListView.as_view(), name='repo_list'),
+
     # 客户库
     path('customers/', CustomerListView.as_view(), name='repo_customer_list'),
     path('customers/add/', CustomerCreateView.as_view(), name='repo_customer_add'),

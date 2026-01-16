@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+<!-- ======================================================= -->
+<!-- 这是项目档案--文件上传（创建）的form页面 -->
+<!-- ======================================================= -->
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">File Manager</div>
+            <h2 class="page-title">上传资料: {{ repo.project.name }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-6">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            
+            <div class="card">
+                <!-- 顶部状态条 -->
+                <div class="card-status-top bg-yellow"></div>
+                
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ti ti-upload me-2 text-yellow"></i> 添加新文件
+                    </h3>
+                </div>
+
+                <div class="card-body">
+                    <!-- 显示错误信息 -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <!-- 1. 文件类型 -->
+                    <div class="mb-3">
+                        <label class="form-label required">文件类型</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-category"></i></span>
+                            {{ form.file_type }}
+                        </div>
+                        <small class="form-hint">请正确分类，以便后续检索。</small>
+                    </div>
+
+                    <!-- 2. 文件上传控件 -->
+                    <div class="mb-3">
+                        <label class="form-label required">选择文件</label>
+                        {{ form.file }}
+                        {% if form.file.errors %}
+                            <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <!-- 3. 文件描述 -->
+                    <div class="mb-3">
+                        <label class="form-label">文件说明 / 备注</label>
+                        <div class="input-icon">
+                            <span class="input-icon-addon"><i class="ti ti-file-description"></i></span>
+                            {{ form.description }}
+                        </div>
+                        <small class="form-hint">例如：V2.0版图纸，包含最新变更。</small>
+                    </div>
+                </div>
+
+                <!-- 底部操作栏 -->
+                <div class="card-footer text-end">
+                    <!-- 取消按钮：跳转回档案编辑页 -->
+                    <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-link link-secondary">
+                        取消
+                    </a>
+                    <button type="submit" class="btn btn-yellow ms-auto">
+                        <i class="ti ti-upload me-1"></i> 开始上传
+                    </button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
