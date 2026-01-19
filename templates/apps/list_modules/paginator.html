@@ -1,4 +1,5 @@
 <!-- 【改动2】新增分页条 (Tabler 风格) -->
+{% load project_extras %}
 {% if page_obj.has_other_pages %}
     <div class="card-footer d-flex align-items-center">
         <p class="m-0 text-muted">
@@ -9,36 +10,29 @@
 
             <!-- 上一页 -->
             <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                <a class="page-link" href="{% if page_obj.has_previous %}?page={{ page_obj.previous_page_number }}{% else %}#{% endif %}">
-                    <!-- Tabler Icon: Chevron Left -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                         stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <polyline points="15 6 9 12 15 18"/>
-                    </svg>
+                <!-- 【修改点 1】使用 url_replace -->
+                <a class="page-link" href="{% if page_obj.has_previous %}?{% url_replace page=page_obj.previous_page_number %}{% else %}#{% endif %}">
+                    <i class="ti ti-chevron-left"></i>
                     上一页
                 </a>
             </li>
 
-            <!-- 页码数字 (简化版，只显示当前页和总页数，如果页数多建议用 elided_pages) -->
+            <!-- 页码数字 -->
             {% for i in page_obj.paginator.page_range %}
                 {% if page_obj.number == i %}
                     <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                 {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
-                    <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                    <!-- 【修改点 2】使用 url_replace -->
+                    <li class="page-item"><a class="page-link" href="?{% url_replace page=i %}">{{ i }}</a></li>
                 {% endif %}
             {% endfor %}
 
             <!-- 下一页 -->
             <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                <a class="page-link" href="{% if page_obj.has_next %}?page={{ page_obj.next_page_number }}{% else %}#{% endif %}">
+                <!-- 【修改点 3】使用 url_replace -->
+                <a class="page-link" href="{% if page_obj.has_next %}?{% url_replace page=page_obj.next_page_number %}{% else %}#{% endif %}">
                     下一页
-                    <!-- Tabler Icon: Chevron Right -->
-                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                         stroke-linecap="round" stroke-linejoin="round">
-                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                        <polyline points="9 6 15 12 9 18"/>
-                    </svg>
+                    <i class="ti ti-chevron-right"></i>
                 </a>
             </li>
         </ul>

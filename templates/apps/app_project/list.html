@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% load project_extras %} <!-- 加载刚才写的 tag -->
+{% load project_extras %}
 
 {% block content %}
     {% include 'apps/list_modules/header.html' %}
     <div class="card mt-3">
         <!-- 工具栏：搜索与筛选 -->
-    {% include 'apps/list_modules/tools_search_filter.html' %}
+        {% include 'apps/list_modules/tools_search_filter.html' %}
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
@@ -14,7 +14,6 @@
                     <th>
                         <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             项目名称
-                            <!-- 【修改】使用 ti-arrow-up / ti-arrow-down -->
                             {% if current_sort == 'name' %}
                                 <i class="ti ti-arrow-up icon-sm"></i>
                             {% elif current_sort == '-name' %}
@@ -36,9 +35,11 @@
                     </th>
 
                     <th>进度概览</th>
-                    <th>当前阶段</th>
+                    
+                    <!-- 【修改】表头改为“最新进展” -->
+                    <th>最新进展</th>
 
-                    <!-- 3. 创建时间 -->
+                    <!-- 4. 创建时间 -->
                     <th>
                         <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             创建时间
@@ -55,48 +56,52 @@
                 </thead>
                 <tbody>
                 {% for project in page_obj %}
-                    {% with info=project.get_progress_info %}
-                        <tr>
-                            <td><a href="{% url 'project_detail' project.pk %}" class="text-reset" tabindex="-1">{{ project.name }}</a></td>
-                            <td>
-                                <span class="avatar avatar-xs rounded me-1">{{ project.manager.username|slice:":1" }}</span>
-                                {{ project.manager.username }}
-                            </td>
-                            <td style="width: 20%">
-                                <div class="d-flex align-items-center mb-1">
-                                    <div>
-                                        <span class="text-secondary">{{ info.current_label }}</span>
-                                    </div>
-                                    <div class="ms-auto subheader me-2">{{ info.percent }}%</div>
+                    <tr>
+                        <td><a href="{% url 'project_detail' project.pk %}" class="text-reset" tabindex="-1">{{ project.name }}</a></td>
+                        <td>
+                            <span class="avatar avatar-xs rounded me-1">{{ project.manager.username|slice:":1" }}</span>
+                            {{ project.manager.username }}
+                        </td>
+                        <td style="width: 20%">
+                            <div class="d-flex align-items-center mb-1">
+                                <div>
+                                    <!-- 直接使用冗余字段的 display 方法 -->
+                                    {% if project.is_terminated %}
+                                        <span class="badge bg-red-lt">❌ 已终止</span>
+                                    {% elif project.progress_percent == 100 %}
+                                        <span class="badge bg-green-lt">✅ 已完成</span>
+                                    {% else %}
+                                        <span class="badge bg-blue-lt">{{ project.get_current_stage_display }}</span>
+                                    {% endif %}
                                 </div>
-                                <div class="progress progress-sm">
-                                    <div class="progress-bar {% if info.is_terminated %}bg-danger{% elif info.percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
-                                         style="width: {{ info.percent }}%"></div>
+                                <div class="auto-width ms-auto">
+                                    <!-- 直接使用冗余字段 -->
+                                    <span class="text-secondary">{{ project.progress_percent }}%</span>
                                 </div>
-                            </td>
-                            <td class="text-muted text-wrap" style="max-width: 200px;">
-                                {{ info.current_remark|truncatechars:20 }}
-                            </td>
-                            <td class="text-muted">{{ project.created_at|date:"Y-m-d H:m" }}</td>
-                            <td>
-                                <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-outline-primary">管理</a>
-                            </td>
-                        </tr>
-                    {% endwith %}
+                            </div>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar {% if project.is_terminated %}bg-danger{% elif project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                     style="width: {{ project.progress_percent }}%"></div>
+                            </div>
+                        </td>
+                        <td class="text-muted text-wrap" style="max-width: 200px;">
+                            <!-- 【修改】显示最新节点备注 -->
+                            {% if project.latest_remark %}
+                                {{ project.latest_remark|truncatechars:20 }}
+                            {% else %}
+                                <span class="text-secondary opacity-50">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ project.created_at|date:"Y-m-d H:m" }}</td>
+                        <td>
+                            <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-outline-primary">管理</a>
+                        </td>
+                    </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center py-4">
+                        <td colspan="7" class="text-center py-4">
                             <div class="empty">
-                                <div class="empty-icon">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-                                         fill="none" stroke-linecap="round" stroke-linejoin="round">
-                                        <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
-                                        <circle cx="12" cy="12" r="9"/>
-                                        <line x1="9" y1="10" x2="9.01" y2="10"/>
-                                        <line x1="15" y1="10" x2="15.01" y2="10"/>
-                                        <path d="M9.5 15.25a3.5 3.5 0 0 1 5 0"/>
-                                    </svg>
-                                </div>
+                                <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-50"></i></div>
                                 <p class="empty-title">没有找到项目</p>
                                 <p class="empty-subtitle text-muted">
                                     尝试更换搜索关键词或筛选条件

@@ -14,15 +14,12 @@
             <ul class="navbar-nav pt-lg-3">
 
                 <!-- 【模块 1：仪表盘】 -->
-                <!-- 通常仪表盘是所有登录用户都能看的，或者只需要基本的登录权限 -->
                 {% if user.is_authenticated %}
                     {% include "sidebar_modules/_dashboard.html" %}
                 {% endif %}
 
 
                 <!-- 【模块 2：项目管理】 -->
-                <!-- 逻辑：只有拥有 'app_project.view_project' 权限的用户才显示此菜单 -->
-                <!-- 这个权限可以是在 Admin 后台分配给组的 -->
                 {% if perms.app_project.view_project %}
                     {% include "sidebar_modules/_projects.html" %}
                 {% endif %}
@@ -30,12 +27,13 @@
 
                 <!-- 【模块 3：项目资料库】 -->
                 {% include "sidebar_modules/_repository.html" %}
+                
+                
+                <!-- 【模块 4：材料数据库 (新增)】 -->
+                {% include "sidebar_modules/_material_db.html" %}
 
 
-                <!-- 【模块 4：用户管理】 -->
-                <!-- 逻辑：通常只有能查看 User 表的人或者是 Staff 才能看到这个菜单 -->
-                <!-- perms.auth.view_user 是 Django 内置 User 表的查看权限 -->
-                <!-- 或者用 user.is_staff 也行 -->
+                <!-- 【模块 5：用户管理】 -->
                 {% if perms.auth.view_user or user.is_staff %}
                     {% include "sidebar_modules/_users.html" %}
                 {% endif %}
@@ -43,15 +41,12 @@
             </ul>
         </div>
 
-        <!-- 底部菜单 (通常是 设置 或 个人中心) -->
+        <!-- 底部菜单 -->
         <div class="mt-auto">
             <ul class="navbar-nav">
-                <!-- 这里的 dashboard 可能是你写错了，通常底部放 设置 或 退出 -->
-                <!-- 示例：显示个人中心入口 -->
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'user_profile' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <!-- Icon Settings -->
                             <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z" /><circle cx="12" cy="12" r="3" /></svg>
                         </span>
                         <span class="nav-link-title">个人设置</span>

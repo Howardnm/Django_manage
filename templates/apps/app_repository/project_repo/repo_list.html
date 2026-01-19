@@ -2,37 +2,39 @@
 {% load project_extras %}
 
 {% block content %}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <h2 class="page-title">项目档案总库</h2>
-            <div class="text-muted mt-1">管理所有项目的商业、技术与文件资料</div>
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">项目档案总库</h2>
+                <div class="text-muted mt-1">管理所有项目的商业、技术与文件资料</div>
+            </div>
+            <!-- 这里不需要新建按钮，因为档案是随项目自动生成的，或者去项目列表新建 -->
         </div>
-        <!-- 这里不需要新建按钮，因为档案是随项目自动生成的，或者去项目列表新建 -->
     </div>
-</div>
 
-<div class="card mt-3">
-    <!-- 引入通用搜索栏 -->
-    {% include 'apps/list_modules/tools_search_filter.html' %}
+    <div class="card mt-3">
+        <!-- 引入通用搜索栏 -->
+        {% include 'apps/list_modules/tools_search_filter.html' %}
 
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap table-hover">
-            <thead>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover">
+                <thead>
                 <tr>
                     <!-- 1. 项目与产品 -->
                     <th>
                         <a href="?{% url_replace sort='project'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             项目 / 产品
-                            {% if current_sort == 'project' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-project' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                            {% if current_sort == 'project' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-project' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
                         </a>
                     </th>
-                    
+
                     <!-- 2. 商业关系 -->
                     <th>
                         <a href="?{% url_replace sort='customer'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             客户 & OEM
-                            {% if current_sort == 'customer' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-customer' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                            {% if current_sort == 'customer' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-customer' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
                         </a>
                     </th>
 
@@ -40,7 +42,8 @@
                     <th>
                         <a href="?{% url_replace sort='material'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             选用材料
-                            {% if current_sort == 'material' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-material' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                            {% if current_sort == 'material' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-material' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
                         </a>
                     </th>
 
@@ -57,132 +60,136 @@
                     <th>
                         <a href="?{% url_replace sort='updated_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             最后更新
-                            {% if current_sort == 'updated_at' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-updated_at' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                            {% if current_sort == 'updated_at' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-updated_at' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>{% endif %}
                         </a>
                     </th>
-                    
+
                     <th>操作</th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% for repo in repos %}
-                <tr>
-                    <!-- 1. 项目信息 (复合) -->
-                    <td>
-                        <div class="d-flex flex-column">
-                            <a href="{% url 'project_detail' repo.project.id %}" class="fw-bold text-reset text-truncate" style="max-width: 180px;" title="{{ repo.project.name }}">
-                                {{ repo.project.name }}
-                            </a>
-                            <div class="small text-muted text-truncate" style="max-width: 180px;">
-                                {% if repo.product_name %}
-                                    <i class="ti ti-package icon-inline"></i> {{ repo.product_name }}
-                                {% else %}
-                                    <span class="opacity-50">未填产品名</span>
-                                {% endif %}
+                    <tr>
+                        <!-- 1. 项目信息 (复合) -->
+                        <td>
+                            <div class="d-flex flex-column">
+                                <a href="{% url 'project_detail' repo.project.id %}" class="fw-bold text-reset text-truncate" style="max-width: 180px;"
+                                   title="{{ repo.project.name }}">
+                                    {{ repo.project.name }}
+                                </a>
+                                <div class="small text-muted text-truncate" style="max-width: 180px;">
+                                    {% if repo.product_name %}
+                                        <i class="ti ti-package icon-inline"></i> {{ repo.product_name }}
+                                    {% else %}
+                                        <span class="opacity-50">未填产品名</span>
+                                    {% endif %}
+                                </div>
                             </div>
-                        </div>
-                    </td>
+                        </td>
 
-                    <!-- 2. 商业关系 (复合) -->
-                    <td>
-                        {% if repo.customer %}
-                            <div class="fw-bold text-primary" title="Tier 1">{{ repo.customer.company_name }}</div>
-                            <div class="small text-muted" title="OEM">
-                                {% if repo.oem %}
-                                    <span class="badge badge-sm bg-azure-lt">{{ repo.oem.name }}</span>
-                                {% else %}
-                                    <span class="opacity-50">-</span>
-                                {% endif %}
-                            </div>
-                        {% else %}
-                            <span class="text-muted">-</span>
-                        {% endif %}
-                    </td>
+                        <!-- 2. 商业关系 (复合) -->
+                        <td>
+                            {% if repo.customer %}
+                                <div class="fw-bold text-primary" title="Tier 1">{{ repo.customer.company_name }}</div>
+                                <div class="small text-muted" title="OEM">
+                                    {% if repo.oem %}
+                                        <span class="badge badge-sm bg-azure-lt">{{ repo.oem.name }}</span>
+                                    {% else %}
+                                        <span class="opacity-50">-</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
 
-                    <!-- 3. 材料 (复合) -->
-                    <td>
-                        {% if repo.material %}
-                            <div class="fw-bold">{{ repo.material.grade_name }}</div>
-                            <div class="small text-muted">{{ repo.material.manufacturer }}</div>
-                        {% else %}
-                            <span class="badge bg-secondary-lt">未选材</span>
-                        {% endif %}
-                    </td>
+                        <!-- 3. 材料 (复合) -->
+                        <td>
+                            {% if repo.material %}
+                                <div class="fw-bold">{{ repo.material.grade_name }}</div>
+                                <div class="small text-muted">{{ repo.material.manufacturer }}</div>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">未选材</span>
+                            {% endif %}
+                        </td>
 
-                    <!-- 4. 财务 (左右对比) -->
-                    <td>
-                        <div class="d-flex align-items-center small gap-2">
-                            <div title="目标成本">
-                                <span class="text-muted">Cost:</span>
-                                <span class="fw-bold text-green">
+                        <!-- 4. 财务 (左右对比) -->
+                        <td>
+                            <div class="d-flex align-items-center small gap-2">
+                                <div title="目标成本">
+                                    <span class="text-muted">Cost:</span>
+                                    <span class="fw-bold text-green">
                                     {% if repo.target_cost %}{{ repo.target_cost }}{% else %}-{% endif %}
                                 </span>
-                            </div>
-                            <div class="vr"></div>
-                            <div title="竞品售价">
-                                <span class="text-muted">Price:</span>
-                                <span class="fw-bold text-orange">
+                                </div>
+                                <div class="vr"></div>
+                                <div title="竞品售价">
+                                    <span class="text-muted">Price:</span>
+                                    <span class="fw-bold text-orange">
                                     {% if repo.competitor_price %}{{ repo.competitor_price }}{% else %}-{% endif %}
                                 </span>
+                                </div>
                             </div>
-                        </div>
-                    </td>
+                        </td>
 
-                    <!-- 5. 人员 (头像组) -->
-                    <td>
-                        <div class="d-flex align-items-center">
-                            <!-- PM -->
-                            <span class="avatar avatar-xs rounded bg-blue-lt me-1" title="项目经理: {{ repo.project.manager.username }}">
+                        <!-- 5. 人员 (头像组) -->
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <!-- PM -->
+                                <span class="avatar avatar-xs rounded bg-blue-lt me-1" title="项目经理: {{ repo.project.manager.username }}">
                                 {{ repo.project.manager.username|slice:":1"|upper }}
                             </span>
-                            <!-- Sales -->
-                            {% if repo.salesperson %}
-                                <span class="avatar avatar-xs rounded bg-purple-lt" title="业务员: {{ repo.salesperson.name }}">
+                                <!-- Sales -->
+                                {% if repo.salesperson %}
+                                    <span class="avatar avatar-xs rounded bg-purple-lt" title="业务员: {{ repo.salesperson.name }}">
                                     {{ repo.salesperson.name|slice:":1" }}
                                 </span>
-                            {% else %}
-                                <span class="avatar avatar-xs rounded bg-secondary-lt opacity-50" title="无业务员">?</span>
-                            {% endif %}
-                        </div>
-                    </td>
+                                {% else %}
+                                    <span class="avatar avatar-xs rounded bg-secondary-lt opacity-50" title="无业务员">?</span>
+                                {% endif %}
+                            </div>
+                        </td>
 
-                    <!-- 6. 文件数 -->
-                    <td>
-                        {% if repo.files.count > 0 %}
-                            <span class="badge bg-green-lt">
+                        <!-- 6. 文件数 -->
+                        <td>
+                            {% if repo.files.count > 0 %}
+                                <span class="badge bg-green-lt">
                                 <i class="ti ti-files me-1"></i> {{ repo.files.count }}
                             </span>
-                        {% else %}
-                            <span class="text-muted opacity-50">-</span>
-                        {% endif %}
-                    </td>
+                            {% else %}
+                                <span class="text-muted opacity-50">-</span>
+                            {% endif %}
+                        </td>
 
-                    <!-- 7. 时间 -->
-                    <td class="text-muted small">
-                        {{ repo.updated_at|date:"m-d" }}
-                    </td>
+                        <!-- 7. 时间 -->
+                        <td class="text-muted small">
+                            {{ repo.updated_at|date:"m-d" }}
+                        </td>
 
-                    <!-- 8. 操作 -->
-                    <td>
-                        <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑档案">
-                            <i class="ti ti-edit"></i>
-                        </a>
-                    </td>
-                </tr>
+                        <!-- 8. 操作 -->
+                        <td>
+                            <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑档案">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="8" class="text-center py-5">
-                        <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-50"></i></div>
-                        <p class="text-muted">暂无档案记录</p>
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="8" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-50"></i></div>
+                                <p class="text-muted">暂无档案记录</p>
+                            </div>
+                        </td>
+                    </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 
-<br>
-{% include 'apps/list_modules/paginator.html' %}
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
 
 {% endblock %}

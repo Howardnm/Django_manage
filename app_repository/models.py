@@ -74,88 +74,187 @@ class Salesperson(models.Model):
         ordering = ['name']
 
 
+# ==========================================
+# 2. 性能指标配置体系 (Configuration)
+# ==========================================
+class MetricCategory(models.Model):
+    """指标分类 (如: 物理性能, 机械性能)"""
+    name = models.CharField("分类名称", max_length=50)
+    order = models.PositiveIntegerField("排序权重", default=0)
+
+    def __str__(self): return self.name
+
+    class Meta:
+        ordering = ['order']
+        verbose_name = "指标分类"
+
+
+class TestConfig(models.Model):
+    """
+    【核心配置】测试项目定义
+    将 指标+标准+条件+单位 打包成一个选项
+    """
+    category = models.ForeignKey(MetricCategory, on_delete=models.CASCADE, verbose_name="所属分类")
+    name = models.CharField("指标名称", max_length=100, help_text="如: 拉伸强度")
+    standard = models.CharField("测试标准", max_length=50, help_text="如: ISO 527")
+    condition = models.CharField("测试条件", max_length=50, blank=True, help_text="如: 50mm/min")
+    unit = models.CharField("单位", max_length=20, blank=True)
+    order = models.PositiveIntegerField("排序权重", default=0)
+
+    def __str__(self):
+        # 下拉框显示文本: [物理] 熔融指数 - ISO 1133 (230℃)
+        cond_str = f" ({self.condition})" if self.condition else ""
+        return f"[{self.category.name}] {self.name} - {self.standard}{cond_str}"
+
+    class Meta:
+        verbose_name = "测试配置项"
+        ordering = ['category__order', 'order']
+
+
+# ==========================================
+# 3. 材料主表 (Material Header)
+# ==========================================
 class MaterialLibrary(models.Model):
-    """
-    材料数据库 (具体的牌号)
-    TDS/MSDS 是跟随材料走的，不管哪个项目用，文件都是同一份。
-    """
-    # --- 1. 基础信息 ---
-    grade_name = models.CharField("材料牌号", max_length=100, unique=True, help_text="如: A3EG6")
-    manufacturer = models.CharField("生产厂家", max_length=100, blank=True, help_text="如: BASF")
-    # 关联到《材料类型models》
+    grade_name = models.CharField("材料牌号", max_length=100, unique=True)
+    manufacturer = models.CharField("生产厂家", max_length=100, blank=True)
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
-    # 关联到《应用场景库》
-    # scenario = models.ForeignKey(ApplicationScenario, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="应用场景")
-    # 【新增】关联到《应用场景库》多对多字段
-    scenarios = models.ManyToManyField(ApplicationScenario,blank=True,verbose_name="适用场景",related_name="materials",help_text="该材料可用于多个场景")
-    # related_name="materials" --> 反向查询名：scenario.materials.all()
 
-    # --- 2. 物理性能 (Physical Properties) ---
-    density = models.FloatField("密度 (g/cm³)", blank=True, null=True)
-    melt_index = models.FloatField("熔融指数 M.I (g/10min)", blank=True, null=True, help_text="测试标准通常为 ASTM D1238")
-    ash_content = models.FloatField("灰分 Ash (%)", blank=True, null=True)
-    shrinkage_md = models.FloatField("收缩率-MD (横向 %)", blank=True, null=True)
-    shrinkage_td = models.FloatField("收缩率-TD (纵向 %)", blank=True, null=True)
+    # 多对多关联场景
+    scenarios = models.ManyToManyField(ApplicationScenario, blank=True, verbose_name="适用场景", related_name="materials")
 
-    # --- 3. 机械性能 (Mechanical Properties) ---
-    tensile_strength = models.FloatField("拉伸强度 (MPa)", blank=True, null=True)
-    elongation_break = models.FloatField("断裂伸长率 EL (%)", blank=True, null=True)
-    flexural_strength = models.FloatField("弯曲强度 FS (MPa)", blank=True, null=True)
-    flexural_modulus = models.FloatField("弯曲模量 FM (MPa)", blank=True, null=True)
-    izod_impact_23 = models.FloatField("Izod缺口冲击 23℃ (kJ/m²)", blank=True, null=True)
-    izod_impact_minus_30 = models.FloatField("Izod缺口冲击 -30℃ (kJ/m²)", blank=True, null=True)
+    # 基础属性
+    flammability = models.CharField("阻燃等级", max_length=20, blank=True,
+                                    choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
+    description = models.TextField("特性描述", blank=True)
 
-    # --- 4. 热学性能 (Thermal Properties) ---
-    hdt_045 = models.FloatField("热变形温度 0.45MPa (℃)", blank=True, null=True)
-    hdt_180 = models.FloatField("热变形温度 1.8MPa (℃)", blank=True, null=True)
-    # 阻燃等级 (改为选择)
-    FLAMMABILITY_CHOICES = [
-        ('HB', 'HB'),
-        ('V-2', 'V-2'),
-        ('V-1', 'V-1'),
-        ('V-0', 'V-0'),
-        ('5VB', '5VB'),
-        ('5VA', '5VA'),
-    ]
-    flammability = models.CharField("阻燃等级", max_length=10, choices=FLAMMABILITY_CHOICES, blank=True, null=True)
-
-    # --- 5. 文件与描述 ---
-    file_tds = models.FileField("TDS (物性表)", upload_to=repo_file_path, blank=True, null=True)
-    file_msds = models.FileField("MSDS (化学品安全)", upload_to=repo_file_path, blank=True, null=True)
-    file_rohs = models.FileField("RoHS/环保报告", upload_to=repo_file_path, blank=True, null=True)
-
-    description = models.TextField("材料特性描述", blank=True, help_text="例如：高流动性、抗UV、玻纤增强等特性说明")
+    # 核心文件
+    file_tds = models.FileField("TDS", upload_to=repo_file_path, blank=True, null=True)
+    file_msds = models.FileField("MSDS", upload_to=repo_file_path, blank=True, null=True)
+    file_rohs = models.FileField("RoHS", upload_to=repo_file_path, blank=True, null=True)
 
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
 
     def __str__(self):
-        return f"{self.grade_name} ({self.manufacturer})"
+        return f"{self.grade_name}"
+
+    # 【新增】辅助方法：将 EAV 数据转为字典，方便模板调用
+    def get_properties_dict(self):
+        """
+        返回格式：
+        {
+            '密度': {'value': 1.2, 'unit': 'g/cm³'},
+            '拉伸强度': {'value': 50, 'unit': 'MPa'},
+            ...
+        }
+        """
+        data = {}
+        # 预加载 test_config 避免 N+1
+        for point in self.properties.select_related('test_config').all():
+            key = point.test_config.name
+            data[key] = {
+                'value': point.value,
+                'unit': point.test_config.unit,
+                'standard': point.test_config.standard,
+                'condition': point.test_config.condition
+            }
+        return data
+
+    # 【新增】辅助方法：按分类分组获取性能数据，用于详情页展示
+    def get_grouped_properties(self):
+        """
+        返回格式：
+        [
+            {
+                'category_name': '物理性能',
+                'items': [
+                    {'name': '密度', 'value': 1.2, 'unit': 'g/cm³', 'standard': 'ISO 1183', 'condition': ''},
+                    ...
+                ]
+            },
+            ...
+        ]
+        """
+        from collections import defaultdict
+        grouped = defaultdict(list)
+        
+        # 预加载 test_config 和 category
+        points = self.properties.select_related('test_config', 'test_config__category').order_by(
+            'test_config__category__order', 'test_config__order'
+        )
+        
+        for point in points:
+            cat_name = point.test_config.category.name
+            grouped[cat_name].append({
+                'name': point.test_config.name,
+                'value': point.value,
+                'unit': point.test_config.unit,
+                'standard': point.test_config.standard,
+                'condition': point.test_config.condition,
+                'remark': point.remark
+            })
+            
+        # 转换为列表格式，保持分类顺序 (因为 defaultdict 是无序的，但我们查询时已经按 category__order 排序了)
+        # 为了确保分类顺序正确，我们最好再处理一下，或者直接依赖查询顺序
+        # 这里简单处理：按出现的顺序生成列表
+        result = []
+        seen_cats = set()
+        # 重新遍历一遍以保持顺序 (虽然有点低效，但数据量很小)
+        for point in points:
+            cat_name = point.test_config.category.name
+            if cat_name not in seen_cats:
+                result.append({
+                    'category_name': cat_name,
+                    'items': grouped[cat_name]
+                })
+                seen_cats.add(cat_name)
+                
+        return result
 
     class Meta:
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            # 1. 针对默认排序字段添加索引 (解决打开页面慢)
+            models.Index(fields=['-created_at']),
+            # 2. 针对高频筛选的外键添加索引 (解决筛选慢)
+            models.Index(fields=['category']),
+        ]
+        ordering = ['-created_at']
         verbose_name = "材料库"
-        verbose_name_plural = "材料库"
-        ordering = ['-created_at']  # 默认按创建时间倒序排列 (最新的在最前)
 
 
-# 【新增】材料额外文件子表
+# ==========================================
+# 4. 性能数据子表 (Data Lines)
+# ==========================================
+class MaterialDataPoint(models.Model):
+    material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='properties')
+    test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
+    value = models.FloatField("数值")
+    remark = models.CharField("备注", max_length=50, blank=True)
+
+    class Meta:
+        verbose_name = "性能数据"
+        unique_together = ('material', 'test_config')  # 防止重复录入同一项
+        ordering = ['test_config__category__order', 'test_config__order']
+
+
+# ==========================================
+# 5. 额外附件子表 (Attachments)
+# ==========================================
+
+FILE_TYPE_CHOICES = [
+    ('UL', 'UL黄卡/认证'),
+    ('REACH', 'REACH报告'),
+    ('COC', 'COC/出厂报告'),
+    ('SPEC', '详细规格书'),
+    ('OTHER', '其他资料'),
+]
+
 class MaterialFile(models.Model):
-    """
-    材料的额外附件库 (一对多)
-    用于存储除了 TDS/MSDS/RoHS 之外的其他文件，如 UL黄卡、COC、REACH报告等
-    """
-    FILE_TYPE_CHOICES = [
-        ('UL', 'UL黄卡/认证'),
-        ('REACH', 'REACH报告'),
-        ('COC', 'COC/出厂报告'),
-        ('SPEC', '详细规格书'),
-        ('OTHER', '其他资料'),
-    ]
-
-    material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files', verbose_name="所属材料")
-    file = models.FileField("文件附件", upload_to=repo_file_path)
-    file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
-    description = models.CharField("文件说明", max_length=100, blank=True)
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+    material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files')
+    file = models.FileField(upload_to=repo_file_path)
+    file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
+    description = models.CharField(max_length=100, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
 
     def filename(self):
         import os
@@ -218,10 +317,9 @@ class ProjectRepository(models.Model):
     competitor_price = models.DecimalField("竞品售价 (RMB/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     target_cost = models.DecimalField("目标成本 (RMB/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
 
-    # 4. 旧的文件字段全部删除 (file_drawing_2d, file_standard 等)
-    # 改为使用下方的 ProjectFile 子表
-
     updated_at = models.DateTimeField("最后更新", auto_now=True)
+
+
 
     def __str__(self):
         return f"{self.project.name} 档案"
@@ -229,6 +327,19 @@ class ProjectRepository(models.Model):
     class Meta:
         verbose_name = "项目档案"
         verbose_name_plural = "项目档案"
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            # 1. 针对默认排序字段添加索引 (解决打开页面慢)
+            models.Index(fields=['-updated_at']),
+
+            # 2. 针对高频筛选的外键添加索引 (解决筛选慢)
+            models.Index(fields=['project']),
+            models.Index(fields=['customer']),
+            models.Index(fields=['oem']),
+            models.Index(fields=['salesperson']),
+            models.Index(fields=['material']),
+        ]
+        ordering = ['-updated_at']
 
 
 # ==========================================
@@ -262,4 +373,11 @@ class ProjectFile(models.Model):
     class Meta:
         verbose_name = "项目文件"
         verbose_name_plural = "项目文件库"
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            # 1. 针对默认排序字段添加索引 (解决打开页面慢)
+            models.Index(fields=['-uploaded_at']),
+            # 2. 针对高频筛选的外键添加索引 (解决筛选慢)
+            models.Index(fields=['repository']),
+        ]
         ordering = ['-uploaded_at']

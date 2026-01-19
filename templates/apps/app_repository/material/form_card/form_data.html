@@ -1,0 +1,61 @@
+<!-- ============================================================ -->
+<!-- 【核心修改】板块 2：性能数据录入 (动态 FormSet) -->
+<!-- ============================================================ -->
+<div class="card mb-3">
+    <div class="card-header bg-blue-lt">
+        <h3 class="card-title">2. 性能指标数据 (EAV)</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table" id="data-table">
+            <thead>
+            <tr>
+                <th class="w-40 required">测试项目 (指标 | 标准 | 条件)</th>
+                <th class="w-25">数值</th>
+                <th class="w-25">备注</th>
+                <th class="w-1">删</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- 管理表单，必须有！ -->
+            {{ data_formset.management_form }}
+
+            {% for subform in data_formset %}
+                <tr class="form-row {% if subform.errors %}table-danger{% endif %}">
+                    <!-- 隐藏字段 (如 ID) -->
+                    {% for hidden in subform.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+
+                    <td>
+                        {{ subform.test_config }}
+                        {% if subform.test_config.errors %}
+                            <div class="text-danger small">{{ subform.test_config.errors.0 }}</div>{% endif %}
+                    </td>
+                    <td>
+                        {{ subform.value }}
+                        {% if subform.value.errors %}
+                            <div class="text-danger small">{{ subform.value.errors.0 }}</div>{% endif %}
+                    </td>
+                    <td>{{ subform.remark }}</td>
+                    <td>
+                        {% if subform.instance.pk %}
+                            <div class="form-check m-0 d-flex justify-content-center">
+                                {{ subform.DELETE }}
+                                <label class="form-check-label visually-hidden" for="{{ subform.DELETE.id_for_label }}">删除</label>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <button type="button" class="btn btn-sm btn-primary" id="add-row">
+            <i class="ti ti-plus"></i> 添加一行数据
+        </button>
+        <span class="text-muted small ms-3">
+                    <i class="ti ti-info-circle me-1"></i> 每行代表一个测试项目的数值。
+                </span>
+    </div>
+</div>

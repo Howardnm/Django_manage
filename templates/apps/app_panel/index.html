@@ -9,6 +9,36 @@
                 <div class="page-pretitle">Overview</div>
                 <h2 class="page-title">项目全景看板</h2>
             </div>
+            <!-- 【新增】右侧筛选器 (日期 + 用户组) -->
+            <div class="col-auto ms-auto d-print-none">
+                <form method="GET" class="d-flex gap-2 align-items-center">
+                    
+                    <!-- 用户组筛选 -->
+                    <div class="d-inline-block" style="width: 150px;">
+                        {{ filter.form.group }}
+                    </div>
+
+                    <!-- 日期筛选 -->
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-calendar"></i></span>
+                        <input type="date" name="start_date" class="form-control" value="{{ start_date|default:'' }}" placeholder="开始日期">
+                    </div>
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-calendar"></i></span>
+                        <input type="date" name="end_date" class="form-control" value="{{ end_date|default:'' }}" placeholder="结束日期">
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-icon" title="筛选">
+                        <i class="ti ti-filter"></i>
+                    </button>
+                    
+                    {% if request.GET %}
+                        <a href="{{ request.path }}" class="btn btn-ghost-danger btn-icon" title="重置">
+                            <i class="ti ti-x"></i>
+                        </a>
+                    {% endif %}
+                </form>
+            </div>
         </div>
     </div>
 

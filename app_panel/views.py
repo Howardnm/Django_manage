@@ -4,123 +4,170 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
 from django.utils import timezone
 from datetime import timedelta
-from django.db.models import Count, Q, Max
+from django.db.models import Count, Q, F
 
 from app_project.models import Project, ProjectNode, ProjectStage
-# 引入之前写好的权限 Mixin (确保路径正确)
 from app_project.mixins import ProjectPermissionMixin
+from app_panel.utils.filters import PanelFilter
 
 
 class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
     def get(self, request):
-        # 1. 获取项目 (复用 Mixin)
-        # 【优化】显式加上 .order_by('-created_at')，确保绝对是按时间倒序（虽然models已经设置了class Meta）
-        base_qs = Project.objects.prefetch_related('nodes', 'manager', 'manager__groups').order_by('-created_at')
-        projects = self.get_permitted_queryset(base_qs)
+        # 1. 获取基础 QuerySet (权限过滤)
+        base_qs = Project.objects.all()
+        projects_qs = self.get_permitted_queryset(base_qs)
+
+        # 使用 FilterSet 处理筛选 (日期 + 用户组)
+        filter_set = PanelFilter(request.GET, queryset=projects_qs)
+        projects_qs = filter_set.qs
+
+        # 获取筛选参数回填
+        start_date = request.GET.get('start_date', '')
+        end_date = request.GET.get('end_date', '')
 
         now = timezone.now()
-        # 2. 初始化统计容器 (保持不变)
-        stats = {
-            'total_all': 0,  # 总数
-            'total_active': 0,  # 进行中
-            'total_completed': 0,  # 【新增】已完成
-            'total_terminated': 0,  # 【新增】已终止
-            'total_users': set(),
-            'stage_counts': {},
-            'stagnant_14d': [],
-            'stagnant_30d': [],
-            'multi_round_pilot': [],
-            'member_stats': {},
-            'group_stats': {},  # 【新增】用于存各组数据
-        }
+        day_14 = now - timedelta(days=14)
+        day_30 = now - timedelta(days=30)
+
+        # =========================================================
+        # 2. 全局数字统计 (【优化】直接使用 Project 冗余字段)
+        # =========================================================
+        # 总数
+        total_all = projects_qs.count()
+
+        # 统计已终止项目
+        terminated_count = projects_qs.filter(is_terminated=True).count()
+
+        # 统计已完成项目 (进度100%且未终止)
+        completed_count = projects_qs.filter(progress_percent=100, is_terminated=False).count()
+
+        # 统计活跃项目 (未终止且未完成)
+        active_count = total_all - terminated_count - completed_count
+        if active_count < 0: active_count = 0
+
+        # 用户总数
+        user_count = projects_qs.values('manager').distinct().count()
+
+        # =========================================================
+        # 3. 阶段分布统计 (【优化】直接聚合 current_stage)
+        # =========================================================
+        # 只统计活跃项目 (未终止且未完成)
+        active_qs = projects_qs.filter(is_terminated=False, progress_percent__lt=100)
+        
+        stage_data = active_qs.values('current_stage').annotate(count=Count('id'))
+        stage_map = {item['current_stage']: item['count'] for item in stage_data}
+
+        stage_counts = {}
         for code, label in ProjectStage.choices:
-            if code != 'FEEDBACK':  # 排除：客户意见
-                stats['stage_counts'][label] = 0  # 将每个阶段的项目数量初始化为0
+            if code != 'FEEDBACK':
+                stage_counts[label] = stage_map.get(code, 0)
 
-        # 3. 核心遍历 (大幅简化)
-        for project in projects:
-            # 【核心修改】直接调用 app_project Model 方法
-            info = project.get_progress_info()
-            stats['total_all'] += 1
+        # =========================================================
+        # 4. 风险预警 (依然需要查 Nodes，但先通过 Project 缩小范围)
+        # =========================================================
+        
+        # A. 滞后 30 天 (严重)
+        # 逻辑：项目未结束，且当前活跃节点的更新时间早于30天前
+        stagnant_30d_raw = active_qs.filter(
+            nodes__status='DOING',
+            nodes__updated_at__lt=day_30
+        ).select_related('manager').distinct()[:10]
 
-            # 【修正点 1】先提取变量，方便后续多次使用，代码更清晰
-            is_terminated = info['is_terminated']
-            is_completed = (info['percent'] == 100)
+        stagnant_30d = []
+        for p in stagnant_30d_raw:
+            # 获取该项目当前卡住的节点
+            node = p.nodes.filter(status='DOING').first()
+            if node:
+                days = (now - node.updated_at).days
+                stagnant_30d.append({'p': p, 'days': days, 'node': node})
 
-            # A. 全局统计
-            if is_terminated:
-                stats['total_terminated'] += 1
-                # 注意：这里不能 continue！如果 continue 了，后面的分组统计代码就执行不到了。
-                # 已终止的项目也要算在“分组统计”里。
-            elif is_completed:
-                stats['total_completed'] += 1
-                # 同理，不要 continue
-            else:
-                stats['total_active'] += 1
+        # B. 滞后 14 天 (中度)
+        stagnant_14d_raw = active_qs.filter(
+            nodes__status='DOING',
+            nodes__updated_at__lt=day_14,
+            nodes__updated_at__gte=day_30
+        ).select_related('manager').distinct()[:10]
 
-            stats['total_users'].add(project.manager.id)
+        stagnant_14d = []
+        for p in stagnant_14d_raw:
+            node = p.nodes.filter(status='DOING').first()
+            if node:
+                days = (now - node.updated_at).days
+                stagnant_14d.append({'p': p, 'days': days, 'node': node})
 
-            # 【修正点 2】节点统计 (仅针对活跃项目)
-            # 只有没终止、没完成的项目，才需要去统计停滞和多轮小试
-            if not is_terminated and not is_completed:
-                # 【核心修改】直接获取当前节点对象
-                current_node = info['current_node_obj']
-                if current_node:
-                    # B. 统计各阶段数量
-                    stage_label = current_node.get_stage_display()
-                    if stage_label in stats['stage_counts']:
-                        stats['stage_counts'][stage_label] += 1
+        # C. 多轮小试 (修改逻辑)
+        # 筛选条件：
+        # 1. 项目必须是活跃的 (active_qs 已经保证了 is_terminated=False, progress_percent<100)
+        # 2. 存在 round > 1 的 PILOT 节点 (无论该节点状态如何)
+        multi_round_raw = active_qs.filter(
+            nodes__stage='PILOT',
+            nodes__round__gt=1
+        ).select_related('manager').distinct()[:10]
 
-                    # C. 统计停滞
-                    if current_node.status in ['PENDING', 'DOING']:
-                        days_diff = (now - current_node.updated_at).days
-                        if days_diff >= 30:
-                            stats['stagnant_30d'].append({'p': project, 'days': days_diff, 'node': current_node})
-                        elif days_diff >= 14:
-                            stats['stagnant_14d'].append({'p': project, 'days': days_diff, 'node': current_node})
+        multi_round_pilot = []
+        for p in multi_round_raw:
+            # 找到那个轮次最大的 PILOT 节点，用于展示
+            # 注意：这里不再限制 status='DOING'，而是找 round > 1 的
+            node = p.nodes.filter(stage='PILOT', round__gt=1).order_by('-round').first()
+            if node:
+                multi_round_pilot.append({'p': p, 'round': node.round})
 
-                    # D. 统计多轮
-                    if current_node.stage in ['RND', 'PILOT'] and current_node.round > 1:
-                        stats['multi_round_pilot'].append({'p': project, 'round': current_node.round})
+        # =========================================================
+        # 5. 成员负载 TOP 10 (【优化】直接聚合 Project)
+        # =========================================================
+        # 统计每个经理手头有多少个活跃项目
+        member_agg = active_qs.values('manager__id', 'manager__username') \
+            .annotate(project_count=Count('id')) \
+            .order_by('-project_count')[:10]
 
-            # E. 统计成员负载 (所有项目都算，还是只算活跃？通常算活跃的，这里假设算活跃的)
-            if not is_terminated and not is_completed:
-                uid = project.manager.id
-                if uid not in stats['member_stats']:
-                    stats['member_stats'][uid] = {
-                        'name': project.manager.username,
-                        'avatar': project.manager.username[0].upper(),
-                        'project_count': 0,
-                        'projects': []
-                    }
-                stats['member_stats'][uid]['project_count'] += 1
-                if len(stats['member_stats'][uid]['projects']) < 3:
-                    stats['member_stats'][uid]['projects'].append(project.name)
+        member_stats_list = []
+        for m in member_agg:
+            member_stats_list.append({
+                'name': m['manager__username'],
+                'avatar': m['manager__username'][0].upper() if m['manager__username'] else 'U',
+                'project_count': m['project_count'],
+                'projects': []
+            })
 
-            # F. 统计各组项目情况 (所有项目都统计)
-            # 这里必须放在最外面，不能被 continue 跳过
-            groups = project.manager.groups.all()  # 因为加了 prefetch，这里极快
-            group_names = [g.name for g in groups] if groups else ['未分组']
+        # =========================================================
+        # 6. 组统计 (【优化】直接聚合 Project)
+        # =========================================================
+        group_agg = projects_qs.values('manager__groups__name') \
+            .annotate(
+            total=Count('id'),
+            active=Count('id', filter=Q(is_terminated=False, progress_percent__lt=100)),
+            terminated=Count('id', filter=Q(is_terminated=True)),
+            completed=Count('id', filter=Q(is_terminated=False, progress_percent=100))
+        ).order_by('-total')
 
-            for g_name in group_names:
-                if g_name not in stats['group_stats']:
-                    stats['group_stats'][g_name] = {
-                        'total': 0, 'active': 0, 'completed': 0, 'terminated': 0
-                    }
+        group_stats = {}
+        for g in group_agg:
+            group_name = g['manager__groups__name'] or '未分组'
+            group_stats[group_name] = {
+                'total': g['total'],
+                'active': g['active'],
+                'terminated': g['terminated'],
+                'completed': g['completed']
+            }
 
-                s = stats['group_stats'][g_name]
-                s['total'] += 1
-
-                if is_terminated:
-                    s['terminated'] += 1
-                elif is_completed:
-                    s['completed'] += 1
-                else:
-                    s['active'] += 1
+        stats = {
+            'total_all': total_all,
+            'total_active': active_count,
+            'total_completed': completed_count,
+            'total_terminated': terminated_count,
+            'stage_counts': stage_counts,
+            'stagnant_30d': stagnant_30d,
+            'stagnant_14d': stagnant_14d,
+            'multi_round_pilot': multi_round_pilot,
+            'group_stats': group_stats,
+        }
 
         context = {
             'stats': stats,
-            'user_count': len(stats['total_users']),
-            'member_stats_list': sorted(stats['member_stats'].values(), key=lambda x: x['project_count'], reverse=True)
+            'user_count': user_count,
+            'member_stats_list': member_stats_list,
+            'start_date': start_date,
+            'end_date': end_date,
+            'filter': filter_set,
         }
         return render(request, 'apps/app_panel/index.html', context)

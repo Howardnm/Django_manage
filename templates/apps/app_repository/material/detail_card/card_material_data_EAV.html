@@ -1,0 +1,86 @@
+<!-- 1. 动态性能数据 (胶囊双列视图) -->
+<!-- 加载自定义标签库 -->
+{% load project_extras repo_tags %}
+
+<!-- 【关键】使用 View 传来的 sorted_properties 进行分组 -->
+{% regroup sorted_properties by test_config.category as category_list %}
+
+{% for category in category_list %}
+
+    <!-- 获取动态颜色 (蓝/橙/红) -->
+    {% get_category_color category.grouper.name as theme_color %}
+
+    <div class="card mb-3">
+
+        <!-- 顶部色条 -->
+{#        <div class="card-status-top bg-{{ theme_color }}"></div>#}
+
+        <!-- 卡片标题 -->
+        <div class="card-header bg-{{ theme_color }}-lt">
+            <h3 class="card-title text-{{ theme_color }}">
+                {% if theme_color == 'blue' %}<i class="ti ti-microscope me-2"></i>
+                {% elif theme_color == 'orange' %}<i class="ti ti-hammer me-2"></i>
+                {% elif theme_color == 'red' %}<i class="ti ti-flame me-2"></i>
+                {% else %}<i class="ti ti-list me-2"></i>{% endif %}
+                {{ category.grouper.name }}
+            </h3>
+        </div>
+
+        <!-- 内容区域 -->
+        <div class="card-body p-2">
+            <div class="row g-2">
+
+                <!-- 【双重保险】在模板层再次强制按 order 排序，确保显示顺序绝对正确 -->
+                {% for prop in category.list|dictsort:"test_config.order" %}
+                    <div class="col-md-6 col-12">
+                        <div class="card card-sm border hover-shadow-sm h-100">
+                            <div class="card-body p-2 d-flex align-items-center justify-content-between">
+
+                                <!-- 左侧：指标定义 -->
+                                <div class="d-flex align-items-center overflow-hidden me-2">
+                                    <!-- 装饰竖条 -->
+                                    <div class="bg-{{ theme_color }} rounded-pill me-2" style="width: 3px; height: 32px;"></div>
+
+                                    <div class="lh-sm text-truncate">
+                                        <!-- 名称 -->
+                                        <div class="font-weight-medium text-body text-truncate" title="{{ prop.test_config.name }}">
+                                            {{ prop.test_config.name }}
+                                        </div>
+                                        <!-- 标准 + 条件 -->
+                                        <div class="text-muted small text-truncate" style="font-size: 10px;">
+                                            {{ prop.test_config.standard }}
+                                            {% if prop.test_config.condition %}
+                                                <span class="mx-1">·</span>{{ prop.test_config.condition }}
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- 右侧：数值 -->
+                                <div class="text-end flex-shrink-0">
+                                    <div class="h2 m-0 text-{{ theme_color }} fw-bold" style="line-height: 1;">
+                                        {{ prop.value }}
+                                    </div>
+                                    <div class="text-secondary" style="font-size: 10px;">
+                                        {{ prop.test_config.unit }}
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+
+            </div>
+        </div>
+    </div>
+{% empty %}
+    <!-- 空状态：引导用户去录入 -->
+    <div class="card mb-3">
+        <div class="card-body text-center py-5">
+            <div class="empty-icon"><i class="ti ti-flask-off fs-1 opacity-25"></i></div>
+            <p class="text-muted">暂无详细性能数据</p>
+            <a href="{% url 'repo_material_edit' material.pk %}" class="btn btn-primary">立即录入数据</a>
+        </div>
+    </div>
+{% endfor %}

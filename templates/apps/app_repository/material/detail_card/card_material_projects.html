@@ -1,0 +1,62 @@
+<!-- 2. 关联项目应用记录 (宽幅表格) -->
+<div class="card mt-3">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-briefcase me-2 text-muted"></i>关联项目应用
+        </h3>
+        <div class="card-actions">
+            <span class="badge bg-blue-lt">{{ related_projects|length }} 个项目</span>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap datatable">
+            <thead>
+            <tr>
+                <th>项目名称</th>
+                <th>负责人</th>
+                <th>进度</th>
+                <th>阶段</th>
+                <th>时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for project in related_projects %}
+                <tr>
+                    <td><a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold">{{ project.name }}</a></td>
+                    <td>
+                        <div class="d-flex align-items-center">
+                            <span class="avatar avatar-xs rounded me-2">{{ project.manager.username|slice:":1"|upper }}</span>
+                            {{ project.manager.username }}
+                        </div>
+                    </td>
+                    <td style="width: 100px">
+                        <div class="progress progress-sm">
+                            <div class="progress-bar {% if project.is_terminated %}bg-danger{% elif project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                 style="width: {{ project.progress_percent }}%"></div>
+                        </div>
+                    </td>
+                    <td>
+                        {% if project.is_terminated %}
+                            <span class="badge bg-red-lt">❌ 已终止</span>
+                        {% elif project.progress_percent == 100 %}
+                            <span class="badge bg-green-lt">✅ 已完成</span>
+                        {% else %}
+                            <span class="badge bg-blue-lt">{{ project.get_current_stage_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted">{{ project.created_at|date:"Y-m-d" }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary"><i class="ti ti-arrow-right"></i></a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted small">暂无关联项目</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

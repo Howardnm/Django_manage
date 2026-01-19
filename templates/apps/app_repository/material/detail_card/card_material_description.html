@@ -1,0 +1,11 @@
+<!-- 2. 描述卡片 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">材料描述</h3>
+    </div>
+    <div class="card-body">
+        <div class="text-secondary small">
+            {{ material.description|default:"暂无详细描述"|linebreaks }}
+        </div>
+    </div>
+</div>

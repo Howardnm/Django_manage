@@ -1,5 +1,14 @@
 from django.urls import path
-from .views import *
+from .views.ProjectRepository import *
+from .views.Material import *
+from .views.MaterialType import *
+from .views.Customer import *
+from .views.OEM import *
+from .views.Scenario import *
+from .views.Salesperson import *
+from .views.SecureFileDownload import *
+from .views.TestConfig import *  # 【新增】
+from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
@@ -15,16 +24,14 @@ urlpatterns = [
     # 材料库
     path('materials/', MaterialListView.as_view(), name='repo_material_list'),
     path('materials/add/', MaterialCreateView.as_view(), name='repo_material_add'),
-    # 【新增】详情页 (注意放在 edit 之前或者之后都可以，只要不冲突)
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='repo_material_detail'),
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='repo_material_edit'),
-    # 【新增】材料文件管理路由
     path('material/<int:material_id>/file/add/', MaterialFileUploadView.as_view(), name='repo_material_file_add'),
     path('material/file/<int:pk>/delete/', MaterialFileDeleteView.as_view(), name='repo_material_file_delete'),
 
-    # 项目档案 (入口是 project_id)
+    # 项目档案
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
-    # 【新增】档案文件管理路由
+    path('api/search/', RepoAutocompleteView.as_view(), name='repo_api_search'),
     path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
     path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
 
@@ -38,6 +45,11 @@ urlpatterns = [
     path('scenarios/add/', ScenarioCreateView.as_view(), name='repo_scenario_add'),
     path('scenarios/<int:pk>/edit/', ScenarioUpdateView.as_view(), name='repo_scenario_edit'),
 
+    # 【新增】测试标准配置
+    path('test-configs/', TestConfigListView.as_view(), name='repo_test_config_list'),
+    path('test-configs/add/', TestConfigCreateView.as_view(), name='repo_test_config_add'),
+    path('test-configs/<int:pk>/edit/', TestConfigUpdateView.as_view(), name='repo_test_config_edit'),
+
     # 通用下载路由
     path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
 
@@ -50,4 +62,4 @@ urlpatterns = [
     path('oems/', OEMListView.as_view(), name='repo_oem_list'),
     path('oems/add/', OEMCreateView.as_view(), name='repo_oem_add'),
     path('oems/<int:pk>/edit/', OEMUpdateView.as_view(), name='repo_oem_edit'),
-]
+] + debug_toolbar_urls() # 这是debug_toolbar的配置

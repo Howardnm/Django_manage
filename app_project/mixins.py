@@ -9,10 +9,11 @@ class ProjectPermissionMixin:
     """
 
     # --- 功能 1：给列表页用 (过滤 QuerySet) ---
-    def get_permitted_queryset(self, queryset):
+    def get_permitted_queryset(self, queryset, manager_field='manager'):
         """
-        传入一个 Project 的 QuerySet，
-        返回当前用户有权查看的 QuerySet。
+        传入一个 QuerySet，返回当前用户有权查看的 QuerySet。
+        :param queryset: 待过滤的查询集
+        :param manager_field: 指向 User 模型的字段名 (例如 'manager' 或 'project__manager')
         """
         user = self.request.user
 
@@ -21,12 +22,16 @@ class ProjectPermissionMixin:
             return queryset
 
         # 2. 普通用户：只保留自己的 + 同组的
-        # 注意：这里使用了 distinct() 去重
+        # 构造动态查询参数
+        # Q(manager=user) -> Q(**{manager_field: user})
+        # Q(manager__groups__in=my_groups) -> Q(**{f"{manager_field}__groups__in": my_groups})
+        
         my_groups = user.groups.all()
-        return queryset.filter(
-            Q(manager=user) |
-            Q(manager__groups__in=my_groups)
-        ).distinct()
+        
+        q_self = Q(**{manager_field: user})
+        q_group = Q(**{f"{manager_field}__groups__in": my_groups})
+
+        return queryset.filter(q_self | q_group).distinct()
 
     # --- 功能 2：给详情/操作页用 (检查单个对象) ---
     def check_project_permission(self, project):

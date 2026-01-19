@@ -1,13 +1,13 @@
 import django_filters
 from django.db.models import Q
+from django import forms
+from django.contrib.auth.models import Group  # 【新增】
 from app_project.models import Project, ProjectNode, ProjectStage
-from django import forms  # 引入 forms 用于定义 widget
+from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
 
-class ProjectFilter(django_filters.FilterSet):
-    # 1. 搜索框 (自定义 Widget 样式)
-    # CharFilter 对应文本输入
-    # method 指向一个自定义函数，因为我们要跨字段搜索 (name OR manager OR description)
+class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
+    # 1. 搜索框
     q = django_filters.CharFilter(
         method='filter_search',
         label='搜索',
@@ -17,50 +17,55 @@ class ProjectFilter(django_filters.FilterSet):
         })
     )
 
-    # 2. 排序 (Sort 参数)
-    # OrderingFilter 自动处理排序，甚至支持 url?sort=-name (自动转倒序)
+    # 2. 排序
     sort = django_filters.OrderingFilter(
         fields=(
             ('created_at', 'created_at'),
             ('name', 'name'),
-            ('manager__username', 'manager'),  # 前端参数叫manager，对应数据库manager__username
+            ('manager__username', 'manager'),
+            ('current_stage', 'stage'),
         ),
         field_labels={
             'created_at': '创建时间',
             'name': '项目名称',
+            'current_stage': '当前阶段',
         },
-        # 加上这句，它在模版 for field in filter.form 循环时，就会渲染成 <input type="hidden">
-        # 这样既不会在界面上显示下拉框，提交表单时又能带上当前的 sort 值
         widget=forms.HiddenInput
     )
 
-    # 3. 负责人筛选 (Manager 参数)
-    # method 指向自定义函数，处理 'me' 这种特殊逻辑
+    # 3. 负责人筛选
     manager = django_filters.ChoiceFilter(
         method='filter_manager',
         label='负责人',
-        # 定义下拉框选项
         choices=[('me', '只看我的')],
-        # 定义空选项的显示文字
         empty_label="所有负责人",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     # 4. 阶段筛选
     stage = django_filters.ChoiceFilter(
-        field_name='current_stage',  # 直接指数据库字段
+        field_name='current_stage',
         choices=ProjectStage.choices,
         label='当前阶段',
+        empty_label="所有阶段",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    # 5. 【新增】用户组筛选
+    group = django_filters.ModelChoiceFilter(
+        queryset=Group.objects.all(),
+        field_name='manager__groups',  # 筛选项目负责人的组
+        label='所属组',
+        empty_label="所有组",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     class Meta:
         model = Project
-        # fields 列表里的字段会自动生成默认的精确匹配查询
-        fields = ['q', 'manager']  # 决定显示的顺序
+        # start_date, end_date 来自 DateRangeFilterMixin
+        fields = ['q', 'manager', 'group', 'stage', 'start_date', 'end_date']
 
     def filter_search(self, queryset, name, value):
-        """自定义搜索逻辑"""
         if not value:
             return queryset
         return queryset.filter(
@@ -70,8 +75,6 @@ class ProjectFilter(django_filters.FilterSet):
         )
 
     def filter_manager(self, queryset, name, value):
-        """自定义负责人筛选逻辑"""
         if value == 'me':
-            # self.request 是在 View 实例化 FilterSet 时传入的
             return queryset.filter(manager=self.request.user)
         return queryset

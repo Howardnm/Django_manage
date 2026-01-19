@@ -1,14 +1,6 @@
-from pickletools import string1
-from xmlrpc.client import boolean
-
-from django.db import models
-
 # Create your models here.
 from django.db import models
 from django.contrib.auth.models import User
-from django.utils import timezone
-from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
 from django.utils.text import Truncator  # 导入文字截断器
 from django.db import transaction  # 用于事务处理，保证排序修改的安全性
 from django.utils.functional import cached_property  # 引入缓存装饰器
@@ -36,9 +28,25 @@ class Project(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     # 【新增】当前阶段字段 (冗余字段，用于加速查询和筛选)
     current_stage = models.CharField("当前阶段", max_length=20, choices=ProjectStage.choices, default=ProjectStage.INIT)
+    # 【新增】冗余字段，用于极速列表展示
+    progress_percent = models.PositiveIntegerField("进度百分比", default=0)
+    is_terminated = models.BooleanField("是否终止", default=False)
+    # 【新增】最新节点备注 (冗余字段，用于列表展示)
+    latest_remark = models.CharField("最新进展", max_length=200, blank=True, help_text="自动同步当前活跃节点的备注")
 
     class Meta:
         verbose_name = "项目"  # 给这个模型起一个名称。
+        # 【核心优化】添加索引
+        indexes = [
+            # 1. 默认排序索引 (已存在)
+            models.Index(fields=['-created_at']),
+            # 2. 【新增】阶段筛选索引 (解决按阶段筛选/排序卡顿)
+            models.Index(fields=['current_stage']),
+            # 3. 【新增】负责人索引 (解决只看我的/权限过滤卡顿)
+            models.Index(fields=['manager']),
+            # 4. 【新增】名称索引 (解决搜索卡顿)
+            models.Index(fields=['name']),
+        ]
         ordering = ['-created_at']  # 定义排序规则，给created_at字段倒序排序，“-”号为倒序，等价于.order_by('-created_at')
 
     def __str__(self):
@@ -51,46 +59,6 @@ class Project(models.Model):
     def cached_nodes(self):
         """获取当前项目的节点列表。将节点按 order 正序排序缓存到内存中，供后续计算使用"""
         return sorted(self.nodes.all(), key=lambda x: x.order)
-
-    def get_progress_info(self):
-        """一次性计算进度信息，返回字典，避免模板多次调用不同的计算方法"""
-        # 1、获取当前进度（计算百分比）
-        valid_nodes = [n for n in self.cached_nodes if n.stage != ProjectStage.FEEDBACK and n.status != 'FAILED']
-        total = len(valid_nodes)
-        if total < 9: total = 9  # 避免除零
-        done_count = sum(1 for n in valid_nodes if n.status == 'DONE')
-        percent = int((done_count / total) * 100)
-        # 2、寻找当前节点（只包含：未开始、进行中、已终止的节点，然后取最前的一个节点）
-        current_node = next((n for n in self.cached_nodes if n.status in ['PENDING', 'DOING']), None)
-        current_node_terminated = next((n for n in reversed(self.cached_nodes) if n.status in ['TERMINATED']), None)
-        # -- 如果存在终止节点，把当前节点切换成终止节点。
-        if current_node_terminated:
-            current_node = current_node_terminated
-        # 3、寻找最后更新时间
-        last_updated = max((n.updated_at for n in self.cached_nodes), default=self.created_at)
-        # 4、寻找是否有终止状态
-        is_terminated = any(n.status == 'TERMINATED' for n in self.cached_nodes)
-        # 5、寻找当前节点的描述
-        current_remark = Truncator(current_node.remark).chars(30) if (current_node and current_node.remark) else " "
-
-        return {
-            'percent': percent,
-            'current_label': self._format_stage_label(current_node),
-            'current_remark': current_remark,
-            'last_updated': last_updated,
-            'is_terminated': is_terminated,
-            # 【新增】返回原始对象，供仪表盘 View 做逻辑判断
-            'current_node_obj': current_node
-        }
-
-    def _format_stage_label(self, node):
-        if not node:
-            return "✅已结束"
-        if node.status in ['TERMINATED']:
-            return "❌已终止"
-        if node.round > 1:
-            return f"🔂{node.get_stage_display()} (第{node.round}轮)"
-        return f"⏳{node.get_stage_display()}"
 
     # --- 业务逻辑封装 ---
     # 【新增功能】插入一个新的迭代节点（例如：小试失败，重新插入一轮研发）
@@ -282,57 +250,3 @@ class ProjectNode(models.Model):
             if self.stage in ['PILOT', 'MID_TEST']:
                 # 基准是 +1 (刚插了一个研发)
                 project.add_iteration_node(ProjectStage.PILOT, self.order + 1)
-
-
-# 4. 【核心逻辑】信号量：创建项目时，自动生成9个节点(监听Project动作，自动触发)
-@receiver(post_save, sender=Project)
-def create_project_nodes(sender, instance, created, **kwargs):
-    '''
-    每当一个新的项目被创建时，系统自动为它生成那 9 个标准的进度节点，而不需要人工一个个去添加。
-    @receiver(post_save, ...)：这是 Django 的信号接收器。它的意思是：“我要监听数据库的保存动作”。
-    :param sender: 意思是“我只监听 Project (项目) 表的动作，其他表我不关心”。
-    :param instance: 这就是刚刚被保存进去的那个具体的项目对象
-    :param created: 这是一个布尔值（True/False）。True：表示这是一次新建（Insert）。False：表示这是一次修改（Update）。
-    :param kwargs:
-    :return:
-    '''
-    if created:
-        nodes_to_create = []
-        # 遍历定义好的枚举，按顺序生成
-        for i, (code, label) in enumerate(ProjectStage.choices):
-            if code not in ['FEEDBACK']:
-                nodes_to_create.append(
-                    ProjectNode(
-                        project=instance,
-                        stage=code,
-                        order=i + 1,  # 1, 2, 3...
-                        round=1,  # 默认都是第1轮
-                        status='PENDING'  # 默认未开始
-                    )
-                )
-        # 批量创建，性能更好（创建9个进度节点到ProjectNode）
-        ProjectNode.objects.bulk_create(nodes_to_create)
-
-
-# 信号量：每当 ProjectNode 发生变化（更新状态、插入新节点）时，自动重新计算并更新父级 Project 的 current_stage。
-@receiver([post_save, post_delete], sender=ProjectNode)
-def update_project_current_stage(sender, instance, **kwargs):
-    """
-    当节点发生变化时，自动更新 Project 的 current_stage 字段
-    """
-    project = instance.project
-
-    # 重新计算当前阶段的逻辑 (复用你 Model 里的思维，但在这里查库)
-    # 找第一个不是 DONE/FAILED/TERMINATED 的节点
-    current_node = project.nodes.exclude(status__in=['DONE', 'FAILED', 'TERMINATED','FEEDBACK']).order_by('order').first()
-
-    if current_node:
-        new_stage = current_node.stage
-    else:
-        # 如果都完成了，或者没有节点，可视情况设为 DONE 或最后一个阶段
-        new_stage = ProjectStage.FEEDBACK  # 或者其他完结状态
-
-    # 如果状态变了，保存
-    if project.current_stage != new_stage:
-        project.current_stage = new_stage
-        project.save(update_fields=['current_stage'])

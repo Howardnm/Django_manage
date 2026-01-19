@@ -1,27 +1,16 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from app_repository.models import Customer, MaterialLibrary, MaterialType, ApplicationScenario, OEM, Salesperson, ProjectRepository
+from django.contrib.auth.models import Group  # 【新增】
+from app_repository.models import Customer, OEM, Salesperson, ProjectRepository
+from app_repository.models import MaterialLibrary, ApplicationScenario, MaterialType
+from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin, DateRangeUpdatedFilterMixin
 
 
-class TablerFilterMixin:
-    """定义通用的搜索框样式，避免重复写 widget"""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 给搜索框 q 加上 form-control
-        if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs.update({
-                'class': 'form-control',
-                'placeholder': '输入关键字搜索...'
-            })
-
-
-# 1. 项目档案列表过滤器
-class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
+# 1. 项目档案列表过滤器 (使用 Updated 时间)
+class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
-    # 支持按业务员筛选
     customer = django_filters.ModelChoiceFilter(
         queryset=Customer.objects.all(),
         label='客户',
@@ -29,11 +18,19 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 支持按业务员筛选
     salesperson = django_filters.ModelChoiceFilter(
         queryset=Salesperson.objects.all(),
         label='业务员',
         empty_label="所有业务员",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    # 【新增】用户组筛选 (筛选项目负责人的组)
+    group = django_filters.ModelChoiceFilter(
+        queryset=Group.objects.all(),
+        field_name='project__manager__groups',  # 注意这里的跨表查询路径
+        label='所属组',
+        empty_label="所有组",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
@@ -49,7 +46,7 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
 
     class Meta:
         model = ProjectRepository
-        fields = ['q']
+        fields = ['q', 'customer', 'salesperson', 'group', 'start_date', 'end_date']
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
@@ -61,18 +58,18 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 1. 客户过滤器
+# 2. 客户过滤器 (使用 Created 时间 - 假设 Customer 有 created_at，如果没有可以去掉 DateRangeFilterMixin)
+# 假设 Customer 没有 created_at 字段，或者我们不关心时间筛选，这里只用 TablerFilterMixin
 class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
-    # 排序字段
     sort = django_filters.OrderingFilter(
         fields=(
             ('company_name', 'company_name'),
             ('contact_name', 'contact_name'),
             ('id', 'id'),
         ),
-        widget=forms.HiddenInput  # 隐藏控件
+        widget=forms.HiddenInput
     )
 
     class Meta:
@@ -87,64 +84,49 @@ class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 2. 材料过滤器
-class MaterialFilter(TablerFilterMixin, django_filters.FilterSet):
+# 3. 材料过滤器 (使用 Created 时间)
+class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
-    # 筛选：按类型 (自动生成下拉框)
-    category = django_filters.ModelChoiceFilter(
-        queryset=MaterialType.objects.all(),
-        label='材料类型',
-        empty_label="所有类型",
-        widget=forms.Select(attrs={'class': 'form-select'})
-    )
-
-    # 筛选：按应用场景
-    # 【修改】使用 ModelMultipleChoiceFilter 支持多选筛选
-    # conjoined=False 表示“或者”关系（包含 A 或 B 均可）
-    # conjoined=True 表示“并且”关系（必须同时包含 A 和 B）
-    # 这里通常用 False，即筛选出“适用于汽车”的所有材料
     scenarios = django_filters.ModelMultipleChoiceFilter(
         queryset=ApplicationScenario.objects.all(),
-        label='应用场景',
         widget=forms.SelectMultiple(attrs={'class': 'form-select form-select-search'}),
         conjoined=False
+    )
+
+    category = django_filters.ModelChoiceFilter(
+        queryset=MaterialType.objects.all(),
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     sort = django_filters.OrderingFilter(
         fields=(
             ('grade_name', 'grade_name'),
-            ('category__name', 'category_name'),
-            # 物理
-            ('melt_index', 'melt_index'),
-            # 机械
-            ('tensile_strength', 'tensile'),
-            ('flexural_strength', 'flex_strength'),
-            ('flexural_modulus', 'flex_modulus'),
-            ('izod_impact_23', 'impact_23'),
-            # 热学
-            ('hdt_045', 'hdt_045'),  # HDT 主要按这个排
-            ('hdt_180', 'hdt_180'),
-            # 阻燃
-            ('flammability', 'flammability'),
-            # 【新增】支持按时间排序
+            ('manufacturer', 'manufacturer'),
             ('created_at', 'created_at'),
+            ('val_density', 'density'),
+            ('val_melt', 'melt_index'),
+            ('val_tensile', 'tensile'),
+            ('val_flex_strength', 'flex_strength'),
+            ('val_flex_modulus', 'flex_modulus'),
+            ('val_impact', 'impact'),
+            ('val_hdt', 'hdt'),
+            ('flammability', 'flammability'),
         ),
         widget=forms.HiddenInput
     )
 
     class Meta:
         model = MaterialLibrary
-        fields = ['q', 'category', 'scenarios']
+        fields = ['q', 'category', 'scenarios', 'start_date', 'end_date']
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
-            Q(grade_name__icontains=value) |
-            Q(manufacturer__icontains=value)
+            Q(grade_name__icontains=value) | Q(manufacturer__icontains=value)
         )
 
 
-# 3. 主机厂过滤器
+# 4. 主机厂过滤器
 class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -168,7 +150,7 @@ class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 1. 材料类型过滤器
+# 5. 材料类型过滤器
 class MaterialTypeFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -191,7 +173,7 @@ class MaterialTypeFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 2. 应用场景过滤器
+# 6. 应用场景过滤器
 class ScenarioFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -214,7 +196,7 @@ class ScenarioFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 【新增】业务员过滤器
+# 7. 业务员过滤器
 class SalespersonFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 

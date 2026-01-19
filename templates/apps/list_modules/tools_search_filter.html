@@ -18,7 +18,18 @@
                     </div>
                 </div>
 
-            <!-- 3. 其他字段 (各种下拉筛选框)：自动渲染 -->
+            <!-- 3. 日期筛选：特殊处理，带日历图标 -->
+            {% elif field.name == 'start_date' or field.name == 'end_date' %}
+                <div class="d-inline-block" style="max-width: 160px;">
+                    <div class="input-icon">
+                        <span class="input-icon-addon">
+                            <i class="ti ti-calendar"></i>
+                        </span>
+                        {{ field }}
+                    </div>
+                </div>
+
+            <!-- 4. 其他字段 (各种下拉筛选框)：自动渲染 -->
             {% else %}
                 <div class="d-inline-block">
                     {{ field }}

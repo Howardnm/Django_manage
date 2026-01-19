@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">所属分类</label>
+                        {{ form.category }}
+                        {% if form.category.errors %}
+                            <div class="invalid-feedback d-block">{{ form.category.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">指标名称</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">测试标准</label>
+                        {{ form.standard }}
+                        {% if form.standard.errors %}
+                            <div class="invalid-feedback d-block">{{ form.standard.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">测试条件</label>
+                        {{ form.condition }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">单位</label>
+                        {{ form.unit }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">排序权重</label>
+                        {{ form.order }}
+                        <small class="form-hint">数字越小越靠前</small>
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{% url 'repo_test_config_list' %}" class="btn btn-link">取消</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

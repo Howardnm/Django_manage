@@ -1,0 +1,69 @@
+<!-- 4. 额外附件列表 (胶囊样式) -->
+<div class="card mt-3">
+    <!-- 头部：极简风格，与上方卡片保持一致 -->
+    <div class="card-header py-2 min-h-auto">
+        <h3 class="card-title text-secondary small text-uppercase fw-bold">
+            <i class="ti ti-paperclip me-1"></i> 其他附件 ({{ material.additional_files.count }})
+        </h3>
+        <div class="card-actions">
+            <!-- 幽灵按钮，小巧精致 -->
+            <a href="{% url 'repo_material_file_add' material.pk %}"
+               class="btn btn-sm btn-icon btn-ghost-primary"
+               title="上传新附件"
+               style="width: 24px; height: 24px;">
+                <i class="ti ti-plus" style="font-size: 14px;"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- 内容区：使用浅色背景容器 -->
+    <div class="card-body p-2">
+        <div class="vstack gap-2"> <!-- vstack gap-2 自动控制垂直间距 -->
+            {% for file in material.additional_files.all %}
+                <!-- 单个文件胶囊：白色背景 + 边框 + 阴影 -->
+                <div class="d-flex align-items-center bg-white border rounded p-2 shadow-sm position-relative group-hover-actions">
+
+                    <!-- 1. 类型图标 (保留你的颜色逻辑) -->
+                    <div class="me-2">
+                        {% if file.file_type == 'UL' %}
+                            <span class="avatar avatar-xs bg-yellow-lt text-yellow rounded fw-bold" style="font-size: 9px;">UL</span>
+                        {% elif file.file_type == 'REACH' %}
+                            <span class="avatar avatar-xs bg-green-lt text-green rounded fw-bold" style="font-size: 9px;">RE</span>
+                        {% elif file.file_type == 'COC' %}
+                            <span class="avatar avatar-xs bg-blue-lt text-blue rounded fw-bold" style="font-size: 9px;">COC</span>
+                        {% else %}
+                            <span class="avatar avatar-xs bg-secondary-lt text-secondary rounded"><i class="ti ti-file" style="font-size: 12px;"></i></span>
+                        {% endif %}
+                    </div>
+
+                    <!-- 2. 文件信息 (紧凑排版) -->
+                    <div class="flex-fill overflow-hidden lh-1">
+                        <a href="{% url 'secure_download' 'app_repository' 'materialfile' file.pk 'file' %}"
+                           target="_blank"
+                           class="text-body fw-bold text-truncate d-block text-decoration-none"
+                           style="font-size: 12px; margin-bottom: 2px;"
+                           title="{{ file.description|default:file.filename }}">
+                            {{ file.description|default:file.filename }}
+                        </a>
+                        <div class="text-muted text-truncate" style="font-size: 10px;">
+                            {{ file.uploaded_at|date:"Y/m/d" }} <span class="mx-1">·</span> {{ file.get_file_type_display }}
+                        </div>
+                    </div>
+
+                    <!-- 3. 删除按钮 -->
+                    <form action="{% url 'repo_material_file_delete' file.pk %}" method="POST" onsubmit="return confirm('确定删除此附件吗？');" class="ms-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link btn-sm text-secondary p-0 border-0" title="删除" style="opacity: 0.5;">
+                            <i class="ti ti-x" style="font-size: 14px;"></i>
+                        </button>
+                    </form>
+                </div>
+            {% empty %}
+                <div class="text-center py-4">
+                    <i class="ti ti-folder-off fs-2 text-muted opacity-25"></i>
+                    <div class="text-muted small mt-1">暂无附件</div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

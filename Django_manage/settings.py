@@ -40,7 +40,8 @@ INSTALLED_APPS = [
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
-    'app_repository.apps.AppRepositoryConfig'
+    'app_repository.apps.AppRepositoryConfig',
+    "debug_toolbar", # 这是debug_toolbar的配置
 ]
 
 MIDDLEWARE = [
@@ -51,6 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "debug_toolbar.middleware.DebugToolbarMiddleware", # 这是debug_toolbar的配置
 ]
 
 ROOT_URLCONF = 'Django_manage.urls'
@@ -128,3 +130,10 @@ LOGIN_REDIRECT_URL = 'panel_index'  # 登录成功后跳到这里
 LOGOUT_REDIRECT_URL = 'login'  # 注销后跳到这里
 
 ADMIN_URL = '/admin'
+
+# 这是debug_toolbar的配置
+INTERNAL_IPS = [
+    # ...
+    "127.0.0.1",
+    # ...
+]

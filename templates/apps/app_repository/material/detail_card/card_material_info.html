@@ -1,0 +1,46 @@
+<!-- 1. 基础信息卡片 -->
+<div class="card mb-3">
+    <div class="card-header">
+        <h3 class="card-title">基础档案</h3>
+    </div>
+    <div class="card-body">
+        <div class="datagrid">
+            <div class="datagrid-item">
+                <div class="datagrid-title">生产厂家</div>
+                <div class="datagrid-content fw-bold">{{ material.manufacturer }}</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">所属类型</div>
+                <div class="datagrid-content">
+                    <span class="badge bg-purple-lt">{{ material.category.name }}</span>
+                </div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">适用场景</div>
+                <div class="datagrid-content">
+                    {% if material.scenarios.exists %}
+                        <div class="d-flex flex-wrap gap-2">
+                            {% for s in material.scenarios.all %}
+                                <span class="badge bg-blue-lt">{{ s.name }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">阻燃等级</div>
+                <div class="datagrid-content">
+                    {% if material.flammability %}
+                        <span class="badge {% if 'V-0' in material.flammability %}bg-red{% else %}bg-orange-lt{% endif %}">
+                                    {{ material.flammability }}
+                                </span>
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

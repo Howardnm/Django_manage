@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="测试标准配置" create_url="repo_test_config_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>分类</th>
+                    <th>指标名称</th>
+                    <th>测试标准</th>
+                    <th>测试条件</th>
+                    <th>单位</th>
+                    <th>排序权重</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for config in configs %}
+                    <tr>
+                        <td><span class="badge bg-blue-lt">{{ config.category.name }}</span></td>
+                        <td class="fw-bold">{{ config.name }}</td>
+                        <td>{{ config.standard }}</td>
+                        <td class="text-muted">{{ config.condition|default:"-" }}</td>
+                        <td>{{ config.unit|default:"-" }}</td>
+                        <td>{{ config.order }}</td>
+                        <td>
+                            <a href="{% url 'repo_test_config_edit' config.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

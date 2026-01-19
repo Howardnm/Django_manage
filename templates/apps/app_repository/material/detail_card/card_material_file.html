@@ -1,0 +1,46 @@
+<!-- 3. 文档下载卡片 -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">技术文档</h3>
+    </div>
+    <div class="list-group list-group-flush">
+        <!-- 核心三件套 -->
+        {% if material.file_tds %}
+            <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_tds' %}" target="_blank"
+               class="list-group-item list-group-item-action d-flex align-items-center">
+                <span class="avatar bg-blue-lt me-3"><i class="ti ti-file-text"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium">TDS 物性表</div>
+                    <div class="text-muted small">Technical Data Sheet</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+        {% endif %}
+        {% if material.file_msds %}
+            <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_msds' %}" target="_blank"
+               class="list-group-item list-group-item-action d-flex align-items-center">
+                <span class="avatar bg-red-lt me-3"><i class="ti ti-flask"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium">MSDS 报告</div>
+                    <div class="text-muted small">Safety Data Sheet</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+        {% endif %}
+        {% if material.file_rohs %}
+            <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' material.pk 'file_rohs' %}" target="_blank"
+               class="list-group-item list-group-item-action d-flex align-items-center">
+                <span class="avatar bg-green-lt me-3"><i class="ti ti-leaf"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium">RoHS 报告</div>
+                    <div class="text-muted small">Environmental Report</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+        {% endif %}
+
+        {% if not material.file_tds and not material.file_msds and not material.file_rohs %}
+            <div class="list-group-item text-center text-muted small py-3">暂无核心文档</div>
+        {% endif %}
+    </div>
+</div>

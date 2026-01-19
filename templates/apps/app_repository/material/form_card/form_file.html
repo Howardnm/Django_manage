@@ -1,0 +1,88 @@
+<!-- ============================================================ -->
+<!-- 板块 3：文件上传 (TDS/MSDS/RoHS) - 保持不变 -->
+<!-- ============================================================ -->
+<div class="card">
+    <div class="card-header bg-red-lt">
+        <h3 class="card-title text-red"><i class="ti ti-flame me-2"></i>文档资料</h3>
+    </div>
+    <div class="card-body">
+
+
+        <!-- 1. TDS 物性表 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="ti ti-file-text text-blue me-1"></i>TDS 物性表
+            </label>
+
+            <input type="file" name="file_tds" class="form-control">
+
+            {% if form.instance.file_tds %}
+                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' form.instance.pk 'file_tds' %}"
+                       target="_blank"
+                       class="text-truncate text-azure fw-bold small"
+                       style="max-width: 70%;"
+                       title="点击下载/预览">
+                        <i class="ti ti-download me-1"></i> 已上传文件
+                    </a>
+
+                    <label class="form-check form-check-inline m-0" title="勾选并在保存后删除">
+                        <input class="form-check-input" type="checkbox" name="file_tds-clear">
+                        <span class="form-check-label small text-danger">删除</span>
+                    </label>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 2. MSDS 报告 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="ti ti-flask text-red me-1"></i>MSDS 报告
+            </label>
+
+            <input type="file" name="file_msds" class="form-control">
+
+            {% if form.instance.file_msds %}
+                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' form.instance.pk 'file_msds' %}"
+                       target="_blank"
+                       class="text-truncate text-red fw-bold small"
+                       style="max-width: 70%;"
+                       title="点击下载/预览">
+                        <i class="ti ti-download me-1"></i> 已上传文件
+                    </a>
+                    <label class="form-check form-check-inline m-0">
+                        <input class="form-check-input" type="checkbox" name="file_msds-clear">
+                        <span class="form-check-label small text-danger">删除</span>
+                    </label>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- 3. RoHS 报告 -->
+        <div class="mb-3">
+            <label class="form-label">
+                <i class="ti ti-leaf text-green me-1"></i>RoHS 环保报告
+            </label>
+
+            <input type="file" name="file_rohs" class="form-control">
+
+            {% if form.instance.file_rohs %}
+                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' form.instance.pk 'file_rohs' %}"
+                       target="_blank"
+                       class="text-truncate text-green fw-bold small"
+                       style="max-width: 70%;"
+                       title="点击下载/预览">
+                        <i class="ti ti-download me-1"></i> 已上传文件
+                    </a>
+                    <label class="form-check form-check-inline m-0">
+                        <input class="form-check-input" type="checkbox" name="file_rohs-clear">
+                        <span class="form-check-label small text-danger">删除</span>
+                    </label>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>

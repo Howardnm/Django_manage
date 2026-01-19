@@ -1,0 +1,21 @@
+<!-- ============================================================ -->
+<!-- 板块 4：详细特性描述 -->
+<!-- ============================================================ -->
+<div class="card">
+    <div class="card-header bg-yellow-lt">
+        <h3 class="card-title text-red"><i class="ti ti-flame me-2"></i>描述</h3>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <label class="form-label">详细特性描述</label>
+            {{ form.description }}
+            <small class="form-hint">请填写材料的特性关键词，如：高流动、抗紫外线、耐水解等。</small>
+        </div>
+    </div>
+    <div class="card-footer text-end">
+        <a href="{% url 'repo_material_list' %}" class="btn btn-link link-secondary">取消</a>
+        <button type="submit" class="btn btn-primary ms-2">
+            <i class="ti ti-check me-1"></i> 保存数据
+        </button>
+    </div>
+</div>

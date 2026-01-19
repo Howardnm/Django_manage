@@ -2,21 +2,21 @@
     <!-- ============================================================ -->
     <!-- 头部：极简模式 (产品名 + 代码 + 编辑) -->
     <!-- ============================================================ -->
-    <div class="card-header py-2 min-h-auto">
+    <div class="card-header py-2 min-h-auto bg-purple-lt">
         <div class="d-flex align-items-center w-100">
             <!-- 图标 -->
             <div class="me-2">
-                <span class="avatar avatar-sm bg-blue-lt rounded"><i class="ti ti-package"></i></span>
+                <span class="avatar avatar-sm bg-white text-purple rounded"><i class="ti ti-package"></i></span>
             </div>
 
             <!-- 文字区：使用 flex-fill 占据剩余空间 -->
             <div class="flex-fill text-truncate me-2">
                 <div class="d-flex align-items-center">
-                    <h3 class="card-title m-0 me-2 text-truncate" title="{{ repo.product_name }}">
+                    <h3 class="card-title m-0 me-2 text-truncate text-purple" title="{{ repo.product_name }}">
                         {{ repo.product_name|default:"未命名产品" }}
                     </h3>
                     {% if repo.product_code %}
-                        <span class="badge bg-orange-lt text-truncate" title="产品代码">
+                        <span class="badge bg-white text-purple text-truncate" title="产品代码">
                             {{ repo.product_code }}
                         </span>
                     {% endif %}
@@ -24,7 +24,7 @@
             </div>
 
             <div class="ms-auto">
-                <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-ghost-primary" title="编辑">
+                <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-ghost-primary bg-white text-purple" title="编辑">
                     <i class="ti ti-edit"></i>
                 </a>
             </div>
