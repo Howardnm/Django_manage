@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">品牌</label>
+                        {{ form.brand }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">型号</label>
+                        {{ form.model_name }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">螺杆直径 (mm)</label>
+                        {{ form.screw_diameter }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">长径比 (L/D)</label>
+                        {{ form.ld_ratio }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">电机功率 (kW)</label>
+                        {{ form.motor_power }}
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">最高转速 (rpm)</label>
+                        {{ form.max_speed }}
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label">适用材料类型</label>
+                        {{ form.suitable_materials }}
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label">备注</label>
+                        {{ form.description }}
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{% url 'process_machine_list' %}" class="btn btn-link">取消</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

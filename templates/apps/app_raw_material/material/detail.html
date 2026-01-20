@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">原材料详情</div>
+                <h2 class="page-title">{{ material.name }} {% if material.model_name %}{{ material.model_name }}{% endif %}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-primary">
+                    <i class="ti ti-edit me-1"></i> 编辑
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cards">
+        <!-- 左侧：基础信息 -->
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">基础信息</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-5">类型</dt>
+                        <dd class="col-7"><span class="badge bg-blue-lt">{{ material.category.name }}</span></dd>
+                        
+                        <dt class="col-5">供应商</dt>
+                        <dd class="col-7">{{ material.supplier.name|default:"-" }}</dd>
+                        
+                        <dt class="col-5">内部编码</dt>
+                        <dd class="col-7">{{ material.warehouse_code|default:"-" }}</dd>
+                        
+                        <dt class="col-5">参考成本</dt>
+                        <dd class="col-7 text-orange">{% if material.cost_price %}¥{{ material.cost_price }}{% else %}-{% endif %}</dd>
+                        
+                        <dt class="col-5">购入日期</dt>
+                        <dd class="col-7">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">文档下载</h3>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% if material.file_tds %}
+                        <a href="{{ material.file_tds.url }}" target="_blank" class="list-group-item list-group-item-action">
+                            <i class="ti ti-file-text me-2 text-primary"></i> TDS
+                        </a>
+                    {% endif %}
+                    {% if material.file_msds %}
+                        <a href="{{ material.file_msds.url }}" target="_blank" class="list-group-item list-group-item-action">
+                            <i class="ti ti-flask me-2 text-danger"></i> MSDS
+                        </a>
+                    {% endif %}
+                    {% if material.file_rohs %}
+                        <a href="{{ material.file_rohs.url }}" target="_blank" class="list-group-item list-group-item-action">
+                            <i class="ti ti-leaf me-2 text-success"></i> RoHS
+                        </a>
+                    {% endif %}
+                    {% if not material.file_tds and not material.file_msds and not material.file_rohs %}
+                        <div class="list-group-item text-muted text-center">暂无文档</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- 右侧：性能指标 -->
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">性能指标</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>分类</th>
+                            <th>测试项目</th>
+                            <th>标准/条件</th>
+                            <th>数值</th>
+                            <th>测试日期</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for prop in material.properties.all %}
+                            <tr>
+                                <td><span class="text-muted small">{{ prop.test_config.category.name }}</span></td>
+                                <td class="fw-bold">{{ prop.test_config.name }}</td>
+                                <td class="text-muted small">
+                                    {{ prop.test_config.standard }}
+                                    {% if prop.test_config.condition %}<br>({{ prop.test_config.condition }}){% endif %}
+                                </td>
+                                <td class="fs-3 fw-bold text-dark">
+                                    {{ prop.value }}
+                                    <span class="text-muted fs-5 fw-normal">{{ prop.test_config.unit }}</span>
+                                </td>
+                                <td>{{ prop.test_date|date:"Y-m-d"|default:"-" }}</td>
+                                <td class="text-muted">{{ prop.remark }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center py-4 text-muted">暂无性能数据</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">使用说明</h3>
+                </div>
+                <div class="card-body">
+                    {{ material.usage_method|linebreaks|default:"暂无描述" }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

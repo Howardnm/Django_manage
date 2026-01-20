@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="工艺方案管理" create_url="process_profile_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>方案名称</th>
+                    <th>工艺类型</th>
+                    <th>机台</th>
+                    <th>螺杆组合</th>
+                    <th>切粒方式</th>
+                    <th>产量</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for profile in profiles %}
+                    <tr>
+                        <td><a href="{% url 'process_profile_detail' profile.pk %}" class="text-reset fw-bold">{{ profile.name }}</a></td>
+                        <td><span class="badge bg-blue-lt">{{ profile.process_type.name }}</span></td>
+                        <td>{{ profile.machine.model_name|default:"-" }}</td>
+                        <td>{{ profile.screw_combination.name|default:"-" }}</td>
+                        <td>{{ profile.get_cooling_method_display }}</td>
+                        <td>{{ profile.throughput }} kg/h</td>
+                        <td>
+                            <a href="{% url 'process_profile_detail' profile.pk %}" class="btn btn-sm btn-outline-secondary">查看</a>
+                            <a href="{% url 'process_profile_edit' profile.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

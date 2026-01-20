@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="工艺类型管理" create_url="process_type_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>工艺类型</th>
+                    <th>适用材料</th>
+                    <th>描述</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for type in types %}
+                    <tr>
+                        <td class="fw-bold">{{ type.name }}</td>
+                        <td>
+                            {% for mat in type.material_types.all %}
+                                <span class="badge bg-blue-lt">{{ mat.name }}</span>
+                            {% endfor %}
+                        </td>
+                        <td class="text-muted text-truncate" style="max-width: 300px;">{{ type.description }}</td>
+                        <td>
+                            <a href="{% url 'process_type_edit' type.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

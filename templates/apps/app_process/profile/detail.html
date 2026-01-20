@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">工艺方案详情</div>
+                <h2 class="page-title">{{ profile.name }}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'process_profile_edit' profile.pk %}" class="btn btn-primary">
+                    <i class="ti ti-edit me-1"></i> 编辑
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cards">
+        <!-- 基础信息 -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">基础配置</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-5">工艺类型</dt>
+                        <dd class="col-7"><span class="badge bg-blue-lt">{{ profile.process_type.name }}</span></dd>
+                        
+                        <dt class="col-5">适用机台</dt>
+                        <dd class="col-7">{{ profile.machine.model_name|default:"-" }}</dd>
+                        
+                        <dt class="col-5">螺杆组合</dt>
+                        <dd class="col-7">{{ profile.screw_combination.name|default:"-" }}</dd>
+                        
+                        <dt class="col-5">切粒方式</dt>
+                        <dd class="col-7">{{ profile.get_cooling_method_display }}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">QC检查要点</h3>
+                </div>
+                <div class="card-body">
+                    {{ profile.qc_check_points|linebreaks|default:"暂无" }}
+                </div>
+            </div>
+        </div>
+
+        <!-- 工艺参数 -->
+        <div class="col-md-8">
+            <!-- 温度表 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">温度设定 (℃)</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table text-center">
+                        <thead>
+                            <tr>
+                                <th>一区</th><th>二区</th><th>三区</th><th>四区</th><th>五区</th><th>六区</th>
+                                <th>七区</th><th>八区</th><th>九区</th><th>十区</th><th>十一区</th><th>十二区</th>
+                                <th class="text-primary">机头</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ profile.temp_zone_1 }}</td>
+                                <td>{{ profile.temp_zone_2 }}</td>
+                                <td>{{ profile.temp_zone_3 }}</td>
+                                <td>{{ profile.temp_zone_4 }}</td>
+                                <td>{{ profile.temp_zone_5 }}</td>
+                                <td>{{ profile.temp_zone_6 }}</td>
+                                <td>{{ profile.temp_zone_7 }}</td>
+                                <td>{{ profile.temp_zone_8 }}</td>
+                                <td>{{ profile.temp_zone_9 }}</td>
+                                <td>{{ profile.temp_zone_10 }}</td>
+                                <td>{{ profile.temp_zone_11 }}</td>
+                                <td>{{ profile.temp_zone_12 }}</td>
+                                <td class="fw-bold text-primary">{{ profile.temp_head }}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row row-cards">
+                <!-- 主机参数 -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h3 class="card-title">主机运行</h3>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-6">螺杆转速</dt>
+                                <dd class="col-6">{{ profile.screw_speed }} rpm</dd>
+                                
+                                <dt class="col-6">主机扭矩</dt>
+                                <dd class="col-6">{{ profile.torque }} %</dd>
+                                
+                                <dt class="col-6">主机电流</dt>
+                                <dd class="col-6">{{ profile.current|default:"-" }} A</dd>
+                                
+                                <dt class="col-6">真空度</dt>
+                                <dd class="col-6">{{ profile.vacuum }} MPa</dd>
+                                
+                                <dt class="col-6">熔体压力</dt>
+                                <dd class="col-6">{{ profile.melt_pressure }} MPa</dd>
+                                
+                                <dt class="col-6">熔体温度</dt>
+                                <dd class="col-6">{{ profile.melt_temp }} ℃</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 喂料与后处理 -->
+                <div class="col-md-6">
+                    <div class="card h-100">
+                        <div class="card-header">
+                            <h3 class="card-title">喂料与后处理</h3>
+                        </div>
+                        <div class="card-body">
+                            <dl class="row">
+                                <dt class="col-6">主喂料</dt>
+                                <dd class="col-6">{{ profile.main_feeder_speed }} rpm/Hz</dd>
+                                
+                                <dt class="col-6">侧喂料</dt>
+                                <dd class="col-6">{{ profile.side_feeder_speed }} rpm/Hz</dd>
+                                
+                                <dt class="col-6">总产量</dt>
+                                <dd class="col-6 fw-bold text-green">{{ profile.throughput }} kg/h</dd>
+                                
+                                <dt class="col-6">切粒转速</dt>
+                                <dd class="col-6">{{ profile.pelletizing_speed }} rpm/Hz</dd>
+                                
+                                <dt class="col-6">冷却水温</dt>
+                                <dd class="col-6">{{ profile.water_temp }} ℃</dd>
+                                
+                                <dt class="col-6">过水长度</dt>
+                                <dd class="col-6">{{ profile.water_bath_length }} m</dd>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        
+        <div class="row row-cards">
+            <!-- 基础信息 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">基础信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">方案名称</label>
+                                {{ form.name }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">工艺类型</label>
+                                {{ form.process_type }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">适用机台</label>
+                                {{ form.machine }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">螺杆组合</label>
+                                {{ form.screw_combination }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 温度控制 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">温度控制 (℃)</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-2 mb-3"><label class="form-label">一区</label>{{ form.temp_zone_1 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">二区</label>{{ form.temp_zone_2 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">三区</label>{{ form.temp_zone_3 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">四区</label>{{ form.temp_zone_4 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">五区</label>{{ form.temp_zone_5 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">六区</label>{{ form.temp_zone_6 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">七区</label>{{ form.temp_zone_7 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">八区</label>{{ form.temp_zone_8 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">九区</label>{{ form.temp_zone_9 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">十区</label>{{ form.temp_zone_10 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">十一区</label>{{ form.temp_zone_11 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label">十二区</label>{{ form.temp_zone_12 }}</div>
+                            <div class="col-md-2 mb-3"><label class="form-label fw-bold text-primary">机头</label>{{ form.temp_head }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 主机与喂料 -->
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title">主机运行参数</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3"><label class="form-label">螺杆转速 (rpm)</label>{{ form.screw_speed }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">主机扭矩 (%)</label>{{ form.torque }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">主机电流 (A)</label>{{ form.current }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">真空度 (MPa)</label>{{ form.vacuum }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">熔体压力 (MPa)</label>{{ form.melt_pressure }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">熔体温度 (℃)</label>{{ form.melt_temp }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-header">
+                        <h3 class="card-title">喂料与后处理</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3"><label class="form-label">主喂料转速</label>{{ form.main_feeder_speed }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">侧喂料转速</label>{{ form.side_feeder_speed }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">液体泵注</label>{{ form.liquid_pump_speed }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">总产量 (kg/h)</label>{{ form.throughput }}</div>
+                            
+                            <div class="col-12"><hr class="my-3"></div>
+                            
+                            <div class="col-md-6 mb-3"><label class="form-label">切粒方式</label>{{ form.cooling_method }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">切粒转速</label>{{ form.pelletizing_speed }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">冷却水温</label>{{ form.water_temp }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">过水长度 (m)</label>{{ form.water_bath_length }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">风刀压力</label>{{ form.air_knife_pressure }}</div>
+                            <div class="col-md-6 mb-3"><label class="form-label">料条根数</label>{{ form.strand_count }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 其他信息 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">其他信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">过滤网目数</label>
+                            {{ form.screen_mesh }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">QC检查要点</label>
+                            {{ form.qc_check_points }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">工艺备注</label>
+                            {{ form.description }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-footer mt-3">
+            <button type="submit" class="btn btn-primary">保存</button>
+            <a href="{% url 'process_profile_list' %}" class="btn btn-link">取消</a>
+        </div>
+    </form>
+{% endblock %}

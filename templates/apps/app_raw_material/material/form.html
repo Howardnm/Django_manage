@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <div class="row row-cards">
+            <!-- 左侧：核心信息 -->
+            <div class="col-lg-8">
+                <!-- 基础信息卡片 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title">基础信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">原材料名称</label>
+                                {{ form.name }}
+                                <div class="form-text text-muted">例如：PA66 2600</div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">型号</label>
+                                {{ form.model_name }}
+                            </div>
+                            
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label required">类型</label>
+                                {{ form.category }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">供应商</label>
+                                {{ form.supplier }}
+                            </div>
+                            
+                            <div class="col-12 mb-3">
+                                <label class="form-label">使用方法/描述</label>
+                                {{ form.usage_method }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 性能指标 FormSet -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title">性能指标录入</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                            <tr>
+                                <th style="width: 35%;">测试项目</th>
+                                <th style="width: 20%;">数值</th>
+                                <th style="width: 20%;">测试日期</th>
+                                <th>备注</th>
+                                <th class="w-1"></th>
+                            </tr>
+                            </thead>
+                            <tbody id="property-formset">
+                            {{ property_formset.management_form }}
+                            {% for form in property_formset %}
+                                <tr class="property-form">
+                                    {{ form.id }}
+                                    <td>{{ form.test_config }}</td>
+                                    <td>{{ form.value }}</td>
+                                    <td>{{ form.test_date }}</td>
+                                    <td>{{ form.remark }}</td>
+                                    <td class="text-center">
+                                        {% if property_formset.can_delete %}
+                                            <div class="form-check form-check-inline m-0" title="删除此行">
+                                                {{ form.DELETE }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button type="button" class="btn btn-ghost-primary" id="add-property">
+                            <i class="ti ti-plus me-1"></i> 添加一行
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧：辅助信息 -->
+            <div class="col-lg-4">
+                <!-- 采购与库存 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title">采购与库存</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">内部编码</label>
+                            {{ form.warehouse_code }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">购入日期</label>
+                            {{ form.purchase_date }}
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">参考成本 (元/kg)</label>
+                            <div class="input-group">
+                                <span class="input-group-text">¥</span>
+                                {{ form.cost_price }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 核心文档 (参考 MaterialLibrary 的样式) -->
+                <div class="card mb-3">
+                    <div class="card-header bg-red-lt">
+                        <h3 class="card-title text-red"><i class="ti ti-flame me-2"></i>文档资料</h3>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- 1. TDS 物性表 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="ti ti-file-text text-blue me-1"></i>TDS 物性表
+                            </label>
+
+                            <input type="file" name="file_tds" class="form-control">
+
+                            {% if form.instance.file_tds %}
+                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_tds' %}"
+                                       target="_blank"
+                                       class="text-truncate text-azure fw-bold small"
+                                       style="max-width: 70%;"
+                                       title="点击下载/预览">
+                                        <i class="ti ti-download me-1"></i> 已上传文件
+                                    </a>
+
+                                    <label class="form-check form-check-inline m-0" title="勾选并在保存后删除">
+                                        <input class="form-check-input" type="checkbox" name="file_tds-clear">
+                                        <span class="form-check-label small text-danger">删除</span>
+                                    </label>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 2. MSDS 报告 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="ti ti-flask text-red me-1"></i>MSDS 报告
+                            </label>
+
+                            <input type="file" name="file_msds" class="form-control">
+
+                            {% if form.instance.file_msds %}
+                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_msds' %}"
+                                       target="_blank"
+                                       class="text-truncate text-red fw-bold small"
+                                       style="max-width: 70%;"
+                                       title="点击下载/预览">
+                                        <i class="ti ti-download me-1"></i> 已上传文件
+                                    </a>
+                                    <label class="form-check form-check-inline m-0">
+                                        <input class="form-check-input" type="checkbox" name="file_msds-clear">
+                                        <span class="form-check-label small text-danger">删除</span>
+                                    </label>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                        <!-- 3. RoHS 报告 -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <i class="ti ti-leaf text-green me-1"></i>RoHS 环保报告
+                            </label>
+
+                            <input type="file" name="file_rohs" class="form-control">
+
+                            {% if form.instance.file_rohs %}
+                                <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_rohs' %}"
+                                       target="_blank"
+                                       class="text-truncate text-green fw-bold small"
+                                       style="max-width: 70%;"
+                                       title="点击下载/预览">
+                                        <i class="ti ti-download me-1"></i> 已上传文件
+                                    </a>
+                                    <label class="form-check form-check-inline m-0">
+                                        <input class="form-check-input" type="checkbox" name="file_rohs-clear">
+                                        <span class="form-check-label small text-danger">删除</span>
+                                    </label>
+                                </div>
+                            {% endif %}
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="form-footer d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-device-floppy me-1"></i> 保存更改
+            </button>
+            <a href="{% url 'raw_material_list' %}" class="btn btn-link link-secondary">取消</a>
+        </div>
+    </form>
+
+    <!-- 修正：使用 empty_form 模板 -->
+    <script type="text/template" id="empty-form-template">
+        <tr class="property-form">
+            {{ property_formset.empty_form.id }}
+            <td>{{ property_formset.empty_form.test_config }}</td>
+            <td>{{ property_formset.empty_form.value }}</td>
+            <td>{{ property_formset.empty_form.test_date }}</td>
+            <td>{{ property_formset.empty_form.remark }}</td>
+            <td class="text-center">
+                <div class="form-check form-check-inline m-0">
+                    {{ property_formset.empty_form.DELETE }}
+                </div>
+            </td>
+        </tr>
+    </script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const addBtn = document.getElementById('add-property');
+            const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
+            const tbody = document.getElementById('property-formset');
+            const template = document.getElementById('empty-form-template').innerHTML;
+
+            addBtn.addEventListener('click', function() {
+                const count = parseInt(totalForms.value);
+                const newRow = template.replace(/__prefix__/g, count);
+                tbody.insertAdjacentHTML('beforeend', newRow);
+                totalForms.value = count + 1;
+                
+                // 重新初始化新添加行的 Tom Select
+                if (window.TomSelect) {
+                    // 找到刚添加的那一行
+                    const newRowElement = tbody.lastElementChild;
+                    // 在该行内查找带有 .form-select-search 的 select 元素
+                    const newSelect = newRowElement.querySelector('.form-select-search');
+                    
+                    if (newSelect) {
+                        new TomSelect(newSelect, {
+                            copyClassesToDropdown: false,
+                            dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡
+                            controlInput: '<input>',
+                            create: false,
+                            placeholder: '输入搜索...',
+                            render: {
+                                no_results: function (data, escape) {
+                                    return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+        });
+    </script>
+{% endblock %}

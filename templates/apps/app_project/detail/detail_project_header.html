@@ -9,7 +9,11 @@
             <!-- 顶部操作区 -->
             <div class="btn-list">
                     <span class="d-none d-sm-inline">
-                        <a href="#" class="btn btn-white">导出报告</a>
+                        <!-- 【修改】指向导出路由 -->
+                        <a href="{% url 'project_export_report' project.pk %}" class="btn btn-white">
+                            <i class="ti ti-file-download me-2"></i>
+                            导出报告
+                        </a>
                     </span>
             </div>
         </div>

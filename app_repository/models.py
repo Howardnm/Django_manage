@@ -12,7 +12,23 @@ from .utils.repo_file_path import repo_file_path  # 引入刚才写的路径函�
 
 class MaterialType(models.Model):
     """材料类型 (如: PA66, ABS, PC, PBT)"""
+    # 行业术语建议使用 Classification (归类) 或 Family Group
+    CLASSIFICATION_CHOICES = [
+        ('COMMODITY', '通用塑料 (PP, PE, PVC...)'),
+        ('ENGINEERING', '工程塑料 (PA, PC, POM...)'),
+        ('SPECIAL', '特种工程塑料 (PEEK, LCP, PPS...)'),
+        ('FLUORINE', '氟塑料 (PTFE, PVDF...)'),
+        ('ELASTOMER', '热塑性弹性体 (TPE, TPU...)'),
+        ('BIO', '生物降解塑料 (PLA, PBAT...)'),
+        ('ALLOY', '塑料合金 (PC/ABS...)'),
+        ('OTHER', '其他'),
+    ]
+
     name = models.CharField("类型名称", max_length=50, unique=True)
+    
+    # 将字段名定为 classification，避免与 MaterialLibrary.category 混淆
+    classification = models.CharField("塑料归类", max_length=20, choices=CLASSIFICATION_CHOICES, default='ENGINEERING')
+    
     description = models.TextField("描述", blank=True)
 
     def __str__(self):
@@ -228,7 +244,7 @@ class MaterialLibrary(models.Model):
 class MaterialDataPoint(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='properties')
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
-    value = models.FloatField("数值")
+    value = models.DecimalField("测试数值", max_digits=10, decimal_places=3)
     remark = models.CharField("备注", max_length=50, blank=True)
 
     class Meta:

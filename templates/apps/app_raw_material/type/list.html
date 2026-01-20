@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">{{ page_title }}</h2>
+            <div class="text-muted mt-1">管理原材料的基础分类体系</div>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'raw_type_add' %}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> 新增类型
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <!-- 引入通用搜索栏 -->
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap table-hover">
+            <thead>
+                <tr>
+                    <th class="w-1">
+                        <a href="?{% url_replace sort='order'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            权重
+                            {% if current_sort == 'order' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-order' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            类型名称
+                            {% if current_sort == 'name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% url_replace sort='code'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            代码
+                            {% if current_sort == 'code' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-code' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>描述</th>
+                    <th class="w-1">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for type in types %}
+                <tr>
+                    <td><span class="text-muted">{{ type.order }}</span></td>
+                    <td>
+                        <span class="badge bg-blue-lt">{{ type.name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-purple-lt">{{ type.code }}</span>
+                    </td>
+                    <td class="text-wrap" style="max-width: 400px;">
+                        {% if type.description %}
+                            <span class="text-secondary">{{ type.description }}</span>
+                        {% else %}
+                            <span class="text-muted small">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'raw_type_edit' type.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
+                            <i class="ti ti-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-5">
+                        <div class="empty">
+                            <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                            <p class="text-muted">暂无类型数据</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<br>
+{% include 'apps/list_modules/paginator.html' %}
+{% endblock %}

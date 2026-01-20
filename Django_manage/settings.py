@@ -41,6 +41,10 @@ INSTALLED_APPS = [
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
+    # 【新增】配方与工艺管理
+    'app_raw_material.apps.AppRawMaterialConfig',
+    'app_process.apps.AppProcessConfig',
+    'app_formula.apps.AppFormulaConfig',
     "debug_toolbar", # 这是debug_toolbar的配置
 ]
 

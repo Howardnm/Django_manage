@@ -3,17 +3,17 @@
         <!-- ============================================================ -->
         <!-- 头部：材料身份信息 (绿色主题) -->
         <!-- ============================================================ -->
-        <div class="card-header bg-green-lt">
+        <div class="card-header bg-danger-lt">
             <div class="d-flex align-items-center w-100">
                 <!-- 左侧：头像 -->
-                <span class="avatar bg-white text-green rounded me-3">
+                <span class="avatar bg-white text-danger rounded me-3">
                     {{ repo.material.grade_name|slice:":1" }}
                 </span>
-                
+
                 <!-- 中间：牌号 & 厂商 -->
                 <div class="flex-fill overflow-hidden">
                     <h3 class="card-title m-0">
-                        <a href="{% url 'repo_material_detail' repo.material.pk %}" target="_blank" class="text-green text-decoration-none" title="点击查看详情">
+                        <a href="{% url 'repo_material_detail' repo.material.pk %}" target="_blank" class="text-danger text-decoration-none" title="点击查看详情">
                             {{ repo.material.grade_name }}
                         </a>
                     </h3>
@@ -23,13 +23,18 @@
                 </div>
 
                 <!-- 右侧：类型 & 阻燃 -->
-                <div class="ms-auto d-flex align-items-center gap-2">
+                <div class="ms-auto d-flex align-items-center gap-2 me-3">
                     <span class="badge bg-purple-lt text-purple">{{ repo.material.category.name }}</span>
                     {% if repo.material.flammability %}
                         <span class="badge {% if 'V-0' in repo.material.flammability %}bg-red text-white{% else %}bg-orange text-white{% endif %}">
                             {{ repo.material.flammability }}
                         </span>
                     {% endif %}
+                </div>
+                <div class="ms-auto">
+                    <a href="{% url 'repo_material_detail' repo.material.pk %}" class="btn btn-icon btn-ghost-danger bg-white text-danger" title="编辑">
+                        <i class="ti ti-edit"></i>
+                    </a>
                 </div>
             </div>
         </div>
@@ -65,7 +70,7 @@
                 {% if repo.material.file_msds %}
                     <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_msds' %}" target="_blank"
                        class="btn btn-sm btn-pill btn-outline-danger">
-                            <i class="ti ti-flask me-1"></i> MSDS
+                        <i class="ti ti-flask me-1"></i> MSDS
                     </a>
                 {% endif %}
                 {% if repo.material.file_rohs %}
@@ -83,7 +88,7 @@
         <div class="card-body p-0">
             {% for group in repo.material.get_grouped_properties %}
                 <div class="p-2 {% if not forloop.last %}border-bottom{% endif %}">
-                    
+
                     <!-- 分类标题：紧凑型全宽胶囊 -->
                     <div class="mb-2">
                         {% if "物理" in group.category_name %}
@@ -114,22 +119,12 @@
                     <div class="row row-cards g-1">
                         {% for item in group.items %}
                             <div class="col-6">
-                                <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between bg-white h-100">
-                                    
-                                    <!-- 左侧：名称与标准 (紧凑堆叠) -->
-                                    <div class="d-flex flex-column overflow-hidden me-1" style="flex: 1;">
-                                        <!-- 【修改】text-secondary 改为 text-dark，提高对比度 -->
-                                        <div class="text-truncate fw-bold text-dark" style="font-size: 11px;" title="{{ item.name }}">
-                                            {{ item.name }}
-                                        </div>
-                                        <div class="text-truncate text-muted" style="font-size: 9px;" title="{{ item.standard }} {{ item.condition }}">
-                                            {{ item.standard }}
-                                            {% if item.condition %}
-                                                <span class="mx-1">·</span>{{ item.condition }}
-                                            {% endif %}
-                                        </div>
-                                    </div>
+                                <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between bg-white h-100 position-relative">
 
+                                    <!-- 左侧：名称与标准 (紧凑堆叠) -->
+                                    <div class="text-truncate fw-bold text-dark" style="font-size: 13px" title="{{ item.name }}">
+                                        {{ item.name }}
+                                    </div>
                                     <!-- 右侧：数值 (高亮加粗) -->
                                     <div class="text-end lh-1 ms-1">
                                         <div class="fw-bolder fs-4 
@@ -140,7 +135,13 @@
                                             {{ item.value }}
                                         </div>
                                         {% if item.unit %}
-                                            <div class="text-muted small text-truncate" style="font-size: 9px; max-width: 50px;">{{ item.unit }}</div>
+                                            <div class="text-muted small text-black" style="font-size: 9px">
+                                                {{ item.standard }}
+                                                {% if item.condition %}
+                                                    <span class="mx-1">·</span>{{ item.condition }}
+                                                {% endif %}
+                                                <span class="mx-2">·</span>{{ item.unit }}
+                                            </div>
                                         {% endif %}
                                     </div>
 

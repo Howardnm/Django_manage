@@ -10,8 +10,10 @@ from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile
-from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson
+from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig
 from app_project.mixins import ProjectPermissionMixin
+from app_process.models import ProcessProfile
+from app_raw_material.models import RawMaterial
 
 
 # ==========================================
@@ -157,9 +159,10 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
         elif model_type == 'oem':
             qs = OEM.objects.all()
             if query:
-                qs = qs.filter(name__icontains=query)
-            qs = qs.values('id', 'name')[:20]
-            data = [{'value': item['id'], 'text': item['name']} for item in qs]
+                qs = qs.filter(Q(name__icontains=query) | Q(short_name__icontains=query))
+            qs = qs.values('id', 'name', 'short_name')[:20]
+            # 【修改】显示格式：名称 (简称)
+            data = [{'value': item['id'], 'text': f"{item['name']} ({item['short_name']})" if item['short_name'] else item['name']} for item in qs]
 
         elif model_type == 'salesperson':
             qs = Salesperson.objects.all()
@@ -167,5 +170,29 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
                 qs = qs.filter(name__icontains=query)
             qs = qs.values('id', 'name')[:20]
             data = [{'value': item['id'], 'text': item['name']} for item in qs]
+            
+        # 【新增】工艺方案搜索
+        elif model_type == 'process':
+            qs = ProcessProfile.objects.all()
+            if query:
+                qs = qs.filter(name__icontains=query)
+            qs = qs.values('id', 'name')[:20]
+            data = [{'value': item['id'], 'text': item['name']} for item in qs]
+            
+        # 【新增】原材料搜索
+        elif model_type == 'raw_material':
+            qs = RawMaterial.objects.all()
+            if query:
+                qs = qs.filter(Q(name__icontains=query) | Q(model_name__icontains=query))
+            qs = qs.values('id', 'name', 'model_name')[:20]
+            data = [{'value': item['id'], 'text': f"{item['name']} {item['model_name'] or ''}"} for item in qs]
+
+        # 【新增】测试标准搜索
+        elif model_type == 'test_config':
+            qs = TestConfig.objects.all()
+            if query:
+                qs = qs.filter(Q(name__icontains=query) | Q(standard__icontains=query))
+            qs = qs.values('id', 'name', 'standard', 'condition')[:20]
+            data = [{'value': item['id'], 'text': f"{item['name']} - {item['standard']} {item['condition'] or ''}"} for item in qs]
 
         return JsonResponse(data, safe=False)

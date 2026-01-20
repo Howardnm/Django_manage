@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="原材料库管理" create_url="raw_material_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>原材料名称</th>
+                    <th>型号</th>
+                    <th>类型</th>
+                    <th>供应商</th>
+                    <th>参考成本</th>
+                    <th>文档</th>
+                    <th>购入日期</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for material in materials %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'raw_material_detail' material.pk %}" class="text-reset fw-bold">{{ material.name }}</a>
+                            {% if material.warehouse_code %}
+                                <div class="text-muted small">编码: {{ material.warehouse_code }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ material.model_name|default:"-" }}</td>
+                        <td><span class="badge bg-blue-lt">{{ material.category.name }}</span></td>
+                        <td>
+                            {% if material.supplier %}
+                                <a href="{% url 'raw_supplier_edit' material.supplier.pk %}" class="text-reset">{{ material.supplier.name }}</a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-orange">
+                            {% if material.cost_price %}¥{{ material.cost_price }}{% else %}-{% endif %}
+                        </td>
+                        <!-- 文档列 -->
+                        <td>
+                            <div class="d-flex gap-1">
+                                {% if material.file_tds %}
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_tds' %}" target="_blank" class="text-azure" title="TDS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
+                                {% endif %}
+                                {% if material.file_msds %}
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_msds' %}" target="_blank" class="text-red" title="MSDS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
+                                {% endif %}
+                                {% if material.file_rohs %}
+                                    <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_rohs' %}" target="_blank" class="text-green" title="RoHS"
+                                       data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="text-muted">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'raw_material_detail' material.pk %}" class="btn btn-sm btn-outline-secondary">查看</a>
+                            <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

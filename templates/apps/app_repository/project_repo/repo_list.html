@@ -90,18 +90,25 @@
 
                         <!-- 2. 商业关系 (复合) -->
                         <td>
-                            {% if repo.customer %}
-                                <div class="fw-bold text-primary" title="Tier 1">{{ repo.customer.company_name }}</div>
-                                <div class="small text-muted" title="OEM">
+                            <div class="d-flex flex-column">
+                                {% if repo.customer %}
+                                    <div class="fw-bold text-primary text-truncate" style="max-width: 150px;" title="Tier 1: {{ repo.customer.company_name }}">
+                                        {{ repo.customer.company_name }}
+                                    </div>
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                                
+                                <div class="small mt-1">
                                     {% if repo.oem %}
-                                        <span class="badge badge-sm bg-azure-lt">{{ repo.oem.name }}</span>
+                                        <span class="badge badge-sm bg-azure-lt" title="OEM: {{ repo.oem.name }}">
+                                            {{ repo.oem.short_name|default:repo.oem.name }}
+                                        </span>
                                     {% else %}
-                                        <span class="opacity-50">-</span>
+                                        <span class="text-muted opacity-50 small">无OEM</span>
                                     {% endif %}
                                 </div>
-                            {% else %}
-                                <span class="text-muted">-</span>
-                            {% endif %}
+                            </div>
                         </td>
 
                         <!-- 3. 材料 (复合) -->

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- 1. 基础信息 -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">基础信息</h3>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">实验单号</label>
+                        {% if form.instance.pk %}
+                            <input type="text" class="form-control" value="{{ form.instance.code }}" readonly>
+                        {% else %}
+                            <input type="text" class="form-control" value="自动生成" disabled>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">配方名称</label>
+                        {{ form.name }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label required">基材类型</label>
+                        {{ form.material_type }}
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">生产工艺</label>
+                        {{ form.process }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">关联成品材料</label>
+                        {{ form.related_materials }}
+                    </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">实际成本 (元/kg)</label>
+                        {{ form.cost_actual }}
+                    </div>
+
+                    <div class="col-12 mb-3">
+                        <label class="form-label">实验描述</label>
+                        {{ form.description }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. BOM 明细 (FormSet) -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">BOM 明细</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th class="w-15">喂料口</th>
+                        <th class="w-25">原材料</th>
+                        <th class="w-15">比例/份数</th>
+                        <th class="w-10">是否尾料</th>
+                        <th class="w-10">是否共混</th>
+                        <th class="w-10">共混顺序</th>
+                        <th class="w-10">共混时间</th>
+                        <th class="w-1">删除</th>
+                    </tr>
+                    </thead>
+                    <tbody id="bom-formset">
+                    {{ bom_formset.management_form }}
+                    {% for form in bom_formset %}
+                        <tr class="bom-form">
+                            {{ form.id }}
+                            <td>{{ form.feeding_port }}</td>
+                            <td>{{ form.raw_material }}</td>
+                            <td>{{ form.percentage }}</td>
+                            <td>{{ form.is_tail }}</td>
+                            <td>{{ form.is_pre_mix }}</td>
+                            <td>{{ form.pre_mix_order }}</td>
+                            <td>{{ form.pre_mix_time }}</td>
+                            <td>
+                                {% if bom_formset.can_delete %}
+                                    {{ form.DELETE }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <button type="button" class="btn btn-ghost-primary" id="add-bom">
+                    <i class="ti ti-plus me-1"></i> 添加原料
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. 测试结果 (FormSet) -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title">测试结果</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table">
+                    <thead>
+                    <tr>
+                        <th class="w-25">测试项目</th>
+                        <th class="w-25">数值</th>
+                        <th class="w-25">测试日期</th>
+                        <th>备注</th>
+                        <th class="w-1">删除</th>
+                    </tr>
+                    </thead>
+                    <tbody id="test-formset">
+                    {{ test_formset.management_form }}
+                    {% for form in test_formset %}
+                        <tr class="test-form">
+                            {{ form.id }}
+                            <td>{{ form.test_config }}</td>
+                            <td>{{ form.value }}</td>
+                            <td>{{ form.test_date }}</td>
+                            <td>{{ form.remark }}</td>
+                            <td>
+                                {% if test_formset.can_delete %}
+                                    {{ form.DELETE }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <button type="button" class="btn btn-ghost-primary" id="add-test">
+                    <i class="ti ti-plus me-1"></i> 添加测试项
+                </button>
+            </div>
+        </div>
+
+        <div class="form-footer">
+            <button type="submit" class="btn btn-primary">保存配方</button>
+            <a href="{% url 'formula_list' %}" class="btn btn-link">取消</a>
+        </div>
+    </form>
+
+    <!-- 动态添加行脚本 -->
+    <script type="text/template" id="bom-empty-form">
+        <tr class="bom-form">
+            {{ bom_formset.empty_form.id }}
+            <td>{{ bom_formset.empty_form.feeding_port }}</td>
+            <td>{{ bom_formset.empty_form.raw_material }}</td>
+            <td>{{ bom_formset.empty_form.percentage }}</td>
+            <td>{{ bom_formset.empty_form.is_tail }}</td>
+            <td>{{ bom_formset.empty_form.is_pre_mix }}</td>
+            <td>{{ bom_formset.empty_form.pre_mix_order }}</td>
+            <td>{{ bom_formset.empty_form.pre_mix_time }}</td>
+            <td>{{ bom_formset.empty_form.DELETE }}</td>
+        </tr>
+    </script>
+
+    <script type="text/template" id="test-empty-form">
+        <tr class="test-form">
+            {{ test_formset.empty_form.id }}
+            <td>{{ test_formset.empty_form.test_config }}</td>
+            <td>{{ test_formset.empty_form.value }}</td>
+            <td>{{ test_formset.empty_form.test_date }}</td>
+            <td>{{ test_formset.empty_form.remark }}</td>
+            <td>{{ test_formset.empty_form.DELETE }}</td>
+        </tr>
+    </script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // 1. 初始化远程搜索 (针对主表单字段)
+            if (window.TomSelect) {
+                document.querySelectorAll('.remote-search').forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    new TomSelect(el, {
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请输入关键词搜索...',
+                        preload: 'focus', // 关键：点击时才加载
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            },
+                            loading: function (data, escape) {
+                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                            }
+                        }
+                    });
+                });
+            }
+
+            // 2. 通用添加行函数
+            function setupFormSet(prefix, btnId, containerId, templateId) {
+                const addBtn = document.getElementById(btnId);
+                const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
+                const container = document.getElementById(containerId);
+                const template = document.getElementById(templateId).innerHTML;
+
+                addBtn.addEventListener('click', function () {
+                    const count = parseInt(totalForms.value);
+                    const newRow = template.replace(/__prefix__/g, count);
+                    container.insertAdjacentHTML('beforeend', newRow);
+                    totalForms.value = count + 1;
+
+                    // 重新初始化 Tom Select (针对新添加的行)
+                    if (window.TomSelect) {
+                        const newRowElement = container.lastElementChild;
+
+                        // A. 初始化普通搜索框 (如 test_config)
+                        newRowElement.querySelectorAll('.form-select-search').forEach(el => {
+                            new TomSelect(el, {
+                                copyClassesToDropdown: false,
+                                controlInput: '<input>',
+                                create: false,
+                                placeholder: '输入搜索...',
+                            });
+                        });
+
+                        // B. 初始化远程搜索框 (如 raw_material)
+                        newRowElement.querySelectorAll('.remote-search').forEach(el => {
+                            var modelType = el.getAttribute('data-model');
+                            new TomSelect(el, {
+                                valueField: 'value',
+                                labelField: 'text',
+                                searchField: 'text',
+                                load: function (query, callback) {
+                                    var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                                    fetch(url)
+                                        .then(response => response.json())
+                                        .then(json => {
+                                            callback(json);
+                                        })
+                                        .catch(() => {
+                                            callback();
+                                        });
+                                },
+                                copyClassesToDropdown: false,
+                                dropdownParent: 'body',
+                                create: false,
+                                placeholder: '请输入关键词搜索...',
+                                preload: 'focus',
+                                render: {
+                                    option: function (data, escape) {
+                                        return '<div>' + escape(data.text) + '</div>';
+                                    },
+                                    item: function (data, escape) {
+                                        return '<div>' + escape(data.text) + '</div>';
+                                    },
+                                    no_results: function (data, escape) {
+                                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                                    },
+                                    loading: function (data, escape) {
+                                        return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                                    }
+                                }
+                            });
+                        });
+                    }
+                });
+            }
+
+            setupFormSet('bom', 'add-bom', 'bom-formset', 'bom-empty-form');
+            setupFormSet('test', 'add-test', 'test-formset', 'test-empty-form');
+        });
+    </script>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">组合名称</label>
+                        {{ form.name }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">组合图纸</label>
+                        {{ form.drawing_file }}
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label required">适用机台</label>
+                        {{ form.machines }}
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label">适用材料类型</label>
+                        {{ form.suitable_materials }}
+                    </div>
+                    
+                    <div class="col-12 mb-3">
+                        <label class="form-label">组合描述</label>
+                        {{ form.description }}
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{% url 'process_screw_list' %}" class="btn btn-link">取消</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

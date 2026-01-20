@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="螺杆组合管理" create_url="process_screw_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>组合名称</th>
+                    <th>适用机台</th>
+                    <th>适用材料</th>
+                    <th>图纸</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for screw in screws %}
+                    <tr>
+                        <td class="fw-bold">{{ screw.name }}</td>
+                        <td>
+                            {% for machine in screw.machines.all|slice:":2" %}
+                                <span class="badge bg-secondary-lt">{{ machine.model_name }}</span>
+                            {% endfor %}
+                            {% if screw.machines.count > 2 %}...{% endif %}
+                        </td>
+                        <td>
+                            {% for mat in screw.suitable_materials.all|slice:":3" %}
+                                <span class="badge bg-green-lt">{{ mat.name }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            {% if screw.drawing_file %}
+                                <a href="{{ screw.drawing_file.url }}" target="_blank" class="text-blue">
+                                    <i class="ti ti-file-download"></i> 下载
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'process_screw_edit' screw.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

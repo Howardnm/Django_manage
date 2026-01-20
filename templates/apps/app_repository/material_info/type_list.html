@@ -41,6 +41,14 @@
                             {% endif %}
                         </a>
                     </th>
+                    <th>
+                        <a href="?{% url_replace sort='classification'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            塑料归类
+                            {% if current_sort == 'classification' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-classification' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
                     <th>描述</th>
                     <th class="w-1">操作</th>
                 </tr>
@@ -51,6 +59,9 @@
                     <td><span class="text-muted">{{ type.id }}</span></td>
                     <td>
                         <span class="badge bg-blue-lt">{{ type.name }}</span>
+                    </td>
+                    <td>
+                        <span class="badge bg-azure-lt">{{ type.get_classification_display }}</span>
                     </td>
                     <td class="text-wrap" style="max-width: 400px;">
                         {% if type.description %}
@@ -68,7 +79,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center py-5">
+                    <td colspan="5" class="text-center py-5">
                         <div class="empty">
                             <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
                             <p class="text-muted">暂无类型数据</p>

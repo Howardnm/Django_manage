@@ -1,0 +1,163 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">配方详情</div>
+                <h2 class="page-title">{{ formula.code }} {{ formula.name }}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'formula_edit' formula.pk %}" class="btn btn-primary">
+                    <i class="ti ti-edit me-1"></i> 编辑
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cards">
+        <!-- 左侧：BOM 与 成本 -->
+        <div class="col-lg-8">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">BOM 明细</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>喂料口</th>
+                            <th>原材料</th>
+                            <th>比例/份数</th>
+                            <th>共混信息</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in formula.bom_lines.all %}
+                            <tr>
+                                <td><span class="badge bg-secondary-lt">{{ item.get_feeding_port_display }}</span></td>
+                                <td class="fw-bold">
+                                    {{ item.raw_material.name }}
+                                    <span class="text-muted small">({{ item.raw_material.model_name }})</span>
+                                </td>
+                                <td class="fs-3">{{ item.percentage }}</td>
+                                <td>
+                                    {% if item.is_pre_mix %}
+                                        <span class="badge bg-purple-lt" title="共混顺序: {{ item.pre_mix_order }}, 时间: {{ item.pre_mix_time }}s">
+                                            共混 ({{ item.pre_mix_time }}s)
+                                        </span>
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.is_tail %}
+                                        <span class="badge bg-orange-lt">尾料回掺</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">测试结果</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>测试项目</th>
+                            <th>标准</th>
+                            <th>数值</th>
+                            <th>测试日期</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for res in formula.test_results.all %}
+                            <tr>
+                                <td>{{ res.test_config.name }}</td>
+                                <td class="text-muted small">{{ res.test_config.standard }}</td>
+                                <td class="fw-bold">
+                                    {% if "密度" in res.test_config.name %}
+                                        {{ res.value|floatformat:3 }}
+                                    {% else %}
+                                        {{ res.value|floatformat:2 }}
+                                    {% endif %}
+                                    <span class="text-muted fw-normal">{{ res.test_config.unit }}</span>
+                                </td>
+                                <td>{{ res.test_date|date:"Y-m-d"|default:"-" }}</td>
+                                <td class="text-muted">{{ res.remark }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted">暂无测试数据</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 右侧：基础信息 -->
+        <div class="col-lg-4">
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">基础信息</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-5">基材类型</dt>
+                        <dd class="col-7"><span class="badge bg-blue-lt">{{ formula.material_type.name }}</span></dd>
+                        
+                        <dt class="col-5">工艺方案</dt>
+                        <dd class="col-7">
+                            {% if formula.process %}
+                                <a href="{% url 'process_profile_detail' formula.process.pk %}" target="_blank">{{ formula.process.name }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
+                        
+                        <dt class="col-5">实验员</dt>
+                        <dd class="col-7">{{ formula.creator.username }}</dd>
+                        
+                        <dt class="col-5">录入日期</dt>
+                        <dd class="col-7">{{ formula.created_at|date:"Y-m-d" }}</dd>
+                    </dl>
+                </div>
+            </div>
+            
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title">成本核算</h3>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>预测成本</span>
+                        <span class="fw-bold text-orange">¥{{ formula.cost_predicted }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>实际成本</span>
+                        <span class="fw-bold text-green">
+                            {% if formula.cost_actual %}¥{{ formula.cost_actual }}{% else %}-{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">实验描述</h3>
+                </div>
+                <div class="card-body">
+                    {{ formula.description|linebreaks|default:"暂无描述" }}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

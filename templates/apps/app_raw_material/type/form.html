@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <form method="post">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label required">类型名称</label>
+                        {{ form.name }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">类型代码</label>
+                        {{ form.code }}
+                    </div>
+                    
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">排序权重</label>
+                        {{ form.order }}
+                        <small class="form-hint">数字越小越靠前</small>
+                    </div>
+                </div>
+
+                <div class="form-footer">
+                    <button type="submit" class="btn btn-primary">保存</button>
+                    <a href="{% url 'raw_type_list' %}" class="btn btn-link">取消</a>
+                </div>
+            </form>
+        </div>
+    </div>
+{% endblock %}

@@ -77,7 +77,8 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             # 开启搜索功能，方便快速查找 "ISO 527"
             'test_config': forms.Select(attrs={'class': 'form-select form-select-search'}),
-            'value': forms.NumberInput(attrs={'step': '0.01'}),
+            # 【修改】允许3位小数
+            'value': forms.NumberInput(attrs={'step': '0.001'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
 
@@ -149,6 +150,9 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
             else:
                 self.fields['salesperson'].queryset = Salesperson.objects.none()
 
+        # 自定义 OEM 字段的显示逻辑：名称 (简称)
+        self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
+
         # 注意：如果是 POST 请求 (self.data 存在)，不要动 queryset
         # Django 需要用完整的 .all() (或者包含提交值的 queryset) 来验证数据有效性
         # 但因为 ModelChoiceField 默认就是 .all()，所以不需要额外写代码
@@ -188,8 +192,9 @@ class OEMForm(TablerFormMixin, forms.ModelForm):
 class MaterialTypeForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialType
-        fields = ['name', 'description']
+        fields = ['name', 'classification', 'description']
         widgets = {
+            'classification': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'rows': 3}),
         }
 

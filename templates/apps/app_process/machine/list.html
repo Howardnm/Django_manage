@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="机台型号管理" create_url="process_machine_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>品牌</th>
+                    <th>型号</th>
+                    <th>螺杆直径</th>
+                    <th>长径比</th>
+                    <th>适用材料</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for machine in machines %}
+                    <tr>
+                        <td>{{ machine.brand }}</td>
+                        <td class="fw-bold">{{ machine.model_name }}</td>
+                        <td>{{ machine.screw_diameter }} mm</td>
+                        <td>{{ machine.ld_ratio }}</td>
+                        <td>
+                            {% for mat in machine.suitable_materials.all|slice:":3" %}
+                                <span class="badge bg-green-lt">{{ mat.name }}</span>
+                            {% endfor %}
+                            {% if machine.suitable_materials.count > 3 %}...{% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'process_machine_edit' machine.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

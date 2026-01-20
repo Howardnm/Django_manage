@@ -1,0 +1,229 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col"><h2 class="page-title">配方数据库</h2></div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'formula_add' %}" class="btn btn-primary"><i class="ti ti-plus"></i> 新增配方</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card mt-3">
+        <!-- 1. 标准切换 Tabs -->
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a href="?{% url_replace std='ISO' page=1 %}" class="nav-link {% if current_std != 'ASTM' %}active{% endif %}">
+                        ISO / 国标
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="?{% url_replace std='ASTM' page=1 %}" class="nav-link {% if current_std == 'ASTM' %}active{% endif %}">
+                        ASTM (美标)
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 2. 筛选区域 -->
+        <div class="card-body border-bottom py-3">
+            <form method="GET" class="row g-2 align-items-center">
+                <!-- 保持当前标准和排序参数 -->
+                <input type="hidden" name="std" value="{{ current_std }}">
+                {% for s in request.GET.getlist.sort %}
+                    <input type="hidden" name="sort" value="{{ s }}">
+                {% endfor %}
+
+                <!-- 基础筛选 -->
+                <div class="col-auto">
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        {{ filter.form.q }}
+                    </div>
+                </div>
+                <div class="col-auto">
+                    {{ filter.form.material_type }}
+                </div>
+
+                <!-- 性能范围筛选 (折叠/展开) -->
+                <div class="col-auto">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
+                        <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
+                    </button>
+                </div>
+
+                <div class="col-auto ms-auto">
+                    <button type="submit" class="btn btn-primary btn-icon"><i class="ti ti-search"></i></button>
+                    <a href="?std={{ current_std }}" class="btn btn-ghost-danger ms-2">重置</a>
+                </div>
+
+                <!-- 高级筛选面板 -->
+                <div class="collapse w-100 mt-2" id="advanced-filter">
+                    <div class="card card-body bg-bule-lt">
+                        <div class="row g-3">
+                            <!-- 密度 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">密度 (g/cm³)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.density_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.density_max }}
+                                </div>
+                            </div>
+                            <!-- 熔指 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">熔融指数</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.melt_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.melt_max }}
+                                </div>
+                            </div>
+                            <!-- 拉伸 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">拉伸强度 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.tensile_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.tensile_max }}
+                                </div>
+                            </div>
+                            <!-- 冲击 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">冲击强度</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.impact_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.impact_max }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+                <thead>
+                <tr>
+                    <th>配方信息</th>
+                    <th>基材</th>
+                    <th>工艺</th>
+                    <th>成本</th>
+
+                    <!-- 动态表头: 物理 -->
+                    <th style="width: 60px;"><a href="?{% sort_url_multi 'density' %}" class="table-sort-header text-reset">密度</a></th>
+                    <th style="width: 60px;"><a href="?{% sort_url_multi 'ash' %}" class="table-sort-header text-reset">灰分</a></th>
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'melt_index' %}" class="table-sort-header text-reset">M.I</a></th>
+
+                    <!-- 动态表头: 机械 -->
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'tensile' %}" class="table-sort-header text-reset">拉伸</a></th>
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'flex_strength' %}" class="table-sort-header text-reset">弯强</a></th>
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'flex_modulus' %}" class="table-sort-header text-reset">弯模</a></th>
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'impact' %}" class="table-sort-header text-reset">冲击</a></th>
+
+                    <!-- 动态表头: 热学 -->
+                    <th style="width: 80px;"><a href="?{% sort_url_multi 'hdt' %}" class="table-sort-header text-reset">HDT</a></th>
+
+                    <th>关联成品</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for formula in formulas %}
+                    <tr>
+                        <!-- 1. 配方信息 -->
+                        <td>
+                            <a href="{% url 'formula_detail' formula.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 180px;" title="{{ formula.name }}">
+                                {{ formula.name|default:"未命名配方" }}
+                            </a>
+                            <div class="text-muted small">{{ formula.code }}</div>
+                        </td>
+
+                        <!-- 2. 基材类型 -->
+                        <td><span class="badge bg-blue-lt">{{ formula.material_type.name }}</span></td>
+
+                        <!-- 3. 工艺方案 -->
+                        <td>
+                            {% if formula.process %}
+                                <a href="{% url 'process_profile_detail' formula.process.pk %}" target="_blank" class="text-reset" title="点击查看工艺详情">
+                                    {{ formula.process.name|truncatechars:15 }}
+                                </a>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- 4. 成本 -->
+                        <td>
+                            <div class="fw-bold text-orange">¥{{ formula.cost_predicted }}</div>
+                            {% if formula.cost_actual %}
+                                <div class="text-green small" title="实际成本">¥{{ formula.cost_actual }}</div>
+                            {% endif %}
+                        </td>
+
+                        <!-- === 动态数据列 (val_xxx) === -->
+                        <!-- 密度 -->
+                        <td>{% if formula.val_density %}<div class="fw-bold">{{ formula.val_density|floatformat:3 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 灰分 -->
+                        <td>{% if formula.val_ash %}<div class="fw-bold">{{ formula.val_ash|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- M.I -->
+                        <td>{% if formula.val_melt %}<div class="fw-bold">{{ formula.val_melt|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 拉伸 -->
+                        <td>{% if formula.val_tensile %}<div class="fw-bold">{{ formula.val_tensile|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 弯强 -->
+                        <td>{% if formula.val_flex_strength %}<div class="fw-bold">{{ formula.val_flex_strength|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 弯模 -->
+                        <td>{% if formula.val_flex_modulus %}<div class="fw-bold">{{ formula.val_flex_modulus|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 冲击 -->
+                        <td>{% if formula.val_impact %}<div class="fw-bold">{{ formula.val_impact|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- HDT -->
+                        <td>{% if formula.val_hdt %}<div class="fw-bold text-red">{{ formula.val_hdt|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 5. 关联成品 -->
+                        <td>
+                            {% if formula.related_materials.exists %}
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 150px;">
+                                    {% for mat in formula.related_materials.all|slice:":2" %}
+                                        <a href="{% url 'repo_material_detail' mat.pk %}" target="_blank" class="badge bg-secondary-lt text-truncate" style="max-width: 100px;">
+                                            {{ mat.grade_name }}
+                                        </a>
+                                    {% endfor %}
+                                    {% if formula.related_materials.count > 2 %}...{% endif %}
+                                </div>
+                            {% else %}-{% endif %}
+                        </td>
+
+                        <!-- 8. 操作 -->
+                        <td>
+                            <a href="{% url 'formula_detail' formula.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="查看详情">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                            <a href="{% url 'formula_edit' formula.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
+                                <i class="ti ti-edit"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="13" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

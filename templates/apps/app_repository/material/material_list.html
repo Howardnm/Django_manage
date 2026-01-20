@@ -27,7 +27,90 @@
                 </li>
             </ul>
         </div>
-        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <!-- 2. 筛选区域 (替换原有的 include) -->
+        <div class="card-body border-bottom py-3">
+            <form method="GET" class="row g-2 align-items-center">
+                <!-- 保持当前标准和排序参数 -->
+                <input type="hidden" name="std" value="{{ current_std }}">
+                {% for s in request.GET.getlist.sort %}
+                    <input type="hidden" name="sort" value="{{ s }}">
+                {% endfor %}
+
+                <!-- 基础筛选 -->
+                <div class="col-auto">
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        {{ filter.form.q }}
+                    </div>
+                </div>
+                <div class="col-auto">
+                    {{ filter.form.category }}
+                </div>
+                <div class="col-auto" style="min-width: 200px;">
+                    {{ filter.form.scenarios }}
+                </div>
+
+                <!-- 性能范围筛选 (折叠/展开) -->
+                <div class="col-auto">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
+                        <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
+                    </button>
+                </div>
+
+                <div class="col-auto ms-auto">
+                    <button type="submit" class="btn btn-primary btn-icon"><i class="ti ti-search"></i></button>
+                    <!-- 重置按钮 -->
+                    {% if request.GET %}
+                        <a href="?std={{ current_std }}" class="btn btn-ghost-danger ms-2">重置</a>
+                    {% endif %}
+                </div>
+
+                <!-- 高级筛选面板 -->
+                <div class="collapse w-100 mt-2" id="advanced-filter">
+                    <div class="card card-body bg-blue-lt">
+                        <div class="row g-3">
+                            <!-- 密度 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">密度 (g/cm³)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.density_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.density_max }}
+                                </div>
+                            </div>
+                            <!-- 熔指 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">熔融指数</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.melt_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.melt_max }}
+                                </div>
+                            </div>
+                            <!-- 拉伸 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">拉伸强度 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.tensile_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.tensile_max }}
+                                </div>
+                            </div>
+                            <!-- 冲击 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">冲击强度</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.impact_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.impact_max }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
 
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
@@ -38,6 +121,8 @@
                     <th>场景</th>
 
                     <!-- 动态表头: 物理 -->
+                    <th style="width: 60px;"><a href="?{% url_replace sort='density'|sort_toggle:current_sort %}" class="table-sort-header text-reset">密度</a></th>
+                    <th style="width: 60px;"><a href="?{% url_replace sort='ash'|sort_toggle:current_sort %}" class="table-sort-header text-reset">灰分</a></th>
                     <th style="width: 80px;"><a href="?{% url_replace sort='melt_index'|sort_toggle:current_sort %}" class="table-sort-header text-reset">M.I</a></th>
 
                     <!-- 动态表头: 机械 -->
@@ -51,6 +136,7 @@
 
                     <th><a href="?{% url_replace sort='flammability'|sort_toggle:current_sort %}" class="table-sort-header text-reset">阻燃</a></th>
                     <th>文档</th>
+                    <th><a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">录入日期</a></th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -76,23 +162,29 @@
                         </td>
 
                         <!-- === 动态数据列 (val_xxx) === -->
+                        <!-- 密度 -->
+                        <td>{% if mat.val_density %}<div class="fw-bold">{{ mat.val_density|floatformat:3 }}</div>{% else %}-{% endif %}</td>
+                        
+                        <!-- 灰分 -->
+                        <td>{% if mat.val_ash %}<div class="fw-bold">{{ mat.val_ash|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
                         <!-- M.I -->
-                        <td>{% if mat.val_melt %}<div class="fw-bold">{{ mat.val_melt }}</div>{% else %}-{% endif %}</td>
+                        <td>{% if mat.val_melt %}<div class="fw-bold">{{ mat.val_melt|floatformat:1 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- 拉伸 -->
-                        <td>{% if mat.val_tensile %}<div class="fw-bold">{{ mat.val_tensile }}</div>{% else %}-{% endif %}</td>
+                        <td>{% if mat.val_tensile %}<div class="fw-bold">{{ mat.val_tensile|floatformat:0 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- 弯强 -->
-                        <td>{% if mat.val_flex_strength %}<div class="fw-bold">{{ mat.val_flex_strength }}</div>{% else %}-{% endif %}</td>
+                        <td>{% if mat.val_flex_strength %}<div class="fw-bold">{{ mat.val_flex_strength|floatformat:0 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- 弯模 -->
                         <td>{% if mat.val_flex_modulus %}<div class="fw-bold">{{ mat.val_flex_modulus|floatformat:0 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- 冲击 -->
-                        <td>{% if mat.val_impact %}<div class="fw-bold">{{ mat.val_impact }}</div>{% else %}-{% endif %}</td>
+                        <td>{% if mat.val_impact %}<div class="fw-bold">{{ mat.val_impact|floatformat:1 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- HDT -->
-                        <td>{% if mat.val_hdt %}<div class="fw-bold text-red">{{ mat.val_hdt }}</div>{% else %}-{% endif %}</td>
+                        <td>{% if mat.val_hdt %}<div class="fw-bold text-red">{{ mat.val_hdt|floatformat:0 }}</div>{% else %}-{% endif %}</td>
 
                         <!-- 阻燃 -->
                         <td>{{ mat.flammability|default:"-" }}</td>
@@ -129,7 +221,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="12" class="text-center py-4 text-muted">暂无材料数据</td>
+                        <td colspan="14" class="text-center py-4 text-muted">暂无材料数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

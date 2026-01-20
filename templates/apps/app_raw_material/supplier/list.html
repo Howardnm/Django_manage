@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' with title="供应商管理" create_url="raw_supplier_add" %}
+    
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable">
+                <thead>
+                <tr>
+                    <th>供应商名称</th>
+                    <th>主营产品</th>
+                    <th>销售联系人</th>
+                    <th>技术联系人</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for supplier in suppliers %}
+                    <tr>
+                        <td><a href="{% url 'raw_supplier_edit' supplier.pk %}" class="text-reset fw-bold">{{ supplier.name }}</a></td>
+                        <td>
+                            {% for type in supplier.product_categories.all %}
+                                <span class="badge bg-blue-lt">{{ type.name }}</span>
+                            {% endfor %}
+                        </td>
+                        <td>
+                            <div>{{ supplier.sales_contact }}</div>
+                            <div class="text-muted small">{{ supplier.sales_phone }}</div>
+                        </td>
+                        <td>
+                            <div>{{ supplier.tech_contact }}</div>
+                            <div class="text-muted small">{{ supplier.tech_phone }}</div>
+                        </td>
+                        <td>
+                            <a href="{% url 'raw_supplier_edit' supplier.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">暂无数据</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+{% endblock %}

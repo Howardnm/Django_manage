@@ -56,7 +56,7 @@
             selects.forEach(function (el) {
                 new TomSelect(el, {
                     copyClassesToDropdown: false,
-                    {#dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡#}
+                    dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡
                     controlInput: '<input>',
                     create: false,
                     placeholder: '输入搜索...',

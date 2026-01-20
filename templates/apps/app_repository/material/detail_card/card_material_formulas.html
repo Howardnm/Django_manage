@@ -1,0 +1,77 @@
+<!-- 关联配方卡片 -->
+<div class="card mt-3">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-flask me-2 text-purple"></i>关联配方记录
+        </h3>
+        <div class="card-actions d-flex gap-2">
+            <!-- 新增配方按钮 -->
+            <a href="{% url 'formula_add' %}?material_id={{ material.pk }}" class="btn btn-sm btn-primary">
+                <i class="ti ti-plus me-1"></i> 新增配方
+            </a>
+
+            <!-- ISO/ASTM 切换按钮 -->
+            <div class="btn-group btn-group-sm">
+                <a href="?std=ISO" class="btn {% if current_std != 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ISO</a>
+                <a href="?std=ASTM" class="btn {% if current_std == 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ASTM</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap datatable" style="font-size: 13px;">
+            <thead>
+            <tr>
+                <th>配方单号</th>
+                <!-- 【修改】工艺列改为密度 -->
+                <th>成本</th>
+                <!-- 动态表头 -->
+                <th style="width: 60px;">密度</th>
+                <th style="width: 60px;">M.I</th>
+                <th style="width: 60px;">拉伸</th>
+                <th style="width: 60px;">弯强</th>
+                <th style="width: 60px;">弯模</th>
+                <th style="width: 60px;">冲击</th>
+                <th style="width: 60px;">HDT</th>
+                <th>时间</th>
+                <th></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for f in related_formulas %}
+                <tr>
+                    <td>
+                        <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="fw-bold text-reset">{{ f.code }}</a>
+                        <div class="text-muted small">{{ f.creator.username }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold text-orange">¥{{ f.cost_predicted }}</div>
+                        {% if f.cost_actual %}
+                            <div class="fw-bold text-green" title="实际成本">¥{{ f.cost_actual }}</div>
+                        {% endif %}
+                    </td>
+
+                    <td>{% if f.display_props.density %}<span class="fw-bold">{{ f.display_props.density|floatformat:3 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.melt %}<span class="fw-bold">{{ f.display_props.melt|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.tensile %}<span class="fw-bold">{{ f.display_props.tensile|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.flex_strength %}<span class="fw-bold">{{ f.display_props.flex_strength|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.flex_modulus %}<span class="fw-bold">{{ f.display_props.flex_modulus|floatformat:0 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.impact %}<span class="fw-bold">{{ f.display_props.impact|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                    <td>{% if f.display_props.hdt %}<span class="fw-bold text-red">{{ f.display_props.hdt|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+
+                    <td class="text-muted">{{ f.created_at|date:"Y-m-d" }}</td>
+                    <td class="text-end">
+                        <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="btn btn-sm btn-icon btn-ghost-secondary">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="11" class="text-center py-4 text-muted small">暂无关联配方</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

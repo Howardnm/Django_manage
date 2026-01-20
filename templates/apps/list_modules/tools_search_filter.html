@@ -29,7 +29,15 @@
                     </div>
                 </div>
 
-            <!-- 4. 其他字段 (各种下拉筛选框)：自动渲染 -->
+            <!-- 4. 性能指标范围筛选 (Min/Max) -->
+            {% elif '_min' in field.name or '_max' in field.name %}
+                <div class="d-inline-block" style="max-width: 100px;">
+                    <div class="input-group input-group-sm">
+                        {{ field }}
+                    </div>
+                </div>
+
+            <!-- 5. 其他字段 (各种下拉筛选框)：自动渲染 -->
             {% else %}
                 <div class="d-inline-block">
                     {{ field }}

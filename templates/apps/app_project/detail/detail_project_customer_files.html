@@ -54,8 +54,11 @@
                         <div class="p-2 border rounded bg-light-lt h-100">
                             <div class="small text-secondary mb-1">主机厂 (OEM)</div>
                             {% if repo.oem %}
-                                <a href="{% url 'repo_oem_edit' repo.oem.pk %}" target="_blank" class="fw-bold text-body text-decoration-none text-truncate d-block">
+                                <a href="{% url 'repo_oem_edit' repo.oem.pk %}" target="_blank" class="fw-bold text-body text-decoration-none text-truncate d-block" title="{{ repo.oem.name }}">
                                     {{ repo.oem.name }}
+                                    {% if repo.oem.short_name %}
+                                        <span class="text-muted fw-bold text-blue me-2">({{ repo.oem.short_name }})</span>
+                                    {% endif %}
                                 </a>
                             {% else %}
                                 <div class="text-muted">-</div>

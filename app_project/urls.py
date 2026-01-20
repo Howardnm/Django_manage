@@ -1,6 +1,7 @@
 from django.urls import path
 from .views.Project import *
 from .views.ProjectNode import *
+from .views.ProjectReport import ProjectReportExportView # 【新增】
 
 urlpatterns = [
     path('list/', ProjectListView.as_view(), name='project_list'),
@@ -13,4 +14,6 @@ urlpatterns = [
     path('node/<int:pk>/failed/', NodeFailedView.as_view(), name='node_failed'),
     # 【新增】客户干预 (对应 InsertFeedbackView)
     path('node/<int:pk>/feedback/', InsertFeedbackView.as_view(), name='node_feedback'),
+    # 【新增】导出报告路由
+    path('<int:pk>/export/', ProjectReportExportView.as_view(), name='project_export_report'),
 ]

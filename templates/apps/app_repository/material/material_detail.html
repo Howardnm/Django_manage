@@ -47,7 +47,11 @@
         <div class="col-lg-8">
             <!-- 1. 动态性能卡片 (按分类分组) -->
             {% include 'apps/app_repository/material/detail_card/card_material_data_EAV.html' %}
-            <!-- 2. 关联项目应用记录 (宽幅表格) -->
+            
+            <!-- 2. 【新增】关联配方记录 -->
+            {% include 'apps/app_repository/material/detail_card/card_material_formulas.html' %}
+            
+            <!-- 3. 关联项目应用记录 (宽幅表格) -->
             {% include 'apps/app_repository/material/detail_card/card_material_projects.html' %}
 
         </div>

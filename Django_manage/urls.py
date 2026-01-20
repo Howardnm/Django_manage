@@ -23,4 +23,8 @@ urlpatterns = [
     path('project/', include('app_project.urls')),
     path('user/', include('app_user.urls')),
     path('repository/', include('app_repository.urls')),
+    path('raw-material/', include('app_raw_material.urls')),
+    path('process/', include('app_process.urls')),
+    # 【新增】配方数据库路由
+    path('formula/', include('app_formula.urls')),
 ]
