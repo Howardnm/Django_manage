@@ -1,6 +1,7 @@
 from django.db import models
 from app_repository.models import TestConfig  # 引入测试标准库
-from app_repository.utils.repo_file_path import repo_file_path # 引入文件路径工具
+from common_utils.repo_file_path import repo_file_path
+
 
 # 2. 原材料类型 (如：树脂、填充、助剂)
 class RawMaterialType(models.Model):

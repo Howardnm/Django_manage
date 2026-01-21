@@ -24,14 +24,22 @@
                         <td class="fw-bold">{{ screw.name }}</td>
                         <td>
                             {% for machine in screw.machines.all|slice:":2" %}
-                                <span class="badge bg-secondary-lt">{{ machine.model_name }}</span>
+                                <span class="badge bg-purple-lt" title="{{ machine }}">
+                                    {% if machine.machine_code %}[{{ machine.machine_code }}] {% endif %}
+                                    {{ machine.brand }} - {{ machine.model_name }} (D{{ machine.screw_diameter|floatformat:0 }})
+                                </span>
                             {% endfor %}
-                            {% if screw.machines.count > 2 %}...{% endif %}
+                            {% if screw.machines.count > 2 %}
+                                <span class="badge bg-secondary-lt" title="更多...">+{{ screw.machines.count|add:"-2" }}</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% for mat in screw.suitable_materials.all|slice:":3" %}
                                 <span class="badge bg-green-lt">{{ mat.name }}</span>
                             {% endfor %}
+                            {% if screw.suitable_materials.count > 3 %}
+                                <span class="badge bg-secondary-lt" title="更多...">+{{ screw.suitable_materials.count|add:"-3" }}</span>
+                            {% endif %}
                         </td>
                         <td>
                             {% if screw.drawing_file %}

@@ -1,5 +1,5 @@
 <!-- 工艺库模块 -->
-{% with route_names='process_type_list process_type_add process_type_edit process_machine_list process_machine_add process_machine_edit process_screw_list process_screw_add process_screw_edit process_profile_list process_profile_add process_profile_edit process_profile_detail' %}
+{% with route_names='process_machine_list process_machine_add process_machine_edit process_screw_list process_screw_add process_screw_edit process_profile_list process_profile_add process_profile_edit process_profile_detail' %}
 
     <li class="nav-item dropdown">
         <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name in route_names %}active{% endif %}"
@@ -33,12 +33,6 @@
                     <a class="dropdown-item {% if 'process_screw' in request.resolver_match.url_name %}active{% endif %}"
                        href="{% url 'process_screw_list' %}">
                         螺杆组合
-                    </a>
-                    
-                    <!-- 工艺类型 -->
-                    <a class="dropdown-item {% if 'process_type' in request.resolver_match.url_name %}active{% endif %}"
-                       href="{% url 'process_type_list' %}">
-                        工艺类型
                     </a>
 
                 </div>

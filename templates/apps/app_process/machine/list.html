@@ -13,6 +13,7 @@
                 <tr>
                     <th>品牌</th>
                     <th>型号</th>
+                    <th>机台号</th>
                     <th>螺杆直径</th>
                     <th>长径比</th>
                     <th>适用材料</th>
@@ -24,6 +25,13 @@
                     <tr>
                         <td>{{ machine.brand }}</td>
                         <td class="fw-bold">{{ machine.model_name }}</td>
+                        <td>
+                            {% if machine.machine_code %}
+                                <span class="badge bg-purple-lt"># {{ machine.machine_code }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ machine.screw_diameter }} mm</td>
                         <td>{{ machine.ld_ratio }}</td>
                         <td>
@@ -38,7 +46,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="6" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="7" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

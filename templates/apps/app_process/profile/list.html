@@ -13,6 +13,7 @@
                 <tr>
                     <th>方案名称</th>
                     <th>工艺类型</th>
+                    <th>适用材料</th>
                     <th>机台</th>
                     <th>螺杆组合</th>
                     <th>切粒方式</th>
@@ -24,7 +25,21 @@
                 {% for profile in profiles %}
                     <tr>
                         <td><a href="{% url 'process_profile_detail' profile.pk %}" class="text-reset fw-bold">{{ profile.name }}</a></td>
-                        <td><span class="badge bg-blue-lt">{{ profile.process_type.name }}</span></td>
+                        <td><span class="badge bg-blue-lt">{{ profile.process_type_name }}</span></td>
+                        <td>
+                            {% if profile.material_types.exists %}
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 200px;">
+                                    {% for mat_type in profile.material_types.all|slice:":3" %}
+                                        <span class="badge bg-purple-lt">{{ mat_type.name }}</span>
+                                    {% endfor %}
+                                    {% if profile.material_types.count > 3 %}
+                                        <span class="badge bg-secondary-lt" title="更多...">+{{ profile.material_types.count|add:"-3" }}</span>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ profile.machine.model_name|default:"-" }}</td>
                         <td>{{ profile.screw_combination.name|default:"-" }}</td>
                         <td>{{ profile.get_cooling_method_display }}</td>
@@ -36,7 +51,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="8" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

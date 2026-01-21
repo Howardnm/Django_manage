@@ -3,7 +3,7 @@ import os
 from django.db import models
 from django.core.validators import FileExtensionValidator
 from app_project.models import Project
-from .utils.repo_file_path import repo_file_path  # 引入刚才写的路径函数
+from common_utils.repo_file_path import repo_file_path
 
 
 # ==============================================================================

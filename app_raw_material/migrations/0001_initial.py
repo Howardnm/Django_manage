@@ -4,6 +4,8 @@ import app_repository.utils.repo_file_path
 import django.db.models.deletion
 from django.db import migrations, models
 
+import common_utils.repo_file_path
+
 
 class Migration(migrations.Migration):
 
@@ -56,9 +58,9 @@ class Migration(migrations.Migration):
                 ('usage_method', models.TextField(blank=True, help_text='如：需烘干，建议添加量...', verbose_name='使用方法/描述')),
                 ('cost_price', models.DecimalField(blank=True, decimal_places=2, max_digits=10, null=True, verbose_name='参考成本 (元/kg)')),
                 ('purchase_date', models.DateField(blank=True, null=True, verbose_name='购入日期')),
-                ('file_tds', models.FileField(blank=True, null=True, upload_to=app_repository.utils.repo_file_path.repo_file_path, verbose_name='TDS')),
-                ('file_msds', models.FileField(blank=True, null=True, upload_to=app_repository.utils.repo_file_path.repo_file_path, verbose_name='MSDS')),
-                ('file_rohs', models.FileField(blank=True, null=True, upload_to=app_repository.utils.repo_file_path.repo_file_path, verbose_name='RoHS')),
+                ('file_tds', models.FileField(blank=True, null=True, upload_to=common_utils.repo_file_path.repo_file_path, verbose_name='TDS')),
+                ('file_msds', models.FileField(blank=True, null=True, upload_to=common_utils.repo_file_path.repo_file_path, verbose_name='MSDS')),
+                ('file_rohs', models.FileField(blank=True, null=True, upload_to=common_utils.repo_file_path.repo_file_path, verbose_name='RoHS')),
                 ('created_at', models.DateTimeField(auto_now_add=True, verbose_name='录入时间')),
                 ('updated_at', models.DateTimeField(auto_now=True, verbose_name='更新时间')),
                 ('category', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='app_raw_material.rawmaterialtype', verbose_name='所属类型')),

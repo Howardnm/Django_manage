@@ -1,15 +1,9 @@
 from django.urls import path
-from .views.ProcessType import *
 from .views.MachineModel import *
 from .views.ScrewCombination import *
 from .views.ProcessProfile import *
 
 urlpatterns = [
-    # 工艺类型
-    path('types/', ProcessTypeListView.as_view(), name='process_type_list'),
-    path('types/add/', ProcessTypeCreateView.as_view(), name='process_type_add'),
-    path('types/<int:pk>/edit/', ProcessTypeUpdateView.as_view(), name='process_type_edit'),
-
     # 机台型号
     path('machines/', MachineModelListView.as_view(), name='process_machine_list'),
     path('machines/add/', MachineModelCreateView.as_view(), name='process_machine_add'),

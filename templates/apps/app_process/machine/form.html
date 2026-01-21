@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header d-print-none">
+    <div class="page-header d-print-none mb-3">
         <div class="row align-items-center">
             <div class="col">
                 <h2 class="page-title">{{ page_title }}</h2>
@@ -15,41 +15,72 @@
                 {% csrf_token %}
                 
                 <div class="row">
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label required">品牌</label>
                         {{ form.brand }}
+                        {% if form.brand.help_text %}
+                            <div class="form-text text-muted">{{ form.brand.help_text }}</div>
+                        {% endif %}
                     </div>
-                    <div class="col-md-6 mb-3">
+                    <div class="col-md-4 mb-3">
                         <label class="form-label required">型号</label>
                         {{ form.model_name }}
+                        {% if form.model_name.help_text %}
+                            <div class="form-text text-muted">{{ form.model_name.help_text }}</div>
+                        {% endif %}
                     </div>
-                    
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label">机台号</label>
+                        {{ form.machine_code }}
+                        {% if form.machine_code.help_text %}
+                            <div class="form-text text-muted">{{ form.machine_code.help_text }}</div>
+                        {% endif %}
+                    </div>
+
                     <div class="col-md-6 mb-3">
                         <label class="form-label">螺杆直径 (mm)</label>
                         {{ form.screw_diameter }}
+                        {% if form.screw_diameter.help_text %}
+                            <div class="form-text text-muted">{{ form.screw_diameter.help_text }}</div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">长径比 (L/D)</label>
                         {{ form.ld_ratio }}
+                        {% if form.ld_ratio.help_text %}
+                            <div class="form-text text-muted">{{ form.ld_ratio.help_text }}</div>
+                        {% endif %}
                     </div>
-                    
+
                     <div class="col-md-6 mb-3">
                         <label class="form-label">电机功率 (kW)</label>
                         {{ form.motor_power }}
+                        {% if form.motor_power.help_text %}
+                            <div class="form-text text-muted">{{ form.motor_power.help_text }}</div>
+                        {% endif %}
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">最高转速 (rpm)</label>
                         {{ form.max_speed }}
+                        {% if form.max_speed.help_text %}
+                            <div class="form-text text-muted">{{ form.max_speed.help_text }}</div>
+                        {% endif %}
                     </div>
-                    
+
                     <div class="col-12 mb-3">
                         <label class="form-label">适用材料类型</label>
                         {{ form.suitable_materials }}
+                        {% if form.suitable_materials.help_text %}
+                            <div class="form-text text-muted">{{ form.suitable_materials.help_text }}</div>
+                        {% endif %}
                     </div>
-                    
+
                     <div class="col-12 mb-3">
                         <label class="form-label">备注</label>
                         {{ form.description }}
+                        {% if form.description.help_text %}
+                            <div class="form-text text-muted">{{ form.description.help_text }}</div>
+                        {% endif %}
                     </div>
                 </div>
 

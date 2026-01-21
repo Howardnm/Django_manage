@@ -1,20 +1,6 @@
 from django.db import models
 from app_repository.models import MaterialType  # 引入材料类型模型
-from app_repository.utils.repo_file_path import repo_file_path # 引入文件路径工具
-
-# 1. 工艺模板/类型 (如：双螺杆挤出、注塑成型)
-class ProcessType(models.Model):
-    name = models.CharField("工艺类型", max_length=50, unique=True)
-    # 【新增】关联材料类型 (多对多)
-    material_types = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="process_types")
-    description = models.TextField("描述", blank=True)
-
-    def __str__(self):
-        return self.name
-    
-    class Meta:
-        verbose_name = "工艺类型"
-        verbose_name_plural = "工艺类型库"
+from common_utils.repo_file_path import repo_file_path
 
 
 # 【新增】机台型号库
@@ -24,6 +10,8 @@ class MachineModel(models.Model):
     """
     brand = models.CharField("品牌", max_length=50, help_text="如：科倍隆, 南京科亚, 瑞亚")
     model_name = models.CharField("型号", max_length=50, unique=True, help_text="如：ZSK-26, TE-35")
+    # 【新增】机台号
+    machine_code = models.IntegerField("机台号", max_length=50, blank=True, help_text="如：1, 2, 3")
     
     # 【新增】适用材料类型 (多对多)
     suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="machines")
@@ -37,12 +25,13 @@ class MachineModel(models.Model):
     description = models.TextField("备注", blank=True)
 
     def __str__(self):
-        return f"{self.brand} - {self.model_name} (D{self.screw_diameter})"
+        code_str = f"[{self.machine_code}] " if self.machine_code else ""
+        return f"{code_str}{self.brand} - {self.model_name} (D{self.screw_diameter})"
 
     class Meta:
         verbose_name = "机台型号"
         verbose_name_plural = "机台型号库"
-        ordering = ['brand', 'screw_diameter']
+        ordering = ['machine_code']
 
 
 # 【新增】螺杆组合库
@@ -50,7 +39,7 @@ class ScrewCombination(models.Model):
     """
     螺杆排列组合 (Screw Configuration)
     """
-    name = models.CharField("组合名称", max_length=100, help_text="如：高剪切组合-V1")
+    name = models.CharField("组合名称", max_length=100, help_text="如：PP+滑石粉 高剪切组合-V1")
     # 【修改】适用机台 (多对多)
     machines = models.ManyToManyField(MachineModel, verbose_name="适用机台", related_name="screw_combinations")
     # 【新增】适用材料类型 (多对多)
@@ -83,7 +72,15 @@ class ProcessProfile(models.Model):
     ]
 
     name = models.CharField("工艺方案名称", max_length=100, help_text="如：PA66+30GF 标准挤出工艺")
-    process_type = models.ForeignKey(ProcessType, on_delete=models.PROTECT, verbose_name="工艺类型")
+    
+    # 【修改】ProcessType 字段合并到这里
+    # 1. 工艺类型名称 (原 ProcessType.name)
+    process_type_name = models.CharField("工艺类型", max_length=50, default="双螺杆挤出", help_text="如：双螺杆挤出、其他")
+    
+    # 2. 适用材料类型 (原 ProcessType.material_types)
+    # 注意：这里改为直接关联，因为一个工艺方案通常针对特定材料
+    # 如果需要多对多，可以保持 ManyToManyField
+    material_types = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="process_profiles")
     
     # 【修改】关联机台型号 (外键)
     machine = models.ForeignKey(MachineModel, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="适用机台")
@@ -129,7 +126,7 @@ class ProcessProfile(models.Model):
     pelletizing_speed = models.FloatField("切粒机转速 (rpm/Hz)", default=0)
 
     # --- E. 其他 ---
-    screen_mesh = models.CharField("过滤网目数", max_length=50, blank=True, help_text="如：80/100/80")
+    screen_mesh = models.CharField("过滤网目数", max_length=50, blank=True, help_text="如：80/100")
     
     # 【修改】关联螺杆组合 (外键)
     screw_combination = models.ForeignKey(ScrewCombination, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="螺杆组合")

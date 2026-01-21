@@ -14,7 +14,8 @@ class ProcessProfileListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('process_type', 'machine', 'screw_combination').order_by('-created_at')
+        # 【修改】预加载 material_types (多对多)
+        qs = super().get_queryset().select_related('machine', 'screw_combination').prefetch_related('material_types').order_by('-created_at')
         self.filterset = ProcessProfileFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
@@ -29,7 +30,8 @@ class ProcessProfileDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'profile'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('process_type', 'machine', 'screw_combination')
+        # 【修改】移除 process_type 关联查询
+        return super().get_queryset().select_related('machine', 'screw_combination')
 
 class ProcessProfileCreateView(LoginRequiredMixin, CreateView):
     model = ProcessProfile

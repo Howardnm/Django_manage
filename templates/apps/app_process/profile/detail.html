@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header d-print-none">
+    <div class="page-header d-print-none mb-3">
         <div class="row align-items-center">
             <div class="col">
                 <div class="page-pretitle">工艺方案详情</div>
@@ -16,57 +16,193 @@
     </div>
 
     <div class="row row-cards">
-        <!-- 基础信息 -->
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">基础配置</h3>
+        <!-- 左侧栏：核心配置与关联信息 (30%) -->
+        <div class="col-lg-4">
+            
+            <!-- 1. 基础配置卡片 -->
+            <div class="card mb-3">
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue"><i class="ti ti-settings me-2"></i>基础配置</h3>
                 </div>
                 <div class="card-body">
-                    <dl class="row">
-                        <dt class="col-5">工艺类型</dt>
-                        <dd class="col-7"><span class="badge bg-blue-lt">{{ profile.process_type.name }}</span></dd>
+                    <dl class="row mb-0">
+                        <dt class="col-5 text-muted">工艺类型</dt>
+                        <dd class="col-7"><span class="badge bg-blue-lt">{{ profile.process_type_name }}</span></dd>
                         
-                        <dt class="col-5">适用机台</dt>
-                        <dd class="col-7">{{ profile.machine.model_name|default:"-" }}</dd>
-                        
-                        <dt class="col-5">螺杆组合</dt>
-                        <dd class="col-7">{{ profile.screw_combination.name|default:"-" }}</dd>
-                        
-                        <dt class="col-5">切粒方式</dt>
+                        <dt class="col-5 text-muted">切粒方式</dt>
                         <dd class="col-7">{{ profile.get_cooling_method_display }}</dd>
+                        
+                        <dt class="col-5 text-muted">适用材料</dt>
+                        <dd class="col-7">
+                            {% for mat in profile.material_types.all %}
+                                <span class="badge bg-green-lt mb-1">{{ mat.name }}</span>
+                            {% empty %}
+                                <span class="text-muted">-</span>
+                            {% endfor %}
+                        </dd>
+                        
+                        <dt class="col-5 text-muted">录入时间</dt>
+                        <dd class="col-7">{{ profile.created_at|date:"Y-m-d" }}</dd>
                     </dl>
                 </div>
             </div>
-            
-            <div class="card mt-3">
+
+            <!-- 2. 关联机台详情 (新增) -->
+            <div class="card mb-3">
+                <div class="card-header bg-purple-lt">
+                    <h3 class="card-title text-purple"><i class="ti ti-device-desktop-analytics me-2"></i>适用机台</h3>
+                    <div class="card-actions">
+                        {% if profile.machine %}
+                            <a href="{% url 'process_machine_edit' profile.machine.pk %}" class="btn btn-sm btn-icon btn-ghost-purple" title="查看机台详情">
+                                <i class="ti ti-arrow-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if profile.machine %}
+                    <div class="card-body">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="avatar bg-purple-lt me-3"><i class="ti ti-server"></i></span>
+                            <div>
+                                <div class="fw-bold">{{ profile.machine.brand }} - {{ profile.machine.model_name }}</div>
+                                <div class="small text-muted">
+                                    {% if profile.machine.machine_code %}
+                                        机台号: {{ profile.machine.machine_code }}
+                                    {% else %}
+                                        无机台号
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="hr-text my-3">参数规格</div>
+                        <div class="row g-2 small">
+                            <div class="col-6">
+                                <div class="text-muted">螺杆直径</div>
+                                <div class="fw-bold">{{ profile.machine.screw_diameter }} mm</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted">长径比 (L/D)</div>
+                                <div class="fw-bold">{{ profile.machine.ld_ratio }}</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted">电机功率</div>
+                                <div class="fw-bold">{{ profile.machine.motor_power|default:"-" }} kW</div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-muted">最高转速</div>
+                                <div class="fw-bold">{{ profile.machine.max_speed|default:"-" }} rpm</div>
+                            </div>
+                        </div>
+                        
+                        <div class="hr-text my-3">适用范围</div>
+                        <div class="small">
+                            <div class="text-muted mb-1">适用材料:</div>
+                            {% for mat in profile.machine.suitable_materials.all %}
+                                <span class="badge bg-green-lt mb-1" style="font-size: 12px;">{{ mat.name }}</span>
+                            {% empty %}
+                                <span class="text-muted">-</span>
+                            {% endfor %}
+                        </div>
+                        
+                        {% if profile.machine.description %}
+                            <div class="mt-2 small text-muted border-top pt-2">
+                                <i class="ti ti-info-circle me-1"></i>{{ profile.machine.description|truncatechars:50 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="card-body text-center text-muted py-4">未关联机台</div>
+                {% endif %}
+            </div>
+
+            <!-- 3. 关联螺杆组合详情 (新增) -->
+            <div class="card mb-3">
+                <div class="card-header bg-orange-lt">
+                    <h3 class="card-title text-orange"><i class="ti ti-tool me-2"></i>螺杆组合</h3>
+                    <div class="card-actions">
+                        {% if profile.screw_combination %}
+                            <a href="{% url 'process_screw_edit' profile.screw_combination.pk %}" class="btn btn-sm btn-icon btn-ghost-orange" title="查看组合详情">
+                                <i class="ti ti-arrow-right"></i>
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% if profile.screw_combination %}
+                    <div class="card-body">
+                        <div class="fw-bold mb-2">{{ profile.screw_combination.name }}</div>
+                        <div class="text-muted small mb-3">
+                            {{ profile.screw_combination.description|default:"暂无描述"|truncatechars:60 }}
+                        </div>
+                        
+                        <div class="small mb-3">
+                            <div class="text-muted mb-1">适用材料:</div>
+                            {% for mat in profile.screw_combination.suitable_materials.all %}
+                                <span class="badge bg-green-lt mb-1" style="font-size: 12px;">{{ mat.name }}</span>
+                            {% empty %}
+                                <span class="text-muted">-</span>
+                            {% endfor %}
+                        </div>
+                        
+                        <div class="small mb-3">
+                            <div class="text-muted mb-1">适用机台:</div>
+                            {% for mac in profile.screw_combination.machines.all %}
+                                <span class="badge bg-purple-lt mb-1" style="font-size: 12px;">{{ mac.model_name }}</span>
+                            {% empty %}
+                                <span class="text-muted">-</span>
+                            {% endfor %}
+                        </div>
+
+                        {% if profile.screw_combination.drawing_file %}
+                            <a href="{{ profile.screw_combination.drawing_file.url }}" target="_blank" class="btn btn-ghost-orange w-100">
+                                <i class="ti ti-file-download me-2"></i>下载组合图纸
+                            </a>
+                        {% else %}
+                            <div class="text-center text-muted small bg-light p-2 rounded">无图纸文件</div>
+                        {% endif %}
+                    </div>
+                {% else %}
+                    <div class="card-body text-center text-muted py-4">未关联螺杆组合</div>
+                {% endif %}
+            </div>
+
+            <!-- 4. QC检查要点 -->
+            <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">QC检查要点</h3>
+                    <h3 class="card-title"><i class="ti ti-list-check me-2"></i>QC检查要点</h3>
                 </div>
                 <div class="card-body">
-                    {{ profile.qc_check_points|linebreaks|default:"暂无" }}
+                    {% if profile.qc_check_points %}
+                        <div class="markdown text-muted small">
+                            {{ profile.qc_check_points|linebreaks }}
+                        </div>
+                    {% else %}
+                        <div class="text-muted text-center small">暂无特别说明</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- 工艺参数 -->
-        <div class="col-md-8">
-            <!-- 温度表 -->
+        <!-- 右侧栏：详细工艺参数 (70%) -->
+        <div class="col-lg-8">
+            
+            <!-- 1. 温度控制 (核心) -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h3 class="card-title">温度设定 (℃)</h3>
+                <div class="card-header bg-red-lt">
+                    <h3 class="card-title text-red"><i class="ti ti-thermometer me-2"></i>温度控制 (Temperature)</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table text-center">
-                        <thead>
+                    <table class="table table-vcenter card-table text-center table-bordered">
+                        <thead class="bg-light">
                             <tr>
+                                <th class="w-1">区段</th>
                                 <th>一区</th><th>二区</th><th>三区</th><th>四区</th><th>五区</th><th>六区</th>
                                 <th>七区</th><th>八区</th><th>九区</th><th>十区</th><th>十一区</th><th>十二区</th>
-                                <th class="text-primary">机头</th>
+                                <th class="bg-red-lt text-red">机头</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
+                                <td class="fw-bold bg-light">设定值</td>
                                 <td>{{ profile.temp_zone_1 }}</td>
                                 <td>{{ profile.temp_zone_2 }}</td>
                                 <td>{{ profile.temp_zone_3 }}</td>
@@ -79,7 +215,7 @@
                                 <td>{{ profile.temp_zone_10 }}</td>
                                 <td>{{ profile.temp_zone_11 }}</td>
                                 <td>{{ profile.temp_zone_12 }}</td>
-                                <td class="fw-bold text-primary">{{ profile.temp_head }}</td>
+                                <td class="fw-bold text-red bg-red-lt">{{ profile.temp_head }}</td>
                             </tr>
                         </tbody>
                     </table>
@@ -87,62 +223,107 @@
             </div>
 
             <div class="row row-cards">
-                <!-- 主机参数 -->
+                <!-- 2. 主机运行参数 -->
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header">
-                            <h3 class="card-title">主机运行</h3>
+                            <h3 class="card-title"><i class="ti ti-engine me-2"></i>主机运行 (Extruder)</h3>
                         </div>
                         <div class="card-body">
-                            <dl class="row">
-                                <dt class="col-6">螺杆转速</dt>
-                                <dd class="col-6">{{ profile.screw_speed }} rpm</dd>
-                                
-                                <dt class="col-6">主机扭矩</dt>
-                                <dd class="col-6">{{ profile.torque }} %</dd>
-                                
-                                <dt class="col-6">主机电流</dt>
-                                <dd class="col-6">{{ profile.current|default:"-" }} A</dd>
-                                
-                                <dt class="col-6">真空度</dt>
-                                <dd class="col-6">{{ profile.vacuum }} MPa</dd>
-                                
-                                <dt class="col-6">熔体压力</dt>
-                                <dd class="col-6">{{ profile.melt_pressure }} MPa</dd>
-                                
-                                <dt class="col-6">熔体温度</dt>
-                                <dd class="col-6">{{ profile.melt_temp }} ℃</dd>
-                            </dl>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="subheader">螺杆转速</div>
+                                    <div class="h3 m-0">{{ profile.screw_speed }} <span class="text-muted fs-5 fw-normal">rpm</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">主机扭矩</div>
+                                    <div class="h3 m-0 text-orange">{{ profile.torque }} <span class="text-muted fs-5 fw-normal">%</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">主机电流</div>
+                                    <div class="h3 m-0">{{ profile.current|default:"-" }} <span class="text-muted fs-5 fw-normal">A</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">真空度</div>
+                                    <div class="h3 m-0 text-blue">{{ profile.vacuum }} <span class="text-muted fs-5 fw-normal">MPa</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">熔体压力</div>
+                                    <div class="h3 m-0">{{ profile.melt_pressure }} <span class="text-muted fs-5 fw-normal">MPa</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">熔体实测温度</div>
+                                    <div class="h3 m-0 text-red">{{ profile.melt_temp }} <span class="text-muted fs-5 fw-normal">℃</span></div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 喂料与后处理 -->
+                <!-- 3. 喂料与后处理 -->
                 <div class="col-md-6">
                     <div class="card h-100">
                         <div class="card-header">
-                            <h3 class="card-title">喂料与后处理</h3>
+                            <h3 class="card-title"><i class="ti ti-assembly me-2"></i>喂料与后处理 (Downstream)</h3>
                         </div>
                         <div class="card-body">
-                            <dl class="row">
-                                <dt class="col-6">主喂料</dt>
-                                <dd class="col-6">{{ profile.main_feeder_speed }} rpm/Hz</dd>
+                            <div class="row g-3">
+                                <div class="col-6">
+                                    <div class="subheader">主喂料转速</div>
+                                    <div class="h3 m-0">{{ profile.main_feeder_speed }} <span class="text-muted fs-5 fw-normal">rpm/Hz</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">侧喂料转速</div>
+                                    <div class="h3 m-0">{{ profile.side_feeder_speed }} <span class="text-muted fs-5 fw-normal">rpm/Hz</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">液体泵注</div>
+                                    <div class="h3 m-0">{{ profile.liquid_pump_speed|default:"-" }} <span class="text-muted fs-5 fw-normal"></span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">总产量</div>
+                                    <div class="h3 m-0 text-green">{{ profile.throughput }} <span class="text-muted fs-5 fw-normal">kg/h</span></div>
+                                </div>
                                 
-                                <dt class="col-6">侧喂料</dt>
-                                <dd class="col-6">{{ profile.side_feeder_speed }} rpm/Hz</dd>
+                                <div class="col-12"><hr class="my-1"></div>
                                 
-                                <dt class="col-6">总产量</dt>
-                                <dd class="col-6 fw-bold text-green">{{ profile.throughput }} kg/h</dd>
-                                
-                                <dt class="col-6">切粒转速</dt>
-                                <dd class="col-6">{{ profile.pelletizing_speed }} rpm/Hz</dd>
-                                
-                                <dt class="col-6">冷却水温</dt>
-                                <dd class="col-6">{{ profile.water_temp }} ℃</dd>
-                                
-                                <dt class="col-6">过水长度</dt>
-                                <dd class="col-6">{{ profile.water_bath_length }} m</dd>
-                            </dl>
+                                <div class="col-6">
+                                    <div class="subheader">切粒转速</div>
+                                    <div class="h3 m-0">{{ profile.pelletizing_speed }} <span class="text-muted fs-5 fw-normal">rpm/Hz</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">冷却水温</div>
+                                    <div class="h3 m-0 text-azure">{{ profile.water_temp }} <span class="text-muted fs-5 fw-normal">℃</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">过水长度</div>
+                                    <div class="h3 m-0">{{ profile.water_bath_length }} <span class="text-muted fs-5 fw-normal">m</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">风刀压力</div>
+                                    <div class="h3 m-0">{{ profile.air_knife_pressure|default:"-" }} <span class="text-muted fs-5 fw-normal">MPa</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">料条根数</div>
+                                    <div class="h3 m-0">{{ profile.strand_count }} <span class="text-muted fs-5 fw-normal">根</span></div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="subheader">过滤网目数</div>
+                                    <div class="h3 m-0">{{ profile.screen_mesh|default:"-" }}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 4. 备注信息 -->
+                <div class="col-12">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title"><i class="ti ti-notes me-2"></i>工艺备注</h3>
+                        </div>
+                        <div class="card-body">
+                            {{ profile.description|linebreaks|default:"暂无备注" }}
                         </div>
                     </div>
                 </div>

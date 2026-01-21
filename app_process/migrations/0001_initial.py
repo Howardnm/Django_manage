@@ -4,6 +4,8 @@ import app_repository.utils.repo_file_path
 import django.db.models.deletion
 from django.db import migrations, models
 
+import common_utils.repo_file_path
+
 
 class Migration(migrations.Migration):
 
@@ -53,7 +55,7 @@ class Migration(migrations.Migration):
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(help_text='如：高剪切组合-V1', max_length=100, verbose_name='组合名称')),
                 ('description', models.TextField(blank=True, help_text='详细描述螺杆排列逻辑，如：输送-熔融-剪切-排气', verbose_name='组合描述')),
-                ('drawing_file', models.FileField(blank=True, help_text='上传螺杆排列图 (PDF/图片)', null=True, upload_to=app_repository.utils.repo_file_path.repo_file_path, verbose_name='组合图纸')),
+                ('drawing_file', models.FileField(blank=True, help_text='上传螺杆排列图 (PDF/图片)', null=True, upload_to=common_utils.repo_file_path.repo_file_path, verbose_name='组合图纸')),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('machines', models.ManyToManyField(related_name='screw_combinations', to='app_process.machinemodel', verbose_name='适用机台')),
                 ('suitable_materials', models.ManyToManyField(blank=True, related_name='screw_combinations', to='app_repository.materialtype', verbose_name='适用材料类型')),

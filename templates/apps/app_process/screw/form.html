@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header d-print-none">
+    <div class="page-header d-print-none mb-3">
         <div class="row align-items-center">
             <div class="col">
                 <h2 class="page-title">{{ page_title }}</h2>
@@ -18,26 +18,41 @@
                     <div class="col-md-6 mb-3">
                         <label class="form-label required">组合名称</label>
                         {{ form.name }}
+                        {% if form.name.help_text %}
+                            <div class="form-text text-muted">{{ form.name.help_text }}</div>
+                        {% endif %}
                     </div>
                     
                     <div class="col-md-6 mb-3">
                         <label class="form-label">组合图纸</label>
                         {{ form.drawing_file }}
+                        {% if form.drawing_file.help_text %}
+                            <div class="form-text text-muted">{{ form.drawing_file.help_text }}</div>
+                        {% endif %}
                     </div>
                     
                     <div class="col-12 mb-3">
                         <label class="form-label required">适用机台</label>
                         {{ form.machines }}
+                        {% if form.machines.help_text %}
+                            <div class="form-text text-muted">{{ form.machines.help_text }}</div>
+                        {% endif %}
                     </div>
                     
                     <div class="col-12 mb-3">
                         <label class="form-label">适用材料类型</label>
                         {{ form.suitable_materials }}
+                        {% if form.suitable_materials.help_text %}
+                            <div class="form-text text-muted">{{ form.suitable_materials.help_text }}</div>
+                        {% endif %}
                     </div>
                     
                     <div class="col-12 mb-3">
                         <label class="form-label">组合描述</label>
                         {{ form.description }}
+                        {% if form.description.help_text %}
+                            <div class="form-text text-muted">{{ form.description.help_text }}</div>
+                        {% endif %}
                     </div>
                 </div>
 
