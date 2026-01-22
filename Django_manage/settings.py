@@ -124,6 +124,13 @@ USE_TZ = True
 STATIC_URL = 'static/'
 # MEDIA_URL = 'images/'
 
+# STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成static文件夹，把各个app下的静态文件收集到这个目录下。
+# 1.在Django中setting.py文件中加入
+# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+# 2.在终端中输入
+# python manage.py collectstatic
+
+
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),  # 记得加“,”号
 )
