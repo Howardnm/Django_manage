@@ -362,7 +362,7 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         ws.cell(row=ws.max_row, column=1).font = orange_font
         
         for row in bom_matrix:
-            data_row = [f"{row['item'].name}\n{row['item'].model_name or ''}", "%"]
+            data_row = [f"{row['item'].name} {row['item'].model_name or ''}", "%"]
             for cell in row['values']:
                 data_row.append(cell['val'])
             ws.append(data_row)
@@ -374,7 +374,7 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         ws.cell(row=ws.max_row, column=1).font = Font(color="800080", bold=True)
         
         for row in test_matrix:
-            data_row = [f"{row['item'].name}\n{row['item'].standard}", row['item'].unit]
+            data_row = [f"{row['item'].name} ({row['item'].standard} · {row['item'].condition})", row['item'].unit]
             ws.append(data_row + [c['val'] for c in row['values']])
             current_row_idx = ws.max_row
             
@@ -393,7 +393,7 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
                 if cell.column == 1:
                     cell.alignment = left_align
                     
-        ws.column_dimensions['A'].width = 30
+        ws.column_dimensions['A'].width = 40
         ws.column_dimensions['B'].width = 10
         for i in range(3, len(headers) + 1):
             ws.column_dimensions[get_column_letter(i)].width = 20
