@@ -4,8 +4,9 @@ from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
 from django.shortcuts import redirect
+from django.db.models import Q, Subquery, OuterRef, DecimalField
 
-from app_raw_material.models import RawMaterial
+from app_raw_material.models import RawMaterial, RawMaterialProperty
 from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 
@@ -17,13 +18,81 @@ class RawMaterialListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('category', 'supplier').order_by('-created_at')
+        # 1. 基础查询
+        qs = super().get_queryset().select_related('category', 'supplier').prefetch_related('suitable_materials', 'properties__test_config').order_by('-created_at')
+        
+        # 2. 获取排序参数
+        sort_param = self.request.GET.get('sort', '')
+        
+        # 3. 映射表 (与 MaterialListView 保持一致)
+        metric_map = {
+            'density': ('密度', 'val_density'),
+            'ash': ('灰分', 'val_ash'),
+            'melt_index': ('熔融指数', 'val_melt'),
+            'tensile': ('拉伸强度', 'val_tensile'),
+            'flex_strength': ('弯曲强度', 'val_flex_strength'),
+            'flex_modulus': ('弯曲模量', 'val_flex_modulus'),
+            'impact': ('冲击', 'val_impact'),
+            'hdt': ('变形温度', 'val_hdt'),
+        }
+
+        # 4. 动态 Annotate (用于排序)
+        if sort_param:
+            clean_sort = sort_param.lstrip('-')
+            if clean_sort in metric_map:
+                keyword, field_name = metric_map[clean_sort]
+                
+                # 获取当前标准
+                current_std = self.request.GET.get('std', 'ISO')
+                std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
+                
+                std_query = Q()
+                for k in std_keywords:
+                    std_query |= Q(test_config__standard__icontains=k)
+                
+                qs = qs.annotate(**{
+                    field_name: Subquery(
+                        RawMaterialProperty.objects.filter(
+                            std_query,
+                            raw_material=OuterRef('pk'),
+                            test_config__name__icontains=keyword
+                        ).order_by('-id').values('value')[:1],
+                        output_field=DecimalField()
+                    )
+                })
+
         self.filterset = RawMaterialFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        # Python 内存填充数据 (与 MaterialListView 逻辑一致)
+        current_std = self.request.GET.get('std', 'ISO')
+        std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
+
+        for mat in context['materials']:
+            props = mat.properties.all()
+
+            def find_val_in_memory(keyword):
+                for p in props:
+                    if keyword in p.test_config.name:
+                        if any(k in p.test_config.standard for k in std_keywords):
+                            return p.value
+                return None
+
+            if not hasattr(mat, 'val_density'): mat.val_density = find_val_in_memory("密度")
+            if not hasattr(mat, 'val_ash'): mat.val_ash = find_val_in_memory("灰分")
+            if not hasattr(mat, 'val_melt'): mat.val_melt = find_val_in_memory("熔融指数")
+            if not hasattr(mat, 'val_tensile'): mat.val_tensile = find_val_in_memory("拉伸强度")
+            if not hasattr(mat, 'val_flex_strength'): mat.val_flex_strength = find_val_in_memory("弯曲强度")
+            if not hasattr(mat, 'val_flex_modulus'): mat.val_flex_modulus = find_val_in_memory("弯曲模量")
+            if not hasattr(mat, 'val_impact'): mat.val_impact = find_val_in_memory("冲击")
+            if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("变形温度")
+
         context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
+        context['current_std'] = current_std
         return context
 
 # 详情视图
@@ -47,7 +116,9 @@ class RawMaterialCreateView(LoginRequiredMixin, CreateView):
         if self.request.POST:
             context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST)
         else:
-            context['property_formset'] = RawMaterialPropertyFormSet()
+            # 【修改】预留 4 行空表单
+            RawMaterialPropertyFormSet.extra = 4
+            context['property_formset'] = RawMaterialPropertyFormSet(queryset=RawMaterialProperty.objects.none())
         return context
 
     def form_valid(self, form):
@@ -81,6 +152,8 @@ class RawMaterialUpdateView(LoginRequiredMixin, UpdateView):
         if self.request.POST:
             context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST, instance=self.object)
         else:
+            # 【修改】编辑时，如果已有数据少于4行，补足到4行 (这里简单设为1，方便添加)
+            RawMaterialPropertyFormSet.extra = 1
             context['property_formset'] = RawMaterialPropertyFormSet(instance=self.object)
         return context
 

@@ -58,6 +58,8 @@ class RawMaterialForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             'usage_method': forms.Textarea(attrs={'rows': 3}),
             'purchase_date': forms.DateInput(attrs={'type': 'date'}),
+            # 【新增】适用材料类型多选框
+            'suitable_materials': forms.SelectMultiple(attrs={'class': 'form-select'}),
         }
     
     def __init__(self, *args, **kwargs):

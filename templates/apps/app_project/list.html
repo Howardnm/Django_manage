@@ -7,7 +7,7 @@
         <!-- 工具栏：搜索与筛选 -->
         {% include 'apps/list_modules/tools_search_filter.html' %}
         <div class="table-responsive">
-            <table class="table card-table table-vcenter text-nowrap datatable">
+            <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
                     <!-- 1. 项目名称 -->
@@ -21,8 +21,20 @@
                             {% endif %}
                         </a>
                     </th>
+                    
+                    <!-- 2. 客户名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='repository__customer__company_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            客户
+                            {% if current_sort == 'repository__customer__company_name' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-repository__customer__company_name' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
 
-                    <!-- 2. 负责人 -->
+                    <!-- 3. 负责人 -->
                     <th>
                         <a href="?{% url_replace sort='manager'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             负责人
@@ -34,10 +46,9 @@
                         </a>
                     </th>
 
-                    <th>进度概览</th>
+                    <th style="width: 15%;">进度概览</th>
                     
-                    <!-- 【修改】表头改为“最新进展” -->
-                    <th>最新进展</th>
+                    <th style="width: 30%;">最新进展</th>
 
                     <!-- 4. 创建时间 -->
                     <th>
@@ -57,51 +68,86 @@
                 <tbody>
                 {% for project in page_obj %}
                     <tr>
-                        <td><a href="{% url 'project_detail' project.pk %}" class="text-reset" tabindex="-1">{{ project.name }}</a></td>
                         <td>
-                            <span class="avatar avatar-xs rounded me-1">{{ project.manager.username|slice:":1" }}</span>
-                            {{ project.manager.username }}
+                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ project.name }}">
+                                {{ project.name }}
+                            </a>
+                            {% if project.repository.product_name %}
+                                <div class="text-muted small text-truncate" style="max-width: 200px;">
+                                    {{ project.repository.product_name }}
+                                </div>
+                            {% endif %}
                         </td>
-                        <td style="width: 20%">
-                            <div class="d-flex align-items-center mb-1">
-                                <div>
-                                    <!-- 直接使用冗余字段的 display 方法 -->
+                        
+                        <!-- 客户名称 -->
+                        <td>
+                            {% if project.repository.customer %}
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar avatar-xs bg-blue-lt rounded me-2">{{ project.repository.customer.company_name|slice:":1" }}</span>
+                                    <span class="text-reset text-truncate" style="max-width: 120px;" title="{{ project.repository.customer.company_name }}">
+                                        {{ project.repository.customer.short_name|default:project.repository.customer.company_name }}
+                                    </span>
+                                </div>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="avatar avatar-xs rounded me-2" style="background-image: url(...)">{{ project.manager.username|slice:":1"|upper }}</span>
+                                <div class="flex-fill">
+                                    <div class="font-weight-medium">{{ project.manager.username }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div class="text-truncate" style="max-width: 120px;">
                                     {% if project.is_terminated %}
-                                        <span class="badge bg-red-lt">❌ 已终止</span>
+                                        <span class="badge bg-red-lt">已终止</span>
                                     {% elif project.progress_percent == 100 %}
-                                        <span class="badge bg-green-lt">✅ 已完成</span>
+                                        <span class="badge bg-green-lt">已完成</span>
                                     {% else %}
-                                        <span class="badge bg-blue-lt">{{ project.get_current_stage_display }}</span>
+                                        <span class="text-blue small fw-bold">{{ project.get_current_stage_display }}</span>
                                     {% endif %}
                                 </div>
-                                <div class="auto-width ms-auto">
-                                    <!-- 直接使用冗余字段 -->
-                                    <span class="text-secondary">{{ project.progress_percent }}%</span>
-                                </div>
+                                <div class="text-muted small">{{ project.progress_percent }}%</div>
                             </div>
                             <div class="progress progress-sm">
                                 <div class="progress-bar {% if project.is_terminated %}bg-danger{% elif project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
-                                     style="width: {{ project.progress_percent }}%"></div>
+                                     style="width: {{ project.progress_percent }}%" role="progressbar" aria-valuenow="{{ project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                </div>
                             </div>
                         </td>
-                        <td class="text-muted text-wrap" style="max-width: 200px;">
-                            <!-- 【修改】显示最新节点备注 -->
+                        
+                        <td class="text-muted text-wrap" style="max-width: 250px;">
                             {% if project.latest_remark %}
-                                {{ project.latest_remark|truncatechars:20 }}
+                                <div class="text-truncate" title="{{ project.latest_remark }}">
+                                    <i class="ti ti-message-dots me-1"></i>
+                                    {{ project.latest_remark }}
+                                </div>
                             {% else %}
                                 <span class="text-secondary opacity-50">-</span>
                             {% endif %}
                         </td>
-                        <td class="text-muted">{{ project.created_at|date:"Y-m-d H:m" }}</td>
+                        
+                        <td class="text-muted">
+                            {{ project.created_at|date:"Y-m-d" }}
+                        </td>
+                        
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-outline-primary">管理</a>
+                            <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="管理项目">
+                                <i class="ti ti-settings"></i>
+                            </a>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4">
+                        <td colspan="8" class="text-center py-5">
                             <div class="empty">
-                                <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-50"></i></div>
+                                <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-25"></i></div>
                                 <p class="empty-title">没有找到项目</p>
                                 <p class="empty-subtitle text-muted">
                                     尝试更换搜索关键词或筛选条件

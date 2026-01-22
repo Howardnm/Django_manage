@@ -8,16 +8,26 @@
         {% include 'apps/list_modules/tools_search_filter.html' %}
         
         <div class="table-responsive">
-            <table class="table card-table table-vcenter text-nowrap datatable">
+            <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
-                    <th>原材料名称</th>
-                    <th>型号</th>
-                    <th>类型</th>
-                    <th>供应商</th>
-                    <th>参考成本</th>
+                    <th><a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">原材料名称</a></th>
+                    <th><a href="?{% url_replace sort='model_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">型号/供应商</a></th>
+                    <th><a href="?{% url_replace sort='category'|sort_toggle:current_sort %}" class="table-sort-header text-reset">类型</a></th>
+                    <th>适用体系</th>
+                    <th><a href="?{% url_replace sort='cost_price'|sort_toggle:current_sort %}" class="table-sort-header text-reset">成本</a></th>
+                    
+                    <!-- 动态性能指标列 -->
+                    <th style="width: 60px;"><a href="?{% url_replace sort='density'|sort_toggle:current_sort %}" class="table-sort-header text-reset">密度</a></th>
+                    <th style="width: 60px;"><a href="?{% url_replace sort='ash'|sort_toggle:current_sort %}" class="table-sort-header text-reset">灰分</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='melt_index'|sort_toggle:current_sort %}" class="table-sort-header text-reset">M.I</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='tensile'|sort_toggle:current_sort %}" class="table-sort-header text-reset">拉伸</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='flex_strength'|sort_toggle:current_sort %}" class="table-sort-header text-reset">弯强</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='flex_modulus'|sort_toggle:current_sort %}" class="table-sort-header text-reset">弯模</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='impact'|sort_toggle:current_sort %}" class="table-sort-header text-reset">冲击</a></th>
+                    <th style="width: 80px;"><a href="?{% url_replace sort='hdt'|sort_toggle:current_sort %}" class="table-sort-header text-reset">HDT</a></th>
+                    
                     <th>文档</th>
-                    <th>购入日期</th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -30,18 +40,55 @@
                                 <div class="text-muted small">编码: {{ material.warehouse_code }}</div>
                             {% endif %}
                         </td>
-                        <td>{{ material.model_name|default:"-" }}</td>
-                        <td><span class="badge bg-blue-lt">{{ material.category.name }}</span></td>
                         <td>
+                            <div>{{ material.model_name|default:"-" }}</div>
                             {% if material.supplier %}
-                                <a href="{% url 'raw_supplier_edit' material.supplier.pk %}" class="text-reset">{{ material.supplier.name }}</a>
-                            {% else %}
-                                <span class="text-muted">-</span>
+                                <div class="text-muted small">{{ material.supplier.name }}</div>
                             {% endif %}
                         </td>
-                        <td class="text-orange">
+                        <td><span class="badge bg-blue-lt">{{ material.category.name }}</span></td>
+                        
+                        <!-- 适用体系 -->
+                        <td>
+                            {% if material.suitable_materials.exists %}
+                                <div class="d-flex flex-wrap gap-1" style="max-width: 150px;">
+                                    {% for mat_type in material.suitable_materials.all|slice:":2" %}
+                                        <span class="badge bg-green-lt" style="font-size: 10px;">{{ mat_type.name }}</span>
+                                    {% endfor %}
+                                    {% if material.suitable_materials.count > 2 %}...{% endif %}
+                                </div>
+                            {% else %}-{% endif %}
+                        </td>
+                        
+                        <td class="text-orange fw-bold">
                             {% if material.cost_price %}¥{{ material.cost_price }}{% else %}-{% endif %}
                         </td>
+                        
+                        <!-- === 动态数据列 (val_xxx) === -->
+                        <!-- 密度 -->
+                        <td>{% if material.val_density %}<div class="fw-bold">{{ material.val_density|floatformat:3 }}</div>{% else %}-{% endif %}</td>
+                        
+                        <!-- 灰分 -->
+                        <td>{% if material.val_ash %}<div class="fw-bold">{{ material.val_ash|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- M.I -->
+                        <td>{% if material.val_melt %}<div class="fw-bold">{{ material.val_melt|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 拉伸 -->
+                        <td>{% if material.val_tensile %}<div class="fw-bold">{{ material.val_tensile|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 弯强 -->
+                        <td>{% if material.val_flex_strength %}<div class="fw-bold">{{ material.val_flex_strength|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 弯模 -->
+                        <td>{% if material.val_flex_modulus %}<div class="fw-bold">{{ material.val_flex_modulus|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- 冲击 -->
+                        <td>{% if material.val_impact %}<div class="fw-bold">{{ material.val_impact|floatformat:1 }}</div>{% else %}-{% endif %}</td>
+
+                        <!-- HDT -->
+                        <td>{% if material.val_hdt %}<div class="fw-bold text-red">{{ material.val_hdt|floatformat:0 }}</div>{% else %}-{% endif %}</td>
+
                         <!-- 文档列 -->
                         <td>
                             <div class="d-flex gap-1">
@@ -59,15 +106,19 @@
                                 {% endif %}
                             </div>
                         </td>
-                        <td class="text-muted">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</td>
+                        
                         <td>
-                            <a href="{% url 'raw_material_detail' material.pk %}" class="btn btn-sm btn-outline-secondary">查看</a>
-                            <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
+                            <a href="{% url 'raw_material_detail' material.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
+                                <i class="ti ti-list"></i>
+                            </a>
+                            <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="编辑">
+                                <i class="ti ti-edit"></i>
+                            </a>
                         </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="15" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

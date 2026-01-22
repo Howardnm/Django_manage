@@ -1,5 +1,5 @@
 from django.db import models
-from app_repository.models import TestConfig  # 引入测试标准库
+from app_repository.models import TestConfig, MaterialType  # 引入测试标准库和材料类型库
 from common_utils.upload_file_path import upload_file_path
 from common_utils.validators import validate_file_size  # 引入文件大小验证器
 
@@ -55,6 +55,11 @@ class RawMaterial(models.Model):
     warehouse_code = models.CharField("内部物料编码", max_length=50, blank=True, unique=True, null=True, help_text="ERP/WMS编码")
     
     category = models.ForeignKey(RawMaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
+    
+    # 【新增】适用材料类型 (多对多)
+    # 用于标识该原材料适用于哪些基材体系 (例如：玻纤适用于 PA66, PBT, PP 等)
+    suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料体系", related_name="raw_materials")
+    
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="供应商")
     
     usage_method = models.TextField("使用方法/描述", blank=True, help_text="如：需烘干，建议添加量...")
