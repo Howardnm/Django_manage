@@ -67,7 +67,7 @@
                                 <div class="fw-bold">{{ profile.machine.brand }} - {{ profile.machine.model_name }}</div>
                                 <div class="small text-muted">
                                     {% if profile.machine.machine_code %}
-                                        机台号: {{ profile.machine.machine_code }}
+                                        机台号: <span class="badge bg-azure-lt ms-1">{{ profile.machine.machine_code }}</span>
                                     {% else %}
                                         无机台号
                                     {% endif %}
@@ -129,11 +129,25 @@
                 </div>
                 {% if profile.screw_combination %}
                     <div class="card-body">
-                        <div class="fw-bold mb-2">{{ profile.screw_combination.name }}</div>
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="avatar bg-orange-lt me-3"><i class="ti ti-settings"></i></span>
+                            <div>
+                                <div class="fw-bold">{{ profile.screw_combination.name }}</div>
+                                <div class="small text-muted">
+                                    {% if profile.screw_combination.combination_code %}
+                                        组合号: <span class="badge bg-azure-lt ms-1">{{ profile.screw_combination.combination_code }}</span>
+                                    {% else %}
+                                        无组合号
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="text-muted small mb-3">
                             {{ profile.screw_combination.description|default:"暂无描述"|truncatechars:60 }}
                         </div>
                         
+                        <div class="hr-text my-3">适用范围</div>
                         <div class="small mb-3">
                             <div class="text-muted mb-1">适用材料:</div>
                             {% for mat in profile.screw_combination.suitable_materials.all %}
@@ -153,7 +167,7 @@
                         </div>
 
                         {% if profile.screw_combination.drawing_file %}
-                            <a href="{{ profile.screw_combination.drawing_file.url }}" target="_blank" class="btn btn-ghost-orange w-100">
+                            <a href="{% url 'secure_download' 'app_process' 'screwcombination' profile.screw_combination.pk 'drawing_file' %}" target="_blank" class="btn btn-ghost-orange w-100">
                                 <i class="ti ti-file-download me-2"></i>下载组合图纸
                             </a>
                         {% else %}

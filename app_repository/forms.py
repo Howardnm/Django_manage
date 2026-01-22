@@ -81,6 +81,12 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
             'value': forms.NumberInput(attrs={'step': '0.001'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 【性能优化】预加载 TestConfig，避免 N+1 查询
+        # 并且按分类排序，方便选择
+        self.fields['test_config'].queryset = TestConfig.objects.select_related('category').order_by('category__order', 'order')
 
 # 定义 FormSet
 MaterialDataFormSet = inlineformset_factory(

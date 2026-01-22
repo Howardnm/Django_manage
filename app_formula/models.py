@@ -5,6 +5,8 @@ from django.utils import timezone
 from app_repository.models import MaterialType, TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_process.models import ProcessProfile
+from common_utils.upload_file_path import upload_file_path
+from common_utils.validators import validate_file_size  # 引入文件大小验证器
 
 # 1. 实验配方主表
 class LabFormula(models.Model):
@@ -14,7 +16,7 @@ class LabFormula(models.Model):
     """
     # 【修改】允许为空，由后端自动生成
     code = models.CharField("实验单号", max_length=50, unique=True, blank=True, help_text="自动生成，如：L20231001-01")
-    name = models.CharField("配方名称", max_length=100, blank=True)
+    name = models.CharField("配方名称", max_length=100, blank=False)
     
     # 关联
     material_type = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="基材类型")
@@ -143,10 +145,23 @@ class FormulaBOM(models.Model):
         ('3_SIDE_2', '侧喂料2 (Side 2)'),
         ('4_LIQUID', '液体注塑 (Liquid)'),
     ]
+    
+    # 【新增】分秤选项 (改性塑料行业标准)
+    WEIGHING_CHOICES = [
+        ('A', 'A秤 (主料1)'),
+        ('B', 'B秤 (主料2)'),
+        ('C', 'C秤 (辅料/助剂)'),
+        ('D', 'D秤 (色粉/微量)'),
+        ('E', 'E秤 (其他)'),
+    ]
 
     formula = models.ForeignKey(LabFormula, on_delete=models.CASCADE, related_name='bom_lines')
     # 喂料口位置
     feeding_port = models.CharField("喂料口", max_length=20, choices=FEEDING_CHOICES, default='1_MAIN')
+    
+    # 【新增】分秤字段
+    weighing_scale = models.CharField("分秤", max_length=5, choices=WEIGHING_CHOICES, default='A', help_text="用于生产投料区分")
+    
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.PROTECT, verbose_name="原材料")
     percentage = models.DecimalField("比例/份数", max_digits=7, decimal_places=2, help_text="百分比/份数")
     is_tail = models.BooleanField("是否尾料", default=False, help_text="是否为上一批次的尾料回掺")
@@ -157,8 +172,8 @@ class FormulaBOM(models.Model):
 
     class Meta:
         verbose_name = "BOM明细"
-        # 【修改】排序规则：先按喂料口，再按原材料类型权重，最后按原材料名称
-        ordering = ['feeding_port', 'raw_material__category__order', 'raw_material__name']
+        # 【修改】排序规则：先按喂料口，再按分秤，再按原材料类型权重，最后按原材料名称
+        ordering = ['feeding_port', 'weighing_scale', 'raw_material__category__order', 'raw_material__name']
 
 
 # 3. 实验物性结果 (Test Result)
@@ -173,6 +188,9 @@ class FormulaTestResult(models.Model):
     # 【新增】测试日期
     test_date = models.DateField("测试日期", null=True, blank=True)
     remark = models.CharField("备注", max_length=50, blank=True)
+    
+    # 【新增】测试报告文件
+    file_report = models.FileField("测试报告", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
 
     class Meta:
         verbose_name = "实验测试结果"

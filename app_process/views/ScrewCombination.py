@@ -14,13 +14,31 @@ class ScrewCombinationListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().prefetch_related('machines', 'suitable_materials').order_by('-created_at')
+        # 1. 基础查询集
+        qs = super().get_queryset().prefetch_related('machines', 'suitable_materials')
+        
+        # 2. 筛选 (Filter)
         self.filterset = ScrewCombinationFilter(self.request.GET, queryset=qs)
-        return self.filterset.qs
+        qs = self.filterset.qs
+
+        # 3. 排序 (Sort) - 处理 URL 中的 sort 参数
+        sort_param = self.request.GET.get('sort')
+        if sort_param:
+            # 允许排序的字段白名单，防止 SQL 注入
+            allowed_sorts = ['name', '-name', 'combination_code', '-combination_code', 'created_at', '-created_at']
+            if sort_param in allowed_sorts:
+                qs = qs.order_by(sort_param)
+        else:
+            # 默认排序
+            qs = qs.order_by('-created_at')
+            
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filterset
+        # 将当前排序参数传给模板，用于高亮表头
+        context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
 class ScrewCombinationCreateView(LoginRequiredMixin, CreateView):

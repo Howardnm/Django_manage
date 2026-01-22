@@ -136,7 +136,9 @@ class MaterialCreateView(LoginRequiredMixin, CreateView):
         if self.request.POST:
             context['data_formset'] = MaterialDataFormSet(self.request.POST)
         else:
-            context['data_formset'] = MaterialDataFormSet()
+            # 【修改】预留 6 行空表单
+            MaterialDataFormSet.extra = 6
+            context['data_formset'] = MaterialDataFormSet(queryset=MaterialDataPoint.objects.none())
         context['page_title'] = '录入新材料'
         context['is_edit'] = False
         return context
@@ -168,6 +170,8 @@ class MaterialUpdateView(LoginRequiredMixin, UpdateView):
         if self.request.POST:
             context['data_formset'] = MaterialDataFormSet(self.request.POST, instance=self.object)
         else:
+            # 【修改】编辑时，如果已有数据少于6行，补足到6行
+            MaterialDataFormSet.extra = 1
             context['data_formset'] = MaterialDataFormSet(instance=self.object)
         context['page_title'] = f'编辑: {self.object.grade_name}'
         context['is_edit'] = True

@@ -1,6 +1,7 @@
 from django.db import models
 from app_repository.models import TestConfig  # 引入测试标准库
-from common_utils.repo_file_path import repo_file_path
+from common_utils.upload_file_path import upload_file_path
+from common_utils.validators import validate_file_size  # 引入文件大小验证器
 
 
 # 2. 原材料类型 (如：树脂、填充、助剂)
@@ -64,9 +65,9 @@ class RawMaterial(models.Model):
     purchase_date = models.DateField("购入日期", null=True, blank=True)
 
     # 【新增】核心文件
-    file_tds = models.FileField("TDS", upload_to=repo_file_path, blank=True, null=True)
-    file_msds = models.FileField("MSDS", upload_to=repo_file_path, blank=True, null=True)
-    file_rohs = models.FileField("RoHS", upload_to=repo_file_path, blank=True, null=True)
+    file_tds = models.FileField("TDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
+    file_msds = models.FileField("MSDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
+    file_rohs = models.FileField("RoHS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
     
     # 【新增】创建时间 (用于排序和筛选)
     created_at = models.DateTimeField("录入时间", auto_now_add=True)

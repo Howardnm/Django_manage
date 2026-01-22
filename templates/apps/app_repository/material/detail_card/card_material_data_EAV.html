@@ -39,8 +39,8 @@
                                     </div>
 
                                     <!-- 中间：标准 (绝对定位居中) -->
-                                    <div class="position-absolute start-50 translate-middle-x text-center" style="max-width: 30%;">
-                                        <div class="text-truncate text-muted" style="font-size: 11px;"
+                                    <div class="position-absolute start-50 translate-middle-x text-center">
+                                        <div class="text-truncate text-muted" style="font-size: 12px;"
                                              title="{{ prop.test_config.standard }} {{ prop.test_config.condition }}">
                                             {{ prop.test_config.standard }}
                                             {% if prop.test_config.condition %}
@@ -52,7 +52,11 @@
                                     <!-- 右侧：数值 (高亮加粗) -->
                                     <div class="text-end lh-1 ms-1" style="min-width: 30%;">
                                         <div class="fw-bolder fs-4 text-{{ theme_color }}">
-                                            {{ prop.value }}
+                                            {% if "密度" in prop.test_config.name or "比重" in prop.test_config.name %}
+                                                {{ prop.value|floatformat:3 }}
+                                            {% else %}
+                                                {{ prop.value|floatformat:2 }}
+                                            {% endif %}
                                         </div>
                                         {% if prop.test_config.unit %}
                                             <div class="text-muted small text-truncate" style="font-size: 9px;">{{ prop.test_config.unit }}</div>

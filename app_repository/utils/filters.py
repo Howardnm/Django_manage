@@ -100,10 +100,6 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
     )
 
     # --- 性能指标范围筛选 ---
-    # 密度
-    density_min = django_filters.NumberFilter(method='filter_metric', label='密度 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
-    density_max = django_filters.NumberFilter(method='filter_metric', label='密度 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
-    
     # 熔指
     melt_min = django_filters.NumberFilter(method='filter_metric', label='熔指 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     melt_max = django_filters.NumberFilter(method='filter_metric', label='熔指 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
@@ -111,6 +107,10 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
     # 拉伸强度
     tensile_min = django_filters.NumberFilter(method='filter_metric', label='拉伸 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     tensile_max = django_filters.NumberFilter(method='filter_metric', label='拉伸 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
+    
+    # 弯曲模量
+    flex_modulus_min = django_filters.NumberFilter(method='filter_metric', label='弯模 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
+    flex_modulus_max = django_filters.NumberFilter(method='filter_metric', label='弯模 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
     # 冲击
     impact_min = django_filters.NumberFilter(method='filter_metric', label='冲击 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
@@ -152,12 +152,13 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
 
         parts = name.split('_')
         operator = parts[-1] # min 或 max
+        # 重新组合 metric_key，因为 flex_modulus 包含下划线
         metric_key = '_'.join(parts[:-1])
 
         keyword_map = {
-            'density': '密度',
             'melt': '熔融',
             'tensile': '拉伸强度',
+            'flex_modulus': '弯曲模量',
             'impact': '冲击',
         }
         keyword = keyword_map.get(metric_key)

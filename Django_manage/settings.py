@@ -141,3 +141,9 @@ INTERNAL_IPS = [
     "127.0.0.1",
     # ...
 ]
+
+# 【新增】文件上传限制
+# # 限制请求体最大为 50MB (默认是 2.5MB)
+# DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800 / 50  # 50MB
+# # 限制单个文件上传最大为 50MB
+# FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800 / 50  # 50MB

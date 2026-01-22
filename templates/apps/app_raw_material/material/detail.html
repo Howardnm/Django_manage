@@ -48,17 +48,17 @@
                 </div>
                 <div class="list-group list-group-flush">
                     {% if material.file_tds %}
-                        <a href="{{ material.file_tds.url }}" target="_blank" class="list-group-item list-group-item-action">
+                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_tds' %}" target="_blank" class="list-group-item list-group-item-action">
                             <i class="ti ti-file-text me-2 text-primary"></i> TDS
                         </a>
                     {% endif %}
                     {% if material.file_msds %}
-                        <a href="{{ material.file_msds.url }}" target="_blank" class="list-group-item list-group-item-action">
+                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_msds' %}" target="_blank" class="list-group-item list-group-item-action">
                             <i class="ti ti-flask me-2 text-danger"></i> MSDS
                         </a>
                     {% endif %}
                     {% if material.file_rohs %}
-                        <a href="{{ material.file_rohs.url }}" target="_blank" class="list-group-item list-group-item-action">
+                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_rohs' %}" target="_blank" class="list-group-item list-group-item-action">
                             <i class="ti ti-leaf me-2 text-success"></i> RoHS
                         </a>
                     {% endif %}

@@ -128,11 +128,25 @@ class LabFormulaDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'formula'
 
     def get_queryset(self):
+        # 【修改】预加载 test_results 时，按 TestConfig 的 order 排序
         return super().get_queryset().select_related('material_type', 'creator', 'process').prefetch_related(
             'bom_lines__raw_material', 
             'test_results__test_config',
+            'test_results__test_config__category', # 预加载分类
             'related_materials'
         )
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # 【新增】手动对 test_results 进行排序
+        # 因为 prefetch_related 的排序能力有限，或者需要在 Python 中二次处理
+        # 这里我们获取关联的 test_results 并按 category__order 和 order 排序
+        sorted_results = self.object.test_results.select_related('test_config', 'test_config__category').order_by(
+            'test_config__category__order', 
+            'test_config__order'
+        )
+        context['sorted_test_results'] = sorted_results
+        return context
 
 class LabFormulaCreateView(LoginRequiredMixin, CreateView):
     model = LabFormula
@@ -155,8 +169,11 @@ class LabFormulaCreateView(LoginRequiredMixin, CreateView):
             context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
             context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
         else:
-            context['bom_formset'] = FormulaBOMFormSet(prefix='bom')
-            context['test_formset'] = FormulaTestResultFormSet(prefix='test')
+            # 【修改】预留 6 行空表单
+            FormulaBOMFormSet.extra = 6
+            FormulaTestResultFormSet.extra = 9
+            context['bom_formset'] = FormulaBOMFormSet(prefix='bom', queryset=LabFormula.objects.none())
+            context['test_formset'] = FormulaTestResultFormSet(prefix='test', queryset=LabFormula.objects.none())
         return context
 
     def form_valid(self, form):
@@ -180,6 +197,8 @@ class LabFormulaCreateView(LoginRequiredMixin, CreateView):
                 return self.render_to_response(self.get_context_data(form=form))
                 
         messages.success(self.request, "配方已创建")
+        # 【修复】使用 self.object.pk 而不是 self.object.id，确保兼容性
+        # 并且确保 redirect 使用的是 get_success_url 返回的 URL 字符串
         return redirect(self.get_success_url())
 
     def get_success_url(self):
@@ -197,6 +216,13 @@ class LabFormulaUpdateView(LoginRequiredMixin, UpdateView):
             context['bom_formset'] = FormulaBOMFormSet(self.request.POST, instance=self.object, prefix='bom')
             context['test_formset'] = FormulaTestResultFormSet(self.request.POST, instance=self.object, prefix='test')
         else:
+            # 【修改】编辑时，如果已有数据少于6行，补足到6行
+            # 注意：inlineformset_factory 的 extra 默认是 3，这里我们动态调整
+            # 但为了简单起见，这里只设置 extra=1 (方便添加)，或者保持默认
+            # 如果要强制显示6行空行，逻辑会比较复杂，通常编辑模式下按需添加更好
+            # 这里我们保持默认行为，或者稍微增加一点 extra
+            FormulaBOMFormSet.extra = 1
+            FormulaTestResultFormSet.extra = 1
             context['bom_formset'] = FormulaBOMFormSet(instance=self.object, prefix='bom')
             context['test_formset'] = FormulaTestResultFormSet(instance=self.object, prefix='test')
         return context

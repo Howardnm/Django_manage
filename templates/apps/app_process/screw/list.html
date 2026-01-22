@@ -11,7 +11,30 @@
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
                 <tr>
-                    <th>组合名称</th>
+                    <!-- 1. 组合名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            组合名称
+                            {% if current_sort == 'name' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
+                    <!-- 2. 组合号 -->
+                    <th>
+                        <a href="?{% url_replace sort='combination_code'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            组合号
+                            {% if current_sort == 'combination_code' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-combination_code' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
                     <th>适用机台</th>
                     <th>适用材料</th>
                     <th>图纸</th>
@@ -22,6 +45,13 @@
                 {% for screw in screws %}
                     <tr>
                         <td class="fw-bold">{{ screw.name }}</td>
+                        <td>
+                            {% if screw.combination_code %}
+                                <span class="badge bg-azure-lt">{{ screw.combination_code }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>
                             {% for machine in screw.machines.all|slice:":2" %}
                                 <span class="badge bg-purple-lt" title="{{ machine }}">
@@ -43,7 +73,7 @@
                         </td>
                         <td>
                             {% if screw.drawing_file %}
-                                <a href="{{ screw.drawing_file.url }}" target="_blank" class="text-blue">
+                                <a href="{% url 'secure_download' 'app_process' 'screwcombination' screw.pk 'drawing_file' %}" target="_blank" class="text-blue">
                                     <i class="ti ti-file-download"></i> 下载
                                 </a>
                             {% else %}
@@ -56,7 +86,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="6" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

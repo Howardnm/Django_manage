@@ -10,7 +10,7 @@ from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile
-from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig
+from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig, MaterialType
 from app_project.mixins import ProjectPermissionMixin
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial
@@ -181,18 +181,24 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
             
         # 【新增】原材料搜索
         elif model_type == 'raw_material':
-            qs = RawMaterial.objects.all()
+            qs = RawMaterial.objects.select_related('category').all()
             if query:
                 qs = qs.filter(Q(name__icontains=query) | Q(model_name__icontains=query))
-            qs = qs.values('id', 'name', 'model_name')[:20]
-            data = [{'value': item['id'], 'text': f"{item['name']} {item['model_name'] or ''}"} for item in qs]
+            qs = qs.values('id', 'name', 'model_name', 'category__name')[:20]
+            # 【修改】单行显示：名称 型号 (类别)
+            data = [{'value': item['id'], 'text': f"{item['name']} {item['model_name'] or ''} ({item['category__name']})"} for item in qs]
 
         # 【新增】测试标准搜索
         elif model_type == 'test_config':
-            qs = TestConfig.objects.all()
+            qs = TestConfig.objects.select_related('category').all()
             if query:
                 qs = qs.filter(Q(name__icontains=query) | Q(standard__icontains=query))
-            qs = qs.values('id', 'name', 'standard', 'condition')[:20]
-            data = [{'value': item['id'], 'text': f"{item['name']} - {item['standard']} {item['condition'] or ''}"} for item in qs]
+            qs = qs.values('id', 'name', 'standard', 'condition', 'category__name')[:20]
+            # 【修改】单行显示：[分类] 名称 - 标准 (条件)
+            data = []
+            for item in qs:
+                cond_str = f" ({item['condition']})" if item['condition'] else ""
+                text = f"[{item['category__name']}] {item['name']} - {item['standard']}{cond_str}"
+                data.append({'value': item['id'], 'text': text})
 
         return JsonResponse(data, safe=False)

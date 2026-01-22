@@ -62,17 +62,8 @@
 
                 <!-- 高级筛选面板 -->
                 <div class="collapse w-100 mt-2" id="advanced-filter">
-                    <div class="card card-body bg-bule-lt">
+                    <div class="card card-body bg-blue-lt">
                         <div class="row g-3">
-                            <!-- 密度 -->
-                            <div class="col-md-3">
-                                <label class="form-label small">密度 (g/cm³)</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.density_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.density_max }}
-                                </div>
-                            </div>
                             <!-- 熔指 -->
                             <div class="col-md-3">
                                 <label class="form-label small">熔融指数</label>
@@ -89,6 +80,15 @@
                                     {{ filter.form.tensile_min }}
                                     <span class="input-group-text">-</span>
                                     {{ filter.form.tensile_max }}
+                                </div>
+                            </div>
+                            <!-- 弯曲模量 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">弯曲模量 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.flex_modulus_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.flex_modulus_max }}
                                 </div>
                             </div>
                             <!-- 冲击 -->
@@ -112,7 +112,7 @@
                 <tr>
                     <th>配方信息</th>
                     <th>基材</th>
-                    <th>工艺</th>
+                    <th>工艺方案</th>
                     <th>成本</th>
 
                     <!-- 动态表头: 物理 -->
@@ -145,12 +145,12 @@
                         </td>
 
                         <!-- 2. 基材类型 -->
-                        <td><span class="badge bg-blue-lt">{{ formula.material_type.name }}</span></td>
+                        <td><span class="badge bg-purple-lt">{{ formula.material_type.name }}</span></td>
 
                         <!-- 3. 工艺方案 -->
                         <td>
                             {% if formula.process %}
-                                <a href="{% url 'process_profile_detail' formula.process.pk %}" target="_blank" class="text-reset" title="点击查看工艺详情">
+                                <a href="{% url 'process_profile_detail' formula.process.pk %}" target="_blank" class="badge bg-blue-lt text-reset" title="点击查看工艺详情">
                                     {{ formula.process.name|truncatechars:15 }}
                                 </a>
                             {% else %}
@@ -196,7 +196,7 @@
                             {% if formula.related_materials.exists %}
                                 <div class="d-flex flex-wrap gap-1" style="max-width: 150px;">
                                     {% for mat in formula.related_materials.all|slice:":2" %}
-                                        <a href="{% url 'repo_material_detail' mat.pk %}" target="_blank" class="badge bg-secondary-lt text-truncate" style="max-width: 100px;">
+                                        <a href="{% url 'repo_material_detail' mat.pk %}" target="_blank" class="badge bg-info-lt text-truncate" style="max-width: 100px;">
                                             {{ mat.grade_name }}
                                         </a>
                                     {% endfor %}

@@ -73,6 +73,16 @@ class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
             # if not user.has_perm('app_repository.view_materiallibrary'):
             #     raise PermissionDenied("您没有查看材料库的权限")
             return True
+        
+        # 策略 D: 工艺库文件 (ScrewCombination)
+        # 假设工艺库对所有登录用户开放
+        elif model_name.lower() == 'screwcombination':
+            return True
+            
+        # 策略 E: 原材料库文件 (RawMaterial)
+        # 假设原材料库对所有登录用户开放
+        elif model_name.lower() == 'rawmaterial':
+            return True
 
         # 策略 C: 其他未知模型
         # 默认拒绝，防止意外暴露其他敏感数据

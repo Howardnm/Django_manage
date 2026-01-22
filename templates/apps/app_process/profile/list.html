@@ -11,13 +11,62 @@
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
                 <tr>
-                    <th>方案名称</th>
+                    <!-- 1. 方案名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            方案名称
+                            {% if current_sort == 'name' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
                     <th>工艺类型</th>
                     <th>适用材料</th>
+                    
+                    <!-- 2. 机台号 -->
+                    <th>
+                        <a href="?{% url_replace sort='machine__machine_code'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            机台号
+                            {% if current_sort == 'machine__machine_code' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-machine__machine_code' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
                     <th>机台</th>
+                    
+                    <!-- 3. 螺杆号 -->
+                    <th>
+                        <a href="?{% url_replace sort='screw_combination__combination_code'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            螺杆号
+                            {% if current_sort == 'screw_combination__combination_code' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-screw_combination__combination_code' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
                     <th>螺杆组合</th>
                     <th>切粒方式</th>
-                    <th>产量</th>
+                    
+                    <!-- 4. 产量 -->
+                    <th>
+                        <a href="?{% url_replace sort='throughput'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            产量
+                            {% if current_sort == 'throughput' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-throughput' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -40,7 +89,21 @@
                                 <span class="text-muted small">-</span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if profile.machine.machine_code %}
+                                <span class="badge bg-azure-lt">{{ profile.machine.machine_code }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ profile.machine.model_name|default:"-" }}</td>
+                        <td>
+                            {% if profile.screw_combination.combination_code %}
+                                <span class="badge bg-azure-lt">{{ profile.screw_combination.combination_code }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
                         <td>{{ profile.screw_combination.name|default:"-" }}</td>
                         <td>{{ profile.get_cooling_method_display }}</td>
                         <td>{{ profile.throughput }} kg/h</td>
@@ -51,7 +114,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="10" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

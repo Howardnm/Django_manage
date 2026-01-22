@@ -1,94 +1,178 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header d-print-none mb-3">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">{{ page_title }}</h2>
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- Page Header -->
+        <div class="page-header d-print-none">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">
+                            {% if form.instance.pk %}
+                                <i class="ti ti-edit me-2"></i>
+                                编辑机台型号
+                            {% else %}
+                                <i class="ti ti-plus me-2"></i>
+                                新增机台型号
+                            {% endif %}
+                        </h2>
+                    </div>
+                    <!-- 顶部操作按钮 -->
+                    <div class="col-auto ms-auto d-print-none">
+                        <div class="btn-list">
+                            <a href="{% url 'process_machine_list' %}" class="btn btn-outline-secondary">
+                                <i class="ti ti-arrow-left me-2"></i>
+                                返回列表
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy me-2"></i>
+                                保存
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-body">
-            <form method="post">
-                {% csrf_token %}
-                
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label required">品牌</label>
-                        {{ form.brand }}
-                        {% if form.brand.help_text %}
-                            <div class="form-text text-muted">{{ form.brand.help_text }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label required">型号</label>
-                        {{ form.model_name }}
-                        {% if form.model_name.help_text %}
-                            <div class="form-text text-muted">{{ form.model_name.help_text }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">机台号</label>
-                        {{ form.machine_code }}
-                        {% if form.machine_code.help_text %}
-                            <div class="form-text text-muted">{{ form.machine_code.help_text }}</div>
-                        {% endif %}
+        <div class="page-body">
+            <div class="container-xl">
+                <div class="row row-cards">
+                    
+                    <!-- 左侧：核心参数 -->
+                    <div class="col-lg-8">
+                        <!-- 1. 基础信息 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-purple-lt">
+                                <h3 class="card-title text-purple"><i class="ti ti-server me-2"></i>基础信息</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label required">品牌</label>
+                                        {{ form.brand }}
+                                        {% if form.brand.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.brand.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="form-text text-muted">{{ form.brand.help_text }}</div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label required">型号</label>
+                                        {{ form.model_name }}
+                                        {% if form.model_name.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.model_name.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="form-text text-muted">{{ form.model_name.help_text }}</div>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">机台号</label>
+                                        {{ form.machine_code }}
+                                        {% if form.machine_code.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.machine_code.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="form-text text-muted">数字编号，如：1</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 2. 规格参数 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-blue-lt">
+                                <h3 class="card-title text-blue"><i class="ti ti-ruler-measure me-2"></i>规格参数</h3>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">螺杆直径 (mm)</label>
+                                        <div class="input-group">
+                                            {{ form.screw_diameter }}
+                                            <span class="input-group-text">mm</span>
+                                        </div>
+                                        {% if form.screw_diameter.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.screw_diameter.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">长径比 (L/D)</label>
+                                        {{ form.ld_ratio }}
+                                        {% if form.ld_ratio.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.ld_ratio.errors.0 }}</div>
+                                        {% endif %}
+                                        <div class="form-text text-muted">{{ form.ld_ratio.help_text }}</div>
+                                    </div>
+
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">电机功率 (kW)</label>
+                                        <div class="input-group">
+                                            {{ form.motor_power }}
+                                            <span class="input-group-text">kW</span>
+                                        </div>
+                                        {% if form.motor_power.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.motor_power.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">最高转速 (rpm)</label>
+                                        <div class="input-group">
+                                            {{ form.max_speed }}
+                                            <span class="input-group-text">rpm</span>
+                                        </div>
+                                        {% if form.max_speed.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.max_speed.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">最高扭矩 (Nm)</label>
+                                        <div class="input-group">
+                                            {{ form.max_torque }}
+                                            <span class="input-group-text">Nm</span>
+                                        </div>
+                                        {% if form.max_torque.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.max_torque.errors.0 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 3. 备注 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3 class="card-title"><i class="ti ti-notes me-2"></i>备注说明</h3>
+                            </div>
+                            <div class="card-body">
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
                     </div>
 
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">螺杆直径 (mm)</label>
-                        {{ form.screw_diameter }}
-                        {% if form.screw_diameter.help_text %}
-                            <div class="form-text text-muted">{{ form.screw_diameter.help_text }}</div>
-                        {% endif %}
+                    <!-- 右侧：辅助信息 -->
+                    <div class="col-lg-4">
+                        <!-- 适用材料 -->
+                        <div class="card mb-3">
+                            <div class="card-header bg-green-lt">
+                                <h3 class="card-title text-green"><i class="ti ti-flask me-2"></i>适用材料类型</h3>
+                            </div>
+                            <div class="card-body">
+                                {{ form.suitable_materials }}
+                                {% if form.suitable_materials.errors %}
+                                    <div class="invalid-feedback d-block mt-2">{{ form.suitable_materials.errors.0 }}</div>
+                                {% endif %}
+                                <div class="form-text text-muted">按住 Ctrl 可多选，指定该机台擅长加工的材料</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">长径比 (L/D)</label>
-                        {{ form.ld_ratio }}
-                        {% if form.ld_ratio.help_text %}
-                            <div class="form-text text-muted">{{ form.ld_ratio.help_text }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">电机功率 (kW)</label>
-                        {{ form.motor_power }}
-                        {% if form.motor_power.help_text %}
-                            <div class="form-text text-muted">{{ form.motor_power.help_text }}</div>
-                        {% endif %}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="form-label">最高转速 (rpm)</label>
-                        {{ form.max_speed }}
-                        {% if form.max_speed.help_text %}
-                            <div class="form-text text-muted">{{ form.max_speed.help_text }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-12 mb-3">
-                        <label class="form-label">适用材料类型</label>
-                        {{ form.suitable_materials }}
-                        {% if form.suitable_materials.help_text %}
-                            <div class="form-text text-muted">{{ form.suitable_materials.help_text }}</div>
-                        {% endif %}
-                    </div>
-
-                    <div class="col-12 mb-3">
-                        <label class="form-label">备注</label>
-                        {{ form.description }}
-                        {% if form.description.help_text %}
-                            <div class="form-text text-muted">{{ form.description.help_text }}</div>
-                        {% endif %}
-                    </div>
+                    
                 </div>
-
-                <div class="form-footer">
-                    <button type="submit" class="btn btn-primary">保存</button>
-                    <a href="{% url 'process_machine_list' %}" class="btn btn-link">取消</a>
-                </div>
-            </form>
+            </div>
         </div>
-    </div>
+    </form>
+
+
 {% endblock %}

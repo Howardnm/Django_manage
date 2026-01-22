@@ -24,7 +24,7 @@
             </div>
 
             <div class="ms-auto">
-                <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-ghost-primary bg-white text-purple" title="编辑">
+                <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-purple" title="编辑">
                     <i class="ti ti-edit"></i>
                 </a>
             </div>
@@ -39,8 +39,8 @@
                 <div class="row g-2">
                     <!-- 第一行：客户与OEM -->
                     <div class="col-6">
-                        <div class="p-2 border rounded bg-light-lt h-100">
-                            <div class="small text-secondary mb-1">直接客户 (Tier 1)</div>
+                        <div class="p-2 border rounded h-100">
+                            <div class="small fw-bold mb-1">直接客户 (Tier 1)</div>
                             {% if repo.customer %}
                                 <a href="{% url 'repo_customer_edit' repo.customer.pk %}" target="_blank" class="fw-bold text-primary text-decoration-none text-truncate d-block">
                                     {{ repo.customer.company_name }}
@@ -51,13 +51,13 @@
                         </div>
                     </div>
                     <div class="col-6">
-                        <div class="p-2 border rounded bg-light-lt h-100">
-                            <div class="small text-secondary mb-1">主机厂 (OEM)</div>
+                        <div class="p-2 border rounded h-100">
+                            <div class="small fw-bold mb-1">主机厂 (OEM)</div>
                             {% if repo.oem %}
-                                <a href="{% url 'repo_oem_edit' repo.oem.pk %}" target="_blank" class="fw-bold text-body text-decoration-none text-truncate d-block" title="{{ repo.oem.name }}">
+                                <a href="{% url 'repo_oem_edit' repo.oem.pk %}" target="_blank" class="fw-bold text-decoration-none text-truncate d-block" title="{{ repo.oem.name }}">
                                     {{ repo.oem.name }}
                                     {% if repo.oem.short_name %}
-                                        <span class="text-muted fw-bold text-blue me-2">({{ repo.oem.short_name }})</span>
+                                        <span class="text-muted fw-bold text-blue me-2"> ({{ repo.oem.short_name }})</span>
                                     {% endif %}
                                 </a>
                             {% else %}
@@ -70,7 +70,7 @@
                     <div class="col-6">
                         <div class="p-2 border rounded h-100">
                             <div class="d-flex justify-content-between align-items-center">
-                                <div class="small text-secondary">目标成本</div>
+                                <div class="small fw-bold">目标成本</div>
                                 <div class="fw-bold text-green">
                                     {% if repo.target_cost %}¥{{ repo.target_cost }}{% else %}-{% endif %}
                                 </div>
@@ -80,7 +80,7 @@
                     <div class="col-6">
                         <div class="p-2 border rounded h-100">
                             <div class="d-flex justify-content-between align-items-center">
-                                <div class="small text-secondary">竞品售价</div>
+                                <div class="small fw-bold">竞品售价</div>
                                 <div class="fw-bold text-orange">
                                     {% if repo.competitor_price %}¥{{ repo.competitor_price }}{% else %}-{% endif %}
                                 </div>
@@ -93,10 +93,10 @@
                     <div class="col-12">
                         <div class="d-flex align-items-center px-2 py-1 rounded bg-azure-lt small">
                             <i class="ti ti-id-badge-2 me-2 opacity-50"></i>
-                            <span class="text-muted me-2">跟进业务员:</span>
-                            <span class="fw-bold text-azure me-auto">{{ repo.salesperson.name }}</span>
+                            <span class="fw-bold text-body me-2">跟进业务员:</span>
+                            <span class="fw-bold text-blue me-auto">{{ repo.salesperson.name }}</span>
                             {% if repo.salesperson.phone %}
-                                <a href="tel:{{ repo.salesperson.phone }}" class="text-azure"><i class="ti ti-phone"></i> {{ repo.salesperson.phone }}</a>
+                                <a href="tel:{{ repo.salesperson.phone }}" class="fw-bold text-blue"><i class="ti ti-phone"></i> {{ repo.salesperson.phone }}</a>
                             {% endif %}
                         </div>
                     </div>
@@ -110,7 +110,7 @@
             <div class="d-flex align-items-center justify-content-between px-3 py-1 bg-light-lt border-bottom">
 
                 <!-- 标题：字号微调到 11px 以匹配窄行 -->
-                <div class="font-weight-bold text-secondary text-uppercase" style="font-size: 11px; letter-spacing: 0.5px;">
+                <div class="font-weight-bold fw-bold text-body" style="font-size: 11px; letter-spacing: 0.5px;">
                     <i class="ti ti-folder me-1"></i>文件资料 ({{ repo.files.count }})
                 </div>
 
@@ -120,7 +120,7 @@
                      3. font-size: 10px: 字体极小化
                 -->
                 <a href="{% url 'repo_file_add' repo.id %}"
-                   class="btn btn-sm btn-ghost-primary bg-primary-lt px-2"
+                   class="btn btn-sm btn-primary px-2"
                    style="height: 22px; line-height: 22px; font-size: 10px; min-height: 0; padding-top: 0; padding-bottom: 0;"
                    title="上传新文件">
                     <i class="ti ti-plus me-1" style="font-size: 10px;"></i> 添加
@@ -150,7 +150,7 @@
                                        class="text-reset d-block text-truncate small fw-bold" title="{{ file.description|default:file.filename }}">
                                         {{ file.description|default:file.filename }}
                                     </a>
-                                    <div class="text-muted" style="font-size: 9px;">{{ file.uploaded_at|date:"m-d" }}</div>
+                                    <div class="text-muted" style="font-size: 9px;">{{ file.uploaded_at|date:"Y-m-d H:i" }}</div>
                                 </div>
 
                                 <!-- 删除 -->

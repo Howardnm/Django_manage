@@ -5,10 +5,10 @@ import uuid
 from django.utils import timezone
 
 
-def repo_file_path(instance, filename):
+def upload_file_path(instance, filename):
     """
     文件路径生成器
-    格式: repository/{模型名}/{ID}/{日期}/{短UUID}_{保留语义的原名}.ext
+    格式: upload_files/{模型名}/{ID}/{日期}/{短UUID}_{保留语义的原名}.ext
     特点: 保留了中文、括号、点号等常用符号，仅替换空格和危险字符
     """
     # 1. 拆分文件名和后缀
@@ -32,7 +32,7 @@ def repo_file_path(instance, filename):
     short_uuid = uuid.uuid4().hex[:6]
 
     # 5. 组合最终文件名: "a1b2c3_测试项目(V1.0).pdf"
-    new_filename = f"{short_uuid}_{clean_name}{ext}"
+    new_filename = f"{clean_name}_{short_uuid}{ext}"
 
     # 6. 获取基本信息
     date_path = timezone.now().strftime("%Y-%m-%d")
@@ -54,4 +54,4 @@ def repo_file_path(instance, filename):
         folder_id = str(instance.material.id)
 
     # 8. 拼接完整路径
-    return os.path.join('files', model_name, folder_id, date_path, new_filename)
+    return os.path.join('upload_files', model_name, folder_id, date_path, new_filename)

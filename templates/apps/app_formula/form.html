@@ -1,155 +1,260 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <div class="page-header d-print-none mb-3">
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">{{ page_title }}</h2>
-            </div>
-        </div>
-    </div>
-
     <form method="post">
         {% csrf_token %}
 
-        <!-- 1. 基础信息 -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">基础信息</h3>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">实验单号</label>
-                        {% if form.instance.pk %}
-                            <input type="text" class="form-control" value="{{ form.instance.code }}" readonly>
-                        {% else %}
-                            <input type="text" class="form-control" value="自动生成" disabled>
-                        {% endif %}
+        <!-- Page Header -->
+        <div class="page-header d-print-none mb-3">
+            <div class="container-xl">
+                <div class="row g-2 align-items-center">
+                    <div class="col">
+                        <h2 class="page-title">
+                            {% if form.instance.pk %}
+                                <i class="ti ti-edit me-2"></i>
+                                编辑实验配方
+                            {% else %}
+                                <i class="ti ti-plus me-2"></i>
+                                新增实验配方
+                            {% endif %}
+                        </h2>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">配方名称</label>
-                        {{ form.name }}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label required">基材类型</label>
-                        {{ form.material_type }}
-                    </div>
-
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">生产工艺</label>
-                        {{ form.process }}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">关联成品材料</label>
-                        {{ form.related_materials }}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="form-label">实际成本 (元/kg)</label>
-                        {{ form.cost_actual }}
-                    </div>
-
-                    <div class="col-12 mb-3">
-                        <label class="form-label">实验描述</label>
-                        {{ form.description }}
+                    <!-- 顶部操作按钮 -->
+                    <div class="col-auto ms-auto d-print-none">
+                        <div class="btn-list">
+                            <a href="{% url 'formula_list' %}" class="btn btn-outline-secondary">
+                                <i class="ti ti-arrow-left me-2"></i>
+                                返回列表
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-device-floppy me-2"></i>
+                                保存配方
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 2. BOM 明细 (FormSet) -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">BOM 明细</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead>
-                    <tr>
-                        <th class="w-15">喂料口</th>
-                        <th class="w-25">原材料</th>
-                        <th class="w-15">比例/份数</th>
-                        <th class="w-10">是否尾料</th>
-                        <th class="w-10">是否共混</th>
-                        <th class="w-10">共混顺序</th>
-                        <th class="w-10">共混时间</th>
-                        <th class="w-1">删除</th>
-                    </tr>
-                    </thead>
-                    <tbody id="bom-formset">
-                    {{ bom_formset.management_form }}
-                    {% for form in bom_formset %}
-                        <tr class="bom-form">
-                            {{ form.id }}
-                            <td>{{ form.feeding_port }}</td>
-                            <td>{{ form.raw_material }}</td>
-                            <td>{{ form.percentage }}</td>
-                            <td>{{ form.is_tail }}</td>
-                            <td>{{ form.is_pre_mix }}</td>
-                            <td>{{ form.pre_mix_order }}</td>
-                            <td>{{ form.pre_mix_time }}</td>
-                            <td>
-                                {% if bom_formset.can_delete %}
-                                    {{ form.DELETE }}
+        <div class="page-body">
+            <div class="container-xl">
+                
+                <!-- 全局错误提示 -->
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {{ form.non_field_errors }}
+                    </div>
+                {% endif %}
+                
+                <!-- FormSet 错误提示 -->
+                {% if bom_formset.non_form_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        BOM 明细错误: {{ bom_formset.non_form_errors }}
+                    </div>
+                {% endif %}
+                {% if test_formset.non_form_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        测试结果错误: {{ test_formset.non_form_errors }}
+                    </div>
+                {% endif %}
+                
+                <!-- 1. 基础信息 (上下布局) -->
+                <div class="card mb-3">
+                    <div class="card-header bg-blue-lt">
+                        <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基础信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">实验单号</label>
+                                {% if form.instance.pk %}
+                                    <input type="text" class="form-control" value="{{ form.instance.code }}" readonly>
+                                {% else %}
+                                    <input type="text" class="form-control" value="自动生成" disabled>
                                 {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer">
-                <button type="button" class="btn btn-ghost-primary" id="add-bom">
-                    <i class="ti ti-plus me-1"></i> 添加原料
-                </button>
-            </div>
-        </div>
-
-        <!-- 3. 测试结果 (FormSet) -->
-        <div class="card mb-3">
-            <div class="card-header">
-                <h3 class="card-title">测试结果</h3>
-            </div>
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table">
-                    <thead>
-                    <tr>
-                        <th class="w-25">测试项目</th>
-                        <th class="w-25">数值</th>
-                        <th class="w-25">测试日期</th>
-                        <th>备注</th>
-                        <th class="w-1">删除</th>
-                    </tr>
-                    </thead>
-                    <tbody id="test-formset">
-                    {{ test_formset.management_form }}
-                    {% for form in test_formset %}
-                        <tr class="test-form">
-                            {{ form.id }}
-                            <td>{{ form.test_config }}</td>
-                            <td>{{ form.value }}</td>
-                            <td>{{ form.test_date }}</td>
-                            <td>{{ form.remark }}</td>
-                            <td>
-                                {% if test_formset.can_delete %}
-                                    {{ form.DELETE }}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label required">配方名称</label>
+                                {{ form.name }}
+                                {% if form.name.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
                                 {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-            <div class="card-footer">
-                <button type="button" class="btn btn-ghost-primary" id="add-test">
-                    <i class="ti ti-plus me-1"></i> 添加测试项
-                </button>
-            </div>
-        </div>
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label required">基材类型</label>
+                                {{ form.material_type }}
+                                {% if form.material_type.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.material_type.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">生产工艺</label>
+                                {{ form.process }}
+                                {% if form.process.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.process.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">关联成品材料</label>
+                                {{ form.related_materials }}
+                                {% if form.related_materials.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.related_materials.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">实际成本 (元/kg)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">¥</span>
+                                    {{ form.cost_actual }}
+                                </div>
+                                {% if form.cost_actual.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.cost_actual.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">实验描述</label>
+                                {{ form.description }}
+                                {% if form.description.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-        <div class="form-footer">
-            <button type="submit" class="btn btn-primary">保存配方</button>
-            <a href="{% url 'formula_list' %}" class="btn btn-link">取消</a>
+                <!-- 2. BOM 明细 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-orange-lt">
+                        <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table text-nowrap">
+                            <thead>
+                            <tr>
+                                <th class="w-10">喂料口</th>
+                                <th class="w-25">原材料</th>
+                                <th class="w-10">比例/份数</th>
+                                <th class="w-1">是否尾料</th>
+                                <th class="w-1">是否共混</th>
+                                <th class="w-10">共混顺序</th>
+                                <th class="w-10">共混时间</th>
+                                <th class="w-10">分秤(用于大机投料)</th>
+                                <th>删除</th>
+                            </tr>
+                            </thead>
+                            <tbody id="bom-formset">
+                            {{ bom_formset.management_form }}
+                            {% for form in bom_formset %}
+                                <tr class="bom-form">
+                                    {{ form.id }}
+                                    <td>
+                                        {{ form.feeding_port }}
+                                        {% if form.feeding_port.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.feeding_port.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.raw_material }}
+                                        {% if form.raw_material.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.raw_material.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.percentage }}
+                                        {% if form.percentage.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.percentage.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ form.is_tail }}</td>
+                                    <td>{{ form.is_pre_mix }}</td>
+                                    <td>{{ form.pre_mix_order }}</td>
+                                    <td>{{ form.pre_mix_time }}</td>
+                                    <td>
+                                        {{ form.weighing_scale }}
+                                        {% if form.weighing_scale.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.weighing_scale.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        {% if bom_formset.can_delete %}
+                                            <div class="form-check form-check-inline m-0" title="删除此行">
+                                                {{ form.DELETE }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button type="button" class="btn btn-ghost-orange" id="add-bom">
+                            <i class="ti ti-plus me-1"></i> 添加原料
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 3. 测试结果 -->
+                <div class="card">
+                    <div class="card-header bg-purple-lt">
+                        <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table text-nowrap">
+                            <thead>
+                            <tr>
+                                <th class="w-50">测试项目</th>
+                                <th class="w-25">数值</th>
+                                <th>测试日期</th>
+                                <th class="w-25">备注</th>
+                                <th>删除</th>
+                            </tr>
+                            </thead>
+                            <tbody id="test-formset">
+                            {{ test_formset.management_form }}
+                            {% for form in test_formset %}
+                                <tr class="test-form">
+                                    {{ form.id }}
+                                    <td>
+                                        {{ form.test_config }}
+                                        {% if form.test_config.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.test_config.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.value }}
+                                        {% if form.value.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.value.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {{ form.test_date }}
+                                        {% if form.test_date.errors %}
+                                            <div class="invalid-feedback d-block">{{ form.test_date.errors.0 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ form.remark }}</td>
+                                    <td class="text-center">
+                                        {% if test_formset.can_delete %}
+                                            <div class="form-check form-check-inline m-0" title="删除此行">
+                                                {{ form.DELETE }}
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer">
+                        <button type="button" class="btn btn-ghost-purple" id="add-test">
+                            <i class="ti ti-plus me-1"></i> 添加测试项
+                        </button>
+                    </div>
+                </div>
+                
+            </div>
         </div>
     </form>
 
@@ -164,7 +269,12 @@
             <td>{{ bom_formset.empty_form.is_pre_mix }}</td>
             <td>{{ bom_formset.empty_form.pre_mix_order }}</td>
             <td>{{ bom_formset.empty_form.pre_mix_time }}</td>
-            <td>{{ bom_formset.empty_form.DELETE }}</td>
+            <td>{{ bom_formset.empty_form.weighing_scale }}</td>
+            <td class="text-center">
+                <div class="form-check form-check-inline m-0">
+                    {{ bom_formset.empty_form.DELETE }}
+                </div>
+            </td>
         </tr>
     </script>
 
@@ -175,7 +285,11 @@
             <td>{{ test_formset.empty_form.value }}</td>
             <td>{{ test_formset.empty_form.test_date }}</td>
             <td>{{ test_formset.empty_form.remark }}</td>
-            <td>{{ test_formset.empty_form.DELETE }}</td>
+            <td class="text-center">
+                <div class="form-check form-check-inline m-0">
+                    {{ test_formset.empty_form.DELETE }}
+                </div>
+            </td>
         </tr>
     </script>
 
@@ -207,10 +321,15 @@
                         preload: 'focus', // 关键：点击时才加载
                         render: {
                             option: function (data, escape) {
-                                return '<div>' + escape(data.text) + '</div>';
+                                // 【修复】单行显示，更紧凑
+                                let extra = '';
+                                if (data.extra) {
+                                    extra = ` <span class="text-muted small">(${escape(data.extra)})</span>`;
+                                }
+                                return `<div>${escape(data.text)}${extra}</div>`;
                             },
                             item: function (data, escape) {
-                                return '<div>' + escape(data.text) + '</div>';
+                                return `<div>${escape(data.text)}</div>`;
                             },
                             no_results: function (data, escape) {
                                 return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
@@ -244,6 +363,7 @@
                         newRowElement.querySelectorAll('.form-select-search').forEach(el => {
                             new TomSelect(el, {
                                 copyClassesToDropdown: false,
+                                dropdownParent: 'body',
                                 controlInput: '<input>',
                                 create: false,
                                 placeholder: '输入搜索...',
@@ -275,10 +395,15 @@
                                 preload: 'focus',
                                 render: {
                                     option: function (data, escape) {
-                                        return '<div>' + escape(data.text) + '</div>';
+                                        // 【修复】单行显示，更紧凑
+                                        let extra = '';
+                                        if (data.extra) {
+                                            extra = ` <span class="text-muted small">(${escape(data.extra)})</span>`;
+                                        }
+                                        return `<div>${escape(data.text)}${extra}</div>`;
                                     },
                                     item: function (data, escape) {
-                                        return '<div>' + escape(data.text) + '</div>';
+                                        return `<div>${escape(data.text)}</div>`;
                                     },
                                     no_results: function (data, escape) {
                                         return '<div class="no-results p-2 text-muted small">无匹配结果</div>';

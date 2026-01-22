@@ -32,16 +32,25 @@
                             <span class="input-icon-addon"><i class="ti ti-tag"></i></span>
                             {{ form.file_type }}
                         </div>
+                        {% if form.file_type.errors %}
+                            <div class="invalid-feedback d-block">{{ form.file_type.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label required">选择文件</label>
                         {{ form.file }}
+                        {% if form.file.errors %}
+                            <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3">
                         <label class="form-label">文件说明</label>
                         {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                        {% endif %}
                     </div>
                 </div>
 

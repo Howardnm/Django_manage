@@ -17,6 +17,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+# 自定义 Admin 站点标题
+admin.site.site_header = "项目管理系统后台"
+admin.site.site_title = "项目管理系统"
+admin.site.index_title = "欢迎使用项目管理系统"
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('app_panel.urls')),

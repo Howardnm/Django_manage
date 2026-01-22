@@ -3,7 +3,8 @@ import os
 from django.db import models
 from django.core.validators import FileExtensionValidator
 from app_project.models import Project
-from common_utils.repo_file_path import repo_file_path
+from common_utils.upload_file_path import upload_file_path
+from common_utils.validators import validate_file_size  # 引入文件大小验证器
 
 
 # ==============================================================================
@@ -144,9 +145,9 @@ class MaterialLibrary(models.Model):
     description = models.TextField("特性描述", blank=True)
 
     # 核心文件
-    file_tds = models.FileField("TDS", upload_to=repo_file_path, blank=True, null=True)
-    file_msds = models.FileField("MSDS", upload_to=repo_file_path, blank=True, null=True)
-    file_rohs = models.FileField("RoHS", upload_to=repo_file_path, blank=True, null=True)
+    file_tds = models.FileField("TDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
+    file_msds = models.FileField("MSDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
+    file_rohs = models.FileField("RoHS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
 
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
 
@@ -267,7 +268,7 @@ FILE_TYPE_CHOICES = [
 
 class MaterialFile(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files')
-    file = models.FileField(upload_to=repo_file_path)
+    file = models.FileField(upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
     description = models.CharField(max_length=100, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -375,7 +376,7 @@ class ProjectFile(models.Model):
     ]
 
     repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='files', verbose_name="所属档案")
-    file = models.FileField("文件附件", upload_to=repo_file_path)
+    file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
     description = models.CharField("文件说明", max_length=100, blank=True)
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)

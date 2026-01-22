@@ -1,5 +1,5 @@
 from django import forms
-from django.forms import inlineformset_factory
+from django.forms import inlineformset_factory, BaseInlineFormSet
 from common_utils.filters import TablerFilterMixin
 from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
@@ -45,26 +45,26 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
         if not self.data:
             instance = kwargs.get('instance')
             initial = kwargs.get('initial', {})
-            
+
             # 1. 工艺方案
             if instance and instance.process_id:
                 self.fields['process'].queryset = ProcessProfile.objects.filter(pk=instance.process_id)
             else:
                 self.fields['process'].queryset = ProcessProfile.objects.none()
-                
+
             # 2. 关联成品 (多对多)
             # 【修复】同时考虑 instance 和 initial
             qs = MaterialLibrary.objects.none()
-            
+
             if instance and instance.pk:
                 qs = instance.related_materials.all()
-            
+
             # 如果 initial 中有预设值 (例如从材料详情页跳转过来)
             if 'related_materials' in initial:
                 ids = initial['related_materials']
                 if ids:
                     qs = qs | MaterialLibrary.objects.filter(pk__in=ids)
-            
+
             self.fields['related_materials'].queryset = qs
 
 
@@ -72,16 +72,18 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
 class FormulaBOMForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = FormulaBOM
-        fields = ['feeding_port', 'raw_material', 'percentage', 'is_tail', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time']
+        # 【新增】weighing_scale 字段
+        fields = ['feeding_port', 'weighing_scale', 'raw_material', 'percentage', 'is_tail', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time']
         widgets = {
             'feeding_port': forms.Select(attrs={'class': 'form-select'}),
+            'weighing_scale': forms.Select(attrs={'class': 'form-select'}),
             'raw_material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'raw_material'}),
             'percentage': forms.NumberInput(attrs={'step': '0.01'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+
         if not self.data:
             instance = kwargs.get('instance')
             if instance and instance.pk and instance.raw_material_id:
@@ -96,7 +98,8 @@ class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
         model = FormulaTestResult
         fields = ['test_config', 'value', 'test_date', 'remark']
         widgets = {
-            'test_config': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'test_config'}),
+            # 【修改】移除 remote-search 类，改为 form-select-search (普通搜索)
+            'test_config': forms.Select(attrs={'class': 'form-select form-select-search'}),
             # 【修改】允许3位小数
             'value': forms.NumberInput(attrs={'step': '0.001'}),
             'test_date': forms.DateInput(attrs={'type': 'date'}),
@@ -104,13 +107,40 @@ class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        if not self.data:
-            instance = kwargs.get('instance')
-            if instance and instance.pk and instance.test_config_id:
-                self.fields['test_config'].queryset = TestConfig.objects.filter(pk=instance.test_config_id)
+
+        # 【修改】不再清空 queryset，而是加载所有 TestConfig
+        # 因为字段不多，直接加载所有选项更方便
+        self.fields['test_config'].queryset = TestConfig.objects.select_related('category').all().order_by('category__order', 'order')
+
+# 【新增】自定义 FormSet，用于控制查询集的排序
+class BaseFormulaTestResultFormSet(BaseInlineFormSet):
+    def get_queryset(self):
+        # 默认的 get_queryset 不会 select_related，也不会按 TestConfig 排序
+        # 这里我们重写它，确保编辑时显示的顺序是正确的
+        if not hasattr(self, '_queryset'):
+            # 【修复】这里不能直接调用 super().get_queryset()，因为 BaseInlineFormSet 的 get_queryset 
+            # 依赖于 self.instance (即 LabFormula 对象)。
+            # 如果是 CreateView，self.instance 是一个新的未保存对象，没有关联的 test_results，
+            # 所以 super().get_queryset() 会返回空 QuerySet，这是正常的。
+            # 但如果我们在 CreateView 中传入了 queryset=LabFormula.objects.none() (为了显示空行)，
+            # 这里的逻辑可能会有问题。
+            
+            # 关键点：FieldError: Cannot resolve keyword 'test_config' into field.
+            # 这说明我们试图对 LabFormula 进行排序，而不是 FormulaTestResult。
+            # BaseInlineFormSet.get_queryset 返回的是 FormulaTestResult 的 QuerySet。
+            
+            qs = super().get_queryset()
+            
+            # 只有当 qs 是 FormulaTestResult 的 QuerySet 时，才能按 test_config 排序
+            if qs.model == FormulaTestResult:
+                self._queryset = qs.select_related('test_config', 'test_config__category').order_by(
+                    'test_config__category__order', 
+                    'test_config__order'
+                )
             else:
-                self.fields['test_config'].queryset = TestConfig.objects.none()
+                self._queryset = qs
+                
+        return self._queryset
 
 # 定义 FormSet
 FormulaBOMFormSet = inlineformset_factory(
@@ -125,6 +155,7 @@ FormulaTestResultFormSet = inlineformset_factory(
     LabFormula,
     FormulaTestResult,
     form=FormulaTestResultForm,
+    formset=BaseFormulaTestResultFormSet, # 使用自定义 FormSet
     extra=0,
     can_delete=True
 )

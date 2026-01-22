@@ -133,9 +133,12 @@
                                 <i class="ti ti-file-text text-blue me-1"></i>TDS 物性表
                             </label>
 
-                            <input type="file" name="file_tds" class="form-control">
+                            <input type="file" name="file_tds" class="form-control {% if form.file_tds.errors %}is-invalid{% endif %}">
+                            {% if form.file_tds.errors %}
+                                <div class="invalid-feedback d-block">{{ form.file_tds.errors.0 }}</div>
+                            {% endif %}
 
-                            {% if form.instance.file_tds %}
+                            {% if form.instance.file_tds and not form.file_tds.errors %}
                                 <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
                                     <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_tds' %}"
                                        target="_blank"
@@ -159,9 +162,12 @@
                                 <i class="ti ti-flask text-red me-1"></i>MSDS 报告
                             </label>
 
-                            <input type="file" name="file_msds" class="form-control">
+                            <input type="file" name="file_msds" class="form-control {% if form.file_msds.errors %}is-invalid{% endif %}">
+                            {% if form.file_msds.errors %}
+                                <div class="invalid-feedback d-block">{{ form.file_msds.errors.0 }}</div>
+                            {% endif %}
 
-                            {% if form.instance.file_msds %}
+                            {% if form.instance.file_msds and not form.file_msds.errors %}
                                 <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
                                     <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_msds' %}"
                                        target="_blank"
@@ -184,9 +190,12 @@
                                 <i class="ti ti-leaf text-green me-1"></i>RoHS 环保报告
                             </label>
 
-                            <input type="file" name="file_rohs" class="form-control">
+                            <input type="file" name="file_rohs" class="form-control {% if form.file_rohs.errors %}is-invalid{% endif %}">
+                            {% if form.file_rohs.errors %}
+                                <div class="invalid-feedback d-block">{{ form.file_rohs.errors.0 }}</div>
+                            {% endif %}
 
-                            {% if form.instance.file_rohs %}
+                            {% if form.instance.file_rohs and not form.file_rohs.errors %}
                                 <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
                                     <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' form.instance.pk 'file_rohs' %}"
                                        target="_blank"

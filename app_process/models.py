@@ -1,6 +1,7 @@
 from django.db import models
 from app_repository.models import MaterialType  # 引入材料类型模型
-from common_utils.repo_file_path import repo_file_path
+from common_utils.upload_file_path import upload_file_path
+from common_utils.validators import validate_file_size  # 引入文件大小验证器
 
 
 # 【新增】机台型号库
@@ -11,7 +12,7 @@ class MachineModel(models.Model):
     brand = models.CharField("品牌", max_length=50, help_text="如：科倍隆, 南京科亚, 瑞亚")
     model_name = models.CharField("型号", max_length=50, unique=True, help_text="如：ZSK-26, TE-35")
     # 【新增】机台号
-    machine_code = models.IntegerField("机台号", max_length=50, blank=True, help_text="如：1, 2, 3")
+    machine_code = models.IntegerField("机台号", null=True, blank=True)
     
     # 【新增】适用材料类型 (多对多)
     suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="machines")
@@ -39,23 +40,28 @@ class ScrewCombination(models.Model):
     """
     螺杆排列组合 (Screw Configuration)
     """
-    name = models.CharField("组合名称", max_length=100, help_text="如：PP+滑石粉 高剪切组合-V1")
+    name = models.CharField("组合名称", max_length=100, help_text="建议命名格式：基材+辅料 功能-版本号，如：PP+滑石粉 高剪切组合-V1")
+    # 【新增】螺杆组合号
+    combination_code = models.IntegerField("螺杆组合号", null=True, blank=True, help_text="数字编号，如：101")
+    
     # 【修改】适用机台 (多对多)
     machines = models.ManyToManyField(MachineModel, verbose_name="适用机台", related_name="screw_combinations")
     # 【新增】适用材料类型 (多对多)
     suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="screw_combinations")
     
     description = models.TextField("组合描述", blank=True, help_text="详细描述螺杆排列逻辑，如：输送-熔融-剪切-排气")
-    drawing_file = models.FileField("组合图纸", upload_to=repo_file_path, blank=True, null=True, help_text="上传螺杆排列图 (PDF/图片)")
+    drawing_file = models.FileField("组合图纸", upload_to=upload_file_path, blank=True, null=True, help_text="上传螺杆排列图 (PDF/图片)", validators=[validate_file_size])
     
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.name
+        code_str = f"[{self.combination_code}] " if self.combination_code else ""
+        return f"{code_str}{self.name}"
 
     class Meta:
         verbose_name = "螺杆组合"
         verbose_name_plural = "螺杆组合库"
+        ordering = ['combination_code', '-created_at']
 
 
 # 2. 工艺参数包 (Process Profile)

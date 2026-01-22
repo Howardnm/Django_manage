@@ -70,15 +70,6 @@
                 <div class="collapse w-100 mt-2" id="advanced-filter">
                     <div class="card card-body bg-blue-lt">
                         <div class="row g-3">
-                            <!-- 密度 -->
-                            <div class="col-md-3">
-                                <label class="form-label small">密度 (g/cm³)</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.density_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.density_max }}
-                                </div>
-                            </div>
                             <!-- 熔指 -->
                             <div class="col-md-3">
                                 <label class="form-label small">熔融指数</label>
@@ -95,6 +86,15 @@
                                     {{ filter.form.tensile_min }}
                                     <span class="input-group-text">-</span>
                                     {{ filter.form.tensile_max }}
+                                </div>
+                            </div>
+                            <!-- 弯曲模量 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">弯曲模量 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.flex_modulus_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.flex_modulus_max }}
                                 </div>
                             </div>
                             <!-- 冲击 -->
