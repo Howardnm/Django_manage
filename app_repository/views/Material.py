@@ -275,6 +275,10 @@ class MaterialDetailView(LoginRequiredMixin, DetailView):
             processed_formulas.append(f)
             
         context['related_formulas'] = processed_formulas
+        
+        # 【新增】传递购物车中的配方 ID，用于前端回显勾选状态
+        # 使用新的 Session Key: cart_formulas_v2
+        context['cart_formula_ids'] = self.request.session.get('cart_formulas_v2', [])
 
         return context
 

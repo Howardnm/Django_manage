@@ -10,9 +10,14 @@
                 <i class="ti ti-flask me-2 text-purple"></i>关联配方记录
             </h3>
             <div class="card-actions d-flex gap-2">
-                <!-- 对比按钮 -->
-                <button type="submit" class="btn btn-sm btn-ghost-purple" title="勾选下方配方进行对比">
-                    <i class="ti ti-columns me-1"></i> 配方对比
+                <!-- 【新增】加入购物车按钮 -->
+                <button type="button" class="btn btn-sm btn-outline-yellow" onclick="addFormulasToCart()">
+                    <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                </button>
+
+                <!-- 对比按钮 (保留旧功能，直接跳转对比) -->
+                <button type="submit" class="btn btn-sm btn-purple" title="勾选下方配方进行对比">
+                    <i class="ti ti-columns me-1"></i> 直接对比
                 </button>
 
                 <!-- 新增配方按钮 -->
@@ -51,7 +56,11 @@
                 <tbody>
                 {% for f in related_formulas %}
                     <tr>
-                        <td><input class="form-check-input m-0 align-middle" type="checkbox" name="formula_ids" value="{{ f.pk }}" aria-label="Select invoice"></td>
+                        <td>
+                            <input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" name="formula_ids" value="{{ f.pk }}" aria-label="Select invoice"
+                                   data-type="formula"
+                                   {% if f.pk in cart_formula_ids %}checked{% endif %}>
+                        </td>
                         <td>
                             <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="fw-bold text-reset d-block text-truncate" style="max-width: 150px;" title="{{ f.name }}">
                                 {{ f.name|default:"未命名配方" }}
@@ -102,5 +111,50 @@
         for(var i=0, n=checkboxes.length;i<n;i++) {
             checkboxes[i].checked = source.checked;
         }
+    }
+
+    // 【新增】批量加入对比购物车
+    function addFormulasToCart() {
+        const checkboxes = document.querySelectorAll('input[name="formula_ids"]:checked');
+        if (checkboxes.length === 0) {
+            alert('请先勾选要对比的配方');
+            return;
+        }
+        
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        // 构建 FormData
+        const formData = new FormData();
+        formData.append('action', 'add_multiple');
+        formData.append('type', 'formula'); // 明确指定类型为配方
+        formData.append('ids', JSON.stringify(ids));
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // 发送请求
+        fetch("{% url 'formula_compare_cart' %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // 刷新 Header 购物车 (如果存在该函数)
+                if (typeof refreshCompareCart === 'function') {
+                    refreshCompareCart();
+                }
+                // 取消勾选
+                checkboxes.forEach(cb => cb.checked = false);
+                const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
+                if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
+                
+                alert('已成功加入 ' + ids.length + ' 个配方到对比清单');
+            } else {
+                alert('加入失败，请重试');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('发生错误，请稍后重试');
+        });
     }
 </script>
