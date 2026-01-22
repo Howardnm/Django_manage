@@ -22,6 +22,10 @@ class TablerFormMixin:
             elif isinstance(field.widget, forms.CheckboxInput):
                 if 'form-check-input' not in existing_class:
                     attrs['class'] = f"{existing_class} form-check-input".strip()
+            elif isinstance(field.widget, forms.DateInput):
+                if 'form-control' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-control".strip()
+                attrs['type'] = 'date' # 强制日期控件
             else:
                 if not isinstance(field.widget, forms.HiddenInput):
                     if 'form-control' not in existing_class:
@@ -84,12 +88,35 @@ class FormulaBOMForm(TablerFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        if not self.data:
-            instance = kwargs.get('instance')
-            if instance and instance.pk and instance.raw_material_id:
-                self.fields['raw_material'].queryset = RawMaterial.objects.filter(pk=instance.raw_material_id)
-            else:
-                self.fields['raw_material'].queryset = RawMaterial.objects.none()
+        rm_ids = set()
+        
+        # 1. 如果表单已绑定数据 (POST 请求)，从 POST 数据中获取 raw_material 的 ID
+        if self.data:
+            field_key = self.add_prefix('raw_material')
+            val = self.data.get(field_key)
+            if val:
+                try: rm_ids.add(int(val))
+                except ValueError: pass
+        
+        # 2. 如果表单有实例 (编辑现有 BOM 行)，从实例中获取 raw_material 的 ID
+        # self.instance 是当前 BOMForm 对应的 FormulaBOM 对象
+        if self.instance and self.instance.pk and self.instance.raw_material_id:
+            rm_ids.add(self.instance.raw_material_id)
+        
+        # 3. 如果表单有初始数据 (例如从 LabFormulaDuplicateView 传入的 initial)，从 initial 中获取 raw_material 的 ID
+        # kwargs['initial'] 包含了当前 FormSet 中单个 Form 的初始数据
+        if 'initial' in kwargs and kwargs['initial'] and 'raw_material' in kwargs['initial']:
+            raw_material_val = kwargs['initial']['raw_material']
+            if raw_material_val:
+                # raw_material_val 可能是 RawMaterial 对象，也可能是其 PK
+                rm_ids.add(raw_material_val.pk if hasattr(raw_material_val, 'pk') else raw_material_val)
+
+        # 设置 raw_material 字段的 queryset，确保包含所有需要的 RawMaterial 对象
+        if rm_ids:
+            self.fields['raw_material'].queryset = RawMaterial.objects.filter(pk__in=rm_ids)
+        else:
+            # 如果没有 raw_material 被选中或初始化，则 queryset 为空
+            self.fields['raw_material'].queryset = RawMaterial.objects.none()
 
 
 # 3. 测试结果表单

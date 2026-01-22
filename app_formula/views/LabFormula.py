@@ -117,6 +117,10 @@ class LabFormulaListView(LoginRequiredMixin, ListView):
                 for key, val in data_map[f.pk].items():
                     setattr(f, key, val)
 
+        # 【新增】传递购物车中的配方 ID，用于前端回显勾选状态
+        # 使用新的 Session Key: cart_formulas_v2
+        context['cart_formula_ids'] = self.request.session.get('cart_formulas_v2', [])
+
         context['filter'] = self.filterset
         context['current_std'] = current_std
         context['current_sort'] = self.request.GET.get('sort', '') 
@@ -128,11 +132,9 @@ class LabFormulaDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'formula'
 
     def get_queryset(self):
-        # 【修改】预加载 test_results 时，按 TestConfig 的 order 排序
         return super().get_queryset().select_related('material_type', 'creator', 'process').prefetch_related(
             'bom_lines__raw_material', 
             'test_results__test_config',
-            'test_results__test_config__category', # 预加载分类
             'related_materials'
         )
     
@@ -199,6 +201,119 @@ class LabFormulaCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, "配方已创建")
         # 【修复】使用 self.object.pk 而不是 self.object.id，确保兼容性
         # 并且确保 redirect 使用的是 get_success_url 返回的 URL 字符串
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('formula_detail', kwargs={'pk': self.object.pk})
+
+# 【新增】配方复制视图
+class LabFormulaDuplicateView(LoginRequiredMixin, UpdateView):
+    model = LabFormula
+    form_class = LabFormulaForm
+    template_name = 'apps/app_formula/form.html'
+
+    def get_object(self, queryset=None):
+        # 获取原始配方对象
+        original_formula = super().get_object(queryset)
+        
+        # 创建一个新的配方对象，复制原始配方的数据
+        new_formula = LabFormula(
+            name=f"{original_formula.name} (副本)",
+            material_type=original_formula.material_type,
+            process=original_formula.process,
+            cost_predicted=original_formula.cost_predicted,
+            cost_actual=original_formula.cost_actual,
+            creator=self.request.user, # 设置为当前用户
+            description=original_formula.description
+        )
+        # 注意：这里不保存 new_formula，而是让 UpdateView 处理它
+        # 但 UpdateView 需要一个已存在的对象，所以这种方式不太适合直接用 UpdateView
+        # 更好的方式是使用 CreateView 并填充 initial 数据
+        return original_formula
+
+    # 重新实现为 CreateView 逻辑
+    def dispatch(self, request, *args, **kwargs):
+        self.original_formula = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '复制配方'
+        
+        # 如果是 GET 请求，预填充 FormSet 数据
+        if not self.request.POST:
+            # 复制 BOM
+            bom_initial = []
+            for bom in self.original_formula.bom_lines.all():
+                bom_initial.append({
+                    'feeding_port': bom.feeding_port,
+                    'weighing_scale': bom.weighing_scale,
+                    'raw_material': bom.raw_material,
+                    'percentage': bom.percentage,
+                    'is_tail': bom.is_tail,
+                    'is_pre_mix': bom.is_pre_mix,
+                    'pre_mix_order': bom.pre_mix_order,
+                    'pre_mix_time': bom.pre_mix_time,
+                })
+            context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
+            # 关键：设置 extra 为列表长度，以显示所有初始数据
+            context['bom_formset'].extra = len(bom_initial)
+            
+            # 复制测试结果
+            test_initial = []
+            for res in self.original_formula.test_results.all():
+                test_initial.append({
+                    'test_config': res.test_config,
+                    'value': res.value,
+                    'test_date': res.test_date,
+                    'remark': res.remark,
+                })
+            context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
+            context['test_formset'].extra = len(test_initial)
+            
+        else:
+            context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
+            context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
+            
+        return context
+
+    def get_initial(self):
+        initial = super().get_initial()
+        # 预填充主表单数据
+        initial.update({
+            'name': f"{self.original_formula.name} (副本)",
+            'material_type': self.original_formula.material_type,
+            'process': self.original_formula.process,
+            'cost_actual': self.original_formula.cost_actual,
+            'description': self.original_formula.description,
+            'related_materials': self.original_formula.related_materials.all()
+        })
+        return initial
+
+    def form_valid(self, form):
+        # 这里实际上是创建一个新对象
+        context = self.get_context_data()
+        bom_formset = context['bom_formset']
+        test_formset = context['test_formset']
+        
+        with transaction.atomic():
+            # 创建新配方
+            form.instance.pk = None # 确保是新建
+            form.instance.code = None # 清空单号，让 save() 自动生成
+            form.instance.creator = self.request.user
+            self.object = form.save()
+            
+            if bom_formset.is_valid() and test_formset.is_valid():
+                bom_formset.instance = self.object
+                bom_formset.save()
+                test_formset.instance = self.object
+                test_formset.save()
+                
+                self.object.calculate_cost()
+            else:
+                return self.render_to_response(self.get_context_data(form=form))
+                
+        messages.success(self.request, "配方已复制并创建")
         return redirect(self.get_success_url())
 
     def get_success_url(self):

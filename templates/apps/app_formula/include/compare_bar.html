@@ -1,0 +1,120 @@
+<!-- 悬浮对比栏 -->
+<div id="compare-bar" class="position-fixed bottom-0 start-50 translate-middle-x mb-4 p-3 bg-white border rounded shadow-lg d-none" style="z-index: 1050; min-width: 300px; max-width: 90%;">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="fw-bold">
+            <i class="ti ti-columns me-1 text-primary"></i>
+            配方对比 (<span id="compare-count">0</span>/5)
+        </div>
+        <button type="button" class="btn-close btn-sm" onclick="clearCompareCart()"></button>
+    </div>
+    
+    <div id="compare-items" class="d-flex flex-wrap gap-2 mb-3">
+        <!-- 动态插入对比项 -->
+    </div>
+    
+    <div class="d-flex gap-2">
+        <a href="{% url 'formula_compare' %}" class="btn btn-primary w-100">
+            开始对比
+        </a>
+        <button type="button" class="btn btn-ghost-danger" onclick="clearCompareCart()">
+            清空
+        </button>
+    </div>
+</div>
+
+<script>
+    // 初始化
+    document.addEventListener("DOMContentLoaded", function() {
+        refreshCompareBar();
+    });
+
+    // 刷新对比栏
+    function refreshCompareBar() {
+        fetch("{% url 'formula_compare_cart' %}")
+            .then(response => response.json())
+            .then(data => {
+                const bar = document.getElementById('compare-bar');
+                const countSpan = document.getElementById('compare-count');
+                const itemsDiv = document.getElementById('compare-items');
+                
+                if (!bar || !countSpan || !itemsDiv) return;
+
+                countSpan.textContent = data.count;
+                itemsDiv.innerHTML = '';
+                
+                if (data.count > 0) {
+                    bar.classList.remove('d-none');
+                    data.items.forEach(item => {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-blue-lt d-flex align-items-center';
+                        badge.innerHTML = `
+                            ${item.code}
+                            <a href="#" onclick="removeFromCompare(${item.id}); return false;" class="ms-2 text-muted"><i class="ti ti-x"></i></a>
+                        `;
+                        itemsDiv.appendChild(badge);
+                    });
+                    
+                    // 更新页面上的复选框状态 (如果存在)
+                    document.querySelectorAll('.compare-checkbox').forEach(cb => {
+                        cb.checked = data.items.some(i => i.id == cb.value);
+                    });
+                } else {
+                    bar.classList.add('d-none');
+                    // 清空复选框
+                    document.querySelectorAll('.compare-checkbox').forEach(cb => {
+                        cb.checked = false;
+                    });
+                }
+            })
+            .catch(error => console.error('Error refreshing compare bar:', error));
+    }
+
+    // 加入/移除对比 (Toggle)
+    function toggleCompare(id) {
+        const formData = new FormData();
+        formData.append('action', 'toggle');
+        formData.append('formula_id', id);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        fetch("{% url 'formula_compare_cart' %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert(data.message);
+                // 恢复复选框状态
+                const cb = document.querySelector(`.compare-checkbox[value="${id}"]`);
+                if (cb) cb.checked = !cb.checked;
+            } else {
+                refreshCompareBar();
+            }
+        });
+    }
+
+    // 移除单个
+    function removeFromCompare(id) {
+        const formData = new FormData();
+        formData.append('action', 'remove');
+        formData.append('formula_id', id);
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        fetch("{% url 'formula_compare_cart' %}", {
+            method: 'POST',
+            body: formData
+        }).then(() => refreshCompareBar());
+    }
+
+    // 清空
+    function clearCompareCart() {
+        const formData = new FormData();
+        formData.append('action', 'clear');
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        fetch("{% url 'formula_compare_cart' %}", {
+            method: 'POST',
+            body: formData
+        }).then(() => refreshCompareBar());
+    }
+</script>

@@ -119,6 +119,10 @@ class MaterialListView(LoginRequiredMixin, ListView):
             # 实际上列表页 Template 并没有直接用 val_hdt，而是用了 val_hdt 作为排序参考
             if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("变形温度")
 
+        # 【新增】传递购物车中的材料 ID，用于前端回显勾选状态
+        # 使用新的 Session Key: cart_materials_v2
+        context['cart_material_ids'] = self.request.session.get('cart_materials_v2', [])
+
         context['filter'] = self.filterset
         context['current_sort'] = self.request.GET.get('sort', '')
         context['current_std'] = current_std

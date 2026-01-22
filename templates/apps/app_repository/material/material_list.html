@@ -7,6 +7,10 @@
             <div class="col"><h2 class="page-title">公共材料库</h2></div>
             <div class="col-auto ms-auto">
                 <a href="{% url 'repo_material_add' %}" class="btn btn-primary"><i class="ti ti-plus"></i> 录入</a>
+                <!-- 【新增】加入对比按钮 -->
+                <button type="button" class="btn btn-outline-warning ms-2" onclick="addSelectedToCompare()">
+                    <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                </button>
             </div>
         </div>
     </div>
@@ -116,6 +120,7 @@
             <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
+                    <th class="w-1"><input class="form-check-input m-0 align-middle form-check-input-warning" type="checkbox" aria-label="Select all invoices" onclick="toggleAll(this)"></th>
                     <th><a href="?{% url_replace sort='grade_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">牌号</a></th>
                     <th>类型</th>
                     <th>场景</th>
@@ -143,6 +148,11 @@
                 <tbody>
                 {% for mat in page_obj %}
                     <tr>
+                        <td>
+                            <input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" value="{{ mat.pk }}"
+                                   data-type="material"
+                                   {% if mat.pk in cart_material_ids %}checked{% endif %}>
+                        </td>
                         <td>
                             <a href="{% url 'repo_material_detail' mat.pk %}" class="fw-bold text-primary text-reset">{{ mat.grade_name }}</a>
                             <div class="small text-muted">{{ mat.manufacturer }}</div>
@@ -232,4 +242,57 @@
     <br>
     {% include 'apps/list_modules/paginator.html' %}
 
+    <script>
+        function toggleAll(source) {
+            checkboxes = document.getElementsByClassName('compare-checkbox');
+            for(var i=0, n=checkboxes.length;i<n;i++) {
+                checkboxes[i].checked = source.checked;
+            }
+        }
+        
+        // 【新增】批量加入对比
+        function addSelectedToCompare() {
+            const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请先勾选要对比的材料');
+                return;
+            }
+            
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            
+            // 构建 FormData
+            const formData = new FormData();
+            formData.append('action', 'add_multiple');
+            formData.append('type', 'material'); // 指定类型为材料
+            formData.append('ids', JSON.stringify(ids));
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            // 发送请求
+            fetch("{% url 'formula_compare_cart' %}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 刷新 Header 购物车 (如果存在该函数)
+                    if (typeof refreshCompareCart === 'function') {
+                        refreshCompareCart();
+                    }
+                    // 取消勾选
+                    checkboxes.forEach(cb => cb.checked = false);
+                    const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
+                    if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
+                    
+                    alert('已成功加入 ' + ids.length + ' 个材料到对比清单');
+                } else {
+                    alert('加入失败，请重试');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('发生错误，请稍后重试');
+            });
+        }
+    </script>
 {% endblock %}
