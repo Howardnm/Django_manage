@@ -381,9 +381,9 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             # 颜色标记 (从第3列开始)
             for i, cell in enumerate(row['values']):
                 if cell.get('compare_class') == 'text-red':
-                    ws.cell(row=current_row_idx, column=i+3).font = red_font
-                elif cell.get('compare_class') == 'text-green':
                     ws.cell(row=current_row_idx, column=i+3).font = green_font
+                elif cell.get('compare_class') == 'text-green':
+                    ws.cell(row=current_row_idx, column=i+3).font = red_font
                     
         # 样式调整
         for row in ws.iter_rows(min_row=2):
