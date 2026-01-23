@@ -1,0 +1,4 @@
+python init_configs.py
+python init_materials_data.py
+python init_oem_data.py
+python init_raw_materials_data.py

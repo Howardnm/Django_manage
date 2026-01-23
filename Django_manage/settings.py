@@ -24,7 +24,15 @@ SECRET_KEY = 'django-insecure-)e+q_t^)%a1(&zrgpj=hgz6aeuj-(4edq4tgod(*s8e^(qwvcv
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+# 允许所有ip访问
+ALLOWED_HOSTS = ['*']
+
+# 示例配置（根据你的实际访问方式修改）
+CSRF_TRUSTED_ORIGINS = [
+    'http://192.168.123.18:8080',  # 你的域名（http协议）
+    'https://www.yourdomain.com',  # 若开启了HTTPS，必须添加对应https域名
+    'http://你的服务器公网IP',  # 若用IP访问，也需添加
+]
 
 # Application definition
 
@@ -88,6 +96,17 @@ DATABASES = {
         'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
+
+# DATABASES = {
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "django_manage",
+#         "USER": "django_manage",
+#         "PASSWORD": "6THtw4rFdHpmZ3Ze",
+#         "HOST": "127.0.0.1",
+#         "PORT": "3306",
+#     }
+# }
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators

@@ -3,7 +3,7 @@ import django
 import sys
 
 # 初始化 Django 环境
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Django_manage.settings')
 django.setup()
