@@ -145,8 +145,15 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         # 支持 POST (表单提交) 和 GET (URL参数)
         if self.request.method == 'POST':
             material_id = self.request.POST.get('material_id') # 单个基准材料 (旧逻辑兼容)
-            formula_ids = self.request.POST.getlist('formula_ids')
-            material_ids = self.request.POST.getlist('material_ids') # 多个对比材料
+            # 过滤空值，防止 [''] 导致 int 转换错误
+            formula_ids = [x for x in self.request.POST.getlist('formula_ids') if x]
+            material_ids = [x for x in self.request.POST.getlist('material_ids') if x]
+
+            # 如果完全没传参数，回退到 Session
+            if not formula_ids and not material_ids and not material_id:
+                formula_ids = self.request.session.get('cart_formulas_v2', [])
+                material_ids = self.request.session.get('cart_materials_v2', [])
+
         else:
             material_id = self.request.GET.get('material_id')
             formula_ids = self.request.GET.getlist('ids') # 优先从 URL 获取 ids (旧逻辑兼容)

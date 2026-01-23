@@ -31,6 +31,8 @@
                 {% for col in columns %}
                     {% if col.type == 'formula' %}
                     <input type="hidden" name="formula_ids" value="{{ col.obj.pk }}">
+                    {% elif col.type == 'material' %}
+                    <input type="hidden" name="material_ids" value="{{ col.obj.pk }}">
                     {% endif %}
                 {% endfor %}
                 <button type="submit" name="export_excel" value="true" class="btn btn-primary">
