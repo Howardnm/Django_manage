@@ -11,13 +11,13 @@
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
                 <tr>
-                    <th>分类</th>
-                    <th>指标名称</th>
-                    <th>测试标准</th>
+                    <th><a href="?{% url_replace sort='category'|sort_toggle:current_sort %}" class="table-sort-header text-reset">分类</a></th>
+                    <th><a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">指标名称</a></th>
+                    <th><a href="?{% url_replace sort='standard'|sort_toggle:current_sort %}" class="table-sort-header text-reset">测试标准</a></th>
                     <th>测试条件</th>
                     <th>单位</th>
-                    <th>数据类型</th>
-                    <th>排序权重</th>
+                    <th><a href="?{% url_replace sort='data_type'|sort_toggle:current_sort %}" class="table-sort-header text-reset">数据类型</a></th>
+                    <th><a href="?{% url_replace sort='order'|sort_toggle:current_sort %}" class="table-sort-header text-reset">排序权重</a></th>
                     <th>操作</th>
                 </tr>
                 </thead>

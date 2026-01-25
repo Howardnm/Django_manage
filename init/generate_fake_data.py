@@ -65,19 +65,19 @@ def create_test_configs():
     
     # ISO 标准配置
     configs_iso = [
-        (cat_phys, "密度", "ISO 1183", "", "g/cm³"),
-        (cat_phys, "熔融指数", "ISO 1133", "230℃/2.16kg", "g/10min"),
-        (cat_phys, "灰分", "ISO 3451", "600℃", "%"),
+        (cat_phys, "密度", "ISO 1183", "23℃", "g/cm³"),
+        (cat_phys, "熔融指数 (MFR)", "ISO 1133", "230℃/2.16kg", "g/10min"),
+        (cat_phys, "灰分", "ISO 3451", "600℃/30min", "%"),
         (cat_mech, "拉伸强度", "ISO 527", "50mm/min", "MPa"),
         (cat_mech, "断裂伸长率", "ISO 527", "50mm/min", "%"),
         (cat_mech, "弯曲强度", "ISO 178", "2mm/min", "MPa"),
         (cat_mech, "弯曲模量", "ISO 178", "2mm/min", "MPa"),
-        (cat_mech, "悬臂梁缺口冲击", "ISO 180", "23℃", "kJ/m²"),
+        (cat_mech, "悬臂梁缺口冲击", "ISO 180/1A", "23℃", "kJ/m²"),
     ]
     
     # ASTM 标准配置
     configs_astm = [
-        (cat_phys, "比重", "ASTM D792", "", "g/cm³"),
+        (cat_phys, "比重", "ASTM D792", "23℃", ""),
         (cat_phys, "熔融指数 (MFR)", "ASTM D1238", "230℃/2.16kg", "g/10min"),
         (cat_phys, "灰分", "ASTM D5630", "600℃", "%"),
         (cat_mech, "拉伸强度", "ASTM D638", "50mm/min", "MPa"),

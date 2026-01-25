@@ -41,13 +41,29 @@ class TestConfigListView(LoginRequiredMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('category').order_by('category__order', 'order')
+        qs = super().get_queryset().select_related('category')
+        
+        # 排序逻辑
+        sort_param = self.request.GET.get('sort', '')
+        if sort_param:
+            # 支持多字段排序，例如按分类和权重
+            if sort_param == 'category':
+                qs = qs.order_by('category__order', 'order')
+            elif sort_param == '-category':
+                qs = qs.order_by('-category__order', 'order')
+            else:
+                qs = qs.order_by(sort_param)
+        else:
+            # 默认排序
+            qs = qs.order_by('category__order', 'order')
+            
         self.filterset = TestConfigFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filterset
+        context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
 # 创建视图
