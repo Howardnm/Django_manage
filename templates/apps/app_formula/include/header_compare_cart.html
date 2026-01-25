@@ -72,12 +72,12 @@
                     const rawMaterials = data.items.filter(i => i.type === 'raw_material');
 
                     // 辅助函数：生成列表项 HTML
-                    const renderItem = (item, badgeClass, badgeText, removeType) => `
+                    const renderItem = (item, badgeClass, badgeText, removeType, detailUrl) => `
                         <div class="list-group-item d-flex align-items-center justify-content-between p-2">
                             <div class="d-flex align-items-center text-truncate me-2" style="max-width: 280px;">
                                 <span class="badge ${badgeClass} me-2" style="min-width: 50px;">${badgeText}</span>
                                 <div class="text-truncate">
-                                    <div class="fw-bold small text-truncate" title="${item.name || item.code}">${item.name || item.code}</div>
+                                    <a href="${detailUrl}" class="fw-bold small text-truncate text-reset d-block" title="${item.name || item.code}">${item.name || item.code}</a>
                                     <div class="text-muted small text-truncate" title="${item.desc || '未命名'}">${item.desc || '未命名'}</div>
                                 </div>
                             </div>
@@ -91,7 +91,8 @@
                     if (formulas.length > 0) {
                         itemsContainer.insertAdjacentHTML('beforeend', '<div class="list-group-header sticky-top bg-white">配方 (' + formulas.length + ')</div>');
                         formulas.forEach(item => {
-                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-purple-lt', '配方', 'formula'));
+                            const url = "{% url 'formula_detail' 0 %}".replace('0', item.id);
+                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-purple-lt', '配方', 'formula', url));
                         });
                     }
 
@@ -99,7 +100,8 @@
                     if (materials.length > 0) {
                         itemsContainer.insertAdjacentHTML('beforeend', '<div class="list-group-header sticky-top bg-white">材料 (' + materials.length + ')</div>');
                         materials.forEach(item => {
-                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-blue-lt', '材料', 'material'));
+                            const url = "{% url 'repo_material_detail' 0 %}".replace('0', item.id);
+                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-blue-lt', '材料', 'material', url));
                         });
                     }
 
@@ -107,7 +109,8 @@
                     if (rawMaterials.length > 0) {
                         itemsContainer.insertAdjacentHTML('beforeend', '<div class="list-group-header sticky-top bg-white">原材料 (' + rawMaterials.length + ')</div>');
                         rawMaterials.forEach(item => {
-                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-orange-lt', '原材料', 'raw_material'));
+                            const url = "{% url 'raw_material_detail' 0 %}".replace('0', item.id);
+                            itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-orange-lt', '原材料', 'raw_material', url));
                         });
                     }
                     

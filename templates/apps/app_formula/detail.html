@@ -9,6 +9,10 @@
             </div>
             <div class="col-auto ms-auto">
                 <div class="btn-list">
+                    <!-- 加入对比按钮 -->
+                    <button type="button" class="btn btn-outline-warning" onclick="addToCompare({{ formula.pk }})">
+                        <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                    </button>
                     <!-- 复制配方按钮 -->
                     <a href="{% url 'formula_duplicate' formula.pk %}" class="btn btn-outline-secondary">
                         <i class="ti ti-copy me-1"></i> 复制副本
@@ -47,7 +51,9 @@
                             <tr>
                                 <td><span class="badge bg-secondary-lt">{{ item.get_feeding_port_display }}</span></td>
                                 <td class="fw-bold">
-                                    {{ item.raw_material.name }}
+                                    <a href="{% url 'raw_material_detail' item.raw_material.pk %}" target="_blank" class="text-reset">
+                                        {{ item.raw_material.name }}
+                                    </a>
                                     <span class="text-muted small">({{ item.raw_material.model_name }})</span>
                                 </td>
                                 <td class="fs-3">{{ item.percentage }}</td>
@@ -209,4 +215,35 @@
 
         </div>
     </div>
+
+    <script>
+        function addToCompare(id) {
+            const formData = new FormData();
+            formData.append('action', 'add');
+            formData.append('type', 'formula');
+            formData.append('id', id);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch("{% url 'formula_compare_cart' %}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 刷新 Header 购物车
+                    if (typeof refreshCompareCart === 'function') {
+                        refreshCompareCart();
+                    }
+                    alert('已加入对比清单');
+                } else {
+                    alert('加入失败，请重试');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('发生错误，请稍后重试');
+            });
+        }
+    </script>
 {% endblock %}

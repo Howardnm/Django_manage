@@ -8,9 +8,15 @@
                 <h2 class="page-title">{{ material.name }} {% if material.model_name %}{{ material.model_name }}{% endif %}</h2>
             </div>
             <div class="col-auto ms-auto">
-                <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-primary">
-                    <i class="ti ti-edit me-1"></i> 编辑
-                </a>
+                <div class="btn-list">
+                    <!-- 加入对比按钮 -->
+                    <button type="button" class="btn btn-outline-warning" onclick="addToCompare({{ material.pk }})">
+                        <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                    </button>
+                    <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-primary">
+                        <i class="ti ti-edit me-1"></i> 编辑
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -166,4 +172,35 @@
             </div>
         </div>
     </div>
+
+    <script>
+        function addToCompare(id) {
+            const formData = new FormData();
+            formData.append('action', 'add');
+            formData.append('type', 'raw_material');
+            formData.append('id', id);
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            fetch("{% url 'formula_compare_cart' %}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 刷新 Header 购物车
+                    if (typeof refreshCompareCart === 'function') {
+                        refreshCompareCart();
+                    }
+                    alert('已加入对比清单');
+                } else {
+                    alert('加入失败，请重试');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('发生错误，请稍后重试');
+            });
+        }
+    </script>
 {% endblock %}
