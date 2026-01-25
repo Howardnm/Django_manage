@@ -21,15 +21,18 @@ class FormulaCompareCartView(LoginRequiredMixin, View):
     处理对比列表的增删改查 (基于 Session)
     Session Key: 'cart_formulas_v2' -> [id1, id2, ...] (V2版本，彻底隔离)
     Session Key: 'cart_materials_v2' -> [id1, id2, ...]
+    Session Key: 'cart_raw_materials_v2' -> [id1, id2, ...] (新增：原材料)
     """
     
     def get(self, request):
         """获取当前对比列表"""
         formula_ids = request.session.get('cart_formulas_v2', [])
         material_ids = request.session.get('cart_materials_v2', [])
+        raw_material_ids = request.session.get('cart_raw_materials_v2', [])
         
         formulas = LabFormula.objects.filter(pk__in=formula_ids).values('id', 'code', 'name')
         materials = MaterialLibrary.objects.filter(pk__in=material_ids).values('id', 'grade_name', 'manufacturer')
+        raw_materials = RawMaterial.objects.filter(pk__in=raw_material_ids).values('id', 'name', 'model_name', 'supplier__name')
         
         # 统一格式返回
         items = []
@@ -37,25 +40,32 @@ class FormulaCompareCartView(LoginRequiredMixin, View):
             items.append({'id': f['id'], 'name': f['code'], 'desc': f['name'], 'type': 'formula'})
         for m in materials:
             items.append({'id': m['id'], 'name': m['grade_name'], 'desc': m['manufacturer'], 'type': 'material'})
+        for rm in raw_materials:
+            desc = rm['supplier__name'] if rm['supplier__name'] else ''
+            name = f"{rm['name']} {rm['model_name']}" if rm['model_name'] else rm['name']
+            items.append({'id': rm['id'], 'name': name, 'desc': desc, 'type': 'raw_material'})
             
         return JsonResponse({'count': len(items), 'items': items})
 
     def post(self, request):
         """加入/移除对比"""
         action = request.POST.get('action') # 'add', 'remove', 'clear', 'toggle', 'add_multiple'
-        item_type = request.POST.get('type') # 'formula' or 'material'
+        item_type = request.POST.get('type') # 'formula' or 'material' or 'raw_material'
         
         # 【严格检查】必须指定 type，且必须合法
-        if action != 'clear' and item_type not in ['formula', 'material']:
+        if action != 'clear' and item_type not in ['formula', 'material', 'raw_material']:
             return JsonResponse({'status': 'error', 'message': 'Invalid type parameter'}, status=400)
         
         # 使用 list() 创建副本，防止引用问题
         formula_ids = list(request.session.get('cart_formulas_v2', []))
         material_ids = list(request.session.get('cart_materials_v2', []))
+        raw_material_ids = list(request.session.get('cart_raw_materials_v2', []))
         
         # 确定目标列表
         if item_type == 'material':
             target_list = material_ids
+        elif item_type == 'raw_material':
+            target_list = raw_material_ids
         else:
             target_list = formula_ids
         
@@ -63,6 +73,7 @@ class FormulaCompareCartView(LoginRequiredMixin, View):
             # 清空所有
             formula_ids = []
             material_ids = []
+            raw_material_ids = []
             target_list = [] # 重置引用
             
         elif action == 'add_multiple':
@@ -110,13 +121,18 @@ class FormulaCompareCartView(LoginRequiredMixin, View):
         if action == 'clear':
             request.session['cart_formulas_v2'] = []
             request.session['cart_materials_v2'] = []
+            request.session['cart_raw_materials_v2'] = []
         else:
             if item_type == 'material':
                 request.session['cart_materials_v2'] = target_list
+            elif item_type == 'raw_material':
+                request.session['cart_raw_materials_v2'] = target_list
             elif item_type == 'formula':
                 request.session['cart_formulas_v2'] = target_list
             
-        total_count = len(request.session.get('cart_formulas_v2', [])) + len(request.session.get('cart_materials_v2', []))
+        total_count = len(request.session.get('cart_formulas_v2', [])) + \
+                      len(request.session.get('cart_materials_v2', [])) + \
+                      len(request.session.get('cart_raw_materials_v2', []))
         
         return JsonResponse({
             'status': 'success', 
@@ -148,25 +164,30 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             # 过滤空值，防止 [''] 导致 int 转换错误
             formula_ids = [x for x in self.request.POST.getlist('formula_ids') if x]
             material_ids = [x for x in self.request.POST.getlist('material_ids') if x]
+            raw_material_ids = [x for x in self.request.POST.getlist('raw_material_ids') if x]
 
             # 如果完全没传参数，回退到 Session
-            if not formula_ids and not material_ids and not material_id:
+            if not formula_ids and not material_ids and not raw_material_ids and not material_id:
                 formula_ids = self.request.session.get('cart_formulas_v2', [])
                 material_ids = self.request.session.get('cart_materials_v2', [])
+                raw_material_ids = self.request.session.get('cart_raw_materials_v2', [])
 
         else:
             material_id = self.request.GET.get('material_id')
             formula_ids = self.request.GET.getlist('ids') # 优先从 URL 获取 ids (旧逻辑兼容)
             material_ids = self.request.GET.getlist('m_ids')
+            raw_material_ids = self.request.GET.getlist('rm_ids')
             
             # 如果 URL 没参数，从 Session 获取
-            if not formula_ids and not material_ids and not material_id:
+            if not formula_ids and not material_ids and not raw_material_ids and not material_id:
                 formula_ids = self.request.session.get('cart_formulas_v2', [])
                 material_ids = self.request.session.get('cart_materials_v2', [])
+                raw_material_ids = self.request.session.get('cart_raw_materials_v2', [])
 
         # 2. 获取对象
         formulas = list(LabFormula.objects.filter(pk__in=formula_ids).order_by('created_at'))
         materials = list(MaterialLibrary.objects.filter(pk__in=material_ids).order_by('created_at'))
+        raw_materials = list(RawMaterial.objects.filter(pk__in=raw_material_ids).order_by('created_at'))
         
         # 兼容旧的单基准材料逻辑
         base_material = None
@@ -176,15 +197,17 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             if base_material not in materials:
                 materials.insert(0, base_material)
         
-        if not formulas and not materials:
+        if not formulas and not materials and not raw_materials:
              messages.warning(self.request, "请先选择要对比的项目")
              return context
 
         # 3. 定义列头 (混合排序或分组)
-        # 策略：先放材料，再放配方
+        # 策略：先放材料，再放原材料，再放配方
         columns = []
         for m in materials:
             columns.append({'type': 'material', 'obj': m})
+        for rm in raw_materials:
+            columns.append({'type': 'raw_material', 'obj': rm})
         for f in formulas:
             columns.append({'type': 'formula', 'obj': f})
 
@@ -206,15 +229,16 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             }
             
             for col in columns:
-                if col['type'] == 'material':
-                    row['values'].append({'val': '-', 'is_highlight': False})
-                else:
+                if col['type'] == 'formula':
                     f = col['obj']
                     line = f.bom_lines.filter(raw_material=rm).first()
                     if line:
                         row['values'].append({'val': line.percentage, 'is_highlight': True})
                     else:
                         row['values'].append({'val': '-', 'is_highlight': False})
+                else:
+                    # 材料和原材料没有 BOM
+                    row['values'].append({'val': '-', 'is_highlight': False})
             bom_matrix.append(row)
 
         # ==========================================
@@ -227,6 +251,10 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         for m in materials:
             for p in m.properties.all():
                 all_test_configs.add(p.test_config)
+        
+        for rm in raw_materials:
+            for p in rm.properties.all():
+                all_test_configs.add(p.test_config)
             
         for f in formulas:
             for res in f.test_results.all():
@@ -237,14 +265,27 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         # 预加载数据
         mat_props = {} # {mat_id: {config_id: val}}
         for m in materials:
-            mat_props[m.id] = {p.test_config_id: p.value for p in m.properties.all()}
+            # 兼容非数值类型
+            mat_props[m.id] = {
+                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value 
+                for p in m.properties.all()
+            }
+            
+        raw_mat_props = {} # {raw_mat_id: {config_id: val}}
+        for rm in raw_materials:
+            raw_mat_props[rm.id] = {
+                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value 
+                for p in rm.properties.all()
+            }
             
         formula_props = {} # {formula_id: {config_id: val}}
         for f in formulas:
-            formula_props[f.id] = {r.test_config_id: r.value for r in f.test_results.all()}
+            formula_props[f.id] = {
+                r.test_config_id: r.value_text if r.test_config.data_type != 'NUMBER' else r.value 
+                for r in f.test_results.all()
+            }
 
         # 确定基准值 (取第一列的值作为基准)
-        # columns[0] 可能是材料也可能是配方
         first_col = columns[0] if columns else None
         
         for tc in sorted_configs:
@@ -258,6 +299,8 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             if first_col:
                 if first_col['type'] == 'material':
                     base_val = mat_props.get(first_col['obj'].id, {}).get(tc.id)
+                elif first_col['type'] == 'raw_material':
+                    base_val = raw_mat_props.get(first_col['obj'].id, {}).get(tc.id)
                 else:
                     base_val = formula_props.get(first_col['obj'].id, {}).get(tc.id)
             
@@ -266,17 +309,20 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
                 val = None
                 if col['type'] == 'material':
                     val = mat_props.get(col['obj'].id, {}).get(tc.id)
+                elif col['type'] == 'raw_material':
+                    val = raw_mat_props.get(col['obj'].id, {}).get(tc.id)
                 else:
                     val = formula_props.get(col['obj'].id, {}).get(tc.id)
                 
                 # 对比逻辑 (从第二列开始对比)
                 compare_class = ""
-                if i > 0 and val is not None and base_val is not None:
+                # 只有数值类型才进行大小比较
+                if i > 0 and val is not None and base_val is not None and tc.data_type == 'NUMBER':
                     try:
                         if val > base_val:
-                            compare_class = "text-red"
-                        elif val < base_val:
                             compare_class = "text-green"
+                        elif val < base_val:
+                            compare_class = "text-red"
                     except: pass
                 
                 row['values'].append({
@@ -322,10 +368,14 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         orange_font = Font(color="FFA500", bold=True)
         
         # 1. 表头
-        headers = ["项目 / 维度", "单位"]
+        # 修改表头结构：拆分第一列
+        headers = ["分类 / 项目", "详情 / 标准", "单位"]
         for col in columns:
             if col['type'] == 'material':
                 headers.append(f"材料\n{col['obj'].grade_name}")
+            elif col['type'] == 'raw_material':
+                name = f"{col['obj'].name} {col['obj'].model_name}" if col['obj'].model_name else col['obj'].name
+                headers.append(f"原材料\n{name}")
             else:
                 headers.append(f"配方\n{col['obj'].code}\n{col['obj'].name}")
         ws.append(headers)
@@ -337,29 +387,33 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             cell.border = border
             
         # 2. 描述
-        desc_row = ["描述/备注", "-"]
+        desc_row = ["描述/备注", "-", "-"]
         for col in columns:
             if col['type'] == 'material':
-                 desc_row.append(col['obj'].manufacturer or "-")
+                 desc_row.append(col['obj'].description or "-")
+            elif col['type'] == 'raw_material':
+                 desc_row.append(col['obj'].usage_method or "-")
             else:
                  desc_row.append(col['obj'].description or "-")
         ws.append(desc_row)
         
         # 3. 成本
-        pred_cost_row = ["预测成本", "元/kg"]
+        pred_cost_row = ["预测成本", "-", "元/kg"]
         for col in columns:
-            if col['type'] == 'material':
-                 pred_cost_row.append("-")
-            else:
+            if col['type'] == 'formula':
                  pred_cost_row.append(col['obj'].cost_predicted)
+            elif col['type'] == 'raw_material':
+                 pred_cost_row.append(col['obj'].cost_price or "-")
+            else:
+                 pred_cost_row.append("-")
         ws.append(pred_cost_row)
         
-        act_cost_row = ["实际成本", "元/kg"]
+        act_cost_row = ["实际成本", "-", "元/kg"]
         for col in columns:
-            if col['type'] == 'material':
-                 act_cost_row.append("-")
-            else:
+            if col['type'] == 'formula':
                  act_cost_row.append(col['obj'].cost_actual or "-")
+            else:
+                 act_cost_row.append("-")
         ws.append(act_cost_row)
         
         # 4. BOM
@@ -369,7 +423,12 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         ws.cell(row=ws.max_row, column=1).font = orange_font
         
         for row in bom_matrix:
-            data_row = [f"{row['item'].name} {row['item'].model_name or ''}", "%"]
+            # 修改 BOM 行结构
+            # 第一列：原材料类型
+            # 第二列：原材料名称 + 型号
+            # 第三列：单位
+            item_name = f"{row['item'].name} {row['item'].model_name or ''}"
+            data_row = [row['item'].category.name, item_name, "%"]
             for cell in row['values']:
                 data_row.append(cell['val'])
             ws.append(data_row)
@@ -381,28 +440,37 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         ws.cell(row=ws.max_row, column=1).font = Font(color="800080", bold=True)
         
         for row in test_matrix:
-            data_row = [f"{row['item'].name} ({row['item'].standard} · {row['item'].condition})", row['item'].unit]
+            # 修改性能行结构
+            # 第一列：指标名称
+            # 第二列：标准 + 条件
+            # 第三列：单位
+            standard_info = row['item'].standard
+            if row['item'].condition:
+                standard_info += f" ({row['item'].condition})"
+                
+            data_row = [row['item'].name, standard_info, row['item'].unit]
             ws.append(data_row + [c['val'] for c in row['values']])
             current_row_idx = ws.max_row
             
-            # 颜色标记 (从第3列开始)
+            # 颜色标记 (从第4列开始，因为前3列是固定列)
             for i, cell in enumerate(row['values']):
-                if cell.get('compare_class') == 'text-red':
-                    ws.cell(row=current_row_idx, column=i+3).font = green_font
-                elif cell.get('compare_class') == 'text-green':
-                    ws.cell(row=current_row_idx, column=i+3).font = red_font
+                if cell.get('compare_class') == 'text-green':
+                    ws.cell(row=current_row_idx, column=i+4).font = green_font
+                elif cell.get('compare_class') == 'text-red':
+                    ws.cell(row=current_row_idx, column=i+4).font = red_font
                     
         # 样式调整
         for row in ws.iter_rows(min_row=2):
             for cell in row:
                 cell.alignment = center_align
                 cell.border = border
-                if cell.column == 1:
+                if cell.column == 1 or cell.column == 2: # 前两列左对齐
                     cell.alignment = left_align
                     
-        ws.column_dimensions['A'].width = 40
-        ws.column_dimensions['B'].width = 10
-        for i in range(3, len(headers) + 1):
+        ws.column_dimensions['A'].width = 20 # 分类/项目
+        ws.column_dimensions['B'].width = 30 # 详情/标准
+        ws.column_dimensions['C'].width = 10 # 单位
+        for i in range(4, len(headers) + 1):
             ws.column_dimensions[get_column_letter(i)].width = 20
             
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')

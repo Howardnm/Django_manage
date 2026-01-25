@@ -85,7 +85,7 @@
                                     <thead>
                                     <tr>
                                         <th style="width: 35%;">测试项目</th>
-                                        <th style="width: 20%;">数值</th>
+                                        <th style="width: 20%;">数值 / 结果</th>
                                         <th style="width: 20%;">测试日期</th>
                                         <th>备注</th>
                                         <th class="w-1"></th>
@@ -97,7 +97,14 @@
                                         <tr class="property-form">
                                             {{ form.id }}
                                             <td>{{ form.test_config }}</td>
-                                            <td>{{ form.value }}</td>
+                                            <td>
+                                                <!-- 数值输入框 -->
+                                                {{ form.value }}
+                                                <!-- 文本输入框 -->
+                                                {{ form.value_text }}
+                                                <!-- 选择框 -->
+                                                {{ form.value_select }}
+                                            </td>
                                             <td>{{ form.test_date }}</td>
                                             <td>{{ form.remark }}</td>
                                             <td class="text-center">
@@ -251,7 +258,11 @@
         <tr class="property-form">
             {{ property_formset.empty_form.id }}
             <td>{{ property_formset.empty_form.test_config }}</td>
-            <td>{{ property_formset.empty_form.value }}</td>
+            <td>
+                {{ property_formset.empty_form.value }}
+                {{ property_formset.empty_form.value_text }}
+                {{ property_formset.empty_form.value_select }}
+            </td>
             <td>{{ property_formset.empty_form.test_date }}</td>
             <td>{{ property_formset.empty_form.remark }}</td>
             <td class="text-center">
@@ -263,6 +274,75 @@
     </script>
     
     <script>
+        // 预加载所有 TestConfig 的数据类型信息
+        const testConfigMeta = {};
+        {% for config in property_formset.form.fields.test_config.queryset %}
+            testConfigMeta['{{ config.id }}'] = {
+                type: '{{ config.data_type }}',
+                options: {{ config.get_options_list|safe }}
+            };
+        {% endfor %}
+
+        function toggleValueInput(selectElement) {
+            const row = selectElement.closest('tr');
+            const valueInput = row.querySelector('.value-number');
+            const textInput = row.querySelector('.value-text');
+            const selectInput = row.querySelector('.value-select');
+            const configId = selectElement.value;
+            
+            if (!configId) return;
+            
+            const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+            
+            // 重置显示
+            valueInput.style.display = 'none';
+            textInput.style.display = 'none';
+            selectInput.style.display = 'none';
+            
+            if (meta.type === 'NUMBER') {
+                valueInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                     textInput.value = '';
+                     selectInput.value = '';
+                }
+            } else if (meta.type === 'TEXT') {
+                textInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                    valueInput.value = '';
+                    selectInput.value = '';
+                }
+            } else if (meta.type === 'SELECT') {
+                selectInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                    valueInput.value = '';
+                    textInput.value = '';
+                }
+                
+                // 动态填充选项
+                if (selectInput.options.length <= 1) {
+                    const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
+                    
+                    selectInput.innerHTML = '';
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = '';
+                    emptyOpt.text = '---------';
+                    selectInput.appendChild(emptyOpt);
+                    
+                    meta.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.text = opt;
+                        if (opt === currentValue) {
+                            option.selected = true;
+                        }
+                        selectInput.appendChild(option);
+                    });
+                }
+            }
+            
+            selectElement.dataset.initialized = 'true';
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             const addBtn = document.getElementById('add-property');
             const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
@@ -289,6 +369,12 @@
                             controlInput: '<input>',
                             create: false,
                             placeholder: '输入搜索...',
+                            onChange: function(value) {
+                                // 触发 toggleValueInput
+                                if (typeof toggleValueInput === 'function') {
+                                    toggleValueInput(newSelect);
+                                }
+                            },
                             render: {
                                 no_results: function (data, escape) {
                                     return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
@@ -298,6 +384,26 @@
                     }
                 }
             });
+            
+            // 初始化现有行的显示状态
+            setTimeout(() => {
+                document.querySelectorAll('.form-select-search').forEach(select => {
+                    if (select.value) {
+                        // 尝试恢复 SELECT 类型的值
+                        const row = select.closest('tr');
+                        const selectInput = row.querySelector('.value-select');
+                        const textInput = row.querySelector('.value-text');
+                        const configId = select.value;
+                        const meta = testConfigMeta[configId];
+                        
+                        if (meta && meta.type === 'SELECT' && textInput.value) {
+                            selectInput.setAttribute('data-current-value', textInput.value);
+                        }
+                        
+                        toggleValueInput(select);
+                    }
+                });
+            }, 100);
         });
     </script>
 {% endblock %}

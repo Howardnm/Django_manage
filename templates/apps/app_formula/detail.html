@@ -91,7 +91,7 @@
                             <th>分类</th>
                             <th>测试项目</th>
                             <th>标准/条件</th>
-                            <th>数值</th>
+                            <th>数值 / 结果</th>
                             <th>测试日期</th>
                             <th>备注</th>
                         </tr>
@@ -106,10 +106,15 @@
                                     {% if res.test_config.condition %}<br>({{ res.test_config.condition }}){% endif %}
                                 </td>
                                 <td class="fs-3 fw-bold text-dark">
-                                    {% if "密度" in res.test_config.name %}
-                                        {{ res.value|floatformat:3 }}
+                                    {% if res.test_config.data_type == 'NUMBER' %}
+                                        {% if "密度" in res.test_config.name %}
+                                            {{ res.value|floatformat:3 }}
+                                        {% else %}
+                                            {{ res.value|floatformat:2 }}
+                                        {% endif %}
                                     {% else %}
-                                        {{ res.value|floatformat:2 }}
+                                        <!-- 文本或选择类型，显示 value_text -->
+                                        {{ res.value_text }}
                                     {% endif %}
                                     <span class="text-muted fs-5 fw-normal">{{ res.test_config.unit }}</span>
                                 </td>

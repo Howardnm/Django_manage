@@ -205,7 +205,7 @@
                             <thead>
                             <tr>
                                 <th class="w-50">测试项目</th>
-                                <th class="w-25">数值</th>
+                                <th class="w-25">数值 / 结果</th>
                                 <th>测试日期</th>
                                 <th class="w-25">备注</th>
                                 <th>删除</th>
@@ -223,7 +223,13 @@
                                         {% endif %}
                                     </td>
                                     <td>
+                                        <!-- 数值输入框 -->
                                         {{ form.value }}
+                                        <!-- 文本输入框 -->
+                                        {{ form.value_text }}
+                                        <!-- 选择框 -->
+                                        {{ form.value_select }}
+                                        
                                         {% if form.value.errors %}
                                             <div class="invalid-feedback d-block">{{ form.value.errors.0 }}</div>
                                         {% endif %}
@@ -282,7 +288,11 @@
         <tr class="test-form">
             {{ test_formset.empty_form.id }}
             <td>{{ test_formset.empty_form.test_config }}</td>
-            <td>{{ test_formset.empty_form.value }}</td>
+            <td>
+                {{ test_formset.empty_form.value }}
+                {{ test_formset.empty_form.value_text }}
+                {{ test_formset.empty_form.value_select }}
+            </td>
             <td>{{ test_formset.empty_form.test_date }}</td>
             <td>{{ test_formset.empty_form.remark }}</td>
             <td class="text-center">
@@ -294,6 +304,75 @@
     </script>
 
     <script>
+        // 预加载所有 TestConfig 的数据类型信息
+        const testConfigMeta = {};
+        {% for config in test_formset.form.fields.test_config.queryset %}
+            testConfigMeta['{{ config.id }}'] = {
+                type: '{{ config.data_type }}',
+                options: {{ config.get_options_list|safe }}
+            };
+        {% endfor %}
+
+        function toggleValueInput(selectElement) {
+            const row = selectElement.closest('tr');
+            const valueInput = row.querySelector('.value-number');
+            const textInput = row.querySelector('.value-text');
+            const selectInput = row.querySelector('.value-select');
+            const configId = selectElement.value;
+            
+            if (!configId) return;
+            
+            const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+            
+            // 重置显示
+            valueInput.style.display = 'none';
+            textInput.style.display = 'none';
+            selectInput.style.display = 'none';
+            
+            if (meta.type === 'NUMBER') {
+                valueInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                     textInput.value = '';
+                     selectInput.value = '';
+                }
+            } else if (meta.type === 'TEXT') {
+                textInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                    valueInput.value = '';
+                    selectInput.value = '';
+                }
+            } else if (meta.type === 'SELECT') {
+                selectInput.style.display = 'block';
+                if (selectElement.dataset.initialized === 'true') {
+                    valueInput.value = '';
+                    textInput.value = '';
+                }
+                
+                // 动态填充选项
+                if (selectInput.options.length <= 1) {
+                    const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
+                    
+                    selectInput.innerHTML = '';
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = '';
+                    emptyOpt.text = '---------';
+                    selectInput.appendChild(emptyOpt);
+                    
+                    meta.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt;
+                        option.text = opt;
+                        if (opt === currentValue) {
+                            option.selected = true;
+                        }
+                        selectInput.appendChild(option);
+                    });
+                }
+            }
+            
+            selectElement.dataset.initialized = 'true';
+        }
+
         document.addEventListener('DOMContentLoaded', function () {
             // 1. 初始化远程搜索 (针对主表单字段)
             if (window.TomSelect) {
@@ -367,6 +446,12 @@
                                 controlInput: '<input>',
                                 create: false,
                                 placeholder: '输入搜索...',
+                                onChange: function(value) {
+                                    // 触发 toggleValueInput
+                                    if (typeof toggleValueInput === 'function') {
+                                        toggleValueInput(el);
+                                    }
+                                }
                             });
                         });
 
@@ -420,6 +505,26 @@
 
             setupFormSet('bom', 'add-bom', 'bom-formset', 'bom-empty-form');
             setupFormSet('test', 'add-test', 'test-formset', 'test-empty-form');
+            
+            // 初始化现有行的显示状态
+            setTimeout(() => {
+                document.querySelectorAll('.form-select-search').forEach(select => {
+                    if (select.value) {
+                        // 尝试恢复 SELECT 类型的值
+                        const row = select.closest('tr');
+                        const selectInput = row.querySelector('.value-select');
+                        const textInput = row.querySelector('.value-text');
+                        const configId = select.value;
+                        const meta = testConfigMeta[configId];
+                        
+                        if (meta && meta.type === 'SELECT' && textInput.value) {
+                            selectInput.setAttribute('data-current-value', textInput.value);
+                        }
+                        
+                        toggleValueInput(select);
+                    }
+                });
+            }, 100);
         });
     </script>
 {% endblock %}

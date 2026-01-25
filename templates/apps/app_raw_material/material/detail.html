@@ -126,7 +126,7 @@
                             <th>分类</th>
                             <th>测试项目</th>
                             <th>标准/条件</th>
-                            <th>数值</th>
+                            <th>数值 / 结果</th>
                             <th>测试日期</th>
                             <th>备注</th>
                         </tr>
@@ -141,7 +141,12 @@
                                     {% if prop.test_config.condition %}<br>({{ prop.test_config.condition }}){% endif %}
                                 </td>
                                 <td class="fs-3 fw-bold text-dark">
-                                    {{ prop.value }}
+                                    {% if prop.test_config.data_type == 'NUMBER' %}
+                                        {{ prop.value }}
+                                    {% else %}
+                                        <!-- 文本或选择类型，显示 value_text -->
+                                        {{ prop.value_text }}
+                                    {% endif %}
                                     <span class="text-muted fs-5 fw-normal">{{ prop.test_config.unit }}</span>
                                 </td>
                                 <td>{{ prop.test_date|date:"Y-m-d"|default:"-" }}</td>

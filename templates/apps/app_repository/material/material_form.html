@@ -70,9 +70,11 @@
                 {% endif %}
             </td>
 
-            <!-- 2. 数值 -->
+            <!-- 2. 数值/文本/选择 -->
             <td>
                 {{ data_formset.empty_form.value }}
+                {{ data_formset.empty_form.value_text }}
+                {{ data_formset.empty_form.value_select }}
                 {% if data_formset.empty_form.value.errors %}
                     <div class="text-danger small">{{ data_formset.empty_form.value.errors.0 }}</div>
                 {% endif %}
@@ -109,6 +111,16 @@
                         render: {
                             no_results: function (data, escape) {
                                 return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            }
+                        },
+                        // 监听变化，触发 toggleValueInput
+                        onChange: function(value) {
+                            // 找到原始的 select 元素并触发 onchange 事件
+                            // 因为 Tom Select 会隐藏原始 select，但我们逻辑绑定在原始 select 上
+                            // 或者直接在这里调用逻辑
+                            // 注意：element 是原始 select
+                            if (typeof toggleValueInput === 'function') {
+                                toggleValueInput(element);
                             }
                         }
                     });

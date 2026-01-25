@@ -16,6 +16,7 @@
                     <th>测试标准</th>
                     <th>测试条件</th>
                     <th>单位</th>
+                    <th>数据类型</th>
                     <th>排序权重</th>
                     <th>操作</th>
                 </tr>
@@ -28,6 +29,15 @@
                         <td>{{ config.standard }}</td>
                         <td class="text-muted">{{ config.condition|default:"-" }}</td>
                         <td>{{ config.unit|default:"-" }}</td>
+                        <td>
+                            <span class="badge 
+                                {% if config.data_type == 'NUMBER' %}bg-green-lt
+                                {% elif config.data_type == 'TEXT' %}bg-orange-lt
+                                {% elif config.data_type == 'SELECT' %}bg-purple-lt
+                                {% endif %}">
+                                {{ config.get_data_type_display }}
+                            </span>
+                        </td>
                         <td>{{ config.order }}</td>
                         <td>
                             <a href="{% url 'repo_test_config_edit' config.pk %}" class="btn btn-sm btn-outline-primary">编辑</a>
@@ -35,7 +45,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-4 text-muted">暂无数据</td>
+                        <td colspan="8" class="text-center py-4 text-muted">暂无数据</td>
                     </tr>
                 {% endfor %}
                 </tbody>

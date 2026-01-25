@@ -2,15 +2,33 @@
 {% load project_extras %}
 
 {% block content %}
-    {% include 'apps/list_modules/header.html' with title="原材料库管理" create_url="raw_material_add" %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">原材料库管理</h2>
+                <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a href="{% url 'raw_material_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i>
+                    新建
+                </a>
+                <!-- 【新增】加入对比按钮 (放在新建按钮右侧) -->
+                <button type="button" class="btn btn-outline-warning ms-2" onclick="addSelectedToCompare()">
+                    <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                </button>
+            </div>
+        </div>
+    </div>
     
     <div class="card mt-3">
         {% include 'apps/list_modules/tools_search_filter.html' %}
-        
+
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
+                    <th class="w-1"><input class="form-check-input m-0 align-middle form-check-input-warning" type="checkbox" aria-label="Select all invoices" onclick="toggleAll(this)"></th>
                     <th><a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">原材料名称</a></th>
                     <th><a href="?{% url_replace sort='model_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">型号/供应商</a></th>
                     <th><a href="?{% url_replace sort='category'|sort_toggle:current_sort %}" class="table-sort-header text-reset">类型</a></th>
@@ -34,6 +52,11 @@
                 <tbody>
                 {% for material in materials %}
                     <tr>
+                        <td>
+                            <input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" value="{{ material.pk }}"
+                                   data-type="raw_material"
+                                   {% if material.pk in cart_raw_material_ids %}checked{% endif %}>
+                        </td>
                         <td>
                             <a href="{% url 'raw_material_detail' material.pk %}" class="text-reset fw-bold">{{ material.name }}</a>
                             {% if material.warehouse_code %}
@@ -127,4 +150,58 @@
     </div>
     <br>
     {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+
+    <script>
+        function toggleAll(source) {
+            checkboxes = document.getElementsByClassName('compare-checkbox');
+            for(var i=0, n=checkboxes.length;i<n;i++) {
+                checkboxes[i].checked = source.checked;
+            }
+        }
+        
+        // 【新增】批量加入对比
+        function addSelectedToCompare() {
+            const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
+            if (checkboxes.length === 0) {
+                alert('请先勾选要对比的原材料');
+                return;
+            }
+            
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            
+            // 构建 FormData
+            const formData = new FormData();
+            formData.append('action', 'add_multiple');
+            formData.append('type', 'raw_material'); // 指定类型为原材料
+            formData.append('ids', JSON.stringify(ids));
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            
+            // 发送请求
+            fetch("{% url 'formula_compare_cart' %}", {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // 刷新 Header 购物车 (如果存在该函数)
+                    if (typeof refreshCompareCart === 'function') {
+                        refreshCompareCart();
+                    }
+                    // 取消勾选
+                    checkboxes.forEach(cb => cb.checked = false);
+                    const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
+                    if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
+                    
+                    alert('已成功加入 ' + ids.length + ' 个原材料到对比清单');
+                } else {
+                    alert('加入失败，请重试');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('发生错误，请稍后重试');
+            });
+        }
+    </script>
 {% endblock %}

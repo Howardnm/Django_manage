@@ -117,11 +117,29 @@ class TestConfig(models.Model):
     condition = models.CharField("测试条件", max_length=50, blank=True, help_text="如: 50mm/min")
     unit = models.CharField("单位", max_length=20, blank=True)
     order = models.PositiveIntegerField("排序权重", default=0)
+    
+    # 【新增】数据类型字段
+    DATA_TYPE_CHOICES = [
+        ('NUMBER', '数值 (Number)'),
+        ('TEXT', '文本 (Text)'),
+        ('SELECT', '选择 (Select)'), # 预留，暂未完全实现动态选项配置
+    ]
+    data_type = models.CharField("数据类型", max_length=20, choices=DATA_TYPE_CHOICES, default='NUMBER', help_text="决定录入时的控件类型")
+    
+    # 【新增】选项配置 (仅当 data_type='SELECT' 时有效)
+    # 格式: "V-0,V-1,V-2,HB" (逗号分隔)
+    options_config = models.TextField("选项配置", blank=True, help_text="仅当类型为'选择'时有效，用逗号分隔选项，如: V-0,V-1,HB")
 
     def __str__(self):
         # 下拉框显示文本: [物理] 熔融指数 - ISO 1133 (230℃)
         cond_str = f" ({self.condition})" if self.condition else ""
         return f"[{self.category.name}] {self.name} - {self.standard}{cond_str}"
+    
+    def get_options_list(self):
+        """解析选项配置为列表"""
+        if not self.options_config:
+            return []
+        return [opt.strip() for opt in self.options_config.split(',') if opt.strip()]
 
     class Meta:
         verbose_name = "测试配置项"
@@ -168,8 +186,11 @@ class MaterialLibrary(models.Model):
         # 预加载 test_config 避免 N+1
         for point in self.properties.select_related('test_config').all():
             key = point.test_config.name
+            # 兼容非数值类型
+            val = point.value_text if point.test_config.data_type != 'NUMBER' else point.value
+            
             data[key] = {
-                'value': point.value,
+                'value': val,
                 'unit': point.test_config.unit,
                 'standard': point.test_config.standard,
                 'condition': point.test_config.condition
@@ -201,9 +222,13 @@ class MaterialLibrary(models.Model):
         
         for point in points:
             cat_name = point.test_config.category.name
+            
+            # 兼容非数值类型
+            val = point.value_text if point.test_config.data_type != 'NUMBER' else point.value
+            
             grouped[cat_name].append({
                 'name': point.test_config.name,
-                'value': point.value,
+                'value': val,
                 'unit': point.test_config.unit,
                 'standard': point.test_config.standard,
                 'condition': point.test_config.condition,
@@ -245,7 +270,13 @@ class MaterialLibrary(models.Model):
 class MaterialDataPoint(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='properties')
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
-    value = models.DecimalField("测试数值", max_digits=10, decimal_places=3)
+    
+    # 数值型数据
+    value = models.DecimalField("测试数值", max_digits=10, decimal_places=3, null=True, blank=True)
+    
+    # 【新增】文本型数据 (用于存储非数字结果，如阻燃等级 V-0)
+    value_text = models.CharField("文本结果", max_length=50, blank=True)
+    
     remark = models.CharField("备注", max_length=50, blank=True)
 
     class Meta:

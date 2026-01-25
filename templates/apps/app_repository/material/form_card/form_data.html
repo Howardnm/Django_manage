@@ -10,7 +10,7 @@
             <thead>
             <tr>
                 <th class="w-40 required">测试项目 (指标 | 标准 | 条件)</th>
-                <th class="w-25">数值</th>
+                <th class="w-25">数值 / 结果</th>
                 <th class="w-25">备注</th>
                 <th class="w-1">删</th>
             </tr>
@@ -32,7 +32,13 @@
                             <div class="text-danger small">{{ subform.test_config.errors.0 }}</div>{% endif %}
                     </td>
                     <td>
+                        <!-- 数值输入框 -->
                         {{ subform.value }}
+                        <!-- 文本输入框 -->
+                        {{ subform.value_text }}
+                        <!-- 选择框 -->
+                        {{ subform.value_select }}
+                        
                         {% if subform.value.errors %}
                             <div class="text-danger small">{{ subform.value.errors.0 }}</div>{% endif %}
                     </td>
@@ -59,3 +65,127 @@
                 </span>
     </div>
 </div>
+
+<script>
+    // 预加载所有 TestConfig 的数据类型信息
+    // 格式: { id: {type: 'NUMBER', options: ['A', 'B']} }
+    const testConfigMeta = {};
+    {% for config in data_formset.form.fields.test_config.queryset %}
+        testConfigMeta['{{ config.id }}'] = {
+            type: '{{ config.data_type }}',
+            options: {{ config.get_options_list|safe }}
+        };
+    {% endfor %}
+
+    function toggleValueInput(selectElement) {
+        const row = selectElement.closest('tr');
+        const valueInput = row.querySelector('.value-number');
+        const textInput = row.querySelector('.value-text');
+        const selectInput = row.querySelector('.value-select');
+        const configId = selectElement.value;
+        
+        if (!configId) return;
+        
+        const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+        
+        // 重置显示
+        valueInput.style.display = 'none';
+        textInput.style.display = 'none';
+        selectInput.style.display = 'none';
+        
+        if (meta.type === 'NUMBER') {
+            valueInput.style.display = 'block';
+            // 只有当切换到 NUMBER 时才清空其他值，避免误操作
+            // 但如果是初始化加载，不应该清空
+            if (selectElement.dataset.initialized === 'true') {
+                 textInput.value = '';
+                 selectInput.value = '';
+            }
+        } else if (meta.type === 'TEXT') {
+            textInput.style.display = 'block';
+            if (selectElement.dataset.initialized === 'true') {
+                valueInput.value = '';
+                selectInput.value = '';
+            }
+        } else if (meta.type === 'SELECT') {
+            selectInput.style.display = 'block';
+            if (selectElement.dataset.initialized === 'true') {
+                valueInput.value = '';
+                textInput.value = '';
+            }
+            
+            // 动态填充选项 (仅当选项为空或需要更新时)
+            // 注意：如果是编辑模式，后端可能已经填充了选项，这里需要小心不要覆盖已选值
+            // 检查是否已经有选项了 (除了默认的空选项)
+            if (selectInput.options.length <= 1) {
+                // 保存当前值 (如果是编辑回显)
+                const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
+                
+                // 清空现有选项
+                selectInput.innerHTML = '';
+                // 添加空选项
+                const emptyOpt = document.createElement('option');
+                emptyOpt.value = '';
+                emptyOpt.text = '---------';
+                selectInput.appendChild(emptyOpt);
+                
+                // 添加配置的选项
+                meta.options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.text = opt;
+                    if (opt === currentValue) {
+                        option.selected = true;
+                    }
+                    selectInput.appendChild(option);
+                });
+            }
+        }
+        
+        // 标记为已初始化
+        selectElement.dataset.initialized = 'true';
+    }
+    
+    // 页面加载完成后，初始化所有行的显示状态
+    document.addEventListener("DOMContentLoaded", function() {
+        // 延迟一点执行，确保 Tom Select 初始化完成 (虽然这里我们操作的是原始 select)
+        setTimeout(() => {
+            document.querySelectorAll('.form-select-search').forEach(select => {
+                // 如果有值，触发一次 toggle
+                if (select.value) {
+                    // 对于 SELECT 类型，我们需要先从 value_text 中恢复值到 value_select
+                    // 因为 value_select 是动态生成的，后端渲染时可能没有正确回显
+                    // 或者我们在 form __init__ 中已经处理了，这里只需要确保选项存在
+                    
+                    // 找到对应的行
+                    const row = select.closest('tr');
+                    const selectInput = row.querySelector('.value-select');
+                    const textInput = row.querySelector('.value-text');
+                    
+                    // 如果是 SELECT 类型，且 value_select 为空但 value_text 有值 (通常是编辑时)
+                    // 我们需要把 value_text 的值暂存，以便 toggleValueInput 使用
+                    const configId = select.value;
+                    const meta = testConfigMeta[configId];
+                    
+                    if (meta && meta.type === 'SELECT') {
+                        // 尝试从 textInput 获取值 (因为数据库存的是 value_text)
+                        // 注意：在 form __init__ 中我们可能已经把值赋给了 initial，但前端渲染时 options 是空的
+                        // 所以 value 属性可能没生效。我们需要手动处理。
+                        // 这里假设 value_text 字段里有值 (虽然它被隐藏了)
+                        // 或者我们可以从 value_select 的 value 属性尝试获取 (如果 form 渲染了 value)
+                        
+                        // 更可靠的方法：在后端 form 渲染时，把值放到 data-current-value 属性上
+                        // 但这里我们只能操作 DOM。
+                        
+                        // 变通：检查 textInput 的 value
+                        if (textInput.value) {
+                            selectInput.setAttribute('data-current-value', textInput.value);
+                        }
+                    }
+                    
+                    toggleValueInput(select);
+                }
+            });
+        }, 100);
+    });
+</script>

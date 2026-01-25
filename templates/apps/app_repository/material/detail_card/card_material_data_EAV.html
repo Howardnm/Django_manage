@@ -52,10 +52,15 @@
                                     <!-- 右侧：数值 (高亮加粗) -->
                                     <div class="text-end lh-1 ms-1" style="min-width: 30%;">
                                         <div class="fw-bolder fs-4 text-{{ theme_color }}">
-                                            {% if "密度" in prop.test_config.name or "比重" in prop.test_config.name %}
-                                                {{ prop.value|floatformat:3 }}
+                                            {% if prop.test_config.data_type == 'NUMBER' %}
+                                                {% if "密度" in prop.test_config.name or "比重" in prop.test_config.name %}
+                                                    {{ prop.value|floatformat:3 }}
+                                                {% else %}
+                                                    {{ prop.value|floatformat:2 }}
+                                                {% endif %}
                                             {% else %}
-                                                {{ prop.value|floatformat:2 }}
+                                                <!-- 文本或选择类型，显示 value_text -->
+                                                {{ prop.value_text }}
                                             {% endif %}
                                         </div>
                                         {% if prop.test_config.unit %}

@@ -54,6 +54,18 @@
                         {{ form.order }}
                         <small class="form-hint">数字越小越靠前</small>
                     </div>
+
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">数据类型</label>
+                        {{ form.data_type }}
+                        <small class="form-hint">决定录入时的控件类型</small>
+                    </div>
+
+                    <div class="col-md-12 mb-3" id="options-config-container" style="display: none;">
+                        <label class="form-label">选项配置</label>
+                        {{ form.options_config }}
+                        <small class="form-hint">仅当类型为"选择"时有效，用逗号分隔选项，如: V-0,V-1,HB</small>
+                    </div>
                 </div>
 
                 <div class="form-footer">
@@ -63,4 +75,25 @@
             </form>
         </div>
     </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const dataTypeSelect = document.querySelector('[name="data_type"]');
+            const optionsContainer = document.getElementById('options-config-container');
+
+            function toggleOptions() {
+                if (dataTypeSelect.value === 'SELECT') {
+                    optionsContainer.style.display = 'block';
+                } else {
+                    optionsContainer.style.display = 'none';
+                }
+            }
+
+            // 初始化
+            toggleOptions();
+
+            // 监听变化
+            dataTypeSelect.addEventListener('change', toggleOptions);
+        });
+    </script>
 {% endblock %}

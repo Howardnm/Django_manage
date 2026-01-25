@@ -116,9 +116,12 @@ class LabFormula(models.Model):
             name = res.test_config.name
             # 只筛选关键指标
             if any(k in name for k in key_keywords):
+                # 兼容非数值类型
+                val = res.value_text if res.test_config.data_type != 'NUMBER' else res.value
+                
                 item = {
                     'name': name,
-                    'value': res.value,
+                    'value': val,
                     'unit': res.test_config.unit,
                     'standard': res.test_config.standard
                 }
@@ -183,7 +186,10 @@ class FormulaTestResult(models.Model):
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
     
     # 【修改】改为 DecimalField，保留3位小数
-    value = models.DecimalField("测试数值", max_digits=10, decimal_places=3)
+    value = models.DecimalField("测试数值", max_digits=10, decimal_places=3, null=True, blank=True)
+    
+    # 【新增】文本型数据 (用于存储非数字结果，如阻燃等级 V-0)
+    value_text = models.CharField("文本结果", max_length=50, blank=True)
     
     # 【新增】测试日期
     test_date = models.DateField("测试日期", null=True, blank=True)
