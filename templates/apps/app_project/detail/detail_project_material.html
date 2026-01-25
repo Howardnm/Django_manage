@@ -132,7 +132,18 @@
                                             {% elif '机械' in group.category_name %}text-orange
                                             {% elif '热学' in group.category_name %}text-red
                                             {% else %}text-purple{% endif %}">
-                                            {{ item.value }}
+                                            
+                                            <!-- 【修改】数值格式化逻辑 -->
+                                            {% if item.data_type == 'NUMBER' %}
+                                                {% if "密度" in item.name or "比重" in item.name %}
+                                                    {{ item.value|floatformat:3 }}
+                                                {% else %}
+                                                    {{ item.value|floatformat:2 }}
+                                                {% endif %}
+                                            {% else %}
+                                                <!-- 非数字内容直接显示 -->
+                                                {{ item.value }}
+                                            {% endif %}
                                         </div>
                                         {% if item.unit %}
                                             <div class="text-muted small text-black" style="font-size: 9px">

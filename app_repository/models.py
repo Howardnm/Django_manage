@@ -232,7 +232,8 @@ class MaterialLibrary(models.Model):
                 'unit': point.test_config.unit,
                 'standard': point.test_config.standard,
                 'condition': point.test_config.condition,
-                'remark': point.remark
+                'remark': point.remark,
+                'data_type': point.test_config.data_type # 增加 data_type
             })
             
         # 转换为列表格式，保持分类顺序 (因为 defaultdict 是无序的，但我们查询时已经按 category__order 排序了)

@@ -21,9 +21,10 @@
     <div class="card-body p-3">
         <!-- 描述区 -->
         <div class="">
+            <!-- 使用 linebreaksbr 过滤器保留换行，并使用 style="white-space: pre-wrap;" 保留空格 -->
             <div class="small text-secondary" style="line-height: 1.6;">
                 {% if project.description %}
-                    {{ project.description }}
+                    {{ project.description|linebreaksbr }}
                 {% else %}
                     <span class="fst-italic opacity-50">暂无项目描述...</span>
                 {% endif %}
