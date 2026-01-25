@@ -109,5 +109,11 @@ class RawMaterialProperty(models.Model):
     class Meta:
         verbose_name = "原材料性能"
         verbose_name_plural = "原材料性能表"
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            models.Index(fields=['raw_material']),
+            models.Index(fields=['test_config']),
+            models.Index(fields=['value_text']),
+        ]
         unique_together = ('raw_material', 'test_config')  # 防止重复录入同一指标
         ordering = ['test_config__category__order', 'test_config__order']

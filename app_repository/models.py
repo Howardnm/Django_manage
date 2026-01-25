@@ -282,6 +282,12 @@ class MaterialDataPoint(models.Model):
     class Meta:
         verbose_name = "性能数据"
         unique_together = ('material', 'test_config')  # 防止重复录入同一项
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            models.Index(fields=['material']),
+            models.Index(fields=['test_config']),
+            models.Index(fields=['value_text']),
+        ]
         ordering = ['test_config__category__order', 'test_config__order']
 
 

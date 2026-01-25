@@ -200,4 +200,10 @@ class FormulaTestResult(models.Model):
 
     class Meta:
         verbose_name = "实验测试结果"
+        # 【核心优化】添加联合索引或单列索引
+        indexes = [
+            models.Index(fields=['formula']),
+            models.Index(fields=['test_config']),
+            models.Index(fields=['value_text']),
+        ]
         unique_together = ('formula', 'test_config')
