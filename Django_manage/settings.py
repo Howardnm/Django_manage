@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
     'app_formula.apps.AppFormulaConfig',
+    'app_basic_research.apps.AppBasicResearchConfig',
     "debug_toolbar", # 这是debug_toolbar的配置
 ]
 
@@ -143,11 +144,16 @@ USE_TZ = True
 STATIC_URL = 'static/'
 # MEDIA_URL = 'images/'
 
-# STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成static文件夹，把各个app下的静态文件收集到这个目录下。
+# STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成staticfiles文件夹，把各个app下的静态文件收集到这个目录下。
 # 1.在Django中setting.py文件中加入
-# STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # 2.在终端中输入
 # python manage.py collectstatic
+# 3.nginx设置文件夹映射
+# location /static/ {
+#     alias /www/wwwroot/django_manage/staticfiles/;  # 静态文件绝对路径
+#     expires 30d;  # 缓存静态文件
+# }
 
 
 STATICFILES_DIRS = (
