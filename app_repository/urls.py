@@ -8,7 +8,6 @@ from .views.Scenario import *
 from .views.Salesperson import *
 from common_utils.SecureFileDownload import *
 from .views.TestConfig import *  # 【新增】
-from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
@@ -62,4 +61,4 @@ urlpatterns = [
     path('oems/', OEMListView.as_view(), name='repo_oem_list'),
     path('oems/add/', OEMCreateView.as_view(), name='repo_oem_add'),
     path('oems/<int:pk>/edit/', OEMUpdateView.as_view(), name='repo_oem_edit'),
-] + debug_toolbar_urls() # 这是debug_toolbar的配置
+]

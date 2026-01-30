@@ -16,6 +16,8 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
+
 
 # 自定义 Admin 站点标题
 admin.site.site_header = "项目管理系统后台"
@@ -33,4 +35,4 @@ urlpatterns = [
     path('process/', include('app_process.urls')),
     # 【新增】配方数据库路由
     path('formula/', include('app_formula.urls')),
-]
+] + debug_toolbar_urls() # 这是debug_toolbar的配置
