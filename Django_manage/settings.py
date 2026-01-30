@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_filters',  # django 列表搜索筛选器
     'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
+    'axes', # django-axes
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
@@ -66,6 +67,8 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     "debug_toolbar.middleware.DebugToolbarMiddleware", # 这是debug_toolbar的配置
+    'axes.middleware.AxesMiddleware', # django-axes 登录失败次数中间件
+    'app_user.middleware.SecurityShieldMiddleware', # 访问盾中间件
 ]
 
 ROOT_URLCONF = 'Django_manage.urls'
@@ -174,8 +177,29 @@ INTERNAL_IPS = [
     # ...
 ]
 
-# 【新增】文件上传限制
-# # 限制请求体最大为 50MB (默认是 2.5MB)
-# DATA_UPLOAD_MAX_MEMORY_SIZE = 52428800 / 50  # 50MB
-# # 限制单个文件上传最大为 50MB
-# FILE_UPLOAD_MAX_MEMORY_SIZE = 52428800 / 50  # 50MB
+
+# 注册页面邀请码（当注释掉邀请码时，自动关闭注册入口）
+# REGISTER_INVITE_CODE = '888888'
+
+# 自定义认证后端 (支持邮箱登录)
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend', # django-axes 认证后端
+    # 'app_user.backends.EmailBackend', # 移除邮箱登录
+    'django.contrib.auth.backends.ModelBackend',
+]
+
+# 邮件配置 (使用163邮箱作为示例，请替换为实际配置)
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.163.com'  # SMTP服务器地址
+EMAIL_PORT = 994  # SMTP端口
+EMAIL_USE_SSL = True  # 使用SSL
+EMAIL_HOST_USER = 'bueess@163.com'  # 发件人邮箱
+EMAIL_HOST_PASSWORD = 'DXHZGGWTFIIQAHCV'  # 邮箱授权码 (非登录密码)
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # 默认发件人
+
+# django-axes 配置
+AXES_FAILURE_LIMIT = 5  # 允许失败的次数
+AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），0.0833小时约等于5分钟
+AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True # 根据用户和IP组合锁定
+AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
+AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)

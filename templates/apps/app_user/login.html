@@ -1,16 +1,20 @@
+{% load static %}
 <!doctype html>
 <html lang="zh">
 <head>
     <meta charset="utf-8"/>
     <title>登录 - 项目管理系统</title>
     <!-- 引入 Tabler CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0/dist/css/tabler.min.css">
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
+    <!-- 引入 HTMX -->
+    <script src="{% static 'htmx.org/core-2.0.8/dist/htmx.min.js' %}"></script>
 </head>
 <body class="d-flex flex-column">
 <div class="page page-center">
     <div class="container container-tight py-4">
         <div class="text-center mb-4">
-            <h2>🚀 项目进度管理系统</h2>
+            <h2>🚀 项目管理系统</h2>
         </div>
         <div class="card card-md">
             <div class="card-body">
@@ -18,9 +22,37 @@
                 <form method="post" autocomplete="off">
                     {% csrf_token %}
 
+                    <!-- 锁定提示 -->
+                    {% if locked_message %}
+                        <div class="alert alert-danger">
+                            <div class="d-flex">
+                                <div>
+                                    <i class="ti ti-lock me-2"></i>
+                                </div>
+                                <div>
+                                    {{ locked_message }}
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
                     <!-- 错误提示 -->
                     {% if form.errors %}
-                        <div class="alert alert-danger">用户名或密码错误</div>
+                        <div class="alert alert-danger">
+                            {% if form.non_field_errors %}
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}<br>
+                                {% endfor %}
+                            {% endif %}
+                            
+                            {% for field in form %}
+                                {% if field.errors %}
+                                    {% for error in field.errors %}
+                                        {{ error }}<br>
+                                    {% endfor %}
+                                {% endif %}
+                            {% endfor %}
+                        </div>
                     {% endif %}
 
                     <div class="mb-3">
@@ -28,11 +60,30 @@
                         {{ form.username }}
                     </div>
                     <div class="mb-2">
-                        <label class="form-label">密码</label>
+                        <label class="form-label">
+                            密码
+                            <span class="form-label-description">
+                                <a href="{% url 'password_reset' %}">忘记密码?</a>
+                            </span>
+                        </label>
                         {{ form.password }}
                     </div>
+
+                    <!-- 验证码模块 -->
+                    <div class="mb-3">
+                        <label class="form-label">图形验证码</label>
+                        <div class="row g-2">
+                            <div class="col">
+                                <input type="text" name="captcha" id="captcha-input" class="form-control" placeholder="请输入验证码" required>
+                            </div>
+                            <div class="col-auto">
+                                <img src="{% url 'captcha' %}" id="captcha-img" style="cursor: pointer;" title="点击刷新">
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="form-footer">
-                        <button type="submit" class="btn btn-primary w-100">登录</button>
+                        <button type="submit" class="btn btn-primary w-100" {% if locked_message %}disabled{% endif %}>登录</button>
                     </div>
                 </form>
             </div>
@@ -42,5 +93,19 @@
         </div>
     </div>
 </div>
+
+<!-- 引入 Tabler JS -->
+<script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 刷新验证码
+        var captchaImg = document.getElementById('captcha-img');
+        if (captchaImg) {
+            captchaImg.addEventListener('click', function() {
+                this.src = "{% url 'captcha' %}?t=" + new Date().getTime();
+            });
+        }
+    });
+</script>
 </body>
 </html>

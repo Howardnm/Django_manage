@@ -1,0 +1,95 @@
+{% load static %}
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8"/>
+    <title>安全检查 - 项目管理系统</title>
+    <!-- 引入 Tabler CSS -->
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <style>
+        body {
+            background-color: #f4f6fa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif;
+        }
+        .shield-container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            max-width: 400px;
+            width: 100%;
+        }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #e1e4e8;
+            border-top: 4px solid #206bc4;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h2 {
+            margin: 0 0 10px;
+            color: #232e3c;
+            font-size: 20px;
+        }
+        p {
+            margin: 0;
+            color: #656d77;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="shield-container">
+        <div class="spinner"></div>
+        <h2>正在检查您的浏览器...</h2>
+        <p>请稍候，我们将很快带您进入系统。</p>
+        <p id="status-text" style="margin-top: 10px; font-size: 12px; color: #999;"></p>
+    </div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            var statusText = document.getElementById('status-text');
+            
+            // 模拟一些检查过程 (延迟 1-2 秒)
+            setTimeout(function() {
+                statusText.innerText = "验证环境安全...";
+                
+                // 发送验证请求
+                fetch("{% url 'verify_browser' %}", {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': '{{ csrf_token }}',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({})
+                })
+                .then(response => {
+                    if (response.ok) {
+                        statusText.innerText = "验证通过，正在跳转...";
+                        // 验证成功，跳转回原页面
+                        window.location.href = "{{ next_url }}";
+                    } else {
+                        statusText.innerText = "验证失败，请刷新重试。";
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    statusText.innerText = "连接错误，请检查网络。";
+                });
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

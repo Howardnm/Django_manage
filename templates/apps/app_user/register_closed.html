@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="zh">
+<head>
+    <meta charset="utf-8"/>
+    <title>注册已关闭 - 项目管理系统</title>
+    <!-- 引入 Tabler CSS -->
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
+</head>
+<body class="d-flex flex-column">
+<div class="page page-center">
+    <div class="container container-tight py-4">
+        <div class="text-center mb-4">
+            <h2>🚀 项目管理系统</h2>
+        </div>
+        <div class="card card-md">
+            <div class="card-body text-center">
+                <div class="mb-4">
+                    <!-- 禁止图标 -->
+                    <i class="ti ti-ban text-danger" style="font-size: 80px;"></i>
+                </div>
+                <h2 class="h2 mb-4">注册功能已关闭</h2>
+                <p class="text-muted mb-4">
+                    系统暂未开放注册功能，请联系管理员获取账号。
+                </p>
+                <div class="form-footer">
+                    <a href="{% url 'login' %}" class="btn btn-primary w-100">返回登录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
