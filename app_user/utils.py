@@ -59,7 +59,7 @@ def send_verification_email(email):
         # 在开发环境下，如果发送失败，依然打印验证码方便调试，并视为成功
         if settings.DEBUG:
             print(f"DEBUG: Mock Send Email to {email}: {code}")
-            return code, False, None
+            return code, True, None
         
         # 生产环境返回失败信息
         return None, False, str(e)
