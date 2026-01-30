@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -11,7 +11,8 @@ from app_repository.utils.filters import MaterialTypeFilter
 # ==========================================
 
 # 1. 材料类型列表
-class MaterialTypeListView(LoginRequiredMixin, ListView):
+class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_materialtype'
     model = MaterialType
     # 注意：建议检查路径是否有空格，通常是 material_info
     template_name = 'apps/app_repository/material_info/type_list.html'
@@ -34,7 +35,9 @@ class MaterialTypeListView(LoginRequiredMixin, ListView):
         return context
 
 
-class MaterialTypeCreateView(LoginRequiredMixin, CreateView):
+class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_materialtype'
+    raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
     template_name = 'apps/app_repository/form_generic.html'  # 复用通用模板
@@ -46,7 +49,9 @@ class MaterialTypeCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class MaterialTypeUpdateView(LoginRequiredMixin, UpdateView):
+class MaterialTypeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_materialtype'
+    raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
     template_name = 'apps/app_repository/form_generic.html'

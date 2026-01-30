@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
@@ -11,7 +11,8 @@ from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 
 # 列表视图
-class RawMaterialListView(LoginRequiredMixin, ListView):
+class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/list.html'
     context_object_name = 'materials'
@@ -101,7 +102,8 @@ class RawMaterialListView(LoginRequiredMixin, ListView):
         return context
 
 # 详情视图
-class RawMaterialDetailView(LoginRequiredMixin, DetailView):
+class RawMaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/detail.html'
     context_object_name = 'material'
@@ -110,7 +112,9 @@ class RawMaterialDetailView(LoginRequiredMixin, DetailView):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related('properties__test_config')
 
 # 创建视图 (带 FormSet)
-class RawMaterialCreateView(LoginRequiredMixin, CreateView):
+class RawMaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_raw_material.add_rawmaterial'
+    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
@@ -146,7 +150,9 @@ class RawMaterialCreateView(LoginRequiredMixin, CreateView):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
 
 # 【新增】原材料复制视图
-class RawMaterialDuplicateView(LoginRequiredMixin, UpdateView):
+class RawMaterialDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_raw_material.add_rawmaterial'
+    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
@@ -221,7 +227,9 @@ class RawMaterialDuplicateView(LoginRequiredMixin, UpdateView):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
 
 # 更新视图 (带 FormSet)
-class RawMaterialUpdateView(LoginRequiredMixin, UpdateView):
+class RawMaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_raw_material.change_rawmaterial'
+    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'

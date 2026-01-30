@@ -1,36 +1,36 @@
 from django.contrib import admin
-from .models import *
-# Register your models here.
+from .models import Project, ProjectNode
 
+# 1. 项目节点内联
+class ProjectNodeInline(admin.TabularInline):
+    model = ProjectNode
+    extra = 0
+    fields = ('stage', 'round', 'order', 'status', 'remark', 'updated_at')
+    readonly_fields = ('updated_at',)
+    ordering = ('order',)
+
+# 2. 项目主表 Admin
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    # 1. 修改表格列的展示 (显示 标题, 作者, 分类, 发布状态, 创建时间)
-    list_display = ('name', 'manager', 'created_at', 'description')
-    # 2. 添加右侧过滤器 (按 发布状态, 分类, 创建时间 筛选)
-    list_filter = ('name', 'manager', 'created_at', 'description')
-    # 3. 添加顶部搜索框 (支持按 标题 和 作者 搜索)
-    search_fields = ('name', 'created_at', 'description')
-    # --- 其他常用配置 (可选) ---
-    # 每页显示多少条
-    list_per_page = 20
-    # 默认排序 (负号表示降序)
-    ordering = ('-created_at',)
-    # 点击哪些列可以进入编辑页面
-    list_display_links = ('name',)
+    list_display = ('name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at')
+    list_filter = ('current_stage', 'is_terminated', 'created_at', 'manager')
+    search_fields = ('name', 'manager__username', 'description')
+    readonly_fields = ('created_at', 'current_stage', 'progress_percent', 'is_terminated', 'latest_remark')
+    inlines = [ProjectNodeInline]
+    
+    fieldsets = (
+        ('基本信息', {
+            'fields': ('name', 'manager', 'description')
+        }),
+        ('进度概览 (自动更新)', {
+            'fields': ('current_stage', 'progress_percent', 'is_terminated', 'latest_remark', 'created_at')
+        }),
+    )
 
-
+# 3. 项目节点 Admin (可选)
 @admin.register(ProjectNode)
-class ProjectAdmin(admin.ModelAdmin):
-    # 1. 修改表格列的展示 (显示 标题, 作者, 分类, 发布状态, 创建时间)
-    list_display = ('project', 'stage', 'round', 'order', 'status', 'updated_at', 'remark')
-    # 2. 添加右侧过滤器 (按 发布状态, 分类, 创建时间 筛选)
-    list_filter = ('project', 'stage', 'round', 'order', 'status', 'updated_at', 'remark')
-    # 3. 添加顶部搜索框 (支持按 标题 和 作者 搜索)
-    search_fields = ('stage', 'round', 'order', 'status', 'updated_at', 'remark')
-    # --- 其他常用配置 (可选) ---
-    # 每页显示多少条
-    list_per_page = 20
-    # 默认排序 (负号表示降序)
-    ordering = ('-updated_at',)
-    # 点击哪些列可以进入编辑页面
-    list_display_links = ('project',)
+class ProjectNodeAdmin(admin.ModelAdmin):
+    list_display = ('project', 'stage', 'round', 'order', 'status', 'updated_at')
+    list_filter = ('stage', 'status', 'updated_at')
+    search_fields = ('project__name', 'remark')
+    ordering = ('project', 'order')

@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 from django.db.models import Q
@@ -34,7 +34,8 @@ class TestConfigFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 # 列表视图
-class TestConfigListView(LoginRequiredMixin, ListView):
+class TestConfigListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_testconfig'
     model = TestConfig
     template_name = 'apps/app_repository/test_config/list.html'
     context_object_name = 'configs'
@@ -67,7 +68,9 @@ class TestConfigListView(LoginRequiredMixin, ListView):
         return context
 
 # 创建视图
-class TestConfigCreateView(LoginRequiredMixin, CreateView):
+class TestConfigCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_testconfig'
+    raise_exception = True
     model = TestConfig
     form_class = TestConfigForm
     template_name = 'apps/app_repository/test_config/form.html'
@@ -83,7 +86,9 @@ class TestConfigCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 # 更新视图
-class TestConfigUpdateView(LoginRequiredMixin, UpdateView):
+class TestConfigUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_testconfig'
+    raise_exception = True
     model = TestConfig
     form_class = TestConfigForm
     template_name = 'apps/app_repository/test_config/form.html'

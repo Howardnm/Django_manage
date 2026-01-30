@@ -81,7 +81,8 @@ class ProjectUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView)
 # ==========================================
 # 3. 项目详情
 # ==========================================
-class ProjectDetailView(LoginRequiredMixin, ProjectPermissionMixin, DetailView):
+class ProjectDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, DetailView):
+    permission_required = 'app_project.view_project'
     model = Project
     template_name = 'apps/app_project/detail.html'
     context_object_name = 'project'

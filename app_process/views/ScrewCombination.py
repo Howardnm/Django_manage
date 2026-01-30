@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -7,7 +7,8 @@ from app_process.models import ScrewCombination
 from app_process.forms import ScrewCombinationForm
 from app_process.utils.filters import ScrewCombinationFilter
 
-class ScrewCombinationListView(LoginRequiredMixin, ListView):
+class ScrewCombinationListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_process.view_screwcombination'
     model = ScrewCombination
     template_name = 'apps/app_process/screw/list.html'
     context_object_name = 'screws'
@@ -41,7 +42,9 @@ class ScrewCombinationListView(LoginRequiredMixin, ListView):
         context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
-class ScrewCombinationCreateView(LoginRequiredMixin, CreateView):
+class ScrewCombinationCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_process.add_screwcombination'
+    raise_exception = True
     model = ScrewCombination
     form_class = ScrewCombinationForm
     template_name = 'apps/app_process/screw/form.html'
@@ -56,7 +59,9 @@ class ScrewCombinationCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, "螺杆组合已添加")
         return super().form_valid(form)
 
-class ScrewCombinationUpdateView(LoginRequiredMixin, UpdateView):
+class ScrewCombinationUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_process.change_screwcombination'
+    raise_exception = True
     model = ScrewCombination
     form_class = ScrewCombinationForm
     template_name = 'apps/app_process/screw/form.html'

@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
@@ -12,7 +12,8 @@ from app_formula.utils.filters import LabFormulaFilter
 from app_repository.models import MaterialLibrary
 from app_basic_research.models import ResearchProject
 
-class LabFormulaListView(LoginRequiredMixin, ListView):
+class LabFormulaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_formula.view_labformula'
     model = LabFormula
     template_name = 'apps/app_formula/list.html'
     context_object_name = 'formulas'
@@ -127,7 +128,8 @@ class LabFormulaListView(LoginRequiredMixin, ListView):
         context['current_sort'] = self.request.GET.get('sort', '') 
         return context
 
-class LabFormulaDetailView(LoginRequiredMixin, DetailView):
+class LabFormulaDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    permission_required = 'app_formula.view_labformula'
     model = LabFormula
     template_name = 'apps/app_formula/detail.html'
     context_object_name = 'formula'
@@ -152,7 +154,9 @@ class LabFormulaDetailView(LoginRequiredMixin, DetailView):
         context['sorted_test_results'] = sorted_results
         return context
 
-class LabFormulaCreateView(LoginRequiredMixin, CreateView):
+class LabFormulaCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_formula.add_labformula'
+    raise_exception = True
     model = LabFormula
     form_class = LabFormulaForm
     template_name = 'apps/app_formula/form.html'
@@ -216,7 +220,9 @@ class LabFormulaCreateView(LoginRequiredMixin, CreateView):
         return reverse('formula_detail', kwargs={'pk': self.object.pk})
 
 # 【新增】配方复制视图
-class LabFormulaDuplicateView(LoginRequiredMixin, UpdateView):
+class LabFormulaDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_formula.add_labformula'
+    raise_exception = True
     model = LabFormula
     form_class = LabFormulaForm
     template_name = 'apps/app_formula/form.html'
@@ -329,7 +335,9 @@ class LabFormulaDuplicateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('formula_detail', kwargs={'pk': self.object.pk})
 
-class LabFormulaUpdateView(LoginRequiredMixin, UpdateView):
+class LabFormulaUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_formula.change_labformula'
+    raise_exception = True
     model = LabFormula
     form_class = LabFormulaForm
     template_name = 'apps/app_formula/form.html'

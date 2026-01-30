@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
@@ -9,7 +9,8 @@ from app_process.models import ProcessProfile
 from app_process.forms import ProcessProfileForm
 from app_process.utils.filters import ProcessProfileFilter
 
-class ProcessProfileListView(LoginRequiredMixin, ListView):
+class ProcessProfileListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_process.view_processprofile'
     model = ProcessProfile
     template_name = 'apps/app_process/profile/list.html'
     context_object_name = 'profiles'
@@ -49,7 +50,8 @@ class ProcessProfileListView(LoginRequiredMixin, ListView):
         context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
-class ProcessProfileDetailView(LoginRequiredMixin, DetailView):
+class ProcessProfileDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    permission_required = 'app_process.view_processprofile'
     model = ProcessProfile
     template_name = 'apps/app_process/profile/detail.html'
     context_object_name = 'profile'
@@ -58,7 +60,9 @@ class ProcessProfileDetailView(LoginRequiredMixin, DetailView):
         # 【修改】移除 process_type 关联查询
         return super().get_queryset().select_related('machine', 'screw_combination')
 
-class ProcessProfileCreateView(LoginRequiredMixin, CreateView):
+class ProcessProfileCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_process.add_processprofile'
+    raise_exception = True
     model = ProcessProfile
     form_class = ProcessProfileForm
     template_name = 'apps/app_process/profile/form.html'
@@ -78,7 +82,9 @@ class ProcessProfileCreateView(LoginRequiredMixin, CreateView):
         return super().form_valid(form)
 
 # 【新增】工艺方案复制视图
-class ProcessProfileDuplicateView(LoginRequiredMixin, UpdateView):
+class ProcessProfileDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_process.add_processprofile'
+    raise_exception = True
     model = ProcessProfile
     form_class = ProcessProfileForm
     template_name = 'apps/app_process/profile/form.html'
@@ -140,7 +146,9 @@ class ProcessProfileDuplicateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('process_profile_detail', kwargs={'pk': self.object.pk})
 
-class ProcessProfileUpdateView(LoginRequiredMixin, UpdateView):
+class ProcessProfileUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_process.change_processprofile'
+    raise_exception = True
     model = ProcessProfile
     form_class = ProcessProfileForm
     template_name = 'apps/app_process/profile/form.html'

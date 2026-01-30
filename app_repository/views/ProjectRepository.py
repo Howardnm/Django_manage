@@ -1,6 +1,6 @@
 from django.http import JsonResponse
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views import View
@@ -23,7 +23,8 @@ from django.contrib.auth.models import User
 # ==========================================
 
 # 8. 项目档案总览列表 (已修复，保持不变)
-class ProjectRepositoryListView(LoginRequiredMixin, ProjectPermissionMixin, ListView):
+class ProjectRepositoryListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, ListView):
+    permission_required = 'app_repository.view_projectrepository'
     model = ProjectRepository
     template_name = 'apps/app_repository/project_repo/repo_list.html'
     context_object_name = 'repos'
@@ -51,7 +52,8 @@ class ProjectRepositoryListView(LoginRequiredMixin, ProjectPermissionMixin, List
 
 
 # 1. 档案基本信息编辑 (UpdateView)
-class ProjectRepositoryUpdateView(LoginRequiredMixin, ProjectPermissionMixin, UpdateView):
+class ProjectRepositoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, UpdateView):
+    permission_required = 'app_repository.change_projectrepository'
     model = ProjectRepository
     form_class = ProjectRepositoryForm
     template_name = 'apps/app_repository/project_repo/project_repo_form.html'
@@ -80,7 +82,8 @@ class ProjectRepositoryUpdateView(LoginRequiredMixin, ProjectPermissionMixin, Up
 
 
 # 2. 图纸文件上传视图
-class ProjectFileUploadView(LoginRequiredMixin, ProjectPermissionMixin, CreateView):
+class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, CreateView):
+    permission_required = 'app_repository.add_projectfile'
     model = ProjectFile
     form_class = ProjectFileForm
     template_name = 'apps/app_repository/project_repo/project_file_form.html'
@@ -115,7 +118,9 @@ class ProjectFileUploadView(LoginRequiredMixin, ProjectPermissionMixin, CreateVi
 
 
 # 3. 文件删除视图
-class ProjectFileDeleteView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class ProjectFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_repository.delete_projectfile'
+
     def post(self, request, pk):
         file_obj = get_object_or_404(ProjectFile, pk=pk)
         project = file_obj.repository.project

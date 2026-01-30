@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -7,7 +7,8 @@ from app_process.models import MachineModel
 from app_process.forms import MachineModelForm
 from app_process.utils.filters import MachineModelFilter
 
-class MachineModelListView(LoginRequiredMixin, ListView):
+class MachineModelListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_process.view_machinemodel'
     model = MachineModel
     template_name = 'apps/app_process/machine/list.html'
     context_object_name = 'machines'
@@ -23,7 +24,9 @@ class MachineModelListView(LoginRequiredMixin, ListView):
         context['filter'] = self.filterset
         return context
 
-class MachineModelCreateView(LoginRequiredMixin, CreateView):
+class MachineModelCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_process.add_machinemodel'
+    raise_exception = True
     model = MachineModel
     form_class = MachineModelForm
     template_name = 'apps/app_process/machine/form.html'
@@ -38,7 +41,9 @@ class MachineModelCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, "机台型号已添加")
         return super().form_valid(form)
 
-class MachineModelUpdateView(LoginRequiredMixin, UpdateView):
+class MachineModelUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_process.change_machinemodel'
+    raise_exception = True
     model = MachineModel
     form_class = MachineModelForm
     template_name = 'apps/app_process/machine/form.html'

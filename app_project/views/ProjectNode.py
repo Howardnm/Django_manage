@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -11,7 +11,8 @@ from app_project.models import ProjectNode
 # ==========================================
 # 4. 节点操作：常规更新
 # ==========================================
-class ProjectNodeUpdateView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class ProjectNodeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_project.change_project'
     template_name = 'apps/app_project/detail/modal_box/_project_progress_update.html'
 
     def get_node_and_check_perm(self, pk):
@@ -45,7 +46,8 @@ class ProjectNodeUpdateView(LoginRequiredMixin, ProjectPermissionMixin, View):
 # ==========================================
 # 5. 节点操作：申报不合格 (失败重开)
 # ==========================================
-class NodeFailedView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class NodeFailedView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_project.change_project'
     template_name = 'apps/app_project/detail/modal_box/_project_progress_failed.html'
 
     def get(self, request, pk):
@@ -68,7 +70,8 @@ class NodeFailedView(LoginRequiredMixin, ProjectPermissionMixin, View):
 # ==========================================
 # 6. 节点操作：客户干预/反馈
 # ==========================================
-class InsertFeedbackView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class InsertFeedbackView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_project.change_project'
     template_name = 'apps/app_project/detail/modal_box/_project_progress_feedback.html'
 
     def get(self, request, pk):

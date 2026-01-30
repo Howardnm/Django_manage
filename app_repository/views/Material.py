@@ -1,5 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, FloatField, DecimalField
 from django.shortcuts import get_object_or_404, redirect
@@ -18,7 +18,8 @@ from app_formula.models import FormulaTestResult # 引入配方测试结果模�
 # ==========================================
 
 # --- 列表视图 (含 Tab 切换逻辑) ---
-class MaterialListView(LoginRequiredMixin, ListView):
+class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_materiallibrary'
     model = MaterialLibrary
     template_name = 'apps/app_repository/material/material_list.html'
     context_object_name = 'materials'
@@ -130,7 +131,9 @@ class MaterialListView(LoginRequiredMixin, ListView):
 
 
 # --- 创建视图 ---
-class MaterialCreateView(LoginRequiredMixin, CreateView):
+class MaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_materiallibrary'
+    raise_exception = True
     model = MaterialLibrary
     form_class = MaterialForm
     template_name = 'apps/app_repository/material/material_form.html'
@@ -164,7 +167,9 @@ class MaterialCreateView(LoginRequiredMixin, CreateView):
 
 
 # --- 更新视图 ---
-class MaterialUpdateView(LoginRequiredMixin, UpdateView):
+class MaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_materiallibrary'
+    raise_exception = True
     model = MaterialLibrary
     form_class = MaterialForm
     template_name = 'apps/app_repository/material/material_form.html'
@@ -197,7 +202,8 @@ class MaterialUpdateView(LoginRequiredMixin, UpdateView):
 
 
 # --- 详情视图 ---
-class MaterialDetailView(LoginRequiredMixin, DetailView):
+class MaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+    permission_required = 'app_repository.view_materiallibrary'
     model = MaterialLibrary
     template_name = 'apps/app_repository/material/material_detail.html'
     context_object_name = 'material'
@@ -286,7 +292,8 @@ class MaterialDetailView(LoginRequiredMixin, DetailView):
 # ==========================================
 # 9. 材料附件管理 (新增)
 # ==========================================
-class MaterialFileUploadView(LoginRequiredMixin, CreateView):
+class MaterialFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_materialfile'
     model = MaterialFile
     form_class = MaterialFileForm
     template_name = 'apps/app_repository/material_info/material_file_form.html'  # 专用模板
@@ -311,7 +318,9 @@ class MaterialFileUploadView(LoginRequiredMixin, CreateView):
         return reverse('repo_material_detail', kwargs={'pk': self.object.material.id})
 
 
-class MaterialFileDeleteView(LoginRequiredMixin, View):
+class MaterialFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'app_repository.delete_materialfile'
+
     def post(self, request, pk):
         file_obj = get_object_or_404(MaterialFile, pk=pk)
         material_id = file_obj.material.id

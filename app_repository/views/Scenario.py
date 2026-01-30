@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -11,7 +11,8 @@ from app_repository.utils.filters import ScenarioFilter
 # ==========================================
 
 # 2. 应用场景列表
-class ScenarioListView(LoginRequiredMixin, ListView):
+class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_applicationscenario'
     model = ApplicationScenario
     template_name = 'apps/app_repository/material_info/scenario_list.html'
     context_object_name = 'scenarios'
@@ -30,7 +31,9 @@ class ScenarioListView(LoginRequiredMixin, ListView):
         return context
 
 
-class ScenarioCreateView(LoginRequiredMixin, CreateView):
+class ScenarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_applicationscenario'
+    raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
     template_name = 'apps/app_repository/form_generic.html'
@@ -42,7 +45,9 @@ class ScenarioCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class ScenarioUpdateView(LoginRequiredMixin, UpdateView):
+class ScenarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_applicationscenario'
+    raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
     template_name = 'apps/app_repository/form_generic.html'

@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -9,7 +9,8 @@ from app_repository.utils.filters import OEMFilter
 # ==========================================
 # 7. 主机厂管理 (OEM)
 # ==========================================
-class OEMListView(LoginRequiredMixin, ListView):
+class OEMListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_oem'
     model = OEM
     template_name = 'apps/app_repository/project_repo_info/oem_list.html'
     context_object_name = 'oems'
@@ -27,7 +28,9 @@ class OEMListView(LoginRequiredMixin, ListView):
         return context
 
 
-class OEMCreateView(LoginRequiredMixin, CreateView):
+class OEMCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_oem'
+    raise_exception = True
     model = OEM
     form_class = OEMForm
     template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单
@@ -39,7 +42,9 @@ class OEMCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class OEMUpdateView(LoginRequiredMixin, UpdateView):
+class OEMUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_oem'
+    raise_exception = True
     model = OEM
     form_class = OEMForm
     template_name = 'apps/app_repository/form_generic.html'

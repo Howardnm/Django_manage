@@ -1,4 +1,4 @@
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -9,7 +9,8 @@ from app_repository.utils.filters import SalespersonFilter
 # ==========================================
 # 6. 业务员管理 (Salesperson)
 # ==========================================
-class SalespersonListView(LoginRequiredMixin, ListView):
+class SalespersonListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_repository.view_salesperson'
     model = Salesperson
     template_name = 'apps/app_repository/project_repo_info/salesperson_list.html'
     context_object_name = 'salespersons' # 统一改为 page_obj 配合分页组件
@@ -28,7 +29,9 @@ class SalespersonListView(LoginRequiredMixin, ListView):
         return context
 
 
-class SalespersonCreateView(LoginRequiredMixin, CreateView):
+class SalespersonCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_repository.add_salesperson'
+    raise_exception = True
     model = Salesperson
     form_class = SalespersonForm
     template_name = 'apps/app_repository/form_generic.html'  # 复用通用表单
@@ -40,7 +43,9 @@ class SalespersonCreateView(LoginRequiredMixin, CreateView):
         return context
 
 
-class SalespersonUpdateView(LoginRequiredMixin, UpdateView):
+class SalespersonUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_repository.change_salesperson'
+    raise_exception = True
     model = Salesperson
     form_class = SalespersonForm
     template_name = 'apps/app_repository/form_generic.html'

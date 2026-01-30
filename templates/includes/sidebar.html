@@ -17,53 +17,69 @@
                 {% endif %}
 
                 <!-- 分割线：项目管理部 -->
-                <li class="nav-item mt-3 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">项目管理部</div>
-                </li>
-                <hr class="my-1 mx-3 opacity-25"/>
+                {% if perms.app_project.view_project or perms.app_repository.view_projectrepository %}
+                    <li class="nav-item mt-3 mb-1">
+                        <div class="text-muted text-uppercase small fw-bold ps-3">项目管理部</div>
+                    </li>
+                    <hr class="my-1 mx-3 opacity-25"/>
 
-                <!-- 【模块 2：项目管理】 -->
-                {% if perms.app_project.view_project %}
-                    {% include "sidebar_modules/_projects.html" %}
+                    <!-- 【模块 2：项目管理】 -->
+                    {% if perms.app_project.view_project %}
+                        {% include "sidebar_modules/_projects.html" %}
+                    {% endif %}
+
+                    <!-- 【模块 3：项目资料库】 -->
+                    {% if perms.app_repository.view_projectrepository %}
+                        {% include "sidebar_modules/_repository.html" %}
+                    {% endif %}
                 {% endif %}
-
-                <!-- 【模块 3：项目资料库】 -->
-                {% include "sidebar_modules/_repository.html" %}
 
 
                 <!-- 分割线：研发技术部 -->
-                <li class="nav-item mt-4 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">研发技术部</div>
-                </li>
-                <hr class="my-1 mx-3 opacity-25"/>
+                {% if perms.app_basic_research.view_researchproject or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula %}
+                    <li class="nav-item mt-4 mb-1">
+                        <div class="text-muted text-uppercase small fw-bold ps-3">研发技术部</div>
+                    </li>
+                    <hr class="my-1 mx-3 opacity-25"/>
 
-                <!-- 【新增模块：基础预研项目】 -->
-                {% include "sidebar_modules/_basic_research.html" %}
+                    <!-- 【新增模块：基础预研项目】 -->
+                    {% if perms.app_basic_research.view_researchproject %}
+                        {% include "sidebar_modules/_basic_research.html" %}
+                    {% endif %}
 
-                <!-- 【模块 4：公共材料库】 -->
-                {% include "sidebar_modules/_material_db.html" %}
+                    <!-- 【模块 4：公共材料库】 -->
+                    {% if perms.app_repository.view_materiallibrary %}
+                        {% include "sidebar_modules/_material_db.html" %}
+                    {% endif %}
 
-                <!-- 【模块 7：配方数据库】 -->
-                {% include "sidebar_modules/_formula.html" %}
+                    <!-- 【模块 7：配方数据库】 -->
+                    {% if perms.app_formula.view_labformula %}
+                        {% include "sidebar_modules/_formula.html" %}
+                    {% endif %}
+                {% endif %}
 
                 <!-- 分割线：工艺技术部 -->
-                <li class="nav-item mt-4 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">工艺技术部</div>
-                </li>
-                <hr class="my-1 mx-3 opacity-25"/>
+                {% if perms.app_process.view_processprofile %}
+                    <li class="nav-item mt-4 mb-1">
+                        <div class="text-muted text-uppercase small fw-bold ps-3">工艺技术部</div>
+                    </li>
+                    <hr class="my-1 mx-3 opacity-25"/>
 
-                <!-- 【模块 6：工艺数据库】 -->
-                {% include "sidebar_modules/_process.html" %}
+                    <!-- 【模块 6：工艺数据库】 -->
+                    {% include "sidebar_modules/_process.html" %}
+                {% endif %}
 
 
                 <!-- 分割线：供应链与资源 -->
-                <li class="nav-item mt-4 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">供应链与资源</div>
-                </li>
-                <hr class="my-1 mx-3 opacity-25"/>
+                {% if perms.app_raw_material.view_rawmaterial %}
+                    <li class="nav-item mt-4 mb-1">
+                        <div class="text-muted text-uppercase small fw-bold ps-3">供应链与资源</div>
+                    </li>
+                    <hr class="my-1 mx-3 opacity-25"/>
 
-                <!-- 【模块 5：原材料库】 -->
-                {% include "sidebar_modules/_raw_material.html" %}
+                    <!-- 【模块 5：原材料库】 -->
+                    {% include "sidebar_modules/_raw_material.html" %}
+                {% endif %}
 
                 <!-- 分割线：系统管理 -->
                 {% if perms.auth.view_user or user.is_staff %}
@@ -85,10 +101,7 @@
                 <li class="nav-item">
                     <a class="nav-link" href="{% url 'user_profile' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" fill="none"
-                                 stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path
-                                    d="M10.325 4.317c.426 -1.756 2.924 -1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543 -.94 3.31 .826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756 .426 1.756 2.924 0 3.35a1.724 1.724 0 0 0 -1.066 2.573c.94 1.543 -.826 3.31 -2.37 2.37a1.724 1.724 0 0 0 -2.572 1.065c-.426 1.756 -2.924 1.756 -3.35 0a1.724 1.724 0 0 0 -2.573 -1.066c-1.543 .94 -3.31 -.826 -2.37 -2.37a1.724 1.724 0 0 0 -1.065 -2.572c-1.756 -.426 -1.756 -2.924 0 -3.35a1.724 1.724 0 0 0 1.066 -2.573c-.94 -1.543 .826 -3.31 2.37 -2.37c1 .608 2.296 .07 2.572 -1.065z"/><circle
-                                    cx="12" cy="12" r="3"/></svg>
+                            <i class="ti ti-settings"></i>
                         </span>
                         <span class="nav-link-title">个人设置</span>
                     </a>

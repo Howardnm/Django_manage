@@ -8,7 +8,7 @@ from app_project.mixins import ProjectPermissionMixin
 # ==========================================
 # 10. 通用下载接口
 # ==========================================
-class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class SecureFileDownloadView(LoginRequiredMixin, View):
     """
     通用安全文件下载视图
     URL格式: /repository/download/<app_label>/<model_name>/<pk>/<field_name>/
@@ -28,7 +28,7 @@ class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
             raise Http404("文件记录不存在")
 
         # 3. 【核心修复】动态权限检查
-        self.check_download_permission(obj, model_name)
+        self.check_download_permission(obj, model_name, app_label)
 
         # 4. 获取文件字段
         if not hasattr(obj, field_name):
@@ -48,7 +48,7 @@ class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
         except FileNotFoundError:
             raise Http404("物理文件丢失")
 
-    def check_download_permission(self, obj, model_name):
+    def check_download_permission(self, obj, model_name, app_label):
         """
         根据模型类型执行不同的权限检查策略
         """
@@ -56,37 +56,50 @@ class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
         if user.is_superuser:
             return True
 
+        model_name_lower = model_name.lower()
+
         # 策略 A: 项目相关文件 (ProjectFile)
         # 必须检查用户是否属于该项目组
-        if model_name.lower() == 'projectfile':
+        if model_name_lower == 'projectfile':
             # obj 是 ProjectFile 实例
             # 路径: ProjectFile -> ProjectRepository -> Project
             project = obj.repository.project
-            self.check_project_permission(project) # 使用 Mixin 检查
+            
+            # 手动实例化 Mixin 并调用检查方法
+            mixin = ProjectPermissionMixin()
+            # 注入 request 对象，因为 Mixin 内部需要 self.request.user
+            mixin.request = self.request
+            mixin.check_project_permission(project) 
             return True
 
         # 策略 B: 材料库文件 (MaterialLibrary, MaterialFile)
-        # 假设材料库对所有登录用户开放，或者检查是否有 'app_repository.view_materiallibrary' 权限
-        elif model_name.lower() in ['materiallibrary', 'materialfile']:
-            # 简单策略：只要登录就能看 (LoginRequiredMixin 已保证)
-            # 进阶策略：检查权限
-            # if not user.has_perm('app_repository.view_materiallibrary'):
-            #     raise PermissionDenied("您没有查看材料库的权限")
+        elif model_name_lower in ['materiallibrary', 'materialfile']:
+            if not user.has_perm('app_repository.view_materiallibrary'):
+                raise PermissionDenied("您没有查看材料库的权限")
             return True
         
         # 策略 D: 工艺库文件 (ScrewCombination)
-        # 假设工艺库对所有登录用户开放
-        elif model_name.lower() == 'screwcombination':
+        elif model_name_lower == 'screwcombination':
+            if not user.has_perm('app_process.view_screwcombination'):
+                raise PermissionDenied("您没有查看螺杆组合的权限")
             return True
             
         # 策略 E: 原材料库文件 (RawMaterial)
-        # 假设原材料库对所有登录用户开放
-        elif model_name.lower() == 'rawmaterial':
+        elif model_name_lower == 'rawmaterial':
+            if not user.has_perm('app_raw_material.view_rawmaterial'):
+                raise PermissionDenied("您没有查看原材料的权限")
             return True
             
         # 策略 F: 预研项目文件 (ResearchProjectFile)
-        # 假设预研项目对所有登录用户开放，或者检查是否有 'app_basic_research.view_researchproject' 权限
-        elif model_name.lower() == 'researchprojectfile':
+        elif model_name_lower == 'researchprojectfile':
+            if not user.has_perm('app_basic_research.view_researchproject'):
+                raise PermissionDenied("您没有查看预研项目的权限")
+            return True
+            
+        # 策略 G: 配方库文件 (FormulaTestResult)
+        elif model_name_lower == 'formulatestresult':
+            if not user.has_perm('app_formula.view_labformula'):
+                raise PermissionDenied("您没有查看实验配方的权限")
             return True
 
         # 策略 C: 其他未知模型

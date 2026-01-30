@@ -2,7 +2,7 @@ import io
 from datetime import datetime
 from django.http import HttpResponse
 from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.shortcuts import get_object_or_404
 from docx import Document
 from docx.shared import Pt, Inches, RGBColor
@@ -12,7 +12,9 @@ from docx.oxml.ns import qn
 from app_project.models import Project
 from app_project.mixins import ProjectPermissionMixin
 
-class ProjectReportExportView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class ProjectReportExportView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_project.view_project'
+
     def get(self, request, pk):
         # 1. 获取项目对象并检查权限
         project = get_object_or_404(Project.objects.select_related(

@@ -1,19 +1,19 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
-from django.db.models import Q
 
 from app_raw_material.models import RawMaterialType
 from app_raw_material.forms import RawMaterialTypeForm
 from app_raw_material.utils.filters import RawMaterialTypeFilter
 
-class RawMaterialTypeListView(LoginRequiredMixin, ListView):
+class RawMaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+    permission_required = 'app_raw_material.view_rawmaterialtype'
     model = RawMaterialType
     template_name = 'apps/app_raw_material/type/list.html'
     context_object_name = 'types'
     paginate_by = 20
-    
+
     def get_queryset(self):
         qs = super().get_queryset().order_by('order', 'name')
         self.filterset = RawMaterialTypeFilter(self.request.GET, queryset=qs)
@@ -26,7 +26,9 @@ class RawMaterialTypeListView(LoginRequiredMixin, ListView):
         context['page_title'] = '原材料类型管理'
         return context
 
-class RawMaterialTypeCreateView(LoginRequiredMixin, CreateView):
+class RawMaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+    permission_required = 'app_raw_material.add_rawmaterialtype'
+    raise_exception = True
     model = RawMaterialType
     form_class = RawMaterialTypeForm
     template_name = 'apps/app_raw_material/type/form.html'
@@ -41,7 +43,9 @@ class RawMaterialTypeCreateView(LoginRequiredMixin, CreateView):
         messages.success(self.request, "类型已添加")
         return super().form_valid(form)
 
-class RawMaterialTypeUpdateView(LoginRequiredMixin, UpdateView):
+class RawMaterialTypeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+    permission_required = 'app_raw_material.change_rawmaterialtype'
+    raise_exception = True
     model = RawMaterialType
     form_class = RawMaterialTypeForm
     template_name = 'apps/app_raw_material/type/form.html'
