@@ -22,7 +22,102 @@
     </div>
     
     <div class="card mt-3">
-        {% include 'apps/list_modules/tools_search_filter.html' %}
+        <!-- 1. 标准切换 Tabs -->
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a href="?{% url_replace std='ISO' page=1 %}" class="nav-link {% if current_std != 'ASTM' %}active{% endif %}">
+                        ISO / 国标
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="?{% url_replace std='ASTM' page=1 %}" class="nav-link {% if current_std == 'ASTM' %}active{% endif %}">
+                        ASTM (美标)
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- 2. 筛选区域 -->
+        <div class="card-body border-bottom py-3">
+            <form method="GET" class="row g-2 align-items-center">
+                <!-- 保持当前标准和排序参数 -->
+                <input type="hidden" name="std" value="{{ current_std }}">
+                {% for s in request.GET.getlist.sort %}
+                    <input type="hidden" name="sort" value="{{ s }}">
+                {% endfor %}
+
+                <!-- 基础筛选 -->
+                <div class="col-auto">
+                    <div class="input-icon">
+                        <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                        {{ filter.form.q }}
+                    </div>
+                </div>
+                <div class="col-auto">
+                    {{ filter.form.category }}
+                </div>
+                <div class="col-auto">
+                    {{ filter.form.supplier }}
+                </div>
+
+                <!-- 性能范围筛选 (折叠/展开) -->
+                <div class="col-auto">
+                    <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
+                        <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
+                    </button>
+                </div>
+
+                <div class="col-auto ms-auto">
+                    <button type="submit" class="btn btn-primary btn-icon"><i class="ti ti-search"></i></button>
+                    <a href="?std={{ current_std }}" class="btn btn-ghost-danger ms-2">重置</a>
+                </div>
+
+                <!-- 高级筛选面板 -->
+                <div class="collapse w-100 mt-2" id="advanced-filter">
+                    <div class="card card-body bg-blue-lt">
+                        <div class="row g-3">
+                            <!-- 熔指 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">熔融指数</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.melt_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.melt_max }}
+                                </div>
+                            </div>
+                            <!-- 拉伸 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">拉伸强度 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.tensile_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.tensile_max }}
+                                </div>
+                            </div>
+                            <!-- 弯曲模量 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">弯曲模量 (MPa)</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.flex_modulus_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.flex_modulus_max }}
+                                </div>
+                            </div>
+                            <!-- 冲击 -->
+                            <div class="col-md-3">
+                                <label class="form-label small">冲击强度</label>
+                                <div class="input-group input-group-sm">
+                                    {{ filter.form.impact_min }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form.impact_max }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
 
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
@@ -131,12 +226,17 @@
                         </td>
                         
                         <td>
-                            <a href="{% url 'raw_material_detail' material.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
-                                <i class="ti ti-list"></i>
-                            </a>
-                            <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="编辑">
-                                <i class="ti ti-edit"></i>
-                            </a>
+                            <div class="btn-list flex-nowrap">
+                                <a href="{% url 'raw_material_duplicate' material.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="复制副本">
+                                    <i class="ti ti-copy"></i>
+                                </a>
+                                <a href="{% url 'raw_material_detail' material.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
+                                    <i class="ti ti-list"></i>
+                                </a>
+                                <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="编辑">
+                                    <i class="ti ti-edit"></i>
+                                </a>
+                            </div>
                         </td>
                     </tr>
                 {% empty %}

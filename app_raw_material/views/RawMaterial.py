@@ -61,7 +61,8 @@ class RawMaterialListView(LoginRequiredMixin, ListView):
                     )
                 })
 
-        self.filterset = RawMaterialFilter(self.request.GET, queryset=qs)
+        # 【修复】传入 request 参数，以便 FilterSet 内部可以访问 self.request (用于性能筛选)
+        self.filterset = RawMaterialFilter(self.request.GET, queryset=qs, request=self.request)
         return self.filterset.qs
 
     def get_context_data(self, **kwargs):
@@ -139,6 +140,81 @@ class RawMaterialCreateView(LoginRequiredMixin, CreateView):
                 
         messages.success(self.request, "原材料已添加")
         # 【修改】跳转到详情页
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
+
+# 【新增】原材料复制视图
+class RawMaterialDuplicateView(LoginRequiredMixin, UpdateView):
+    model = RawMaterial
+    form_class = RawMaterialForm
+    template_name = 'apps/app_raw_material/material/form.html'
+
+    def get_object(self, queryset=None):
+        original_material = super().get_object(queryset)
+        return original_material
+
+    # 重新实现为 CreateView 逻辑
+    def dispatch(self, request, *args, **kwargs):
+        self.original_material = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '复制原材料'
+        
+        # 如果是 GET 请求，预填充 FormSet 数据
+        if not self.request.POST:
+            # 复制性能指标
+            prop_initial = []
+            for prop in self.original_material.properties.all():
+                prop_initial.append({
+                    'test_config': prop.test_config,
+                    'value': prop.value,
+                    'value_text': prop.value_text,
+                    'test_date': prop.test_date,
+                    'remark': prop.remark,
+                })
+            context['property_formset'] = RawMaterialPropertyFormSet(initial=prop_initial)
+            context['property_formset'].extra = len(prop_initial)
+        else:
+            context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST)
+            
+        return context
+
+    def get_initial(self):
+        initial = super().get_initial()
+        # 预填充主表单数据
+        initial.update({
+            'name': f"{self.original_material.name} (副本)",
+            'model_name': self.original_material.model_name,
+            'warehouse_code': None, # 清空编码
+            'category': self.original_material.category,
+            'supplier': self.original_material.supplier,
+            'usage_method': self.original_material.usage_method,
+            'cost_price': self.original_material.cost_price,
+            'purchase_date': self.original_material.purchase_date,
+            'suitable_materials': self.original_material.suitable_materials.all(),
+        })
+        return initial
+
+    def form_valid(self, form):
+        context = self.get_context_data()
+        property_formset = context['property_formset']
+        
+        with transaction.atomic():
+            # 创建新原材料
+            form.instance.pk = None # 确保是新建
+            self.object = form.save()
+            
+            if property_formset.is_valid():
+                property_formset.instance = self.object
+                property_formset.save()
+            else:
+                return self.render_to_response(self.get_context_data(form=form))
+                
+        messages.success(self.request, "原材料已复制并创建")
         return redirect(self.get_success_url())
 
     def get_success_url(self):

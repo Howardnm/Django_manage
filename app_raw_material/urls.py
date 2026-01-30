@@ -19,4 +19,6 @@ urlpatterns = [
     path('materials/add/', RawMaterialCreateView.as_view(), name='raw_material_add'),
     path('materials/<int:pk>/', RawMaterialDetailView.as_view(), name='raw_material_detail'),
     path('materials/<int:pk>/edit/', RawMaterialUpdateView.as_view(), name='raw_material_edit'),
+    # 【新增】复制副本路由
+    path('materials/<int:pk>/duplicate/', RawMaterialDuplicateView.as_view(), name='raw_material_duplicate'),
 ]

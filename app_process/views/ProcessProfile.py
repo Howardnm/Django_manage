@@ -2,6 +2,8 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy, reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
+from django.db import transaction
+from django.shortcuts import redirect
 
 from app_process.models import ProcessProfile
 from app_process.forms import ProcessProfileForm
@@ -74,6 +76,69 @@ class ProcessProfileCreateView(LoginRequiredMixin, CreateView):
     def form_valid(self, form):
         messages.success(self.request, "工艺方案已添加")
         return super().form_valid(form)
+
+# 【新增】工艺方案复制视图
+class ProcessProfileDuplicateView(LoginRequiredMixin, UpdateView):
+    model = ProcessProfile
+    form_class = ProcessProfileForm
+    template_name = 'apps/app_process/profile/form.html'
+
+    def get_object(self, queryset=None):
+        original_profile = super().get_object(queryset)
+        return original_profile
+
+    # 重新实现为 CreateView 逻辑
+    def dispatch(self, request, *args, **kwargs):
+        self.original_profile = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+        
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = '复制工艺方案'
+        return context
+
+    def get_initial(self):
+        initial = super().get_initial()
+        # 预填充主表单数据
+        initial.update({
+            'name': f"{self.original_profile.name} (副本)",
+            'machine': self.original_profile.machine,
+            'screw_combination': self.original_profile.screw_combination,
+            'material_types': self.original_profile.material_types.all(),
+            'throughput': self.original_profile.throughput,
+            'screw_speed': self.original_profile.screw_speed,
+            'torque': self.original_profile.torque,
+            'melt_temp': self.original_profile.melt_temp,
+            'melt_pressure': self.original_profile.melt_pressure,
+            'vacuum': self.original_profile.vacuum,
+            'temp_zone_1': self.original_profile.temp_zone_1,
+            'temp_zone_2': self.original_profile.temp_zone_2,
+            'temp_zone_3': self.original_profile.temp_zone_3,
+            'temp_zone_4': self.original_profile.temp_zone_4,
+            'temp_zone_5': self.original_profile.temp_zone_5,
+            'temp_zone_6': self.original_profile.temp_zone_6,
+            'temp_zone_7': self.original_profile.temp_zone_7,
+            'temp_zone_8': self.original_profile.temp_zone_8,
+            'temp_zone_9': self.original_profile.temp_zone_9,
+            'temp_zone_10': self.original_profile.temp_zone_10,
+            'temp_zone_11': self.original_profile.temp_zone_11,
+            'temp_zone_12': self.original_profile.temp_zone_12,
+            'temp_head': self.original_profile.temp_head,
+            'description': self.original_profile.description,
+        })
+        return initial
+
+    def form_valid(self, form):
+        with transaction.atomic():
+            # 创建新工艺方案
+            form.instance.pk = None # 确保是新建
+            self.object = form.save()
+                
+        messages.success(self.request, "工艺方案已复制并创建")
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('process_profile_detail', kwargs={'pk': self.object.pk})
 
 class ProcessProfileUpdateView(LoginRequiredMixin, UpdateView):
     model = ProcessProfile

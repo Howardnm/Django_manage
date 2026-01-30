@@ -19,4 +19,6 @@ urlpatterns = [
     path('profiles/add/', ProcessProfileCreateView.as_view(), name='process_profile_add'),
     path('profiles/<int:pk>/', ProcessProfileDetailView.as_view(), name='process_profile_detail'),
     path('profiles/<int:pk>/edit/', ProcessProfileUpdateView.as_view(), name='process_profile_edit'),
+    # 【新增】复制副本路由
+    path('profiles/<int:pk>/duplicate/', ProcessProfileDuplicateView.as_view(), name='process_profile_duplicate'),
 ]
