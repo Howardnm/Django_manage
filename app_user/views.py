@@ -33,6 +33,18 @@ class CustomLoginView(LoginView):
             context['locked_message'] = f"登录失败次数过多，账号已被锁定 {cooloff_minutes} 分钟，请稍后再试。"
         return context
 
+    def form_valid(self, form):
+        # 处理 "保持登录" 逻辑
+        remember_me = form.cleaned_data.get('remember_me')
+        if not remember_me:
+            # 如果未勾选，设置 session 在浏览器关闭时失效
+            self.request.session.set_expiry(0)
+        else:
+            # 如果勾选，使用 settings.SESSION_COOKIE_AGE (默认10小时)
+            self.request.session.set_expiry(settings.SESSION_COOKIE_AGE)
+            
+        return super().form_valid(form)
+
     def form_invalid(self, form):
         # 检查是否被 axes 锁定
         response = super().form_invalid(form)

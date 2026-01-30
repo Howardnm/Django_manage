@@ -203,3 +203,7 @@ AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），0.0833小时约等于5
 AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True # 根据用户和IP组合锁定
 AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
+
+# Session 配置
+SESSION_COOKIE_AGE = 36000  # 保持登录10小时 (10 * 60 * 60)
+SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登录 (除非勾选"保持登录")

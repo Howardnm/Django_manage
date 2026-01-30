@@ -82,6 +82,14 @@
                         </div>
                     </div>
 
+                    <!-- 保持登录 -->
+                    <div class="mb-2">
+                        <label class="form-check">
+                            {{ form.remember_me }}
+                            <span class="form-check-label">在此设备上保持登录</span>
+                        </label>
+                    </div>
+
                     <div class="form-footer">
                         <button type="submit" class="btn btn-primary w-100" {% if locked_message %}disabled{% endif %}>登录</button>
                     </div>

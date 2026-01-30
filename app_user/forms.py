@@ -8,12 +8,15 @@ from .models import UserProfile
 
 # 1. 登录表单
 class UserLoginForm(AuthenticationForm):
+    remember_me = forms.BooleanField(label="在此设备上保持登录", required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
+
     def __init__(self, request=None, *args, **kwargs):
         # 接收 request 参数，以便在 clean 方法中访问 session
         self.request = request
         super().__init__(request, *args, **kwargs)
         for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})
+            if field.widget.attrs.get('class') != 'form-check-input':
+                field.widget.attrs.update({'class': 'form-control'})
 
     def clean(self):
         # 1. 先校验验证码
