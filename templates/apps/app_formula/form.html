@@ -102,6 +102,14 @@
                                     <div class="invalid-feedback d-block">{{ form.related_materials.errors.0 }}</div>
                                 {% endif %}
                             </div>
+                            <!-- 新增：关联预研项目 -->
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">关联预研项目</label>
+                                {{ form.research_projects }}
+                                {% if form.research_projects.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.research_projects.errors.0 }}</div>
+                                {% endif %}
+                            </div>
                             <div class="col-md-4 mb-3">
                                 <label class="form-label">实际成本 (元/kg)</label>
                                 <div class="input-group">
@@ -112,7 +120,7 @@
                                     <div class="invalid-feedback d-block">{{ form.cost_actual.errors.0 }}</div>
                                 {% endif %}
                             </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-12 mb-3">
                                 <label class="form-label">实验描述</label>
                                 {{ form.description }}
                                 {% if form.description.errors %}

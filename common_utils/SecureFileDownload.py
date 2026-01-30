@@ -83,6 +83,11 @@ class SecureFileDownloadView(LoginRequiredMixin, ProjectPermissionMixin, View):
         # 假设原材料库对所有登录用户开放
         elif model_name.lower() == 'rawmaterial':
             return True
+            
+        # 策略 F: 预研项目文件 (ResearchProjectFile)
+        # 假设预研项目对所有登录用户开放，或者检查是否有 'app_basic_research.view_researchproject' 权限
+        elif model_name.lower() == 'researchprojectfile':
+            return True
 
         # 策略 C: 其他未知模型
         # 默认拒绝，防止意外暴露其他敏感数据

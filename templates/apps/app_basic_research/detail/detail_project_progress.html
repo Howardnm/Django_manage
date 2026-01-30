@@ -1,0 +1,90 @@
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title">执行进度追踪</h3>
+    </div>
+    <div class="card-body">
+        <ul class="steps steps-vertical">
+            {% for node in nodes %}
+                <!-- 垂直进度条 -->
+                <li class="step-item {{ node.row_active_class }}">
+
+                    <div class="h4 m-0 d-flex align-items-center justify-content-between">
+                            <span>
+                                <span class="{% if node.status == 'PENDING' %}text-secondary{% else %}text-primary{% endif %}">
+                                    {{ forloop.counter }}、{{ node.get_stage_display }}
+                                </span>
+                                {% if node.round > 1 %}
+                                    <span class="badge bg-secondary-lt">第{{ node.round }}轮</span>
+                                {% endif %}
+                            </span>
+
+                        <span class="badge {{ node.status_css_class }}">
+                                {{ node.get_status_display }}
+                            </span>
+                    </div>
+
+                    <!-- 备注区域 -->
+                    {% if node.remark %}
+                        <div class="mt-2">
+                            <div class="card card-sm border-0 bg-muted-lt">
+                                <div class="card-body p-2">
+                                    <div class="d-flex align-items-start">
+                                        <div class="me-2 text-secondary">
+                                            <i class="ti ti-note"></i>
+                                        </div>
+                                        <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ node.remark|linebreaksbr }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-secondary mt-1 small text-muted">
+                            <i class="ti ti-note me-1"></i>暂无备注
+                        </div>
+                    {% endif %}
+
+                    {% if node.status != 'PENDING' %}
+                        <div class="text-muted small mt-1 primary">
+                            更新于: {{ node.updated_at|date:"Y-m-d H:i" }}
+                        </div>
+                    {% endif %}
+
+                    <!-- 按钮组 -->
+                    <div class="mt-2 btn-list">
+                        {% if node.can_update_status %}
+                            <button class="btn btn-sm btn-outline-secondary"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-generic"
+                                    hx-get="{% url 'basic_research_node_update' node.id %}"
+                                    hx-target="#modal-content-placeholder">
+                                更新状态
+                            </button>
+                        {% endif %}
+
+                        {% if node.can_report_failure %}
+                            <button class="btn btn-sm btn-outline-yellow"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#modal-generic"
+                                    hx-get="{% url 'basic_research_node_failed' node.id %}"
+                                    hx-target="#modal-content-placeholder">
+                                实验调整/迭代
+                            </button>
+                        {% endif %}
+                    </div>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+
+<!-- 【HTMX 专用通用模态框容器】 -->
+<div class="modal modal-blur fade" id="modal-generic" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" id="modal-content-placeholder">
+            <!-- HTMX 会把后端返回的表单 HTML 塞到这里面 -->
+            <div class="p-3 text-center">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        </div>
+    </div>
+</div>

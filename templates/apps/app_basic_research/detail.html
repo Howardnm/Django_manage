@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+    {% include 'apps/app_basic_research/detail/detail_project_header.html' %}
+
+    <div class="row row-cards mt-3">
+
+        <!-- 左侧栏 (静态档案区) -->
+        <div class="col-lg-6">
+
+            <!-- 1. 项目基本信息 -->
+            {% include 'apps/app_basic_research/detail/detail_project_info.html' %}
+
+            <!-- 2. 项目附件 -->
+            {% include 'apps/app_basic_research/detail/detail_project_files.html' %}
+
+            <!-- 3. 关联实验配方 -->
+            {% include 'apps/app_basic_research/detail/detail_project_formulas.html' %}
+
+
+
+        </div>
+
+        <!-- 右侧栏 (动态进度区) -->
+        <div class="col-lg-6">
+            <div class="row row-cards">
+                <!-- 垂直进度时间轴 -->
+                {% include 'apps/app_basic_research/detail/detail_project_progress.html' %}
+            </div>
+        </div>
+
+    </div>
+
+{% endblock %}

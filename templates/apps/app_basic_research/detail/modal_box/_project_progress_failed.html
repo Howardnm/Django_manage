@@ -1,0 +1,18 @@
+<div class="modal-header">
+    <h5 class="modal-title text-yellow">新增实验节点</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+<form hx-post="{% url 'basic_research_node_failed' node.id %}" hx-swap="none">
+    {% csrf_token %}
+    <div class="modal-body">
+        <p class="text-secondary">确认【 {{ node.get_stage_display }} 】迭代吗？这将自动创建新一轮实验节点。</p>
+        <div class="mb-3">
+            <label class="form-label">调整计划</label>
+            <textarea name="remark" class="form-control" rows="3" required placeholder="例如：拉伸强度未达标，计划调整配方..."></textarea>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-yellow">确认调整/迭代</button>
+    </div>
+</form>

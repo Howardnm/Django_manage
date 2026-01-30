@@ -6,7 +6,7 @@ from .views.Customer import *
 from .views.OEM import *
 from .views.Scenario import *
 from .views.Salesperson import *
-from .views.SecureFileDownload import *
+from common_utils.SecureFileDownload import *
 from .views.TestConfig import *  # 【新增】
 from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
 

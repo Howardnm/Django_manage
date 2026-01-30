@@ -1,0 +1,100 @@
+<!-- 附件列表卡片 -->
+<div class="card mt-3">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-paperclip me-2 text-blue"></i>项目附件
+        </h3>
+        <div class="card-actions">
+            <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#modal-upload-file">
+                <i class="ti ti-upload me-1"></i> 上传附件
+            </button>
+        </div>
+    </div>
+    
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap datatable">
+            <thead>
+                <tr>
+                    <th>附件名称</th>
+                    <th>描述</th>
+                    <th>上传人</th>
+                    <th>上传时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for file in project.files.all %}
+                <tr>
+                    <td>
+                        <!-- 使用通用安全下载链接 -->
+                        <a href="{% url 'secure_download' 'app_basic_research' 'ResearchProjectFile' file.pk 'file' %}" target="_blank" class="text-reset fw-bold">
+                            <i class="ti ti-file me-1"></i>
+                            {{ file.name }}
+                        </a>
+                    </td>
+                    <td class="text-muted text-truncate" style="max-width: 200px;" title="{{ file.description }}">
+                        {{ file.description|default:"-" }}
+                    </td>
+                    <td>
+                        <span class="avatar avatar-xs rounded me-1" style="background-image: url(...)">{{ file.uploader.username|slice:":1"|upper }}</span>
+                        {{ file.uploader.username }}
+                    </td>
+                    <td class="text-muted">{{ file.uploaded_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <div class="btn-list flex-nowrap">
+                            <!-- 使用通用安全下载链接 -->
+                            <a href="{% url 'secure_download' 'app_basic_research' 'ResearchProjectFile' file.pk 'file' %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="下载">
+                                <i class="ti ti-download"></i>
+                            </a>
+                            <form action="{% url 'basic_research_file_delete' file.pk %}" method="POST" onsubmit="return confirm('确定要删除这个附件吗？');" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-icon btn-ghost-danger" title="删除">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" class="text-center py-4 text-muted small">暂无附件</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- 上传附件模态框 -->
+<div class="modal modal-blur fade" id="modal-upload-file" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">上传新附件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="{% url 'basic_research_file_upload' project.pk %}" method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label required">选择文件</label>
+                        {{ file_form.file }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">附件名称</label>
+                        {{ file_form.name }}
+                        <small class="form-hint">如果不填，将默认使用文件名</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">描述</label>
+                        {{ file_form.description }}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-primary">开始上传</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>

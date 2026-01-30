@@ -1,0 +1,34 @@
+<!-- 模态框：被ResearchProjectNodeUpdateView视图调用 -->
+<div class="modal-header">
+    <h5 class="modal-title">更新节点: {{ node.get_stage_display }}</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+</div>
+
+<!-- hx-post 指向 update 路径 -->
+<form hx-post="{% url 'basic_research_node_update' node.id %}" hx-swap="none">
+    {% csrf_token %}
+    <div class="modal-body">
+        <div class="mb-3">
+            <label class="form-label">状态</label>
+            <select name="status" class="form-select">
+                <!-- 循环 View 传过来的 choices -->
+                {% for code, label in status_choices %}
+                    <!-- 过滤掉特殊状态 -->
+                    {% if code != 'FAILED' and code != 'TERMINATED' %}
+                        <option value="{{ code }}" {% if node.status == code %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">备注</label>
+            <textarea name="remark" class="form-control" rows="3">{{ node.remark|default:'' }}</textarea>
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">保存修改</button>
+    </div>
+</form>

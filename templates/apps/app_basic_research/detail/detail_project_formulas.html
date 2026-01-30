@@ -1,0 +1,158 @@
+<!-- 关联配方卡片 (预研项目专用) -->
+<div class="card mt-3">
+    <!-- 包裹整个表格的 Form，用于提交对比请求 -->
+    <form action="{% url 'formula_compare' %}" method="POST" target="_blank">
+        {% csrf_token %}
+        <!-- 预研项目 ID (可选，用于回跳) -->
+        <input type="hidden" name="research_project_id" value="{{ project.pk }}">
+
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-flask me-2 text-purple"></i>关联实验配方
+            </h3>
+            <div class="card-actions d-flex gap-2">
+                <!-- 加入购物车按钮 -->
+                <button type="button" class="btn btn-sm btn-outline-yellow" onclick="addFormulasToCart()">
+                    <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
+                </button>
+
+                <!-- 直接对比按钮 -->
+                <button type="submit" class="btn btn-sm btn-purple" title="勾选下方配方进行对比">
+                    <i class="ti ti-columns me-1"></i> 直接对比
+                </button>
+
+                <!-- 新增配方按钮 (带上预研项目ID) -->
+                <a href="{% url 'formula_add' %}?research_project_id={{ project.pk }}" class="btn btn-sm btn-primary">
+                    <i class="ti ti-plus me-1"></i> 新增实验
+                </a>
+
+                <!-- ISO/ASTM 切换按钮 -->
+                <div class="btn-group btn-group-sm">
+                    <a href="?std=ISO" class="btn {% if current_std != 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ISO</a>
+                    <a href="?std=ASTM" class="btn {% if current_std == 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ASTM</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable" style="font-size: 13px;">
+                <thead>
+                <tr>
+                    <th class="w-1"><input class="form-check-input m-0 align-middle" type="checkbox" aria-label="Select all invoices" onclick="toggleAll(this)"></th>
+                    <th>配方信息</th>
+                    <th>成本</th>
+                    <!-- 动态表头 -->
+                    <th style="width: 60px;">密度</th>
+                    <th style="width: 60px;">M.I</th>
+                    <th style="width: 60px;">拉伸</th>
+                    <th style="width: 60px;">弯强</th>
+                    <th style="width: 60px;">弯模</th>
+                    <th style="width: 60px;">冲击</th>
+                    <th style="width: 60px;">HDT</th>
+                    <th>时间</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for f in related_formulas %}
+                    <tr>
+                        <td>
+                            <input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" name="formula_ids" value="{{ f.pk }}" aria-label="Select invoice"
+                                   data-type="formula"
+                                   {% if f.pk in cart_formula_ids %}checked{% endif %}>
+                        </td>
+                        <td>
+                            <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="fw-bold text-reset d-block text-truncate" style="max-width: 150px;" title="{{ f.name }}">
+                                {{ f.name|default:"未命名配方" }}
+                            </a>
+                            <div class="text-muted small">{{ f.code }}</div>
+                        </td>
+                        <td>
+                            <div class="fw-bold text-orange">¥{{ f.cost_predicted }}</div>
+                            {% if f.cost_actual %}
+                                <div class="fw-bold text-green" title="实际成本">¥{{ f.cost_actual }}</div>
+                            {% endif %}
+                        </td>
+
+                        <td>{% if f.display_props.density %}<span class="fw-bold">{{ f.display_props.density|floatformat:3 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.melt %}<span class="fw-bold">{{ f.display_props.melt|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.tensile %}<span class="fw-bold">{{ f.display_props.tensile|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.flex_strength %}<span class="fw-bold">{{ f.display_props.flex_strength|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.flex_modulus %}<span class="fw-bold">{{ f.display_props.flex_modulus|floatformat:0 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.impact %}<span class="fw-bold">{{ f.display_props.impact|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+                        <td>{% if f.display_props.hdt %}<span class="fw-bold text-red">{{ f.display_props.hdt|floatformat:2 }}</span>{% else %}-{% endif %}</td>
+
+                        <td class="text-muted">{{ f.created_at|date:"Y-m-d" }}</td>
+                        <td class="text-end">
+                            <div class="btn-list flex-nowrap">
+                                <a href="{% url 'formula_duplicate' f.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="复制副本">
+                                    <i class="ti ti-copy"></i>
+                                </a>
+                                <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
+                                    <i class="ti ti-arrow-right"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center py-4 text-muted small">暂无关联实验配方</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </form>
+</div>
+
+<script>
+    function toggleAll(source) {
+        checkboxes = document.getElementsByName('formula_ids');
+        for(var i=0, n=checkboxes.length;i<n;i++) {
+            checkboxes[i].checked = source.checked;
+        }
+    }
+
+    // 批量加入对比购物车
+    function addFormulasToCart() {
+        const checkboxes = document.querySelectorAll('input[name="formula_ids"]:checked');
+        if (checkboxes.length === 0) {
+            alert('请先勾选要对比的配方');
+            return;
+        }
+        
+        const ids = Array.from(checkboxes).map(cb => cb.value);
+        
+        // 构建 FormData
+        const formData = new FormData();
+        formData.append('action', 'add_multiple');
+        formData.append('type', 'formula');
+        formData.append('ids', JSON.stringify(ids));
+        formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+        
+        // 发送请求
+        fetch("{% url 'formula_compare_cart' %}", {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                if (typeof refreshCompareCart === 'function') {
+                    refreshCompareCart();
+                }
+                checkboxes.forEach(cb => cb.checked = false);
+                const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
+                if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
+                
+                alert('已成功加入 ' + ids.length + ' 个配方到对比清单');
+            } else {
+                alert('加入失败，请重试');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('发生错误，请稍后重试');
+        });
+    }
+</script>

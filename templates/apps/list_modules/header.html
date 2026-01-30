@@ -1,13 +1,11 @@
 <div class="page-header d-print-none">
     <div class="row align-items-center">
         <div class="col">
-            <!-- 【修改】支持传入 title 变量，默认为 '项目管理' -->
-            <h2 class="page-title">{{ title|default:"项目管理" }}</h2>
+            <h2 class="page-title">{{ title|default:"预研项目管理" }}</h2>
             <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
         </div>
         <div class="col-auto ms-auto d-print-none">
-            <!-- 【修改】支持传入 create_url 变量，默认为 'project_create' -->
-            <a href="{% url create_url|default:'project_create' %}" class="btn btn-primary">
+            <a href="{% url create_url|default:'basic_research_create' %}" class="btn btn-primary">
                 <i class="ti ti-plus"></i>
                 新建
             </a>

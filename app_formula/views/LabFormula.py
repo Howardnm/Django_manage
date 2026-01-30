@@ -10,6 +10,7 @@ from app_formula.models import LabFormula, FormulaTestResult
 from app_formula.forms import LabFormulaForm, FormulaBOMFormSet, FormulaTestResultFormSet
 from app_formula.utils.filters import LabFormulaFilter
 from app_repository.models import MaterialLibrary
+from app_basic_research.models import ResearchProject
 
 class LabFormulaListView(LoginRequiredMixin, ListView):
     model = LabFormula
@@ -19,7 +20,7 @@ class LabFormulaListView(LoginRequiredMixin, ListView):
 
     def get_queryset(self):
         # 1. 基础查询
-        qs = super().get_queryset().select_related('material_type', 'creator', 'process').prefetch_related('related_materials')
+        qs = super().get_queryset().select_related('material_type', 'creator', 'process').prefetch_related('related_materials', 'research_projects')
         
         # 2. 获取排序参数 (支持多个)
         sort_params = self.request.GET.getlist('sort')
@@ -135,7 +136,8 @@ class LabFormulaDetailView(LoginRequiredMixin, DetailView):
         return super().get_queryset().select_related('material_type', 'creator', 'process').prefetch_related(
             'bom_lines__raw_material', 
             'test_results__test_config',
-            'related_materials'
+            'related_materials',
+            'research_projects'
         )
     
     def get_context_data(self, **kwargs):
@@ -162,6 +164,13 @@ class LabFormulaCreateView(LoginRequiredMixin, CreateView):
         if material_id:
             # 注意：对于多对多字段，initial 应该是一个列表
             initial['related_materials'] = [material_id]
+            
+        # 【新增】处理预关联预研项目
+        # 注意：URL 参数名是 research_project_id，但 initial 字典的 key 必须是 form 字段名 research_projects
+        project_id = self.request.GET.get('research_project_id')
+        if project_id:
+            initial['research_projects'] = [project_id]
+            
         return initial
 
     def get_context_data(self, **kwargs):
@@ -286,7 +295,8 @@ class LabFormulaDuplicateView(LoginRequiredMixin, UpdateView):
             'process': self.original_formula.process,
             'cost_actual': self.original_formula.cost_actual,
             'description': self.original_formula.description,
-            'related_materials': self.original_formula.related_materials.all()
+            'related_materials': self.original_formula.related_materials.all(),
+            'research_projects': self.original_formula.research_projects.all()
         })
         return initial
 

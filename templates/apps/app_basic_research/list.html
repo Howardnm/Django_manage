@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    {% include 'apps/list_modules/header.html' %}
+    <div class="card mt-3">
+        <!-- 工具栏：搜索与筛选 -->
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
+                <thead>
+                <tr>
+                    <!-- 1. 项目名称 -->
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            项目名称
+                            {% if current_sort == 'name' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    
+                    <!-- 2. 项目编号 -->
+                    <th>
+                        <a href="?{% url_replace sort='code'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            项目编号
+                        </a>
+                    </th>
+
+                    <!-- 3. 负责人 -->
+                    <th>
+                        <a href="?{% url_replace sort='manager'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            负责人
+                            {% if current_sort == 'manager' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-manager' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+
+                    <th style="width: 15%;">进度概览</th>
+                    
+                    <th style="width: 30%;">最新进展</th>
+
+                    <!-- 4. 创建时间 -->
+                    <th>
+                        <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            创建时间
+                            {% if current_sort == 'created_at' %}
+                                <i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-created_at' %}
+                                <i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for project in page_obj %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'basic_research_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ project.name }}">
+                                {{ project.name }}
+                            </a>
+                        </td>
+                        
+                        <td>
+                            <span class="text-muted">{{ project.code }}</span>
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <span class="avatar avatar-xs rounded me-2" style="background-image: url(...)">{{ project.manager.username|slice:":1"|upper }}</span>
+                                <div class="flex-fill">
+                                    <div class="font-weight-medium">{{ project.manager.username }}</div>
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td>
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <div class="text-truncate" style="max-width: 120px;">
+                                    {% if project.is_terminated %}
+                                        <span class="badge bg-red-lt">已终止</span>
+                                    {% elif project.progress_percent == 100 %}
+                                        <span class="badge bg-green-lt">已完成</span>
+                                    {% else %}
+                                        <span class="text-blue small fw-bold">{{ project.get_current_stage_display }}</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted small">{{ project.progress_percent }}%</div>
+                            </div>
+                            <div class="progress progress-sm">
+                                <div class="progress-bar {% if project.is_terminated %}bg-danger{% elif project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                     style="width: {{ project.progress_percent }}%" role="progressbar" aria-valuenow="{{ project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </td>
+                        
+                        <td class="text-muted text-wrap" style="max-width: 250px;">
+                            {% if project.latest_remark %}
+                                <div class="text-truncate" title="{{ project.latest_remark }}">
+                                    <i class="ti ti-message-dots me-1"></i>
+                                    {{ project.latest_remark }}
+                                </div>
+                            {% else %}
+                                <span class="text-secondary opacity-50">-</span>
+                            {% endif %}
+                        </td>
+                        
+                        <td class="text-muted">
+                            {{ project.created_at|date:"Y-m-d" }}
+                        </td>
+                        
+                        <td>
+                            <a href="{% url 'basic_research_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="管理项目">
+                                <i class="ti ti-settings"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-25"></i></div>
+                                <p class="empty-title">没有找到预研项目</p>
+                                <p class="empty-subtitle text-muted">
+                                    尝试更换搜索关键词或筛选条件
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
+{% endblock %}

@@ -26,6 +26,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('app_panel.urls')),
     path('project/', include('app_project.urls')),
+    path('research/', include('app_basic_research.urls')),
     path('user/', include('app_user.urls')),
     path('repository/', include('app_repository.urls')),
     path('raw-material/', include('app_raw_material.urls')),

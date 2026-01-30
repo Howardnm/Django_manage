@@ -5,6 +5,7 @@ from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
 from app_repository.models import MaterialLibrary, TestConfig
 from app_raw_material.models import RawMaterial
+from app_basic_research.models import ResearchProject
 
 class TablerFormMixin:
     """
@@ -41,6 +42,7 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
             'material_type': forms.Select(attrs={'class': 'form-select'}),
             'process': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'process'}),
             'related_materials': forms.SelectMultiple(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
+            'research_projects': forms.SelectMultiple(attrs={'class': 'form-select remote-search', 'data-model': 'research_project'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -58,18 +60,31 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
 
             # 2. 关联成品 (多对多)
             # 【修复】同时考虑 instance 和 initial
-            qs = MaterialLibrary.objects.none()
+            qs_materials = MaterialLibrary.objects.none()
 
             if instance and instance.pk:
-                qs = instance.related_materials.all()
+                qs_materials = instance.related_materials.all()
 
             # 如果 initial 中有预设值 (例如从材料详情页跳转过来)
             if 'related_materials' in initial:
                 ids = initial['related_materials']
                 if ids:
-                    qs = qs | MaterialLibrary.objects.filter(pk__in=ids)
+                    qs_materials = qs_materials | MaterialLibrary.objects.filter(pk__in=ids)
 
-            self.fields['related_materials'].queryset = qs
+            self.fields['related_materials'].queryset = qs_materials
+
+            # 3. 关联预研项目 (多对多)
+            qs_projects = ResearchProject.objects.none()
+            
+            if instance and instance.pk:
+                qs_projects = instance.research_projects.all()
+                
+            if 'research_projects' in initial:
+                ids = initial['research_projects']
+                if ids:
+                    qs_projects = qs_projects | ResearchProject.objects.filter(pk__in=ids)
+                    
+            self.fields['research_projects'].queryset = qs_projects
 
 
 # 2. BOM 明细表单

@@ -1,0 +1,28 @@
+<!-- 基础预研项目模块 -->
+{% with route_names='basic_research_list basic_research_create basic_research_detail basic_research_edit' %}
+
+<li class="nav-item dropdown">
+    <!-- 父级菜单高亮逻辑 -->
+    <a class="nav-link dropdown-toggle {% if request.resolver_match.url_name in route_names %}active{% endif %}"
+       href="#navbar-basic-research" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button"
+       aria-expanded="{% if request.resolver_match.url_name in route_names %}true{% else %}false{% endif %}">
+
+        <span class="nav-link-icon"><i class="ti ti-flask"></i></span>
+        <span class="nav-link-title">基础预研</span>
+    </a>
+
+    <!-- 下拉展开逻辑 -->
+    <div class="dropdown-menu {% if request.resolver_match.url_name in route_names %}show{% endif %}">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'basic_research_list' %}active{% endif %}"
+                   href="{% url 'basic_research_list' %}">
+                   预研项目列表
+                </a>
+
+            </div>
+        </div>
+    </div>
+</li>
+{% endwith %}

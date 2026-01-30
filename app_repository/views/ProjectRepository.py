@@ -14,6 +14,8 @@ from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, T
 from app_project.mixins import ProjectPermissionMixin
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial
+from app_basic_research.models import ResearchProject
+from django.contrib.auth.models import User
 
 
 # ==========================================
@@ -200,5 +202,21 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
                 cond_str = f" ({item['condition']})" if item['condition'] else ""
                 text = f"[{item['category__name']}] {item['name']} - {item['standard']}{cond_str}"
                 data.append({'value': item['id'], 'text': text})
+
+        # 【新增】预研项目搜索
+        elif model_type == 'research_project':
+            qs = ResearchProject.objects.all()
+            if query:
+                qs = qs.filter(Q(code__icontains=query) | Q(name__icontains=query))
+            qs = qs.values('id', 'code', 'name')[:20]
+            data = [{'value': item['id'], 'text': f"{item['code']} {item['name']}"} for item in qs]
+
+        # 【新增】用户搜索
+        elif model_type == 'user':
+            qs = User.objects.filter(is_active=True)
+            if query:
+                qs = qs.filter(Q(username__icontains=query) | Q(first_name__icontains=query))
+            qs = qs.values('id', 'username', 'first_name')[:20]
+            data = [{'value': item['id'], 'text': f"{item['first_name'] or item['username']}"} for item in qs]
 
         return JsonResponse(data, safe=False)
