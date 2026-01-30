@@ -205,5 +205,5 @@ AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
 
 # Session 配置
-SESSION_COOKIE_AGE = 36000  # 保持登录10小时 (10 * 60 * 60)
+SESSION_COOKIE_AGE = 1800  # 保持登录0.5小时 (1 * 30 * 60)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登录 (除非勾选"保持登录")
