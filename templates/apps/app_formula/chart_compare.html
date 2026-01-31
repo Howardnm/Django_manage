@@ -73,8 +73,8 @@
                                 <i class="ti ti-vs icon-lg"></i>
                             </div>
                             <div class="col">
-                                <div id="y-axis-dropzone" class="dropzone">
-                                    <span class="dropzone-text">拖动指标到 Y 轴</span>
+                                <div id="y-axis-dropzone" class="dropzone multi-dropzone">
+                                    <span class="dropzone-text">拖动一个或多个指标到 Y 轴</span>
                                 </div>
                             </div>
                             <div class="col-auto">
@@ -110,12 +110,15 @@
 
 <style>
     .dimension-list { max-height: 200px; overflow-y: auto; }
-    .dimension-item { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 5px; cursor: grab; transition: background-color 0.2s, box-shadow 0.2s; display: flex; align-items: center; overflow: hidden; }
+    .dimension-item { padding: 6px 10px; border: 1px solid #e5e7eb; border-radius: 4px; margin-bottom: 5px; cursor: grab; transition: background-color 0.2s, box-shadow 0.2s; display: flex; align-items: center; overflow: hidden; position: relative; }
     .dimension-item:hover { background-color: #f0f2f5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .dropzone { border: 2px dashed #adb5bd; border-radius: 4px; padding: 20px; text-align: center; transition: background-color 0.2s, border-color 0.2s; height: 100%; display: flex; align-items: center; justify-content: center; min-height: 70px; }
+    .dropzone { border: 2px dashed #adb5bd; border-radius: 4px; padding: 10px; text-align: center; transition: background-color 0.2s, border-color 0.2s; height: 100%; display: flex; align-items: center; justify-content: center; min-height: 70px; }
+    .dropzone.multi-dropzone { flex-wrap: wrap; justify-content: flex-start; align-items: flex-start; gap: 5px; }
     .dropzone.drag-over { background-color: #e9f7ff; border-color: #467fcf; }
-    .dropzone .dimension-item { cursor: default; box-shadow: none; }
+    .dropzone .dimension-item { cursor: default; box-shadow: none; padding-right: 25px; }
     .dropzone-text { color: #6c757d; }
+    .remove-item-btn { position: absolute; top: 50%; right: 5px; transform: translateY(-50%); cursor: pointer; color: #999; display: none; font-size: 1.2em; line-height: 1; }
+    .dropzone .dimension-item:hover .remove-item-btn { display: block; }
 </style>
 {% endblock %}
 
@@ -132,38 +135,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     if (draggables.length === 0) return;
 
-    // --- Drag Start ---
     draggables.forEach(draggable => {
         draggable.addEventListener('dragstart', (e) => {
             const payload = JSON.stringify({
-                id: e.target.dataset.id,
-                type: e.target.dataset.type,
-                html: e.target.innerHTML.trim()
+                id: e.target.closest('.dimension-item').dataset.id,
+                type: e.target.closest('.dimension-item').dataset.type,
+                html: e.target.closest('.dimension-item').innerHTML.trim()
             });
             e.dataTransfer.setData('application/json', payload);
             e.dataTransfer.effectAllowed = 'copy';
         });
     });
 
-    // --- Drop Zone Handling ---
     dropzones.forEach(zone => {
-        const preventDefaults = (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-        };
-
-        zone.addEventListener('dragenter', (e) => {
-            preventDefaults(e);
-            zone.classList.add('drag-over');
-        }, false);
-
+        const preventDefaults = (e) => { e.preventDefault(); e.stopPropagation(); };
+        zone.addEventListener('dragenter', (e) => { preventDefaults(e); zone.classList.add('drag-over'); }, false);
         zone.addEventListener('dragover', preventDefaults, false);
-
-        zone.addEventListener('dragleave', (e) => {
-            preventDefaults(e);
-            zone.classList.remove('drag-over');
-        }, false);
-
+        zone.addEventListener('dragleave', (e) => { preventDefaults(e); zone.classList.remove('drag-over'); }, false);
         zone.addEventListener('drop', (e) => {
             preventDefaults(e);
             zone.classList.remove('drag-over');
@@ -175,26 +163,39 @@ document.addEventListener('DOMContentLoaded', function () {
                 newItem.className = 'dimension-item';
                 newItem.dataset.id = payload.id;
                 newItem.dataset.type = payload.type;
-                newItem.innerHTML = payload.html;
+                newItem.innerHTML = payload.html + '<span class="remove-item-btn" style="font-size: 1.2em; line-height: 1;">&times;</span>';
 
-                zone.innerHTML = '';
-                zone.appendChild(newItem);
+                if (zone.id === 'y-axis-dropzone') {
+                    const placeholder = zone.querySelector('.dropzone-text');
+                    if (placeholder) placeholder.style.display = 'none';
+                    zone.appendChild(newItem);
+                } else {
+                    zone.innerHTML = '';
+                    zone.appendChild(newItem);
+                }
                 
                 fetchChartData();
-            } catch (err) {
-                console.error("Drop Error:", err);
-            }
+            } catch (err) { console.error("Drop Error:", err); }
         }, false);
     });
 
-    // --- Chart and UI Logic ---
+    document.querySelector('body').addEventListener('click', function(e) {
+        if (e.target.classList.contains('remove-item-btn')) {
+            const item = e.target.parentElement;
+            const zone = item.parentElement;
+            item.remove();
+            if (zone.id === 'y-axis-dropzone' && zone.children.length === 0) {
+                zone.innerHTML = '<span class="dropzone-text">拖动一个或多个指标到 Y 轴</span>';
+            }
+            fetchChartData();
+        }
+    });
+
     document.getElementById('reset-chart-btn').addEventListener('click', () => {
         document.getElementById('x-axis-dropzone').innerHTML = '<span class="dropzone-text">拖动指标到 X 轴</span>';
-        document.getElementById('y-axis-dropzone').innerHTML = '<span class="dropzone-text">拖动指标到 Y 轴</span>';
-        if (chart) {
-            chart.destroy();
-            chart = null;
-        }
+        document.getElementById('y-axis-dropzone').innerHTML = '<span class="dropzone-text">拖动一个或多个指标到 Y 轴</span>';
+
+        if (chart) { chart.destroy(); chart = null; }
         document.getElementById('chart-container').innerHTML = `
             <div class="empty">
                 <div class="empty-icon"><i class="ti ti-chart-line"></i></div>
@@ -205,15 +206,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function fetchChartData() {
         const xAxisItem = document.querySelector('#x-axis-dropzone .dimension-item');
-        const yAxisItem = document.querySelector('#y-axis-dropzone .dimension-item');
+        const yAxisItems = document.querySelectorAll('#y-axis-dropzone .dimension-item');
 
-        if (!xAxisItem || !yAxisItem) return;
+        if (!xAxisItem || yAxisItems.length === 0) {
+            return;
+        }
+
+        const yAxes = Array.from(yAxisItems).map(item => ({
+            type: item.dataset.type,
+            id: item.dataset.id
+        }));
 
         const params = new URLSearchParams({
             x_axis_type: xAxisItem.dataset.type,
             x_axis_id: xAxisItem.dataset.id,
-            y_axis_type: yAxisItem.dataset.type,
-            y_axis_id: yAxisItem.dataset.id,
+            y_axes: JSON.stringify(yAxes)
         });
 
         document.getElementById('chart-container').innerHTML = '<div class="progress"><div class="progress-bar-indeterminate"></div></div>';
@@ -225,7 +232,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     document.getElementById('chart-container').innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
                     return;
                 }
-                if (data.series && data.series[0] && data.series[0].data.length === 0) {
+                if (data.series && data.series.every(s => s.data.length === 0)) {
                      document.getElementById('chart-container').innerHTML = `
                         <div class="empty">
                             <div class="empty-icon"><i class="ti ti-chart-off"></i></div>
@@ -243,60 +250,46 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderChart(data) {
-        // 为保证折线图正确，对数据点按 X 轴数值进行排序
-        if (data.series && data.series[0] && data.series[0].data) {
-            data.series[0].data.sort((a, b) => a.x - b.x);
-        }
+        data.series.forEach(series => {
+            if (series.data) {
+                series.data.sort((a, b) => a.x - b.x);
+            }
+        });
 
-        chart = Highcharts.chart('chart-container', {
-            chart: { 
-                type: 'spline', 
-                zoomType: 'xy' 
-            },
+        const chartOptions = {
+            chart: { zoomType: 'xy' },
             title: data.title,
             xAxis: {
                 ...data.xAxis,
-                title: {
-                    ...data.xAxis.title,
-                    style: {
-                        color: '#000000',
-                        fontSize: '14px'
-                    }
-                }
+                title: { ...data.xAxis.title, style: { fontWeight: 'bold' } },
             },
-            yAxis: {
-                ...data.yAxis,
-                title: {
-                    ...data.yAxis.title,
-                    style: {
-                        color: '#000000',
-                        fontSize: '14px'
-                    }
-                }
-            },
+            yAxis: data.yAxis,
             tooltip: {
-                headerFormat: '<b>{point.point.name}</b><br>',
-                pointFormat: `${data.yAxis.title.text}: <b>{point.y}</b><br>${data.xAxis.title.text}: <b>{point.x}</b>`
+                shared: true,
+                crosshairs: true,
+                headerFormat: '<b>{point.key}</b> (配方: {point.point.name})<br/>',
+                pointFormat: '<span style="color:{series.color}">{series.name}</span>: <b>{point.y}</b><br/>'
             },
             series: data.series,
             credits: { enabled: false },
             plotOptions: {
                 spline: {
-                    marker: {
-                        enabled: true,
-                        radius: 4
-                    },
-                    dataLabels: {
-                        enabled: true,
-                        format: '{point.y}',
-                        style: {
-                            fontSize: '12px',
-                            color: '#000000',
-                            textOutline: 'none'
-                        }
-                    }
+                    marker: { enabled: true, radius: 4 },
+                    dataLabels: { enabled: true, format: '{point.y}', style: { fontSize: '12px', color: '#000000', textOutline: 'none' } }
                 }
             }
+        };
+
+        chart = Highcharts.chart('chart-container', chartOptions, function(c) {
+            c.series.forEach((series, i) => {
+                if (c.yAxis[i]) {
+                    const seriesColor = series.color;
+                    c.yAxis[i].update({
+                        title: { style: { color: seriesColor, fontWeight: 'bold' } },
+                        labels: { style: { color: seriesColor } }
+                    });
+                }
+            });
         });
     }
 });
