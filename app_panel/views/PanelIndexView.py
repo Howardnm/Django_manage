@@ -1,14 +1,14 @@
-# apps/app_panel/views.py
-from django.views import View
+from datetime import timedelta
+
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count, Q
 from django.shortcuts import render
 from django.utils import timezone
-from datetime import timedelta
-from django.db.models import Count, Q, F
+from django.views import View
 
-from app_project.models import Project, ProjectNode, ProjectStage
-from app_project.mixins import ProjectPermissionMixin
 from app_panel.utils.filters import PanelFilter
+from app_project.mixins import ProjectPermissionMixin
+from app_project.models import Project, ProjectStage
 
 
 class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
@@ -53,7 +53,7 @@ class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
         # =========================================================
         # 只统计活跃项目 (未终止且未完成)
         active_qs = projects_qs.filter(is_terminated=False, progress_percent__lt=100)
-        
+
         stage_data = active_qs.values('current_stage').annotate(count=Count('id'))
         stage_map = {item['current_stage']: item['count'] for item in stage_data}
 
@@ -65,7 +65,7 @@ class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
         # =========================================================
         # 4. 风险预警 (依然需要查 Nodes，但先通过 Project 缩小范围)
         # =========================================================
-        
+
         # A. 滞后 30 天 (严重)
         # 逻辑：项目未结束，且当前活跃节点的更新时间早于30天前
         stagnant_30d_raw = active_qs.filter(
