@@ -200,7 +200,6 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # 默认发件人
 # django-axes 配置
 AXES_FAILURE_LIMIT = 5  # 允许失败的次数
 AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），0.0833小时约等于5分钟
-AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True # 根据用户和IP组合锁定
 AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
 
