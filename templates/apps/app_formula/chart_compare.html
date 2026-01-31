@@ -24,9 +24,9 @@
 <div class="page-body">
     <div class="container-xl">
         {% if formulas %}
-        <div class="row g-4">
+        <div class="row">
             <!-- 侧边栏：可选维度 -->
-            <div class="col-lg-3">
+            <div class="col-lg-4">
                 <div class="card mb-3">
                     <div class="card-header">
                         <h3 class="card-title">可选维度</h3>
@@ -37,7 +37,7 @@
                             {% for rm in raw_materials %}
                             <div class="dimension-item" draggable="true" data-id="{{ rm.id }}" data-type="raw_material">
                                 <i class="ti ti-flask icon-sm me-2"></i>
-                                <span class="text-truncate">{{ rm.name }}{% if rm.model_name %} - {{ rm.model_name }}{% endif %}</span>
+                                <span class="text-truncate">({{ rm.category.name }}) {{ rm.name }} {% if rm.model_name %}{{ rm.model_name }}{% endif %}</span>
                             </div>
                             {% empty %}
                             <div class="text-muted small">无可用原材料</div>
@@ -60,7 +60,7 @@
             </div>
 
             <!-- 主内容区：拖拽目标和图表 -->
-            <div class="col-lg-9">
+            <div class="col-lg-8">
                 <div class="card">
                     <div class="card-body">
                         <div class="row g-3 align-items-center mb-4">
@@ -258,10 +258,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const chartOptions = {
             chart: { zoomType: 'xy' },
-            title: data.title,
+            title: { text: null },
             xAxis: {
                 ...data.xAxis,
-                title: { ...data.xAxis.title, style: { fontWeight: 'bold' } },
+                title: { ...data.xAxis.title, style: {  } },
+                labels: { style: {  } }
             },
             yAxis: data.yAxis,
             tooltip: {
@@ -285,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (c.yAxis[i]) {
                     const seriesColor = series.color;
                     c.yAxis[i].update({
-                        title: { style: { color: seriesColor, fontWeight: 'bold' } },
+                        title: { style: { color: seriesColor } },
                         labels: { style: { color: seriesColor } }
                     });
                 }

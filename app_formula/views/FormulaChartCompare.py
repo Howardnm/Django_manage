@@ -68,7 +68,7 @@ class FormulaChartDataAPI(LoginRequiredMixin, TemplateView):
         if x_axis_type == 'raw_material':
             rm = RawMaterial.objects.select_related('category').filter(pk=x_axis_id).first()
             if rm:
-                x_title_text = f"({rm.category.name}){rm.name}{f' {rm.model_name}' if rm.model_name else ''} (%)"
+                x_title_text = f"({rm.category.name}) {rm.name}{f' {rm.model_name}' if rm.model_name else ''} (%)"
         elif x_axis_type == 'test_config':
             tc = TestConfig.objects.filter(pk=x_axis_id).first()
             if tc:
