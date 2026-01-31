@@ -25,6 +25,9 @@
                     <a href="{% url 'formula_compare' %}" class="btn btn-yellow w-100 me-2" id="btn-start-compare">
                         开始对比
                     </a>
+                    <a href="{% url 'formula_chart_compare' %}" class="btn btn-primary w-100" id="btn-start-chart-compare">
+                        图表对比
+                    </a>
                 </div>
             </div>
         </div>
@@ -51,6 +54,7 @@
                 const countBadge = document.getElementById('header-compare-count');
                 const itemsContainer = document.getElementById('header-compare-items');
                 const startBtn = document.getElementById('btn-start-compare');
+                const startChartBtn = document.getElementById('btn-start-chart-compare');
                 
                 if (!countBadge || !itemsContainer) return;
 
@@ -59,9 +63,11 @@
                     countBadge.textContent = data.count;
                     countBadge.style.display = 'block';
                     startBtn.classList.remove('disabled');
+                    startChartBtn.classList.remove('disabled');
                 } else {
                     countBadge.style.display = 'none';
                     startBtn.classList.add('disabled');
+                    startChartBtn.classList.add('disabled');
                 }
 
                 // 更新列表内容
