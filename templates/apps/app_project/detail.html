@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-
+{% load static %}
 {% block content %}
     {% include 'apps/app_project/detail/detail_project_header.html' %}
 
@@ -38,4 +38,9 @@
 
     </div>
 
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'highcharts/core-12.5.0/highcharts-gantt.js' %}"></script>
+    <script src="{% static 'highcharts/core-12.5.0/modules/exporting.js' %}"></script>
 {% endblock %}

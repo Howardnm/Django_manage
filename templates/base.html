@@ -14,6 +14,8 @@
     <link rel="stylesheet" href="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"/>
     <!-- 引入 HTMX, 建议放在 <head> 中 -->
     <script src="{% static 'htmx.org/core-2.0.8/dist/htmx.min.js' %}"></script>
+    
+    {% block extra_css %}{% endblock %}
 </head>
 <body>
 <div class="page">
@@ -25,6 +27,7 @@
         {% include "includes/header.html" %}
 
         <!-- 3. 页面内容占位符 -->
+        {% block page_header %}{% endblock %}
         <div class="page-body">
             <div class="container-xl">
                 {% block content %}{% endblock %}
@@ -43,8 +46,7 @@
 <script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
 <script src="{% static 'tom-select/core-2.2.2/dist/js/tom-select.complete.min.js' %}"></script>
 <script src="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"></script>
-<script src="{% static 'highcharts/core-12.5.0/highcharts-gantt.js' %}"></script>
-<script src="{% static 'highcharts/core-12.5.0/modules/exporting.js' %}"></script>
+
 <!-- ======================================================= -->
 <!-- Tom Select 集成 (实现下拉搜索) 在base引入tom-select.complete.min.js -->
 <!-- ======================================================= -->
@@ -70,5 +72,9 @@
         }
     });
 </script>
+
+<!-- 子模板可以插入额外的JS -->
+{% block extra_js %}{% endblock %}
+
 </body>
 </html>
