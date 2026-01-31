@@ -148,7 +148,8 @@ class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
             # 【修改】允许3位小数
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}), # 默认隐藏
-            'test_date': forms.DateInput(attrs={'type': 'date'}),
+            # 【修复】为 test_date 明确指定 format 和 type
+            'test_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
 
@@ -178,7 +179,6 @@ class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
                 # 将当前值存入 data-current-value 属性，方便前端 JS 读取
                 self.fields['value_select'].widget.attrs['data-current-value'] = self.instance.value_text
         
-        # 如果是 POST 请求，必须重新填充 choices，否则 Django 验证会失败
         if self.data:
             prefix = self.prefix or ''
             test_config_key = f"{prefix}-test_config" if prefix else "test_config"
