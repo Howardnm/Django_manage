@@ -1,4 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+    <!-- apexcharts -->
+    <link rel="stylesheet" href="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"/>
+{% endblock %}
 
 {% block title %}仪表盘{% endblock %}
 
@@ -12,7 +18,7 @@
             <!-- 【新增】右侧筛选器 (日期 + 用户组) -->
             <div class="col-auto ms-auto d-print-none">
                 <form method="GET" class="d-flex gap-2 align-items-center">
-                    
+
                     <!-- 用户组筛选 -->
                     <div class="d-inline-block" style="width: 150px;">
                         {{ filter.form.group }}
@@ -31,7 +37,7 @@
                     <button type="submit" class="btn btn-primary btn-icon" title="筛选">
                         <i class="ti ti-filter"></i>
                     </button>
-                    
+
                     {% if request.GET %}
                         <a href="{{ request.path }}" class="btn btn-ghost-danger btn-icon" title="重置">
                             <i class="ti ti-x"></i>
@@ -97,4 +103,8 @@
 
     </div>
 
+{% endblock %}
+
+{% block extra_js %}
+    <script src="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"></script>
 {% endblock %}
