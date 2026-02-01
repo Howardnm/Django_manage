@@ -1,4 +1,5 @@
 from datetime import timedelta
+from collections import defaultdict
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Q, Max
@@ -116,25 +117,35 @@ class ProjectOverviewView(LoginRequiredMixin, CustomPermissionRequiredMixin, Pro
                 multi_round_pilot.append({'p': p, 'round': node.round})
 
         # =========================================================
-        # 5. 成员负载 TOP 10 (【优化】直接聚合 Project)
+        # 5. 成员负载 TOP 10 (【代码精简】避免 N+1 查询)
         # =========================================================
-        # 统计每个经理手头有多少个活跃项目
-        member_agg = active_qs.values('manager__id', 'manager__username') \
+        # 步骤 1: 找出活跃项目最多的前 10 位负责人
+        top_managers_agg = active_qs.values('manager__id', 'manager__username') \
             .annotate(project_count=Count('id')) \
             .order_by('-project_count')[:10]
 
+        top_manager_ids = [m['manager__id'] for m in top_managers_agg]
+
+        # 步骤 2: 一次性获取这 10 位负责人名下所有的活跃项目
+        all_projects_for_top_managers = active_qs.filter(manager__id__in=top_manager_ids) \
+            .annotate(latest_node_update=Max('nodes__updated_at')) \
+            .order_by('manager_id', '-latest_node_update') \
+            .values('id', 'name', 'manager_id')
+
+        # 步骤 3: 在内存中将项目按负责人ID进行分组
+        projects_by_manager = defaultdict(list)
+        for p in all_projects_for_top_managers:
+            projects_by_manager[p['manager_id']].append({'id': p['id'], 'name': p['name']})
+
+        # 步骤 4: 构建最终的上下文列表
         member_stats_list = []
-        for m in member_agg:
-            # 【修复】获取该成员负责的所有活跃项目，并按其最新节点的更新时间排序
-            projects = active_qs.filter(manager__id=m['manager__id']) \
-                                .annotate(latest_node_update=Max('nodes__updated_at')) \
-                                .order_by('-latest_node_update') \
-                                .values('id', 'name')
+        for m in top_managers_agg:
+            manager_id = m['manager__id']
             member_stats_list.append({
                 'name': m['manager__username'],
                 'avatar': m['manager__username'][0].upper() if m['manager__username'] else 'U',
                 'project_count': m['project_count'],
-                'projects': list(projects)
+                'projects': projects_by_manager.get(manager_id, [])
             })
 
         # =========================================================
