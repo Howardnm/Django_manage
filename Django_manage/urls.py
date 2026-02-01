@@ -16,6 +16,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.shortcuts import render # 导入 render
 from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
 
 
@@ -23,6 +24,11 @@ from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配
 admin.site.site_header = "项目管理系统后台"
 admin.site.site_title = "项目管理系统"
 admin.site.index_title = "欢迎使用项目管理系统"
+
+# 定义一个简单的视图函数来渲染无权限页面
+def permission_denied_view(request):
+    return render(request, 'permission_denied.html', status=403)
+
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -35,4 +41,7 @@ urlpatterns = [
     path('process/', include('app_process.urls')),
     # 【新增】配方数据库路由
     path('formula/', include('app_formula.urls')),
+
+    # 添加无权限页面的 URL 模式
+    path('permission-denied/', permission_denied_view, name='permission_denied'),
 ] + debug_toolbar_urls() # 这是debug_toolbar的配置

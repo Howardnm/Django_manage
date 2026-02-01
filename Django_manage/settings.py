@@ -168,6 +168,9 @@ LOGIN_URL = 'login'  # 没登录时自动跳到这里
 LOGIN_REDIRECT_URL = 'panel_home'  # 登录成功后跳到这里
 LOGOUT_REDIRECT_URL = 'login'  # 注销后跳到这里
 
+# 当用户已登录但没有所需权限时，PermissionRequiredMixin 会重定向到此 URL
+PERM_DENIED_URL = '/permission-denied/'
+
 ADMIN_URL = '/admin'
 
 # 这是debug_toolbar的配置
