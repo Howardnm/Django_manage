@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count, Q
 from django.shortcuts import render
 from django.utils import timezone
@@ -11,7 +11,9 @@ from app_project.mixins import ProjectPermissionMixin
 from app_project.models import Project, ProjectStage
 
 
-class ProjectOverviewView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class ProjectOverviewView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, View):
+    permission_required = 'app_project.view_project' # 设置权限，不设置 raise_exception=True，让 Django 自动重定向
+
     def get(self, request):
         # 1. 获取基础 QuerySet (权限过滤)
         base_qs = Project.objects.all()
