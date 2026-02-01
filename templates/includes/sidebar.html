@@ -1,3 +1,4 @@
+{% load static %}
 <aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
     <div class="container-fluid">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false"
@@ -23,12 +24,14 @@
                     </a>
                 </li>
 
-                <li class="nav-item mt-3 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">系统看板</div>
-                </li>
-                <hr class="my-1 mx-3 opacity-25"/>
-                <!-- 【模块 1：看板下拉菜单】 -->
-                {% include "sidebar_modules/_dashboard.html" %}
+                {# 如果用户有任何看板权限，则显示“系统看板”标题和下拉菜单 #}
+                {% if perms.app_project.view_project or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial %}
+                    <li class="nav-item mt-3 mb-1">
+                        <div class="text-muted text-uppercase small fw-bold ps-3">系统看板</div>
+                    </li>
+                    <!-- 【模块 1：看板下拉菜单】 -->
+                    {% include "sidebar_modules/_dashboard.html" %}
+                {% endif %}
 
 
                 <!-- 分割线：项目管理部 -->
