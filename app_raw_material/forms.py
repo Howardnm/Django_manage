@@ -3,37 +3,7 @@ from django.forms import inlineformset_factory
 from .models import Supplier, RawMaterialType, RawMaterial, RawMaterialProperty
 from app_repository.models import TestConfig
 from django.utils.text import Truncator
-
-class TablerFormMixin:
-    """
-    混入类：自动给字段添加 Tabler 样式
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            attrs = field.widget.attrs
-            existing_class = attrs.get('class', '')
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_class:
-                    existing_class += ' form-select'
-                
-                if 'value-select' not in existing_class and 'form-select-search' not in existing_class:
-                    existing_class += ' form-select-search'
-                    
-                attrs['class'] = existing_class.strip()
-            elif isinstance(field.widget, forms.CheckboxInput):
-                if 'form-check-input' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-check-input".strip()
-            elif isinstance(field.widget, forms.DateInput):
-                # TablerFormMixin 应该始终为 DateInput 添加 form-control class
-                if 'form-control' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-control".strip()
-                # TablerFormMixin 应该始终为 DateInput 添加 type='date'
-                attrs['type'] = 'date'
-            else:
-                if not isinstance(field.widget, forms.HiddenInput):
-                    if 'form-control' not in existing_class:
-                        attrs['class'] = f"{existing_class} form-control".strip()
+from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 
 # 1. 供应商表单
 class SupplierForm(TablerFormMixin, forms.ModelForm):
@@ -63,11 +33,25 @@ class RawMaterialForm(TablerFormMixin, forms.ModelForm):
             'usage_method': forms.Textarea(attrs={'rows': 3}),
             'purchase_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'suitable_materials': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            # 为供应商字段添加懒加载属性
+            'supplier': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'supplier'}),
         }
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['category'].label_from_instance = lambda obj: f"{obj.name} ({Truncator(obj.description).chars(22)})" if obj.description else obj.name
+
+        # 【性能核心优化】
+        # 如果没有 data (说明是 GET 请求渲染页面)，则清空 QuerySet，避免渲染成千上万个 option
+        # 但是，必须保留 "当前已选" 的那个值，否则页面上显示为空
+        if not self.data:
+            instance = kwargs.get('instance')
+
+            # 优化供应商字段
+            if instance and instance.supplier_id:
+                self.fields['supplier'].queryset = Supplier.objects.filter(pk=instance.supplier_id)
+            else:
+                self.fields['supplier'].queryset = Supplier.objects.none()
 
 
 # 4. 原材料性能指标行表单
@@ -81,7 +65,6 @@ class RawMaterialPropertyForm(TablerFormMixin, forms.ModelForm):
             'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
-            # 【修复】为 test_date 明确指定 format 和 type
             'test_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }

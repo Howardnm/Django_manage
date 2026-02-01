@@ -93,90 +93,179 @@
             </td>
         </tr>
     </template>
-    <!-- Tom Select 集成 (移到这里确保 FormSet 字段也能被处理) -->
+    <!-- Tom Select 集成 -->
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-
-            // --- 1. Tom Select 初始化函数 (封装以便复用) ---
-            function initTomSelect(element) {
-                // 防止重复初始化
-                if (window.TomSelect && !element.classList.contains('tomselected')) {
-                    new TomSelect(element, {
+            if (window.TomSelect) {
+                // --- 1. 初始化远程搜索的 Tom Select (单选) ---
+                // 适用于 ProjectRepositoryForm 中的 customer, oem, material, salesperson
+                // 以及 RawMaterialForm 中的 supplier
+                document.querySelectorAll('.remote-search:not(.tomselect-multi-remote)').forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    new TomSelect(el, {
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
                         copyClassesToDropdown: false,
                         dropdownParent: 'body',
-                        controlInput: '<input>',
                         create: false,
-                        placeholder: '点击搜索...',
-                        plugins: ['remove_button', 'clear_button'],
+                        placeholder: '请输入关键词搜索...',
+                        preload: 'focus',
                         render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
                             no_results: function (data, escape) {
                                 return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                            }
-                        },
-                        // 监听变化，触发 toggleValueInput
-                        onChange: function(value) {
-                            // 找到原始的 select 元素并触发 onchange 事件
-                            // 因为 Tom Select 会隐藏原始 select，但我们逻辑绑定在原始 select 上
-                            // 或者直接在这里调用逻辑
-                            // 注意：element 是原始 select
-                            if (typeof toggleValueInput === 'function') {
-                                toggleValueInput(element);
+                            },
+                            loading: function (data, escape) {
+                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
                             }
                         }
                     });
+                });
+
+                // --- 2. 初始化远程搜索的 Tom Select (多选，胶囊样式) ---
+                // 适用于 MaterialForm 中的 scenarios
+                document.querySelectorAll('.remote-search.tomselect-multi-remote').forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    new TomSelect(el, {
+                        mode: 'multi', // 启用多选模式
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请输入关键词搜索...',
+                        preload: 'focus',
+                        plugins: ['remove_button'], // 允许移除已选中的项
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            },
+                            loading: function (data, escape) {
+                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                            }
+                        }
+                    });
+                });
+
+                // --- 3. 初始化本地多选的 Tom Select (胶囊样式) ---
+                // 适用于 ProcessProfileForm 中的 material_types
+                document.querySelectorAll('.tomselect-multi-local').forEach(function (el) {
+                    new TomSelect(el, {
+                        mode: 'multi', // 启用多选模式
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请选择...',
+                        plugins: ['remove_button'], // 允许移除已选中的项
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            }
+                        }
+                    });
+                });
+
+                // --- 4. 初始化 FormSet 内部的 Tom Select (本地搜索，单选) ---
+                // 适用于 MaterialDataPointForm 中的 test_config
+                function initFormsetTomSelect(element) {
+                    if (window.TomSelect && !element.classList.contains('tomselected')) {
+                        new TomSelect(element, {
+                            copyClassesToDropdown: false,
+                            dropdownParent: 'body',
+                            controlInput: '<input>',
+                            create: false,
+                            placeholder: '点击搜索...',
+                            plugins: ['remove_button', 'clear_button'],
+                            render: {
+                                no_results: function (data, escape) {
+                                    return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                                }
+                            },
+                            onChange: function(value) {
+                                if (typeof toggleValueInput === 'function') {
+                                    toggleValueInput(element);
+                                }
+                            }
+                        });
+                    }
                 }
+                document.querySelectorAll('.form-select-search').forEach(initFormsetTomSelect);
             }
 
-            // --- 2. 页面加载时：初始化现有的下拉框 ---
-            document.querySelectorAll('.form-select-search').forEach(initTomSelect);
-
-            // --- 3. 动态添加行逻辑 ---
+            // --- FormSet 动态添加行逻辑 ---
             const addBtn = document.getElementById('add-row');
             const tableBody = document.querySelector('#data-table tbody');
-            // 注意：Django inlineformset_factory 默认的前缀通常是 related_name (properties)
-            // 如果这里报错，请 F12 查看页面上的 hidden input id 是什么，通常是 id_properties-TOTAL_FORMS
-            const totalFormsInput = document.getElementById('id_properties-TOTAL_FORMS');
+            const totalFormsInput = document.getElementById('id_properties-TOTAL_FORMS'); // 假设是 properties
 
             if (addBtn && tableBody && totalFormsInput) {
                 addBtn.addEventListener('click', function () {
-                    // A. 获取当前表单总数
                     let formIdx = parseInt(totalFormsInput.value);
-
-                    // B. 获取模板内容
                     const template = document.getElementById('empty-form-template');
                     if (!template) {
                         console.error("找不到 ID 为 empty-form-template 的模板，请检查 HTML");
                         return;
                     }
-
-                    // C. 克隆并替换 ID (核心步骤: __prefix__ -> 0, 1, 2...)
                     let newRowHtml = template.innerHTML.replace(/__prefix__/g, formIdx);
-
-                    // D. 创建 TR 元素并插入
                     let newRow = document.createElement('tr');
-                    newRow.className = 'form-row'; // 保持样式一致
+                    newRow.className = 'form-row';
                     newRow.innerHTML = newRowHtml;
                     tableBody.appendChild(newRow);
-
-                    // E. 更新 Django 管理表单计数器
                     totalFormsInput.value = formIdx + 1;
-
-                    // F. 【关键】给新行里的下拉框应用 Tom Select
-                    newRow.querySelectorAll('.form-select-search').forEach(initTomSelect);
+                    
+                    // 【关键】给新行里的下拉框应用 Tom Select
+                    newRow.querySelectorAll('.form-select-search').forEach(initFormsetTomSelect);
                 });
             } else {
                 console.error("无法找到表格或添加按钮，请检查 HTML ID 是否匹配");
             }
 
-            // --- 4. 动态删除行逻辑 (事件委托) ---
+            // --- 动态删除行逻辑 (事件委托) ---
             tableBody.addEventListener('click', function (e) {
-                // 查找点击的是否是删除按钮 (包含子元素图标)
                 const btn = e.target.closest('.remove-row');
                 if (btn) {
                     const row = btn.closest('tr');
-                    // 直接移除 DOM 元素 (注意：这只适用于新建的行。如果是已保存的行，逻辑不同，这里模板里已经处理了区分)
                     row.remove();
-                    // 注意：这里不需要减少 TOTAL_FORMS，Django 会处理空缺
                 }
             });
         });

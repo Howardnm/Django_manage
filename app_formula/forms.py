@@ -1,36 +1,11 @@
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
-from common_utils.filters import TablerFilterMixin
+from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
 from app_repository.models import MaterialLibrary, TestConfig
 from app_raw_material.models import RawMaterial
 from app_basic_research.models import ResearchProject
-
-class TablerFormMixin:
-    """
-    混入类：自动给字段添加 Tabler 样式
-    """
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.fields.items():
-            attrs = field.widget.attrs
-            existing_class = attrs.get('class', '')
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_class:
-                    existing_class += ' form-select'
-                attrs['class'] = existing_class.strip()
-            elif isinstance(field.widget, forms.CheckboxInput):
-                if 'form-check-input' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-check-input".strip()
-            elif isinstance(field.widget, forms.DateInput):
-                if 'form-control' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-control".strip()
-                attrs['type'] = 'date' # 强制日期控件
-            else:
-                if not isinstance(field.widget, forms.HiddenInput):
-                    if 'form-control' not in existing_class:
-                        attrs['class'] = f"{existing_class} form-control".strip()
 
 # 1. 配方主表单
 class LabFormulaForm(TablerFormMixin, forms.ModelForm):

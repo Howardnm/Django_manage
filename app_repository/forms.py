@@ -2,57 +2,7 @@ from django import forms
 from .models import Customer, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
 from django.forms import inlineformset_factory
 from .models import MaterialLibrary, MaterialDataPoint, MaterialFile, TestConfig
-
-class TablerFormMixin:
-    """
-    混入类：
-    1. 自动给普通字段添加 form-control
-    2. 自动给 Checkbox 添加 form-check-input
-    3. 自动给 Select 添加 form-select 和 form-select-search (启用 Tom Select)
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        for field_name, field in self.fields.items():
-            # 获取该字段原本可能已经在 widgets 里定义的 class，避免覆盖
-            attrs = field.widget.attrs
-            existing_class = attrs.get('class', '')
-            # -----------------------------------------------------------
-            # 情况 1: 下拉选择框 (Select / SelectMultiple)
-            # -----------------------------------------------------------
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
-                # Tabler 标准样式是 form-select，而不是 form-control
-                # 追加 form-select-search 以启用我们刚才写的 Tom Select JS
-                # 使用 strip() 去除可能产生的多余空格
-                if 'form-select' not in existing_class:
-                    existing_class += ' form-select'
-                
-                # 【修复】如果字段明确指定了不需要搜索 (no-search)，则不添加 form-select-search
-                # 或者反过来，只对默认情况添加。
-                # 这里我们简单判断：如果 widget attrs 里没有明确禁止，就添加。
-                # 但更简单的做法是：在 MaterialDataPointForm 中手动移除该类。
-                # 不过为了通用性，我们可以在这里加一个判断：
-                # 如果 widget 已经有了 'value-select' 类 (我们在 MaterialDataPointForm 里加的)，就不加 search
-                if 'value-select' not in existing_class and 'form-select-search' not in existing_class:
-                    existing_class += ' form-select-search'
-                    
-                attrs['class'] = existing_class.strip()
-            # -----------------------------------------------------------
-            # 情况 2: 复选框 (Checkbox)
-            # -----------------------------------------------------------
-            elif isinstance(field.widget, forms.CheckboxInput):
-                if 'form-check-input' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-check-input".strip()
-            # -----------------------------------------------------------
-            # 情况 3: 其他输入框 (Text, Number, Email, Date, File, Password...)
-            # -----------------------------------------------------------
-            else:
-                # 排除 HiddenInput，不需要样式
-                if not isinstance(field.widget, forms.HiddenInput):
-                    if 'form-control' not in existing_class:
-                        attrs['class'] = f"{existing_class} form-control".strip()
-
+from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 
 # ==============================================================================
 # 1. 客户表单
@@ -72,10 +22,27 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
         fields = '__all__'
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
-            'scenarios': forms.SelectMultiple(attrs={'class': 'form-select'}),
+            # 为 scenarios 字段添加懒加载属性，并指定为多选远程搜索
+            'scenarios': forms.SelectMultiple(attrs={'class': 'form-select remote-search tomselect-multi-remote', 'data-model': 'applicationscenario'}),
             'flammability': forms.Select(attrs={'class': 'form-select'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        # 【性能核心优化】
+        # 如果没有 data (说明是 GET 请求渲染页面)，则清空 QuerySet，避免渲染成千上万个 option
+        # 但是，必须保留 "当前已选" 的那个值，否则页面上显示为空
+        if not self.data:
+            instance = kwargs.get('instance')
+
+            # 优化应用场景字段 (多对多)
+            qs_scenarios = ApplicationScenario.objects.none()
+            if instance and instance.pk:
+                qs_scenarios = instance.scenarios.all()
+            self.fields['scenarios'].queryset = qs_scenarios
+
 
 # 性能数据行表单
 class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):

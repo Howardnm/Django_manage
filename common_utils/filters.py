@@ -4,24 +4,57 @@ from django import forms
 
 class TablerFormMixin:
     """
-    混入类：自动给字段添加 Tabler 样式
+    混入类：
+    1. 自动给普通字段添加 form-control
+    2. 自动给 Checkbox 添加 form-check-input
+    3. 自动给 Select 添加 form-select 和 form-select-search (启用 Tom Select)
+    4. 自动给 DateInput 添加 form-control 和 type='date'
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
+            # 获取该字段原本可能已经在 widgets 里定义的 class，避免覆盖
             attrs = field.widget.attrs
             existing_class = attrs.get('class', '')
+            # -----------------------------------------------------------
+            # 情况 1: 下拉选择框 (Select / SelectMultiple)
+            # -----------------------------------------------------------
             if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
+                # Tabler 标准样式是 form-select，而不是 form-control
                 if 'form-select' not in existing_class:
                     existing_class += ' form-select'
-                if 'form-select-search' not in existing_class:
+                
+                # 【修复】只有当字段没有明确指定 Tom Select 行为时，才添加 form-select-search
+                # 这些明确指定的行为包括：no-tomselect, value-select, remote-search, tomselect-multi-local
+                if (
+                    'no-tomselect' not in existing_class and
+                    'value-select' not in existing_class and
+                    'remote-search' not in existing_class and
+                    'tomselect-multi-local' not in existing_class and
+                    'form-select-search' not in existing_class # 避免重复添加
+                ):
                     existing_class += ' form-select-search'
+                    
                 attrs['class'] = existing_class.strip()
+            # -----------------------------------------------------------
+            # 情况 2: 复选框 (Checkbox)
+            # -----------------------------------------------------------
             elif isinstance(field.widget, forms.CheckboxInput):
                 if 'form-check-input' not in existing_class:
                     attrs['class'] = f"{existing_class} form-check-input".strip()
+            # -----------------------------------------------------------
+            # 情况 3: 日期输入框 (DateInput)
+            # -----------------------------------------------------------
+            elif isinstance(field.widget, forms.DateInput):
+                if 'form-control' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-control".strip()
+                attrs['type'] = 'date' # 强制日期控件
+            # -----------------------------------------------------------
+            # 情况 4: 其他输入框 (Text, Number, Email, File, Password...)
+            # -----------------------------------------------------------
             else:
+                # 排除 HiddenInput，不需要样式
                 if not isinstance(field.widget, forms.HiddenInput):
                     if 'form-control' not in existing_class:
                         attrs['class'] = f"{existing_class} form-control".strip()

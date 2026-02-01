@@ -344,6 +344,51 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
+            // TomSelect 初始化 for remote-search
+            var remoteSelects = document.querySelectorAll('.remote-search');
+            if (window.TomSelect) {
+                remoteSelects.forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    new TomSelect(el, {
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            // 使用一个通用的 API 搜索 URL，这里需要定义 raw_material_api_search
+                            var url = "{% url 'raw_material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请输入关键词搜索...',
+                        preload: 'focus',
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            },
+                            loading: function (data, escape) {
+                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                            }
+                        }
+                    });
+                });
+            }
+
+            // FormSet 动态添加行逻辑
             const addBtn = document.getElementById('add-property');
             const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
             const tbody = document.getElementById('property-formset');
@@ -355,22 +400,19 @@
                 tbody.insertAdjacentHTML('beforeend', newRow);
                 totalForms.value = count + 1;
                 
-                // 重新初始化新添加行的 Tom Select
+                // 重新初始化新添加行的 Tom Select (针对性能指标的 test_config)
                 if (window.TomSelect) {
-                    // 找到刚添加的那一行
                     const newRowElement = tbody.lastElementChild;
-                    // 在该行内查找带有 .form-select-search 的 select 元素
                     const newSelect = newRowElement.querySelector('.form-select-search');
                     
                     if (newSelect) {
                         new TomSelect(newSelect, {
                             copyClassesToDropdown: false,
-                            dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡
+                            dropdownParent: 'body',
                             controlInput: '<input>',
                             create: false,
                             placeholder: '输入搜索...',
                             onChange: function(value) {
-                                // 触发 toggleValueInput
                                 if (typeof toggleValueInput === 'function') {
                                     toggleValueInput(newSelect);
                                 }
@@ -385,11 +427,10 @@
                 }
             });
             
-            // 初始化现有行的显示状态
+            // 初始化现有行的显示状态 (针对性能指标的 test_config)
             setTimeout(() => {
                 document.querySelectorAll('.form-select-search').forEach(select => {
                     if (select.value) {
-                        // 尝试恢复 SELECT 类型的值
                         const row = select.closest('tr');
                         const selectInput = row.querySelector('.value-select');
                         const textInput = row.querySelector('.value-text');

@@ -2,6 +2,7 @@ from django.urls import path
 from .views.MachineModel import *
 from .views.ScrewCombination import *
 from .views.ProcessProfile import *
+from .views.api import process_api_search # 导入新的 API 视图
 
 urlpatterns = [
     # 机台型号
@@ -21,4 +22,7 @@ urlpatterns = [
     path('profiles/<int:pk>/edit/', ProcessProfileUpdateView.as_view(), name='process_profile_edit'),
     # 【新增】复制副本路由
     path('profiles/<int:pk>/duplicate/', ProcessProfileDuplicateView.as_view(), name='process_profile_duplicate'),
+
+    # 【新增】API 搜索路由 (用于 Tom Select 远程加载)
+    path('api/search/', process_api_search, name='process_api_search'),
 ]

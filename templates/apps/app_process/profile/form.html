@@ -272,4 +272,75 @@
         </div>
     </form>
 
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.TomSelect) {
+                // 1. 初始化远程搜索的 Tom Select (单选)
+                var remoteSelects = document.querySelectorAll('.remote-search');
+                remoteSelects.forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    new TomSelect(el, {
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            var url = "{% url 'process_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请输入关键词搜索...',
+                        preload: 'focus',
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            },
+                            loading: function (data, escape) {
+                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                            }
+                        }
+                    });
+                });
+
+                // 2. 初始化本地多选的 Tom Select (胶囊样式)
+                var multiLocalSelects = document.querySelectorAll('.tomselect-multi-local');
+                multiLocalSelects.forEach(function (el) {
+                    new TomSelect(el, {
+                        mode: 'multi', // 启用多选模式
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请选择...',
+                        // 对于本地多选，不需要远程加载，也不需要 preload
+                        // preload: 'focus', // 移除此项，避免加载所有选项
+                        render: {
+                            option: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            item: function (data, escape) {
+                                return '<div>' + escape(data.text) + '</div>';
+                            },
+                            no_results: function (data, escape) {
+                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                            }
+                        }
+                    });
+                });
+            }
+        });
+    </script>
 {% endblock %}

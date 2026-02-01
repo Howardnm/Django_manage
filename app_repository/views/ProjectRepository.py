@@ -10,7 +10,7 @@ from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile
-from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig, MaterialType
+from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig, MaterialType, ApplicationScenario # 导入 ApplicationScenario
 from app_project.mixins import ProjectPermissionMixin
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial
@@ -223,5 +223,13 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
                 qs = qs.filter(Q(username__icontains=query) | Q(first_name__icontains=query))
             qs = qs.values('id', 'username', 'first_name')[:20]
             data = [{'value': item['id'], 'text': f"{item['first_name'] or item['username']}"} for item in qs]
+
+        # 【新增】应用场景搜索
+        elif model_type == 'applicationscenario':
+            qs = ApplicationScenario.objects.all()
+            if query:
+                qs = qs.filter(name__icontains=query)
+            qs = qs.values('id', 'name')[:20]
+            data = [{'value': item['id'], 'text': item['name']} for item in qs]
 
         return JsonResponse(data, safe=False)
