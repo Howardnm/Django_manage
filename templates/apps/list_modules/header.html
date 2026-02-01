@@ -5,7 +5,7 @@
             <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
         </div>
         <div class="col-auto ms-auto d-print-none">
-            <a href="{% url create_url|default:'basic_research_create' %}" class="btn btn-primary">
+            <a href="{% url create_url|default:'panel_home' %}" class="btn btn-primary">
                 <i class="ti ti-plus"></i>
                 新建
             </a>

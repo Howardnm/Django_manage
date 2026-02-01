@@ -2,7 +2,7 @@
 {% load project_extras %}
 
 {% block content %}
-    {% include 'apps/list_modules/header.html' %}
+    {% include 'apps/list_modules/header.html' with title="预研项目管理" create_url="basic_research_create" %}
     <div class="card mt-3">
         <!-- 工具栏：搜索与筛选 -->
         {% include 'apps/list_modules/tools_search_filter.html' %}
