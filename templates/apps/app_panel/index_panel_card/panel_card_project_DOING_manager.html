@@ -3,7 +3,7 @@
     <div class="card-header">
         <h3 class="card-title">成员项目负载</h3>
     </div>
-    <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+    <div class="table-responsive" style="max-height: 320px; overflow-y: auto;">
         <table class="table table-vcenter card-table">
             <thead>
             <tr>
@@ -26,8 +26,20 @@
                     <td>
                         <span class="badge bg-blue-lt">{{ member.project_count }}</span>
                     </td>
-                    <td class="text-muted small">
-                        {{ member.projects|join:", " }}, ...
+                    <td style="min-width: 150px;">
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for p in member.projects|slice:":3" %}
+                                <a href="{% url 'project_detail' p.id %}" class="badge bg-purple-lt" title="{{ p.name }}">
+                                    {{ p.name|truncatechars:30 }}
+                                </a>
+                            {% endfor %}
+                            {% if member.project_count > 3 %}
+                                <span class="text-muted">...</span>
+                            {% endif %}
+                            {% if not member.projects %}
+                                <span class="text-muted">无</span>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
             {% endfor %}

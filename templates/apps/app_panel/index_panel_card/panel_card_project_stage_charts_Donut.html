@@ -8,88 +8,59 @@
 </div>
 
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    var stageCategories = [{% for k, v in stats.stage_counts.items %}"{{ k }}",{% endfor %}];
-    var stageSeriesData = [{% for k, v in stats.stage_counts.items %}{{ v }}, {% endfor %}];
+    document.addEventListener("DOMContentLoaded", function () {
+        var stageCategories = [{% for k, v in stats.stage_counts.items %}"{{ k }}",{% endfor %}];
+        var stageSeriesData = [{% for k, v in stats.stage_counts.items %}{{ v }}, {% endfor %}];
 
-    Highcharts.chart('chart-stages-bar', {
-        chart: {
-            type: 'bar',
-            backgroundColor: 'transparent',
-            // 让 Highcharts 根据分类数量动态计算高度
-            height: (stageCategories.length * 25) + 70
-        },
-        title: {
-            text: null
-        },
-        xAxis: {
-            categories: stageCategories,
+        Highcharts.chart('chart-stages-bar', {
+            chart: {
+                type: 'bar',
+                backgroundColor: 'transparent',
+                // 让 Highcharts 根据分类数量动态计算高度
+                height: (stageCategories.length * 25) + 70
+            },
             title: {
                 text: null
             },
-            labels: {
-                style: {
-                    fontFamily: 'inherit',
-                    color: '#6c7a91'
-                }
-            },
-            lineColor: '#e9ecf1',
-            tickColor: '#e9ecf1'
-        },
-        yAxis: {
-            min: 0,
-            title: {
-                text: '项目数量',
-                align: 'high',
-                 style: {
-                    fontFamily: 'inherit',
-                    color: '#6c7a91'
-                }
-            },
-            labels: {
-                overflow: 'justify',
-                style: {
-                    fontFamily: 'inherit',
-                    color: '#6c7a91'
-                }
-            },
-            gridLineColor: '#e9ecf1',
-            allowDecimals: false
-        },
-        tooltip: {
-            valueSuffix: ' 个',
-            backgroundColor: '#333',
-            borderColor: '#333',
-            style: {
-                color: '#fff',
-                fontFamily: 'inherit'
-            }
-        },
-        plotOptions: {
-            bar: {
-                dataLabels: {
-                    enabled: true,
-                     style: {
-                        fontFamily: 'inherit',
-                        color: '#6c7a91',
-                        textOutline: 'none'
-                    }
+            xAxis: {
+                categories: stageCategories,
+                title: {
+                    text: null
                 },
-                borderRadius: 3,
-                borderColor: 'transparent'
-            }
-        },
-        legend: {
-            enabled: false
-        },
-        credits: {
-            enabled: false
-        },
-        series: [{
-            name: '项目数',
-            data: stageSeriesData,
-            color: '#206bc4'
-        }]
+            },
+            yAxis: {
+                min: 0,
+                title: {
+                    text: '项目数量',
+                    align: 'high'
+                },
+                labels: {
+                    overflow: 'justify'
+                },
+                allowDecimals: false
+            },
+            tooltip: {
+                valueSuffix: ' 个',
+            },
+            plotOptions: {
+                bar: {
+                    dataLabels: {
+                        enabled: true
+                    },
+                    borderRadius: 3,
+                    borderColor: 'transparent'
+                }
+            },
+            legend: {
+                enabled: false
+            },
+            credits: {
+                enabled: false
+            },
+            series: [{
+                name: '项目数',
+                data: stageSeriesData,
+            }]
+        });
     });
-});
 </script>

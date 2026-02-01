@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Max
 from django.shortcuts import render
 from django.utils import timezone
 from django.views import View
@@ -125,11 +125,16 @@ class ProjectOverviewView(LoginRequiredMixin, CustomPermissionRequiredMixin, Pro
 
         member_stats_list = []
         for m in member_agg:
+            # 【修复】获取该成员负责的所有活跃项目，并按其最新节点的更新时间排序
+            projects = active_qs.filter(manager__id=m['manager__id']) \
+                                .annotate(latest_node_update=Max('nodes__updated_at')) \
+                                .order_by('-latest_node_update') \
+                                .values('id', 'name')
             member_stats_list.append({
                 'name': m['manager__username'],
                 'avatar': m['manager__username'][0].upper() if m['manager__username'] else 'U',
                 'project_count': m['project_count'],
-                'projects': []
+                'projects': list(projects)
             })
 
         # =========================================================
