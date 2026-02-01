@@ -1,9 +1,37 @@
-<!-- 首页模块 -->
-<li class="nav-item">
-    <a class="nav-link {% if request.resolver_match.url_name == 'panel_index' %}active{% endif %}" href="{% url 'panel_index' %}">
-        <span class="nav-link-icon"><i class="ti ti-dashboard"></i></span>
-        <span class="nav-link-title">项目全景看板</span>
+{% comment %}
+检测当前 URL 是否属于看板模块，用于高亮父菜单
+{% endcomment %}
+<li class="nav-item dropdown {% if request.resolver_match.url_name == 'panel_home' or request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}">
+    <a class="nav-link dropdown-toggle" href="#navbar-dashboard" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{% if request.resolver_match.url_name == 'panel_home' or request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}true{% else %}false{% endif %}">
+        <span class="nav-link-icon d-md-none d-lg-inline-block">
+            <i class="ti ti-layout-dashboard"></i>
+        </span>
+        <span class="nav-link-title">
+            看板
+        </span>
     </a>
+    <div class="dropdown-menu {% if request.resolver_match.url_name == 'panel_home' or request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}show{% endif %}">
+        <div class="dropdown-menu-columns">
+            <div class="dropdown-menu-column">
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}" href="{% url 'panel_home' %}">
+                    首页
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'project_overview' %}active{% endif %}" href="{% url 'project_overview' %}">
+                    项目全景看板
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'material_library' %}active{% endif %}" href="{% url 'material_library' %}">
+                    材料库看板
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'formula_library' %}active{% endif %}" href="{% url 'formula_library' %}">
+                    配方库看板
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'process_library' %}active{% endif %}" href="{% url 'process_library' %}">
+                    工艺库看板
+                </a>
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}" href="{% url 'raw_material_library' %}">
+                    原材料库看板
+                </a>
+            </div>
+        </div>
+    </div>
 </li>
-
-

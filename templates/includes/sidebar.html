@@ -11,10 +11,9 @@
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
 
-                <!-- 【模块 1：仪表盘】 -->
-                {% if user.is_authenticated %}
-                    {% include "sidebar_modules/_dashboard.html" %}
-                {% endif %}
+                <!-- 【模块 1：看板下拉菜单】 -->
+                {% include "sidebar_modules/_dashboard.html" %}
+
 
                 <!-- 分割线：项目管理部 -->
                 {% if perms.app_project.view_project or perms.app_repository.view_projectrepository %}

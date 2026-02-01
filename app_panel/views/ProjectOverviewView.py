@@ -11,7 +11,7 @@ from app_project.mixins import ProjectPermissionMixin
 from app_project.models import Project, ProjectStage
 
 
-class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
+class ProjectOverviewView(LoginRequiredMixin, ProjectPermissionMixin, View):
     def get(self, request):
         # 1. 获取基础 QuerySet (权限过滤)
         base_qs = Project.objects.all()
@@ -170,4 +170,4 @@ class PanelIndexView(LoginRequiredMixin, ProjectPermissionMixin, View):
             'end_date': end_date,
             'filter': filter_set,
         }
-        return render(request, 'apps/app_panel/index.html', context)
+        return render(request, 'apps/app_panel/project_overview.html', context)
