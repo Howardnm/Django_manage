@@ -66,7 +66,7 @@
             </div>
 
             <!-- 第二排：图表 + 成员负载 -->
-            <div class="row row-deck row-cards mt-2">
+            <div class="row row-cards mt-2">
                 <!-- 阶段分布图表 (稍微宽一点) -->
                 <div class="col-lg-5">
                     {% include 'apps/app_panel/index_panel_card/panel_card_project_stage_charts_Donut.html' %}
@@ -101,5 +101,5 @@
 {% endblock %}
 
 {% block extra_js %}
-    <script src="{% static 'apexcharts/core-5.3.6/dist/apexcharts.min.js' %}"></script>
+    <script src="{% static 'highcharts/core-12.5.0/highcharts.js' %}"></script>
 {% endblock %}
