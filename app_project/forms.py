@@ -1,47 +1,7 @@
 from django import forms
 from .models import Project, ProjectNode
 from django.contrib.auth.models import User
-
-
-# ========================================================
-# 1. 定义 Tabler 样式混入类
-# (建议以后将其移动到专门的 utils.py 或 common 应用中实现复用)
-# ========================================================
-class TablerFormMixin:
-    """
-    混入类：自动给字段添加 Tabler/Bootstrap 样式类
-    1. Select -> form-select (支持 Tom Select)
-    2. Checkbox -> form-check-input
-    3. Input/Textarea -> form-control
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        for field_name, field in self.fields.items():
-            attrs = field.widget.attrs
-            existing_class = attrs.get('class', '')
-
-            # 下拉框
-            if isinstance(field.widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_class:
-                    existing_class += ' form-select'
-                # 如果你想让项目表单的下拉框也支持搜索，加上这个
-                if 'form-select-search' not in existing_class:
-                    existing_class += ' form-select-search'
-                attrs['class'] = existing_class.strip()
-
-            # 复选框
-            elif isinstance(field.widget, forms.CheckboxInput):
-                if 'form-check-input' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-check-input".strip()
-
-            # 普通输入框
-            else:
-                if not isinstance(field.widget, forms.HiddenInput):
-                    if 'form-control' not in existing_class:
-                        attrs['class'] = f"{existing_class} form-control".strip()
-
+from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 
 
 class RegisterForm(forms.ModelForm):
@@ -73,11 +33,13 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
         }
 
 
-class ProjectNodeUpdateForm(forms.ModelForm):
+# 确保 ProjectNodeUpdateForm 也继承 TablerFormMixin
+class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = ProjectNode
         fields = ['status', 'remark']
         widgets = {
-            'status_choices': forms.Select(attrs={'class': 'form-select'}),
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 12, 'placeholder': '填写备注信息...'}),
+            # status 字段会通过 TablerFormMixin 自动获得 form-select 样式
+            'status': forms.Select(), 
+            'remark': forms.Textarea(attrs={'rows': 12, 'placeholder': '填写备注信息...'}),
         }
