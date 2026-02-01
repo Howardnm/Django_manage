@@ -24,7 +24,7 @@
 
                 <!-- 右侧：类型 & 阻燃 -->
                 <div class="ms-auto d-flex align-items-center gap-2 me-3">
-                    <span class="badge bg-purple-lt text-purple">{{ repo.material.category.name }}</span>
+                    <span class="badge bg-green text-white">{{ repo.material.category.name }}</span>
                     {% if repo.material.flammability %}
                         <span class="badge bg-orange text-white">
                             {{ repo.material.flammability }}
@@ -47,7 +47,7 @@
             <div class="mb-2 d-flex align-items-center flex-wrap gap-1">
                 <span class="text-body small fw-bold me-1">适用场景:</span>
                 {% for s in repo.material.scenarios.all %}
-                    <span class="badge bg-green-lt text-green">{{ s.name }}</span>
+                    <span class="badge bg-blue-lt text-blue">{{ s.name }}</span>
                 {% empty %}
                     <span class="text-muted small fst-italic">通用场景</span>
                 {% endfor %}

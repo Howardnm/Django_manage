@@ -74,12 +74,12 @@
                 {% for profile in profiles %}
                     <tr>
                         <td><a href="{% url 'process_profile_detail' profile.pk %}" class="text-reset fw-bold">{{ profile.name }}</a></td>
-                        <td><span class="badge bg-blue-lt">{{ profile.process_type_name }}</span></td>
+                        <td><span class="badge bg-orange-lt">{{ profile.process_type_name }}</span></td>
                         <td>
                             {% if profile.material_types.exists %}
                                 <div class="d-flex flex-wrap gap-1" style="max-width: 200px;">
                                     {% for mat_type in profile.material_types.all|slice:":3" %}
-                                        <span class="badge bg-purple-lt">{{ mat_type.name }}</span>
+                                        <span class="badge bg-green-lt">{{ mat_type.name }}</span>
                                     {% endfor %}
                                     {% if profile.material_types.count > 3 %}
                                         <span class="badge bg-secondary-lt" title="更多...">+{{ profile.material_types.count|add:"-3" }}</span>
@@ -91,7 +91,7 @@
                         </td>
                         <td>
                             {% if profile.machine.machine_code %}
-                                <span class="badge bg-azure-lt">{{ profile.machine.machine_code }}</span>
+                                <span class="badge bg-purple-lt">{{ profile.machine.machine_code }}</span>
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
