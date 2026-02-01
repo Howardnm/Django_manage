@@ -19,6 +19,18 @@
                     </tr>
                     </thead>
                     <tbody>
+                    <!-- 【优先显示】多轮小试 -->
+                    {% for item in stats.multi_round_pilot %}
+                        <tr>
+                            <td><a href="{% url 'project_detail' item.p.id %}" class="text-reset fw-bold">{{ item.p.name }}</a></td>
+                            <td>{{ item.p.manager.username }}</td>
+                            <td>{{ item.p.get_current_stage_display }}</td>
+                            <td><span class="badge bg-purple text-white">第 {{ item.round }} 轮小试</span></td>
+                            <td>-</td>
+                            <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
+                        </tr>
+                    {% endfor %}
+
                     <!-- 30天停滞 -->
                     {% for item in stats.stagnant_30d %}
                         <tr>
@@ -39,18 +51,6 @@
                             <td>{{ item.node.get_stage_display }}</td>
                             <td><span class="badge bg-yellow text-white">停滞 {{ item.days }} 天</span></td>
                             <td>{{ item.node.updated_at|date:"Y-m-d" }}</td>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
-                        </tr>
-                    {% endfor %}
-
-                    <!-- 多轮小试 -->
-                    {% for item in stats.multi_round_pilot %}
-                        <tr>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="text-reset">{{ item.p.name }}</a></td>
-                            <td>{{ item.p.manager.username }}</td>
-                            <td>{{ item.p.get_current_stage_label }}</td>
-                            <td><span class="badge bg-purple text-white">第 {{ item.round }} 轮小试</span></td>
-                            <td>-</td>
                             <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
                         </tr>
                     {% endfor %}

@@ -13,13 +13,11 @@
         <div class="d-flex align-items-baseline">
             <div class="h1 mb-3 me-2">{{ stats.total_all }}</div>
             <div class="me-auto">
-                    <span class="text-green inline-block">
-                        <!-- 这里可以放同比环比，暂时留空 -->
-                        <svg xmlns="http://www.w3.org/2000/svg" class="icon icon-inline" width="24" height="24" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"
-                             fill="none" stroke-linecap="round" stroke-linejoin="round"><path stroke="none" d="M0 0h24v24H0z" fill="none"/><path
-                                d="M3 12a9 9 0 1 0 18 0a9 9 0 0 0 -18 0"/><path d="M12 9h.01"/><path d="M11 12h1v4h1"/></svg>
-                        All Projects
-                    </span>
+                <!-- 【修复】使用 Tabler Icon 替换 SVG -->
+                <span class="text-green d-inline-flex align-items-center lh-1">
+                    <i class="ti ti-info-circle icon-inline"></i>
+                    All Projects
+                </span>
             </div>
         </div>
 
