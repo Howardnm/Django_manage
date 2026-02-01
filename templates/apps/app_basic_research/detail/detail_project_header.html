@@ -3,16 +3,15 @@
     <div class="row g-2 align-items-center">
         <div class="col">
             <div class="page-pretitle">预研项目详情</div>
-            <h2 class="page-title">
-                <span class="text-muted me-2">[{{ project.code }}]</span>
-                {{ project.name }}
-            </h2>
+            <h2 class="page-title">项目名称：{{ project.name }}</h2>
         </div>
         <div class="col-auto ms-auto">
             <!-- 顶部操作区 -->
             <div class="btn-list">
-                <!-- 预留导出按钮 -->
-                {# <a href="#" class="btn btn-white"><i class="ti ti-file-download me-2"></i>导出报告</a> #}
+                <span class="d-none d-sm-inline">
+                    <!-- 预留导出按钮 -->
+                    {# <a href="#" class="btn btn-white"><i class="ti ti-file-download me-2"></i>导出报告</a> #}
+                </span>
             </div>
         </div>
     </div>
