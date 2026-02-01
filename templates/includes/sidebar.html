@@ -11,6 +11,22 @@
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
 
+                {# 新增独立的首页链接 #}
+                <li class="nav-item {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'panel_home' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="ti ti-home"></i> {# 使用一个家庭图标 #}
+                        </span>
+                        <span class="nav-link-title">
+                            首页
+                        </span>
+                    </a>
+                </li>
+
+                <li class="nav-item mt-3 mb-1">
+                    <div class="text-muted text-uppercase small fw-bold ps-3">系统看板</div>
+                </li>
+                <hr class="my-1 mx-3 opacity-25"/>
                 <!-- 【模块 1：看板下拉菜单】 -->
                 {% include "sidebar_modules/_dashboard.html" %}
 
