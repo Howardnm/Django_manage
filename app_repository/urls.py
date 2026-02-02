@@ -6,7 +6,6 @@ from .views.Customer import *
 from .views.OEM import *
 from .views.Scenario import *
 from .views.Salesperson import *
-from common_utils.SecureFileDownload import *
 from .views.TestConfig import *  # 【新增】
 
 urlpatterns = [
@@ -48,9 +47,6 @@ urlpatterns = [
     path('test-configs/', TestConfigListView.as_view(), name='repo_test_config_list'),
     path('test-configs/add/', TestConfigCreateView.as_view(), name='repo_test_config_add'),
     path('test-configs/<int:pk>/edit/', TestConfigUpdateView.as_view(), name='repo_test_config_edit'),
-
-    # 通用下载路由
-    path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
 
     # 业务员库
     path('sales/', SalespersonListView.as_view(), name='repo_sales_list'),

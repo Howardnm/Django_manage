@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from django.shortcuts import render # 导入 render
+from common_utils.SecureFileDownload import SecureFileDownloadView
 from debug_toolbar.toolbar import debug_toolbar_urls # 这是debug_toolbar的配置
 
 
@@ -39,9 +40,9 @@ urlpatterns = [
     path('repository/', include('app_repository.urls')),
     path('raw-material/', include('app_raw_material.urls')),
     path('process/', include('app_process.urls')),
-    # 【新增】配方数据库路由
     path('formula/', include('app_formula.urls')),
-
+    # 通用下载路由
+    path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
     # 添加无权限页面的 URL 模式
     path('permission-denied/', permission_denied_view, name='permission_denied'),
 ] + debug_toolbar_urls() # 这是debug_toolbar的配置

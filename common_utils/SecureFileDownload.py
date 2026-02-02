@@ -11,7 +11,7 @@ from app_project.mixins import ProjectPermissionMixin
 class SecureFileDownloadView(LoginRequiredMixin, View):
     """
     通用安全文件下载视图
-    URL格式: /repository/download/<app_label>/<model_name>/<pk>/<field_name>/
+    URL格式: /download/<app_label>/<model_name>/<pk>/<field_name>/
     """
 
     def get(self, request, app_label, model_name, pk, field_name):
