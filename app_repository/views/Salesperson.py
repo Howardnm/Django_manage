@@ -12,7 +12,7 @@ from app_repository.utils.filters import SalespersonFilter
 class SalespersonListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'app_repository.view_salesperson'
     model = Salesperson
-    template_name = 'apps/app_repository/project_repo_info/salesperson_list.html'
+    template_name = 'apps/app_repository/salesperson/salesperson_list.html'
     context_object_name = 'salespersons' # 统一改为 page_obj 配合分页组件
     paginate_by = 10
 

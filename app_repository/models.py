@@ -4,7 +4,8 @@ from django.db import models
 from django.core.validators import FileExtensionValidator
 from app_project.models import Project
 from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size  # 引入文件大小验证器
+from common_utils.validators import validate_file_size
+from django.contrib.auth.models import User
 
 
 # ==============================================================================
@@ -58,9 +59,24 @@ class ApplicationScenario(models.Model):
 # ==========================================
 class OEM(models.Model):
     """主机厂 (如：比亚迪、特斯拉、吉利)"""
+    LEVEL_CHOICES = [
+        ('A', 'A级 (核心客户)'),
+        ('B', 'B级 (重要客户)'),
+        ('C', 'C级 (普通客户)'),
+        ('D', 'D级 (潜在客户)'),
+    ]
+
     name = models.CharField("主机厂名称", max_length=100, unique=True)
     short_name = models.CharField("简称", max_length=20, blank=True)
     description = models.TextField("描述/备注", blank=True)
+
+    # --- 新增字段 ---
+    website = models.URLField("官方网站", blank=True)
+    contact_name = models.CharField("主要联系人", max_length=50, blank=True)
+    contact_phone = models.CharField("联系电话", max_length=50, blank=True)
+    contact_email = models.EmailField("电子邮箱", blank=True)
+    address = models.CharField("公司地址", max_length=200, blank=True)
+    cooperation_level = models.CharField("合作级别", max_length=10, choices=LEVEL_CHOICES, default='C')
 
     def __str__(self):
         return self.short_name or self.name
@@ -68,6 +84,35 @@ class OEM(models.Model):
     class Meta:
         verbose_name = "主机厂"
         verbose_name_plural = "主机厂库"
+
+# ==========================================
+# 【新增】主机厂标准文件模型
+# ==========================================
+class OEMStandardFile(models.Model):
+    """主机厂标准文件库"""
+    FILE_TYPE_CHOICES = [
+        ('MATERIAL', '材料标准'),
+        ('TEST', '测试标准'),
+        ('QUALITY', '质量协议'),
+        ('OTHER', '其他标准'),
+    ]
+
+    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, related_name='standard_files', verbose_name="所属主机厂")
+    name = models.CharField("文件名称", max_length=100)
+    file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
+    file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='MATERIAL')
+    description = models.TextField("文件描述/摘要", blank=True)
+
+    uploader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="上传人")
+    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "主机厂标准文件"
+        verbose_name_plural = "主机厂标准文件库"
+        ordering = ['-uploaded_at']
 
 
 # ==========================================
@@ -188,7 +233,7 @@ class MaterialLibrary(models.Model):
             key = point.test_config.name
             # 兼容非数值类型
             val = point.value_text if point.test_config.data_type != 'NUMBER' else point.value
-            
+
             data[key] = {
                 'value': val,
                 'unit': point.test_config.unit,
@@ -214,18 +259,18 @@ class MaterialLibrary(models.Model):
         """
         from collections import defaultdict
         grouped = defaultdict(list)
-        
+
         # 预加载 test_config 和 category
         points = self.properties.select_related('test_config', 'test_config__category').order_by(
             'test_config__category__order', 'test_config__order'
         )
-        
+
         for point in points:
             cat_name = point.test_config.category.name
-            
+
             # 兼容非数值类型
             val = point.value_text if point.test_config.data_type != 'NUMBER' else point.value
-            
+
             grouped[cat_name].append({
                 'name': point.test_config.name,
                 'value': val,
@@ -235,7 +280,7 @@ class MaterialLibrary(models.Model):
                 'remark': point.remark,
                 'data_type': point.test_config.data_type # 增加 data_type
             })
-            
+
         # 转换为列表格式，保持分类顺序 (因为 defaultdict 是无序的，但我们查询时已经按 category__order 排序了)
         # 为了确保分类顺序正确，我们最好再处理一下，或者直接依赖查询顺序
         # 这里简单处理：按出现的顺序生成列表
@@ -250,7 +295,7 @@ class MaterialLibrary(models.Model):
                     'items': grouped[cat_name]
                 })
                 seen_cats.add(cat_name)
-                
+
         return result
 
     class Meta:
@@ -271,13 +316,13 @@ class MaterialLibrary(models.Model):
 class MaterialDataPoint(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='properties')
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
-    
+
     # 数值型数据
     value = models.DecimalField("测试数值", max_digits=10, decimal_places=3, null=True, blank=True)
-    
+
     # 【新增】文本型数据 (用于存储非数字结果，如阻燃等级 V-0)
     value_text = models.CharField("文本结果", max_length=50, blank=True)
-    
+
     remark = models.CharField("备注", max_length=50, blank=True)
 
     class Meta:

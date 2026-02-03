@@ -1,0 +1,25 @@
+<div class="modal-header">
+    <h5 class="modal-title">上传标准文件</h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+<form hx-post="{% url 'repo_oem_file_upload' oem.pk %}" hx-encoding="multipart/form-data" hx-target="#htmx-modal-content">
+    {% csrf_token %}
+    <div class="modal-body">
+        {% for field in form %}
+            <div class="mb-3">
+                <label class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <small class="form-hint">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">确认上传</button>
+    </div>
+</form>

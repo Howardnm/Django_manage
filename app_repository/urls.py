@@ -6,7 +6,7 @@ from .views.Customer import *
 from .views.OEM import *
 from .views.Scenario import *
 from .views.Salesperson import *
-from .views.TestConfig import *  # 【新增】
+from .views.TestConfig import *
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
@@ -43,7 +43,7 @@ urlpatterns = [
     path('scenarios/add/', ScenarioCreateView.as_view(), name='repo_scenario_add'),
     path('scenarios/<int:pk>/edit/', ScenarioUpdateView.as_view(), name='repo_scenario_edit'),
 
-    # 【新增】测试标准配置
+    # 测试标准配置
     path('test-configs/', TestConfigListView.as_view(), name='repo_test_config_list'),
     path('test-configs/add/', TestConfigCreateView.as_view(), name='repo_test_config_add'),
     path('test-configs/<int:pk>/edit/', TestConfigUpdateView.as_view(), name='repo_test_config_edit'),
@@ -56,5 +56,9 @@ urlpatterns = [
     # 主机厂 (OEM)
     path('oems/', OEMListView.as_view(), name='repo_oem_list'),
     path('oems/add/', OEMCreateView.as_view(), name='repo_oem_add'),
+    path('oems/<int:pk>/', OEMDetailView.as_view(), name='repo_oem_detail'),
     path('oems/<int:pk>/edit/', OEMUpdateView.as_view(), name='repo_oem_edit'),
+    path('oems/<int:pk>/file/form/', OEMStandardFileFormView.as_view(), name='repo_oem_file_form'), # 【新增】HTMX模态框
+    path('oems/<int:pk>/file/upload/', OEMStandardFileUploadView.as_view(), name='repo_oem_file_upload'),
+    path('oems/file/<int:pk>/delete/', OEMStandardFileDeleteView.as_view(), name='repo_oem_file_delete'),
 ]

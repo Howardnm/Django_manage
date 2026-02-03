@@ -296,7 +296,7 @@ class MaterialFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Create
     permission_required = 'app_repository.add_materialfile'
     model = MaterialFile
     form_class = MaterialFileForm
-    template_name = 'apps/app_repository/material_info/material_file_form.html'  # 专用模板
+    template_name = 'apps/app_repository/material/material_file_form.html'  # 专用模板
 
     def form_valid(self, form):
         # 关联到指定的材料

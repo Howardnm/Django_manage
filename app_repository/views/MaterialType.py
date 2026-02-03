@@ -15,7 +15,7 @@ class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
     permission_required = 'app_repository.view_materialtype'
     model = MaterialType
     # 注意：建议检查路径是否有空格，通常是 material_info
-    template_name = 'apps/app_repository/material_info/type_list.html'
+    template_name = 'apps/app_repository/materialtype/type_list.html'
     context_object_name = 'types'
     paginate_by = 10
 

@@ -14,7 +14,7 @@ from app_repository.utils.filters import ScenarioFilter
 class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'app_repository.view_applicationscenario'
     model = ApplicationScenario
-    template_name = 'apps/app_repository/material_info/scenario_list.html'
+    template_name = 'apps/app_repository/scenario/scenario_list.html'
     context_object_name = 'scenarios'
     paginate_by = 10
 

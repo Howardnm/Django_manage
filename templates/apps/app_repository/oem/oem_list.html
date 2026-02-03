@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">主机厂库 (OEM)</h2>
+                <div class="text-muted mt-1">管理终端汽车品牌/主机厂信息</div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <a href="{% url 'repo_oem_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus"></i> 新增主机厂
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover">
+                <thead>
+                <tr>
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            主机厂名称
+                            {% if current_sort == 'name' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-name' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th>简称</th>
+                    <th>
+                        <a href="?{% url_replace sort='cooperation_level'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            合作级别
+                            {% if current_sort == 'cooperation_level' %}<i class="ti ti-arrow-up icon-sm"></i>{% elif current_sort == '-cooperation_level' %}<i class="ti ti-arrow-down icon-sm"></i>{% endif %}
+                        </a>
+                    </th>
+                    <th>主要联系人</th>
+                    <th>备注描述</th>
+                    <th class="w-1">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for oem in oems %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'repo_oem_detail' oem.pk %}" class="fw-bold">{{ oem.name }}</a>
+                        </td>
+                        <td>
+                            {% if oem.short_name %}<span class="badge bg-blue-lt">{{ oem.short_name }}</span>{% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            <span class="badge bg-secondary-lt">{{ oem.get_cooperation_level_display }}</span>
+                        </td>
+                        <td>{{ oem.contact_name|default:"-" }}</td>
+                        <td class="text-muted text-truncate" style="max-width: 300px;">
+                            {{ oem.description|default:"-" }}
+                        </td>
+                        <td>
+                            <div class="btn-group">
+                                <a href="{% url 'repo_oem_detail' oem.pk %}" class="btn btn-sm btn-ghost-info" title="查看详情">
+                                    <i class="ti ti-eye"></i>
+                                </a>
+                                <a href="{% url 'repo_oem_edit' oem.pk %}" class="btn btn-sm btn-ghost-primary" title="编辑">
+                                    <i class="ti ti-edit"></i>
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                                <p class="empty-title">暂无主机厂数据</p>
+                                <p class="empty-subtitle text-muted">
+                                    尝试点击右上角的“新增主机厂”按钮来添加第一条数据。
+                                </p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {# 【修复】直接引入分页器，不再需要额外的 div 包裹 #}
+        {% include 'apps/list_modules/paginator.html' %}
+    </div>
+{% endblock %}

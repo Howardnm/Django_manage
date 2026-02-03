@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}主机厂详情: {{ oem.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">主机厂管理</div>
+            <h2 class="page-title">{{ oem.name }}</h2>
+        </div>
+        <div class="col-auto ms-auto d-print-none">
+            <a href="{% url 'repo_oem_list' %}" class="btn btn-outline-secondary">
+                <i class="ti ti-arrow-left"></i> 返回列表
+            </a>
+            <a href="{% url 'repo_oem_edit' oem.pk %}" class="btn btn-primary ms-2">
+                <i class="ti ti-edit"></i> 编辑
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-2">
+    <!-- 左侧：统一的基础信息卡片 -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-info-circle me-2 text-muted"></i>
+                    基础信息
+                </h3>
+            </div>
+            <div class="list-group list-group-flush">
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted">简称</span>
+                    <strong>{{ oem.short_name|default:"-" }}</strong>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted">合作级别</span>
+                    <span class="badge bg-blue-lt">{{ oem.get_cooperation_level_display }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted">主要联系人</span>
+                    <strong>{{ oem.contact_name|default:"-" }}</strong>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted">联系电话</span>
+                    <span>{{ oem.contact_phone|default:"-" }}</span>
+                </div>
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <span class="text-muted">电子邮箱</span>
+                    <span>{{ oem.contact_email|default:"-" }}</span>
+                </div>
+                <div class="list-group-item">
+                    <div class="text-muted mb-1">公司地址</div>
+                    <p class="mb-0">{{ oem.address|default:"-" }}</p>
+                </div>
+                <div class="list-group-item">
+                    <div class="text-muted mb-1">官方网站</div>
+                    <a href="{{ oem.website }}" target="_blank" rel="noopener noreferrer">{{ oem.website|default:"-" }}</a>
+                </div>
+            </div>
+            <div class="card-body">
+                <h4 class="card-title mt-2">备注</h4>
+                <p class="text-muted">{{ oem.description|default:"无"|linebreaksbr }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右侧：标准文件 -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">主机厂标准文件</h3>
+                <div class="ms-auto">
+                    <button class="btn btn-primary btn-sm"
+                            hx-get="{% url 'repo_oem_file_form' oem.pk %}"
+                            hx-target="#htmx-modal-content"
+                            data-bs-toggle="modal"
+                            data-bs-target="#htmx-modal">
+                        <i class="ti ti-upload"></i> 上传文件
+                    </button>
+                </div>
+            </div>
+            <div class="table-responsive" id="file-list-container">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>文件名称</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                            <th>上传人</th>
+                            <th>上传时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for file in oem.standard_files.all %}
+                        <tr>
+                            <td><a href="{{ file.file.url }}" target="_blank" class="text-reset">{{ file.name }}</a></td>
+                            <td><span class="badge bg-secondary-lt">{{ file.get_file_type_display }}</span></td>
+                            <td class="text-muted text-truncate" style="max-width: 200px;">{{ file.description|default:"-" }}</td>
+                            <td>{{ file.uploader.username|default:"-" }}</td>
+                            <td>{{ file.uploaded_at|date:"Y-m-d" }}</td>
+                            <td>
+                                <form action="{% url 'repo_oem_file_delete' file.pk %}" method="post" onsubmit="return confirm('确定要删除这个文件吗？');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-ghost-danger">删除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted py-5">暂无标准文件</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- HTMX 模态框占位符 -->
+<div class="modal" id="htmx-modal" tabindex="-1">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content" id="htmx-modal-content">
+            <!-- 内容将由 HTMX 加载 -->
+        </div>
+    </div>
+</div>
+{% endblock %}

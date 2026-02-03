@@ -12,7 +12,7 @@ from app_repository.utils.filters import CustomerFilter
 class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'app_repository.view_customer'
     model = Customer
-    template_name = 'apps/app_repository/project_repo_info/customer_list.html'
+    template_name = 'apps/app_repository/customer/customer_list.html'
     context_object_name = 'customers'  # 随便起一个名方便复用分页模板，但不能为 page_obj
     paginate_by = 10
 

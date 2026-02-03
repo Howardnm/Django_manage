@@ -1,5 +1,5 @@
 from django import forms
-from .models import Customer, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson
+from .models import Customer, ProjectRepository, MaterialType, ApplicationScenario, ProjectFile, OEM, Salesperson, OEMStandardFile
 from django.forms import inlineformset_factory
 from .models import MaterialLibrary, MaterialDataPoint, MaterialFile, TestConfig
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -62,13 +62,13 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}), # 默认隐藏
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # 【性能优化】预加载 TestConfig，避免 N+1 查询
         # 并且按分类排序，方便选择
         self.fields['test_config'].queryset = TestConfig.objects.select_related('category').order_by('category__order', 'order')
-        
+
         # 如果是编辑状态，且当前数据是文本类型，则显示文本框，隐藏数字框
         if self.instance and self.instance.pk:
             dtype = self.instance.test_config.data_type
@@ -79,7 +79,7 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
                 self.fields['value'].widget.attrs['style'] = 'display:none;'
                 self.fields['value_text'].widget.attrs['style'] = 'display:none;'
                 self.fields['value_select'].widget.attrs['style'] = 'display:block;'
-                
+
                 # 动态填充选项
                 options = self.instance.test_config.get_options_list()
                 self.fields['value_select'].choices = [(opt, opt) for opt in options]
@@ -87,7 +87,7 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
                 self.fields['value_select'].initial = self.instance.value_text
                 # 将当前值存入 data-current-value 属性，方便前端 JS 读取
                 self.fields['value_select'].widget.attrs['data-current-value'] = self.instance.value_text
-        
+
         # 【关键修复】如果是 POST 请求，必须重新填充 choices，否则 Django 验证会失败
         # 因为 ChoiceField 默认验证提交的值必须在 choices 中
         if self.data:
@@ -96,7 +96,7 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
             prefix = self.prefix or ''
             test_config_key = f"{prefix}-test_config" if prefix else "test_config"
             test_config_id = self.data.get(test_config_key)
-            
+
             if test_config_id:
                 try:
                     config = TestConfig.objects.get(pk=test_config_id)
@@ -110,22 +110,15 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
         cleaned_data = super().clean()
         test_config = cleaned_data.get('test_config')
         value_select = cleaned_data.get('value_select')
-        
+
         # 如果是选择类型，将选择的值赋给 value_text
         if test_config and test_config.data_type == 'SELECT':
             # 修复：即使 value_select 为空字符串，也要赋值给 value_text，以便清空
             cleaned_data['value_text'] = value_select
-            
+
         return cleaned_data
 
-# 定义 FormSet
-MaterialDataFormSet = inlineformset_factory(
-    MaterialLibrary,
-    MaterialDataPoint,
-    form=MaterialDataPointForm,
-    extra=0,       # 默认不显示空行，靠 JS 添加
-    can_delete=True
-)
+MaterialDataFormSet = inlineformset_factory(MaterialLibrary, MaterialDataPoint, form=MaterialDataPointForm, extra=0, can_delete=True)
 
 # 【新增】材料附件上传表单
 class MaterialFileForm(TablerFormMixin, forms.ModelForm):
@@ -161,32 +154,14 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
         # 但是，必须保留 "当前已选" 的那个值，否则页面上显示为空
         if not self.data:
             instance = kwargs.get('instance')
-
-            # 1. 优化材料字段
-            if instance and instance.material_id:
-                self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
-            else:
-                self.fields['material'].queryset = MaterialLibrary.objects.none()
-
-            # 2. 优化客户字段
-            if instance and instance.customer_id:
-                self.fields['customer'].queryset = Customer.objects.filter(pk=instance.customer_id)
-            else:
-                self.fields['customer'].queryset = Customer.objects.none()
-
-            # 3. 优化 OEM
-            if instance and instance.oem_id:
-                self.fields['oem'].queryset = OEM.objects.filter(pk=instance.oem_id)
-            else:
-                self.fields['oem'].queryset = OEM.objects.none()
-
-            # 4. 优化业务员
-            if instance and instance.salesperson_id:
-                self.fields['salesperson'].queryset = Salesperson.objects.filter(pk=instance.salesperson_id)
-            else:
-                self.fields['salesperson'].queryset = Salesperson.objects.none()
-
-        # 自定义 OEM 字段的显示逻辑：名称 (简称)
+            if instance and instance.material_id: self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
+            else: self.fields['material'].queryset = MaterialLibrary.objects.none()
+            if instance and instance.customer_id: self.fields['customer'].queryset = Customer.objects.filter(pk=instance.customer_id)
+            else: self.fields['customer'].queryset = Customer.objects.none()
+            if instance and instance.oem_id: self.fields['oem'].queryset = OEM.objects.filter(pk=instance.oem_id)
+            else: self.fields['oem'].queryset = OEM.objects.none()
+            if instance and instance.salesperson_id: self.fields['salesperson'].queryset = Salesperson.objects.filter(pk=instance.salesperson_id)
+            else: self.fields['salesperson'].queryset = Salesperson.objects.none()
         self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
 
         # 注意：如果是 POST 请求 (self.data 存在)，不要动 queryset
@@ -212,13 +187,26 @@ class SalespersonForm(TablerFormMixin, forms.ModelForm):
         fields = ['name', 'phone', 'email']
 
 
+# ==============================================================================
 # 6. 主机厂表单
+# ==============================================================================
 class OEMForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = OEM
-        fields = ['name', 'short_name', 'description']
+        fields = ['name', 'short_name', 'website', 'cooperation_level', 'contact_name', 'contact_phone', 'contact_email', 'address', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '备注信息...'}),
+            'address': forms.Textarea(attrs={'rows': 2, 'placeholder': '公司详细地址...'}),
+            'cooperation_level': forms.Select(attrs={'class': 'form-select'}),
+        }
+
+class OEMStandardFileForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = OEMStandardFile
+        fields = ['name', 'file_type', 'file', 'description']
+        widgets = {
+            'file_type': forms.Select(attrs={'class': 'form-select'}),
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '文件说明/摘要...'}),
         }
 
 
