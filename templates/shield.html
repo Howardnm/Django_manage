@@ -3,6 +3,7 @@
 <html lang="zh">
 <head>
     <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>安全检查 - 项目管理系统</title>
     <!-- 引入 Tabler CSS -->
     <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
@@ -48,47 +49,216 @@
             color: #656d77;
             font-size: 14px;
         }
+        .verification-controls {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .btn {
+            width: 100%;
+        }
+        /* 滑块样式 */
+        .slider-container {
+            position: relative;
+            width: 100%;
+            height: 40px;
+            background-color: #e9ecef;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            user-select: none; /* 防止拖动时选中文本 */
+            cursor: default;
+        }
+        .slider-track {
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: 0;
+            background-color: #a3e9a4; /* 验证过程中的背景色 */
+            border-radius: 20px;
+        }
+        .slider-handle {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 40px;
+            height: 40px;
+            background-color: #206bc4;
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            font-weight: bold;
+        }
+        .slider-text {
+            color: #6c757d;
+            z-index: 1;
+            transition: opacity 0.2s ease;
+        }
+        .slider-container.completed .slider-handle {
+            background-color: #2fb344;
+            cursor: default;
+        }
+        .slider-container.completed .slider-text {
+            opacity: 0;
+        }
     </style>
 </head>
 <body>
     <div class="shield-container">
         <div class="spinner"></div>
-        <h2>正在检查您的浏览器...</h2>
-        <p>请稍候，我们将很快带您进入系统。</p>
+        <h2>正在进行人机验证...</h2>
+        <p>请将滑块拖动到最右边以完成验证。</p>
         <p id="status-text" style="margin-top: 10px; font-size: 12px; color: #999;"></p>
+
+        <div class="verification-controls">
+            <div id="slider-container" class="slider-container">
+                <div id="slider-track" class="slider-track"></div>
+                <div id="slider-handle" class="slider-handle">&gt;</div>
+                <span id="slider-text" class="slider-text">向右滑动以验证</span>
+            </div>
+            <button id="redirect-button" class="btn btn-primary" disabled>确认并跳转</button>
+        </div>
     </div>
 
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            var statusText = document.getElementById('status-text');
+            const statusText = document.getElementById('status-text');
+            const redirectButton = document.getElementById('redirect-button');
+            const sliderContainer = document.getElementById('slider-container');
+            const sliderHandle = document.getElementById('slider-handle');
+            const sliderTrack = document.getElementById('slider-track');
+            const sliderText = document.getElementById('slider-text');
             
-            {#模拟一些检查过程 (延迟 1-2 秒)#}
-            setTimeout(function() {
-                statusText.innerText = "验证环境安全...";
+            // 从模板中获取一次性令牌
+            const nonce = "{{ nonce }}";
+
+            let isDragging = false;
+            let startX = 0;
+            let completed = false;
+            let trajectory = []; // 用于存储轨迹数据
+
+            const maxDrag = sliderContainer.clientWidth - sliderHandle.clientWidth;
+
+            function startDrag(e) {
+                if (completed) return;
+                isDragging = true;
+                startX = e.clientX || e.touches[0].clientX;
+                trajectory = []; // 重置轨迹
+                sliderHandle.style.transition = 'none';
+                sliderTrack.style.transition = 'none';
+                statusText.innerText = ""; // 清空状态文本
+            }
+
+            function onDrag(e) {
+                if (!isDragging || completed) return;
                 
-                // 发送验证请求
+                const currentX = e.clientX || e.touches[0].clientX;
+                const currentY = e.clientY || e.touches[0].clientY;
+                
+                trajectory.push({ x: currentX, y: currentY, t: Date.now() });
+
+                let newLeft = currentX - startX;
+
+                if (newLeft < 0) newLeft = 0;
+                if (newLeft > maxDrag) newLeft = maxDrag;
+
+                sliderHandle.style.left = `${newLeft}px`;
+                sliderTrack.style.width = `${newLeft + sliderHandle.clientWidth / 2}px`;
+            }
+
+            function endDrag() {
+                if (!isDragging || completed) return;
+                isDragging = false;
+                
+                if (sliderHandle.offsetLeft >= maxDrag - 5) {
+                    // 前端只做位置判断，轨迹判断交给后端
+                    sliderHandle.style.transition = 'left 0.3s ease';
+                    sliderTrack.style.transition = 'width 0.3s ease';
+                    sliderHandle.style.left = `${maxDrag}px`;
+                    sliderTrack.style.width = '100%';
+                    completeFrontendVerification();
+                } else {
+                    // 未拖到末端，重置
+                    resetSlider();
+                }
+            }
+            
+            function completeFrontendVerification() {
+                completed = true; // 标记前端验证完成
+                sliderContainer.classList.add('completed');
+                sliderHandle.innerHTML = '✓';
+                
+                redirectButton.disabled = false;
+                statusText.innerText = "前端验证通过，请点击按钮完成最终验证。";
+                
+                // 移除事件监听器
+                sliderHandle.removeEventListener('mousedown', startDrag);
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', endDrag);
+                sliderHandle.removeEventListener('touchstart', startDrag);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', endDrag);
+            }
+
+            function resetSlider() {
+                sliderHandle.style.transition = 'left 0.3s ease';
+                sliderTrack.style.transition = 'width 0.3s ease';
+                sliderHandle.style.left = '0px';
+                sliderTrack.style.width = '0px';
+            }
+
+            // 桌面端事件
+            sliderHandle.addEventListener('mousedown', startDrag);
+            document.addEventListener('mousemove', onDrag);
+            document.addEventListener('mouseup', endDrag);
+
+            // 移动端事件
+            sliderHandle.addEventListener('touchstart', startDrag);
+            document.addEventListener('touchmove', onDrag);
+            document.addEventListener('touchend', endDrag);
+
+            redirectButton.addEventListener('click', () => {
+                statusText.innerText = "正在进行最终验证...";
+                redirectButton.disabled = true;
+                
                 fetch("{% url 'verify_browser' %}", {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': '{{ csrf_token }}',
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({})
+                    body: JSON.stringify({ 
+                        trajectory: trajectory,
+                        nonce: nonce  // 在请求中包含一次性令牌
+                    })
                 })
-                .then(response => {
-                    if (response.ok) {
+                .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
+                .then(({ ok, status, data }) => {
+                    if (ok) {
                         statusText.innerText = "验证通过，正在跳转...";
-                        // 验证成功，跳转回原页面
                         window.location.href = "{{ next_url }}";
                     } else {
-                        statusText.innerText = "验证失败，请刷新重试。";
+                        // 后端验证失败，显示后端返回的错误信息
+                        statusText.innerText = data.message || `验证失败 (代码: ${status})，请刷新重试。`;
+                        // 允许用户重试
+                        redirectButton.disabled = false; 
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
                     statusText.innerText = "连接错误，请检查网络。";
+                    redirectButton.disabled = false;
                 });
-            }, 1500);
+            });
         });
     </script>
 </body>

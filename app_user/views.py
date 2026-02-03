@@ -1,4 +1,6 @@
 # apps/app_user/views.py
+import json
+import uuid
 from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import CreateView, View, TemplateView, FormView
@@ -66,14 +68,56 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
-# 浏览器验证接口
+# 浏览器验证接口 (带后端轨迹和Nonce验证)
 def verify_browser(request):
-    if request.method == 'POST':
-        # 简单的验证逻辑，可以根据需要扩展（例如检查 User-Agent, Referer 等）
-        # 这里只要是 POST 请求就认为是合法的浏览器行为
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': '请求方法错误'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        trajectory = data.get('trajectory', [])
+        received_nonce = data.get('nonce')
+        session_nonce = request.session.get('shield_nonce')
+
+        # 1. Nonce (一次性令牌) 验证
+        if not received_nonce or not session_nonce or received_nonce != session_nonce:
+            return JsonResponse({'status': 'fail', 'message': '验证令牌无效或已过期，请刷新页面'}, status=403)
+
+        # 2. 轨迹点数量验证
+        if len(trajectory) < 50:
+            return JsonResponse({'status': 'fail', 'message': '轨迹点过少，请重新尝试'}, status=400)
+
+        # 3. 滑动时间验证
+        start_time = trajectory[0]['t']
+        end_time = trajectory[-1]['t']
+        duration = end_time - start_time
+        if duration < 200:  # 必须超过100毫秒
+            return JsonResponse({'status': 'fail', 'message': '滑动速度过快，请重新尝试'}, status=400)
+
+        # 4. Y轴变化验证
+        y_coords = {point['y'] for point in trajectory}
+        if len(y_coords) < 5: # 至少有3个不同的Y坐标，允许轻微的直线抖动
+            return JsonResponse({'status': 'fail', 'message': '轨迹过于平直，疑似机器人操作'}, status=400)
+            
+        # 5. X轴非线性验证 (简易版)
+        # 检查x坐标是否是单调递增的，防止来回拖动
+        x_coords = [point['x'] for point in trajectory]
+        for i in range(len(x_coords) - 1):
+            if x_coords[i] > x_coords[i+1]:
+                 return JsonResponse({'status': 'fail', 'message': '轨迹异常，请勿来回拖动'}, status=400)
+
+        # --- 所有验证通过 ---
+        
+        # 关键步骤：立即销毁令牌，防止重放
+        if 'shield_nonce' in request.session:
+            del request.session['shield_nonce']
+            
         request.session['access_granted'] = True
         return JsonResponse({'status': 'success'})
-    return JsonResponse({'status': 'error'}, status=400)
+
+    except (json.JSONDecodeError, KeyError, IndexError):
+        return JsonResponse({'status': 'error', 'message': '请求数据格式错误'}, status=400)
+
 
 # 发送邮箱验证码视图
 def send_email_code(request):
