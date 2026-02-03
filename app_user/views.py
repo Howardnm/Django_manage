@@ -84,15 +84,15 @@ def verify_browser(request):
             return JsonResponse({'status': 'fail', 'message': '验证令牌无效或已过期，请刷新页面'}, status=403)
 
         # 2. 轨迹点数量验证
-        if len(trajectory) < 50:
+        if len(trajectory) < 20:
             return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
 
         # 3. 滑动时间验证
         start_time = trajectory[0]['t']
         end_time = trajectory[-1]['t']
         duration = end_time - start_time
-        if duration < 200:  # 必须超过100毫秒
-            return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
+        if duration < 250:  # 必须超过100毫秒
+            return JsonResponse({'status': 'fail', 'message': '滑动过快，请刷新页面重试'}, status=400)
 
         # 4. Y轴变化验证
         y_coords = {point['y'] for point in trajectory}
