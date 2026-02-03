@@ -85,26 +85,26 @@ def verify_browser(request):
 
         # 2. 轨迹点数量验证
         if len(trajectory) < 50:
-            return JsonResponse({'status': 'fail', 'message': '轨迹点过少，请重新尝试'}, status=400)
+            return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
 
         # 3. 滑动时间验证
         start_time = trajectory[0]['t']
         end_time = trajectory[-1]['t']
         duration = end_time - start_time
         if duration < 200:  # 必须超过100毫秒
-            return JsonResponse({'status': 'fail', 'message': '滑动速度过快，请重新尝试'}, status=400)
+            return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
 
         # 4. Y轴变化验证
         y_coords = {point['y'] for point in trajectory}
         if len(y_coords) < 5: # 至少有3个不同的Y坐标，允许轻微的直线抖动
-            return JsonResponse({'status': 'fail', 'message': '轨迹过于平直，疑似机器人操作'}, status=400)
+            return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
             
         # 5. X轴非线性验证 (简易版)
         # 检查x坐标是否是单调递增的，防止来回拖动
         x_coords = [point['x'] for point in trajectory]
         for i in range(len(x_coords) - 1):
             if x_coords[i] > x_coords[i+1]:
-                 return JsonResponse({'status': 'fail', 'message': '轨迹异常，请勿来回拖动'}, status=400)
+                 return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
 
         # --- 所有验证通过 ---
         
