@@ -2,9 +2,9 @@
 检测当前 URL 是否属于子菜单模块，用于高亮父菜单
 {% endcomment %}
 
-{% if perms.app_project.view_project or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial %}
-<li class="nav-item dropdown {% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}">
-    <a class="nav-link dropdown-toggle" href="#navbar-submenu" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}true{% else %}false{% endif %}">
+{% if perms.app_project.view_project or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial or perms.app_basic_research.view_researchproject %}
+<li class="nav-item dropdown {% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'basic_research_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}">
+    <a class="nav-link dropdown-toggle" href="#navbar-submenu" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'basic_research_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}true{% else %}false{% endif %}">
         <span class="nav-link-icon d-md-none d-lg-inline-block">
             <i class="ti ti-layout-grid"></i> {# 使用一个网格图标，表示子菜单 #}
         </span>
@@ -12,32 +12,37 @@
             系统全景看板
         </span>
     </a>
-    <div class="dropdown-menu {% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}show{% endif %}">
+    <div class="dropdown-menu {% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'basic_research_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}show{% endif %}">
         <div class="dropdown-menu-columns">
             <div class="dropdown-menu-column">
-                {# 首页已移至顶级菜单，此处移除 #}
-                {% if perms.app_project.view_project %} {# 检查项目全景看板权限 #}
+                {% if perms.app_project.view_project %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'project_overview' %}active{% endif %}" href="{% url 'project_overview' %}">
-                        项目全景看板
+                        项目进度看板
                     </a>
                 {% endif %}
 
-                {% if perms.app_repository.view_materiallibrary %} {# 检查材料库看板权限 #}
+                {% if perms.app_basic_research.view_researchproject %}
+                    <a class="dropdown-item {% if request.resolver_match.url_name == 'basic_research_overview' %}active{% endif %}" href="{% url 'basic_research_overview' %}">
+                        基础预研看板
+                    </a>
+                {% endif %}
+
+                {% if perms.app_repository.view_materiallibrary %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'material_library' %}active{% endif %}" href="{% url 'material_library' %}">
                         材料库看板
                     </a>
                 {% endif %}
-                {% if perms.app_formula.view_labformula %} {# 检查配方库看板权限 #}
+                {% if perms.app_formula.view_labformula %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'formula_library' %}active{% endif %}" href="{% url 'formula_library' %}">
                         配方库看板
                     </a>
                 {% endif %}
-                {% if perms.app_process.view_processprofile %} {# 检查工艺库看板权限 #}
+                {% if perms.app_process.view_processprofile %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'process_library' %}active{% endif %}" href="{% url 'process_library' %}">
                         工艺库看板
                     </a>
                 {% endif %}
-                {% if perms.app_raw_material.view_rawmaterial %} {# 检查原材料库看板权限 #}
+                {% if perms.app_raw_material.view_rawmaterial %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}" href="{% url 'raw_material_library' %}">
                         原材料库看板
                     </a>

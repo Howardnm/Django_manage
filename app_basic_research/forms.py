@@ -23,6 +23,12 @@ class ResearchProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 12, 'placeholder': '填写备注信息...'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 【修复】如果节点状态是 FAILED，则禁止修改状态，只允许修改备注
+        if self.instance and self.instance.status == 'FAILED':
+            self.fields['status'].disabled = True
+
 
 class ResearchProjectFileForm(TablerFormMixin, forms.ModelForm):
     class Meta:

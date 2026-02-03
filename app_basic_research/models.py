@@ -156,7 +156,8 @@ class ResearchProjectNode(models.Model):
 
     @property
     def can_update_status(self):
-        return self.status not in ['TERMINATED', 'FAILED']
+        # 【修复】允许对状态为 FAILED 的节点进行更新，以便修改备注
+        return self.status not in ['TERMINATED']
 
     @property
     def can_report_failure(self):

@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+    <div class="page-header d-print-none">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">Overview</div>
+                <h2 class="page-title">{{ page_title }}</h2>
+            </div>
+        </div>
+    </div>
+
+    <div class="row row-cards mt-2">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <p>这里是基础预研项目看板的内容区域，待填充。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
