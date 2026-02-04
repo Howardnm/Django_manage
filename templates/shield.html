@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8"/>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>请稍候。。。</title>
+    <title>安全检查</title>
     <!-- 引入 Tabler CSS -->
     <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
     <style>
@@ -138,13 +138,12 @@
             const sliderTrack = document.getElementById('slider-track');
             const sliderText = document.getElementById('slider-text');
             
-            // 从模板中获取一次性令牌
             const nonce = "{{ nonce }}";
 
             let isDragging = false;
             let startX = 0;
             let completed = false;
-            let trajectory = []; // 用于存储轨迹数据
+            let trajectory = [];
 
             const maxDrag = sliderContainer.clientWidth - sliderHandle.clientWidth;
 
@@ -152,10 +151,10 @@
                 if (completed) return;
                 isDragging = true;
                 startX = e.clientX || e.touches[0].clientX;
-                trajectory = []; // 重置轨迹
+                trajectory = [];
                 sliderHandle.style.transition = 'none';
                 sliderTrack.style.transition = 'none';
-                statusText.innerText = ""; // 清空状态文本
+                statusText.innerText = "";
             }
 
             function onDrag(e) {
@@ -180,27 +179,44 @@
                 isDragging = false;
                 
                 if (sliderHandle.offsetLeft >= maxDrag - 5) {
-                    // 前端只做位置判断，轨迹判断交给后端
                     sliderHandle.style.transition = 'left 0.3s ease';
                     sliderTrack.style.transition = 'width 0.3s ease';
                     sliderHandle.style.left = `${maxDrag}px`;
                     sliderTrack.style.width = '100%';
                     completeFrontendVerification();
                 } else {
-                    // 未拖到末端，重置
-                    resetSlider();
+                    resetSliderUI();
                 }
             }
             
             function completeFrontendVerification() {
-                completed = true; // 标记前端验证完成
+                completed = true;
                 sliderContainer.classList.add('completed');
                 sliderHandle.innerHTML = '✓';
                 
                 redirectButton.disabled = false;
-                statusText.innerText = "请点击按钮完成最终验证。";
+                statusText.innerText = "前端验证通过，请点击按钮完成最终验证。";
                 
-                // 移除事件监听器
+                removeEventListeners();
+            }
+
+            function resetSliderUI() {
+                sliderHandle.style.transition = 'left 0.3s ease';
+                sliderTrack.style.transition = 'width 0.3s ease';
+                sliderHandle.style.left = '0px';
+                sliderTrack.style.width = '0px';
+            }
+
+            function addEventListeners() {
+                sliderHandle.addEventListener('mousedown', startDrag);
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', endDrag);
+                sliderHandle.addEventListener('touchstart', startDrag);
+                document.addEventListener('touchmove', onDrag);
+                document.addEventListener('touchend', endDrag);
+            }
+
+            function removeEventListeners() {
                 sliderHandle.removeEventListener('mousedown', startDrag);
                 document.removeEventListener('mousemove', onDrag);
                 document.removeEventListener('mouseup', endDrag);
@@ -209,22 +225,8 @@
                 document.removeEventListener('touchend', endDrag);
             }
 
-            function resetSlider() {
-                sliderHandle.style.transition = 'left 0.3s ease';
-                sliderTrack.style.transition = 'width 0.3s ease';
-                sliderHandle.style.left = '0px';
-                sliderTrack.style.width = '0px';
-            }
-
-            // 桌面端事件
-            sliderHandle.addEventListener('mousedown', startDrag);
-            document.addEventListener('mousemove', onDrag);
-            document.addEventListener('mouseup', endDrag);
-
-            // 移动端事件
-            sliderHandle.addEventListener('touchstart', startDrag);
-            document.addEventListener('touchmove', onDrag);
-            document.addEventListener('touchend', endDrag);
+            // 初始化时添加事件监听
+            addEventListeners();
 
             redirectButton.addEventListener('click', () => {
                 statusText.innerText = "正在进行最终验证...";
@@ -238,19 +240,21 @@
                     },
                     body: JSON.stringify({ 
                         trajectory: trajectory,
-                        nonce: nonce  // 在请求中包含一次性令牌
+                        nonce: nonce
                     })
                 })
                 .then(response => response.json().then(data => ({ ok: response.ok, status: response.status, data })))
-                .then(({ ok, status, data }) => {
+                .then(({ ok, data }) => {
                     if (ok) {
                         statusText.innerText = "验证通过，正在跳转...";
                         window.location.href = "{{ next_url }}";
                     } else {
-                        // 后端验证失败，显示后端返回的错误信息
-                        statusText.innerText = data.message || `验证失败 (代码: ${status})，请刷新重试。`;
-                        // 允许用户重试
-                        redirectButton.disabled = false; 
+                        // 关键：验证失败，自动初始化
+                        statusText.innerText = "验证失败，自动重置...";
+                        setTimeout(() => {
+                            // 重新加载页面是获取新Nonce的最可靠方法
+                            window.location.reload(); 
+                        }, 1000);
                     }
                 })
                 .catch(error => {
