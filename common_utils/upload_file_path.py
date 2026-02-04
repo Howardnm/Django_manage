@@ -44,14 +44,34 @@ def upload_file_path(instance, filename):
     # 情况 A: 项目文件 -> Project ID
     if hasattr(instance, 'repository') and instance.repository:
         folder_id = str(instance.repository.project.id)
+    
+    # 情况 B: 预研项目文件 -> ResearchProject ID
+    elif hasattr(instance, 'project') and instance.project:
+        folder_id = str(instance.project.id)
 
-    # 情况 B: 材料库 -> Material ID
+    # 情况 C: 材料库 -> Material ID
     elif hasattr(instance, 'grade_name'):
         folder_id = str(instance.id) if instance.id else 'temp_new'
 
-    # 情况 C: 材料附件 -> Material ID
+    # 情况 D: 材料附件 -> Material ID
     elif hasattr(instance, 'material'):
         folder_id = str(instance.material.id)
+
+    # 情况 E: 主机厂标准文件 -> OEM ID
+    elif hasattr(instance, 'oem'):
+        folder_id = str(instance.oem.id)
+
+    # 情况 F: 实验配方测试结果 -> LabFormula ID
+    elif hasattr(instance, 'formula'):
+        folder_id = str(instance.formula.id)
+
+    # 情况 G: 螺杆组合 -> ScrewCombination ID
+    elif hasattr(instance, 'combination_code'):
+        folder_id = str(instance.id) if instance.id else 'temp_new'
+        
+    # 情况 H: 原材料 -> RawMaterial ID
+    elif hasattr(instance, 'model_name') and hasattr(instance, 'warehouse_code'):
+        folder_id = str(instance.id) if instance.id else 'temp_new'
 
     # 8. 拼接完整路径
     return os.path.join('upload_files', model_name, folder_id, date_path, new_filename)

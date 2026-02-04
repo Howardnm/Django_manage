@@ -98,12 +98,13 @@
                     <tbody>
                         {% for file in oem.standard_files.all %}
                         <tr>
-                            <td><a href="{{ file.file.url }}" target="_blank" class="text-reset">{{ file.name }}</a></td>
+                            <td><a href="{% url 'secure_download' app_label='app_repository' model_name='oemstandardfile' pk=file.pk field_name='file' %}" class="text-reset">{{ file.name }}</a></td>
                             <td><span class="badge bg-secondary-lt">{{ file.get_file_type_display }}</span></td>
                             <td class="text-muted text-truncate" style="max-width: 200px;">{{ file.description|default:"-" }}</td>
                             <td>{{ file.uploader.username|default:"-" }}</td>
                             <td>{{ file.uploaded_at|date:"Y-m-d" }}</td>
-                            <td>
+                            <td class="d-flex gap-1">
+                                <a href="{% url 'secure_download' app_label='app_repository' model_name='oemstandardfile' pk=file.pk field_name='file' %}" class="btn btn-sm btn-ghost-primary">下载</a>
                                 <form action="{% url 'repo_oem_file_delete' file.pk %}" method="post" onsubmit="return confirm('确定要删除这个文件吗？');">
                                     {% csrf_token %}
                                     <button type="submit" class="btn btn-sm btn-ghost-danger">删除</button>
