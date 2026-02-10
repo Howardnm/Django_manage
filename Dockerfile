@@ -1,14 +1,15 @@
 # --- Builder Stage ---
 # 这个阶段安装构建依赖并编译 Python 包
-FROM python:3.13-slim as builder
+FROM python:3.13-slim AS builder
 
 # 设置环境变量，防止生成 .pyc 文件并以非缓冲模式运行
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # 为 mysqlclient 和 lxml 等包安装构建时所需的系统依赖
 RUN apt-get update && apt-get install -y \
     build-essential \
+    pkg-config \
     default-libmysqlclient-dev \
     libxml2-dev \
     libxslt1-dev \
@@ -30,8 +31,8 @@ RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 FROM python:3.13-slim
 
 # 设置环境变量
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # 为应用程序创建一个专用的非 root 用户和组
 RUN addgroup --system django && adduser --system --ingroup django django-user
