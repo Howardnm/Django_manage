@@ -149,7 +149,7 @@ STATIC_URL = 'static/'
 
 # STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成staticfiles文件夹，把各个app下的静态文件收集到这个目录下。
 # 1.在Django中setting.py文件中加入
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # 2.在终端中输入
 # python manage.py collectstatic
 # 3.nginx设置文件夹映射
