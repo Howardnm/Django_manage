@@ -43,9 +43,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.postgres', # 用于支持PostgreSQL的高级功能
     'django_filters',  # django 列表搜索筛选器
     'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
     'axes', # django-axes
+    'pgvector.django', # pgvector
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
@@ -55,6 +57,7 @@ INSTALLED_APPS = [
     'app_process.apps.AppProcessConfig',
     'app_formula.apps.AppFormulaConfig',
     'app_basic_research.apps.AppBasicResearchConfig',
+    'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
     "debug_toolbar", # 这是debug_toolbar的配置
 ]
 
@@ -93,24 +96,6 @@ WSGI_APPLICATION = 'Django_manage.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-# DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.sqlite3',
-#         'NAME': BASE_DIR / 'db.sqlite3',
-#     }
-# }
-
-# DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "django_manage",
-#         "USER": "django_manage",
-#         "PASSWORD": "6THtw4rFdHpmZ3Ze",
-#         "HOST": "127.0.0.1",
-#         "PORT": "3306",
-#     }
-# }
 
 
 DATABASES = {

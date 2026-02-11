@@ -72,6 +72,10 @@ def upload_file_path(instance, filename):
     # 情况 H: 原材料 -> RawMaterial ID
     elif hasattr(instance, 'model_name') and hasattr(instance, 'warehouse_code'):
         folder_id = str(instance.id) if instance.id else 'temp_new'
+        
+    # 新增情况 I: 文献知识库 -> Document ID
+    elif model_name == 'document':
+        folder_id = str(instance.id) if instance.id else 'temp_new'
 
     # 8. 拼接完整路径
     return os.path.join('upload_files', model_name, folder_id, date_path, new_filename)
