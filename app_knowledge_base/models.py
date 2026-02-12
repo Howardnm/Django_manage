@@ -54,9 +54,12 @@ class Document(models.Model):
     processing_error = models.TextField(blank=True, null=True, verbose_name="处理错误信息")
     processed_at = models.DateTimeField(blank=True, null=True, verbose_name="上次处理时间")
     related_documents = models.ManyToManyField('self', blank=True, verbose_name="相关文献")
+    
+    # --- 新增：为AI Agent准备的字段 ---
+    structured_data = models.JSONField(blank=True, null=True, verbose_name="AI提取的结构化数据")
+    
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
     updated_at = models.DateTimeField(auto_now=True, verbose_name="更新时间")
-
     search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
@@ -72,9 +75,7 @@ class Document(models.Model):
         return self.title
 
     def update_search_vector(self):
-        """计算并更新搜索向量"""
         content_text = ''
-        # 检查 content_model 是否存在且已加载
         if hasattr(self, 'content_model') and self.content_model:
             content_text = self.content_model.content or ''
         
@@ -84,15 +85,11 @@ class Document(models.Model):
             SearchVector('source', weight='B', config='chinese') +
             SearchVector(models.Value(content_text), weight='D', config='chinese')
         )
-        # 使用 .update() 避免触发 save() 导致无限递归
         Document.objects.filter(pk=self.pk).update(search_vector=vector)
 
     def save(self, *args, **kwargs):
-        # 关键修改：重写 save 方法
         is_new = self._state.adding
         super().save(*args, **kwargs)
-        # 如果是新创建的对象，或者有关联的 content，则更新向量
-        # 避免在 content 还不存在时执行
         if not is_new or hasattr(self, 'content_model'):
              self.update_search_vector()
 
@@ -105,6 +102,67 @@ class DocumentContent(models.Model):
         return f"Content for: {self.document.title}"
 
     def save(self, *args, **kwargs):
-        # 关键修改：保存自己，然后调用关联 document 的 save 方法
         super().save(*args, **kwargs)
         self.document.save()
+
+
+# --- 新增：AI Agent相关模型 ---
+
+class AgentTask(models.Model):
+    """
+    AI Agent 任务队列
+    """
+    class TaskStatus(models.TextChoices):
+        PENDING = 'PENDING', '待处理'
+        PROCESSING = 'PROCESSING', '处理中'
+        SUCCESS = 'SUCCESS', '成功'
+        FAILED = 'FAILED', '失败'
+
+    class TaskType(models.TextChoices):
+        SUMMARIZE = 'SUMMARIZE', '生成摘要'
+        EXTRACT_KEYWORDS = 'EXTRACT_KEYWORDS', '提取关键词'
+        EXTRACT_STRUCTURED_DATA = 'EXTRACT_STRUCTURED_DATA', '提取结构化数据'
+        # ...可以根据需要添加更多任务类型
+
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='agent_tasks', verbose_name="关联文献")
+    task_type = models.CharField(max_length=50, choices=TaskType.choices, verbose_name="任务类型")
+    status = models.CharField(max_length=20, choices=TaskStatus.choices, default=TaskStatus.PENDING, db_index=True, verbose_name="任务状态")
+    
+    input_params = models.JSONField(blank=True, null=True, verbose_name="输入参数")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="创建时间")
+    started_at = models.DateTimeField(blank=True, null=True, verbose_name="开始时间")
+    completed_at = models.DateTimeField(blank=True, null=True, verbose_name="完成时间")
+
+    class Meta:
+        verbose_name = "AI Agent 任务"
+        verbose_name_plural = verbose_name
+        ordering = ['-created_at']
+
+
+class AgentActionLog(models.Model):
+    """
+    AI Agent 行为日志，用于审计和追踪
+    """
+    class ActionStatus(models.TextChoices):
+        SUCCESS = 'SUCCESS', '成功'
+        FAILED = 'FAILED', '失败'
+
+    task = models.ForeignKey(AgentTask, on_delete=models.SET_NULL, null=True, blank=True, related_name='action_logs', verbose_name="关联任务")
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='action_logs', verbose_name="关联文献")
+    
+    agent_name = models.CharField(max_length=100, verbose_name="Agent名称")
+    action_type = models.CharField(max_length=100, verbose_name="操作类型") # e.g., 'llm_call', 'db_query'
+    
+    prompt = models.TextField(blank=True, null=True, verbose_name="输入/Prompt")
+    result = models.TextField(blank=True, null=True, verbose_name="输出/Result")
+    
+    status = models.CharField(max_length=20, choices=ActionStatus.choices, verbose_name="状态")
+    error_message = models.TextField(blank=True, null=True, verbose_name="错误信息")
+    
+    duration_ms = models.PositiveIntegerField(blank=True, null=True, verbose_name="耗时(毫秒)")
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="发生时间")
+
+    class Meta:
+        verbose_name = "AI Agent 行为日志"
+        verbose_name_plural = verbose_name
+        ordering = ['-created_at']
