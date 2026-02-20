@@ -1,74 +1,76 @@
-# --- Builder Stage ---
-# 这个阶段安装构建依赖并编译 Python 包
-FROM python:3.13-slim AS builder
+# ==========================================
+# 第一阶段：Builder (构建依赖与环境)
+# ==========================================
+FROM python:3.13-slim-bookworm AS builder
 
-# 设置环境变量，防止生成 .pyc 文件并以非缓冲模式运行
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# 设置环境变量
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# 为 mysqlclient 和 lxml 等包安装构建时所需的系统依赖
-RUN apt-get update && apt-get install -y \
+# 安装系统构建依赖 (编译 mysqlclient/lxml 需要)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     default-libmysqlclient-dev \
     libxml2-dev \
-    libxslt1-dev \
-    --no-install-recommends
+    libxslt1-dev
 
-# 设置工作目录
+# 创建并激活虚拟环境
+# 我们将环境安装在 /opt/venv 下
+RUN python -m venv /opt/venv
+# 将虚拟环境的 bin 目录加入 PATH，后续的 pip 安装就会自动装入该环境
+ENV PATH="/opt/venv/bin:$PATH"
+
+# 复制依赖文件并安装
+COPY requirements.txt .
+# 升级 pip 并安装依赖
+RUN pip install --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
+
+
+# ==========================================
+# 第二阶段：Final (运行时镜像)
+# ==========================================
+FROM python:3.13-slim-bookworm
+
+# 1. 设置环境变量
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# 2. 设置工作目录
 WORKDIR /app
 
-# 复制依赖文件
-COPY requirements.txt .
+# 3. 创建非 root 用户
+RUN addgroup --system --gid 1001 django && \
+    adduser --system --uid 1001 --ingroup django django-user
 
-# 为依赖创建 wheelhouse
-# 这会编译依赖并将其存储为 wheel 文件
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+# 4. 安装运行时必需的系统库 (比 default-mysql-client 更小)
+# 只需要 libmariadb3 (MySQL 运行时) 和 libxml2
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libmariadb3 \
+    libxml2 \
+    && rm -rf /var/lib/apt/lists/*
 
+# 5. 【核心优化】从 Builder 阶段直接复制整个虚拟环境
+# 这样 Final 镜像里连构建工具产生的垃圾都没有，只有纯粹的库
+COPY --from=builder --chown=django-user:django /opt/venv /opt/venv
 
-# --- Final Stage ---
-# 这个阶段构建最终的、精简的生产镜像
-FROM python:3.13-slim
+# 6. 复制项目代码 (使用 --chown 避免双倍体积)
+COPY --chown=django-user:django . .
 
-# 设置环境变量
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# 7. 准备静态文件目录 (避免权限问题)
+RUN mkdir -p staticfiles && chown django-user:django staticfiles
 
-# 为应用程序创建一个专用的非 root 用户和组
-RUN addgroup --system django && adduser --system --ingroup django django-user
-
-# 安装运行时所需的系统依赖
-RUN apt-get update && apt-get install -y \
-    default-mysql-client \
-    --no-install-recommends && \
-    rm -rf /var/lib/apt/lists/*
-
-# 设置工作目录
-WORKDIR /home/django-user/app
-
-# 从 builder 阶段复制已编译的 wheel 文件
-COPY --from=builder /app/wheels /wheels
-
-# 从 wheel 文件安装 Python 依赖
-# 这样更快，且不需要在最终镜像中包含构建工具
-RUN pip install --no-cache /wheels/*
-
-# 将应用程序代码复制到容器中
-# .dockerignore 文件会阻止不必要的文件被复制
-COPY . .
-
-# 运行 collectstatic 来收集所有静态文件
-# 重要提示：请确保在你的 settings.py 中配置了 STATIC_ROOT (例如: STATIC_ROOT = BASE_DIR / "staticfiles")
-RUN python manage.py collectstatic --noinput
-
-# 将应用程序目录的所有权更改为非 root 用户
-RUN chown -R django-user:django /home/django-user/app
-
-# 切换到非 root 用户
+# 切换用户
 USER django-user
 
-# 暴露应用程序运行的端口
+# 8. 收集静态文件
+# 此时环境里已经有 django 了 (在 /opt/venv 里)
+RUN python manage.py collectstatic --noinput
+
+# 暴露端口
 EXPOSE 8000
 
-# 使用 Gunicorn 运行应用程序
+# 启动命令
 CMD ["gunicorn", "Django_manage.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2"]

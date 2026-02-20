@@ -3,6 +3,8 @@ name: Build and Push to Docker Hub
 on:
   push:
     branches: [ "master" ]
+    # 新增：当推送以 'v' 开头的 tag 时触发（例如 v1.0.0, v2.0）
+    tags: [ "v*" ]
   pull_request:
     branches: [ "master" ]
 
@@ -19,10 +21,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # --- 核心修改开始 ---
+      # 使用 docker/metadata-action 自动生成标签
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/django-manage
+          # 配置标签生成规则：
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=ref,event=branch
+      # --- 核心修改结束 ---
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
           context: .
           push: true
-          # 镜像的标签格式为: 你的DockerHub用户名/仓库名:commit哈希
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/django-manage:${{ github.sha }}
+          # 这里不再手动拼接字符串，而是直接引用上面 meta 步骤生成的 tags
+          tags: ${{ steps.meta.outputs.tags }}
+          # 推荐：同时加上 labels，这会把 GitHub 的仓库信息写入镜像元数据
+          labels: ${{ steps.meta.outputs.labels }}
