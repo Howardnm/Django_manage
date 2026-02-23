@@ -1,5 +1,6 @@
 import random
 import string
+import os
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 from django.core.mail import send_mail
@@ -17,12 +18,15 @@ def generate_captcha():
     image = Image.new('RGB', (width, height), (255, 255, 255))
     # 创建画笔
     draw = ImageDraw.Draw(image)
-    # 生成随机字体 (如果没有字体文件，使用默认)
-    # font = ImageFont.truetype('arial.ttf', 36) 
-    # 为了兼容性，这里尝试加载默认字体，或者简单的绘制
+    
+    # 关键修改：构建字体的绝对路径
     try:
-        font = ImageFont.truetype("arial.ttf", 28)
-    except:
+        # 使用 settings.BASE_DIR 构建绝对路径，确保在任何环境下都能找到字体文件
+        font_path = os.path.join(settings.BASE_DIR, 'common_utils', 'arial.ttf')
+        font = ImageFont.truetype(font_path, 28)
+    except IOError:
+        # 如果字体文件不存在或加载失败，则使用默认字体
+        logger.warning(f"Font file not found at {font_path}. Using default font.")
         font = ImageFont.load_default()
 
     # 生成随机验证码
