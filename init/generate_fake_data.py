@@ -14,16 +14,16 @@ django.setup()
 # ==========================================
 # 配置生成数量 (可在此处调整)
 # ==========================================
-COUNT_SALESPERSON = 10      # 业务员数量
-COUNT_CUSTOMER = 20         # 客户数量
-COUNT_MATERIAL = 20         # 成品材料库数量
-COUNT_SUPPLIER = 20         # 供应商数量
-COUNT_RAW_MATERIAL = 50     # 原材料数量
-COUNT_MACHINE = 10          # 机台型号数量
-COUNT_SCREW = 20            # 螺杆组合数量
-COUNT_PROFILE = 20          # 工艺方案数量
-COUNT_PROJECT = 20          # 研发项目数量
-COUNT_FORMULA = 20          # 实验配方数量
+COUNT_SALESPERSON = 0      # 业务员数量
+COUNT_CUSTOMER = 0         # 客户数量
+COUNT_MATERIAL = 5         # 成品材料库数量
+COUNT_SUPPLIER = 0         # 供应商数量
+COUNT_RAW_MATERIAL = 0     # 原材料数量
+COUNT_MACHINE = 0          # 机台型号数量
+COUNT_SCREW = 0            # 螺杆组合数量
+COUNT_PROFILE = 0          # 工艺方案数量
+COUNT_PROJECT = 0          # 研发项目数量
+COUNT_FORMULA = 0          # 实验配方数量
 
 # 尝试导入 Faker，如果没有则使用简单的随机生成
 try:
