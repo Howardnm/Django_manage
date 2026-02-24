@@ -90,7 +90,7 @@ class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView)
             if not hasattr(mat, 'val_flex_strength'): mat.val_flex_strength = find_val_in_memory("弯曲强度")
             if not hasattr(mat, 'val_flex_modulus'): mat.val_flex_modulus = find_val_in_memory("弯曲模量")
             if not hasattr(mat, 'val_impact'): mat.val_impact = find_val_in_memory("冲击")
-            if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("变形温度")
+            if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("热变形")
 
         # 【新增】传递购物车中的原材料 ID，用于前端回显勾选状态
         # 使用新的 Session Key: cart_raw_materials_v2

@@ -115,6 +115,7 @@ class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             if not hasattr(mat, 'val_flex_strength'): mat.val_flex_strength = find_val_in_memory("弯曲强度")
             if not hasattr(mat, 'val_flex_modulus'): mat.val_flex_modulus = find_val_in_memory("弯曲模量")
             if not hasattr(mat, 'val_impact'): mat.val_impact = find_val_in_memory("冲击")
+            if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("热变形")
 
             # HDT 特殊处理：因为列表显示的是合并列，这里只取一个主要的用于排序显示
             # 实际上列表页 Template 并没有直接用 val_hdt，而是用了 val_hdt 作为排序参考

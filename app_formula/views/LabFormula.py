@@ -106,10 +106,10 @@ class LabFormulaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             
             if '密度' in name: data_map[fid]['val_density'] = val
             elif '灰分' in name: data_map[fid]['val_ash'] = val
-            elif '熔融' in name: data_map[fid]['val_melt'] = val
-            elif '拉伸' and '强度' in name: data_map[fid]['val_tensile'] = val
-            elif '弯曲' and '强度' in name: data_map[fid]['val_flex_strength'] = val
-            elif '弯曲' and '模量' in name: data_map[fid]['val_flex_modulus'] = val
+            elif '熔融指数' in name: data_map[fid]['val_melt'] = val
+            elif '拉伸强度' in name: data_map[fid]['val_tensile'] = val
+            elif '弯曲强度' in name: data_map[fid]['val_flex_strength'] = val
+            elif '弯曲模量' in name: data_map[fid]['val_flex_modulus'] = val
             elif '冲击' in name: data_map[fid]['val_impact'] = val
             elif '热变形' in name: data_map[fid]['val_hdt'] = val
 
