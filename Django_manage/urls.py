@@ -41,6 +41,7 @@ urlpatterns = [
     path('raw-material/', include('app_raw_material.urls')),
     path('process/', include('app_process.urls')),
     path('formula/', include('app_formula.urls')),
+    path('notifications/', include('app_notification.urls')), # 新增：通知App的URL
     # 通用下载路由
     path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
     # 添加无权限页面的 URL 模式

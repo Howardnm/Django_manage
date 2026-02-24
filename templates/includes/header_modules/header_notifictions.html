@@ -2,42 +2,70 @@
 <div class="nav-item dropdown d-none d-md-flex me-3">
     <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications" aria-expanded="false">
         <i class="ti ti-bell fs-2"></i>
-        <!-- 红点提醒 -->
-        <span class="badge bg-red"></span>
+        {% if unread_notification_count > 0 %}
+            <span class="badge bg-red text-white">{{ unread_notification_count }}</span>
+        {% endif %}
     </a>
 
-    <!-- 通知下拉面板 -->
-    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card">
+    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card" style="width: 430px;">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">最近消息</h3>
-                <div class="btn-close ms-auto" data-bs-dismiss="dropdown"></div>
+                {% if unread_notification_count > 0 %}
+                    <a href="{% url 'notification_mark_all_as_read' %}" class="ms-auto small text-secondary">全部标记为已读</a>
+                {% endif %}
             </div>
-            <div class="list-group list-group-flush list-group-hoverable">
-                <!-- 消息项 1 -->
-                <div class="list-group-item">
-                    <div class="row align-items-center">
-                        <div class="col-auto"><span class="status-dot status-dot-animated bg-red d-block"></span></div>
-                        <div class="col text-truncate">
-                            <a href="#" class="text-body d-block">系统警告</a>
-                            <div class="d-block text-secondary text-truncate mt-n1">服务器负载过高，请检查...</div>
+            <div class="list-group list-group-flush list-group-hoverable" style="max-height: 380px; overflow-y: auto;">
+                
+                {% for notification in unread_notifications %}
+                    <a href="{% url 'notification_mark_as_read' notification.pk %}" class="list-group-item list-group-item-action">
+                        <div class="row align-items-center">
+                            <div class="col-auto">
+                                <span class="status-dot status-dot-animated bg-red d-block"></span>
+                            </div>
+                            <div class="col">
+                                {# --- 第一行：谁，关于什么项目 --- #}
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="fw-bold text-truncate" style="max-width: 80px;">{{ notification.actor.username|default:"系统" }}</span>
+                                    {% if notification.action_object %}
+                                        <span class="badge bg-blue-lt ms-2 text-truncate" title="项目名称">
+                                            <i class="ti ti-folder-filled opacity-50"></i>{{ notification.action_object.name }}
+                                        </span>
+                                        <span class="badge bg-secondary-lt ms-2 text-truncate" title="项目负责人">
+                                            <i class="ti ti-user-circle opacity-50"></i>{{ notification.action_object.manager.username }}
+                                        </span>
+                                    {% endif %}
+                                </div>
+                                
+                                {# --- 第二行：做了什么，结果如何 --- #}
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="text-secondary text-truncate">
+                                        {% if notification.target %}
+                                            <span class="badge {{ notification.target.status_css_class }} me-2" style="min-width: 55px;">
+                                                {{ notification.target.get_status_display }}
+                                            </span>
+                                        {% endif %}
+                                        {{ notification.verb }}
+                                    </div>
+                                    <div class="text-secondary small ms-2">{{ notification.timestamp|timesince }}前</div>
+                                </div>
+                            </div>
                         </div>
-                        <div class="col-auto">
-                            <a href="#" class="list-group-item-actions"><i class="ti ti-star text-muted"></i></a>
+                    </a>
+                {% empty %}
+                    <div class="list-group-item">
+                        <div class="text-center text-secondary py-3">
+                            <i class="ti ti-circle-check fs-1"></i>
+                            <p class="mt-2">暂无新消息</p>
                         </div>
                     </div>
-                </div>
-                <!-- 消息项 2 -->
-                <div class="list-group-item">
-                    <div class="row align-items-center">
-                        <div class="col-auto"><span class="status-dot d-block"></span></div>
-                        <div class="col text-truncate">
-                            <a href="#" class="text-body d-block">新任务分配</a>
-                            <div class="d-block text-secondary text-truncate mt-n1">张三 给您分配了 "重构首页" 任务</div>
-                        </div>
-                    </div>
-                </div>
+                {% endfor %}
             </div>
+            
+            <div class="card-footer text-center">
+                <a href="{% url 'notification_list' %}" class="text-secondary">查看所有消息</a>
+            </div>
+
         </div>
     </div>
 </div>

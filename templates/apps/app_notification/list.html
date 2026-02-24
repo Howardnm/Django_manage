@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+    <!-- Page Header -->
+    <div class="page-header d-print-none">
+        <div class="container-xl">
+            <div class="row g-2 align-items-center">
+                <div class="col">
+                    <h2 class="page-title">
+                        <i class="ti ti-bell-ringing me-2"></i>
+                        我的消息通知
+                    </h2>
+                </div>
+                <div class="col-auto ms-auto d-print-none">
+                    <a href="{% url 'notification_mark_all_as_read' %}" class="btn btn-outline-primary">
+                        <i class="ti ti-checks me-2"></i>
+                        全部标记为已读
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Page Body -->
+    <div class="page-body">
+        <div class="container-xl">
+            <div class="card">
+                <div class="card-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for notification in notifications %}
+                            <a href="{% url 'notification_mark_as_read' notification.pk %}?next={% if notification.target %}{{ notification.target.get_absolute_url }}{% else %}{% url 'panel_home' %}{% endif %}"
+                               class="list-group-item list-group-item-action {% if not notification.unread %}text-secondary{% endif %}">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        {% if notification.unread %}
+                                            <span class="status-dot status-dot-animated bg-primary d-block"></span>
+                                        {% else %}
+                                            <span class="status-dot bg-secondary d-block"></span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col text-truncate">
+                                        <div>
+                                            <span class="fw-bold">{{ notification.actor.username|default:"系统" }}</span>
+                                            {{ notification.verb }}
+                                        </div>
+                                        <div class="d-flex justify-content-between align-items-center mt-1">
+                                            <div class="text-secondary text-truncate" title="{{ notification.target|default:'' }}">
+                                                {% if notification.target %}
+                                                    "{{ notification.target }}"
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-secondary small ms-2">{{ notification.timestamp|timesince }}前</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </a>
+                        {% empty %}
+                            <div class="list-group-item">
+                                <div class="text-center text-secondary py-5">
+                                    <i class="ti ti-circle-check fs-1"></i>
+                                    <p class="mt-2">暂无任何消息</p>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if page_obj.has_other_pages %}
+                    <div class="card-footer d-flex align-items-center">
+                        <p class="m-0 text-secondary">
+                            显示第 <span>{{ page_obj.start_index }}</span> 到 <span>{{ page_obj.end_index }}</span> 项，共 <span>{{ paginator.count }}</span> 项
+                        </p>
+                        <ul class="pagination m-0 ms-auto">
+                            {% if page_obj.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">
+                                        <i class="ti ti-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                                        <i class="ti ti-chevron-left"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for i in paginator.page_range %}
+                                {% if page_obj.number == i %}
+                                    <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                                {% else %}
+                                    <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">
+                                        <i class="ti ti-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% else %}
+                                <li class="page-item disabled">
+                                    <a class="page-link" href="#" tabindex="-1" aria-disabled="true">
+                                        <i class="ti ti-chevron-right"></i>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

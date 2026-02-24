@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
+    'app_notification.apps.AppNotificationConfig', # 通知中心
     # 【新增】配方与工艺管理
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
@@ -72,6 +73,8 @@ MIDDLEWARE = [
     "debug_toolbar.middleware.DebugToolbarMiddleware", # 这是debug_toolbar的配置
     'axes.middleware.AxesMiddleware', # django-axes 登录失败次数中间件
     'app_user.middleware.SecurityShieldMiddleware', # 访问盾中间件
+    # 关键修复：添加我们自己的中间件
+    'app_notification.middleware.CurrentUserMiddleware',
 ]
 
 ROOT_URLCONF = 'Django_manage.urls'
@@ -87,6 +90,8 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                # 新增：通知上下文处理器
+                'app_notification.context_processors.notifications',
             ],
         },
     },
