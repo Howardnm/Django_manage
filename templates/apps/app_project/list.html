@@ -10,58 +10,11 @@
             <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
-                    <!-- 1. 项目名称 -->
-                    <th>
-                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
-                            项目名称
-                            {% if current_sort == 'name' %}
-                                <i class="ti ti-arrow-up icon-sm"></i>
-                            {% elif current_sort == '-name' %}
-                                <i class="ti ti-arrow-down icon-sm"></i>
-                            {% endif %}
-                        </a>
-                    </th>
-                    
-                    <!-- 2. 客户名称 -->
-                    <th>
-                        <a href="?{% url_replace sort='repository__customer__company_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
-                            客户
-                            {% if current_sort == 'repository__customer__company_name' %}
-                                <i class="ti ti-arrow-up icon-sm"></i>
-                            {% elif current_sort == '-repository__customer__company_name' %}
-                                <i class="ti ti-arrow-down icon-sm"></i>
-                            {% endif %}
-                        </a>
-                    </th>
-
-                    <!-- 3. 负责人 -->
-                    <th>
-                        <a href="?{% url_replace sort='manager'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
-                            负责人
-                            {% if current_sort == 'manager' %}
-                                <i class="ti ti-arrow-up icon-sm"></i>
-                            {% elif current_sort == '-manager' %}
-                                <i class="ti ti-arrow-down icon-sm"></i>
-                            {% endif %}
-                        </a>
-                    </th>
-
-                    <th style="width: 15%;">进度概览</th>
-                    
+                    <th>项目名称</th>
+                    <th>客户 / 产品</th>
+                    <th>进度概览</th>
                     <th style="width: 30%;">最新进展</th>
-
-                    <!-- 4. 创建时间 -->
-                    <th>
-                        <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
-                            创建时间
-                            {% if current_sort == 'created_at' %}
-                                <i class="ti ti-arrow-up icon-sm"></i>
-                            {% elif current_sort == '-created_at' %}
-                                <i class="ti ti-arrow-down icon-sm"></i>
-                            {% endif %}
-                        </a>
-                    </th>
-
+                    <th>创建时间</th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -72,14 +25,12 @@
                             <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
-                            {% if project.repository.product_name %}
-                                <div class="text-muted small text-truncate" style="max-width: 200px;">
-                                    {{ project.repository.product_name }}
-                                </div>
-                            {% endif %}
+                            <div class="text-purple small d-flex align-items-center mt-1">
+                                <i class="ti ti-user-circle me-1"></i>
+                                <span>{{ project.manager.username }}</span>
+                            </div>
                         </td>
                         
-                        <!-- 客户名称 -->
                         <td>
                             {% if project.repository.customer %}
                                 <div class="d-flex align-items-center">
@@ -91,15 +42,14 @@
                             {% else %}
                                 <span class="text-muted">-</span>
                             {% endif %}
-                        </td>
-                        
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <span class="avatar avatar-xs rounded me-2" style="background-image: url(...)">{{ project.manager.username|slice:":1"|upper }}</span>
-                                <div class="flex-fill">
-                                    <div class="font-weight-medium">{{ project.manager.username }}</div>
+                            
+                            {# 关键修改：在下方显示产品名称和代码 #}
+                            {% if project.repository.product_name or project.repository.product_code %}
+                                <div class="text-blue small text-truncate mt-1" style="max-width: 150px;" title="{{ project.repository.product_name }} | {{ project.repository.product_code }}">
+                                    <i class="ti ti-package me-1 opacity-50"></i>
+                                    <span>{{ project.repository.product_name|default_if_none:"" }} {{ project.repository.product_code|default_if_none:"" }}</span>
                                 </div>
-                            </div>
+                            {% endif %}
                         </td>
                         
                         <td>
