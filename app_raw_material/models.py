@@ -50,7 +50,8 @@ class Supplier(models.Model):
 
 # 3. 原材料主表
 class RawMaterial(models.Model):
-    name = models.CharField("原材料名称", max_length=100, unique=True, help_text="如：PA66")
+    # 关键修改：移除了 name 字段的 unique=True
+    name = models.CharField("原材料名称", max_length=100, help_text="如：PA66")
     model_name = models.CharField("原材料型号", max_length=100, blank=True, help_text="如：2600, 101L")
     warehouse_code = models.CharField("内部物料编码", max_length=50, blank=True, unique=True, null=True, help_text="ERP/WMS编码")
     
@@ -89,6 +90,8 @@ class RawMaterial(models.Model):
         verbose_name = "原材料"
         verbose_name_plural = "原材料库"
         ordering = ['category', 'name']
+        # 关键修改：添加联合唯一约束
+        unique_together = ('name', 'model_name')
 
 
 # 4. 【新增】原材料性能指标子表

@@ -30,6 +30,19 @@
 
         <div class="page-body">
             <div class="container-xl">
+
+                {# 关键修改：在这里显示非字段错误 #}
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <h4 class="alert-title">保存失败</h4>
+                        <div class="text-muted">
+                            {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+
                 <div class="row row-cards">
                     <!-- 左侧：核心信息 -->
                     <div class="col-lg-9">

@@ -1,21 +1,80 @@
-# 请进入到本项目Python虚拟环境，然后运行此脚本进行数据库初始化。
-# 1. 构建初始化数据表
+#!/bin/bash
+
+# ==============================================================================
+# Django 项目一键初始化脚本
+# ==============================================================================
+#
+# 使用方法:
+# 1. 确保您已进入项目的 Python 虚拟环境。
+# 2. 确保数据库连接信息在 settings.py 中已配置正确。
+# 3. 在项目根目录下运行此脚本: ./Initialize.sh
+#
+# ==============================================================================
+
+# 函数：打印带有颜色的信息
+print_info() {
+    echo -e "\n\033[1;34m--- $1 ---\033[0m"
+}
+
+print_success() {
+    echo -e "\033[1;32m✅ $1\033[0m"
+}
+
+print_warning() {
+    echo -e "\033[1;33m⚠️ $1\033[0m"
+}
+
+# --- 步骤 1: 数据库迁移 ---
+print_info "步骤 1/4: 正在执行数据库迁移..."
 python manage.py makemigrations
 python manage.py migrate
 
-# 2. 收集静态文件
-python manage.py collectstatic
-# nginx设置文件夹映射
-# location /static/ {
-#     alias /www/wwwroot/django_manage/staticfiles/;  # 静态文件绝对路径
-#     expires 30d;  # 缓存静态文件
-# }
+# 检查迁移是否成功
+if [ $? -ne 0 ]; then
+    echo -e "\033[1;31m❌ 数据库迁移失败，请检查错误信息并修复。脚本已中止。\033[0m"
+    exit 1
+fi
+print_success "数据库迁移完成。"
 
-# 3. 导入初始化数据
-python ./init/init_configs.py
-python ./init/init_materials_data.py
-python ./init/init_oem_data.py
-python ./init/init_raw_materials_data.py
 
-# 4. 创建超级管理员（请根据终端指示，填入对应的信息）
+# --- 步骤 2: 导入基础数据 ---
+# 这个顺序非常重要，确保被依赖的数据先被导入
+print_info "步骤 2/4: 正在导入基础数据..."
+echo "  -> 正在导入供应商..."
+python manage.py import_suppliers
+echo "  -> 正在导入原材料类型..."
+python manage.py import_raw_material_types
+echo "  -> 正在导入主机厂(OEM)和应用场景..."
+python manage.py import_base_data
+python manage.py import_oems
+echo "  -> 正在导入测试配置库..."
+python manage.py import_configs
+echo "  -> 正在导入原材料..."
+python manage.py import_raw_materials
+print_success "基础数据导入完成。"
+
+
+# --- 步骤 3: 收集静态文件 ---
+print_info "步骤 3/4: 正在收集静态文件..."
+python manage.py collectstatic --noinput
+
+if [ $? -ne 0 ]; then
+    print_warning "静态文件收集过程中出现问题，但这通常不影响开发环境的运行。"
+else
+    print_success "静态文件收集完成。"
+fi
+echo "  生产环境提示: 请确保您的 Web 服务器 (如 Nginx) 已正确配置静态文件目录映射。"
+echo "  例如: location /static/ { alias /path/to/your/project/staticfiles/; }"
+
+
+# --- 步骤 4: 创建超级管理员 ---
+print_info "步骤 4/4: 创建超级管理员账户"
+print_warning "接下来，请根据终端提示，输入您的管理员用户名、邮箱和密码。"
 python manage.py createsuperuser
+
+
+# --- 完成 ---
+echo -e "\n\n=================================================="
+print_success "🎉 项目初始化流程已全部完成！"
+echo "您现在可以运行 'python manage.py runserver' 来启动开发服务器了。"
+echo "=================================================="
