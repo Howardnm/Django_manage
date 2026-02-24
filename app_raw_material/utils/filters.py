@@ -31,11 +31,16 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     
+    # 关键修改：添加 style 和 data-placeholder 属性
     supplier = django_filters.ModelChoiceFilter(
         queryset=Supplier.objects.all(),
         label='供应商',
         empty_label="所有供应商",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-search',
+            'style': 'width: 250px;',
+            'data-placeholder': '输入供应商名称搜索...'
+        })
     )
     
     # 【新增】适用体系筛选 (多选)
@@ -43,13 +48,15 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         queryset=MaterialType.objects.all(),
         field_name='suitable_materials', # 多对多筛选
         label='适用体系',
-        # 使用 SelectMultiple 控件，并添加 form-select-search 类以启用 Tom Select
-        widget=forms.SelectMultiple(attrs={'class': 'form-select form-select-search'}),
-        conjoined=False # False 表示 OR 关系 (只要包含其中一个即可)，True 表示 AND 关系
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-select form-select-search',
+            'data-placeholder': '选择适用的材料体系...'
+        }),
+        conjoined=False 
     )
 
     # 【新增】性能范围筛选
-    # 1. 熔融指数 (Melt Index)
+    # ... (以下部分保持不变) ...
     melt_min = django_filters.NumberFilter(
         method='filter_property_range', 
         label='熔融指数 Min',
@@ -142,11 +149,11 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
             'flex_modulus': '弯曲模量',
             'impact': '冲击',
         }
-        
+
         # 提取前缀 (melt, tensile...) 和后缀 (min, max)
         prefix = '_'.join(name.split('_')[:-1])
         suffix = name.split('_')[-1]
-        
+
         keyword = keyword_map.get(prefix)
         if not keyword:
             return queryset
@@ -159,19 +166,19 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         # 3. 构建子查询
         # 查找符合条件的 RawMaterialProperty
         # 逻辑：RawMaterial.properties.filter(test_config__name__contains=keyword, value__gte/lte=value)
-        
+
         lookup_expr = 'gte' if suffix == 'min' else 'lte'
-        
+
         # 使用 filter 而不是 exclude，因为我们要保留符合条件的
         # 这里利用 Django 的跨关联查询
         # 注意：这里可能会有性能问题，如果数据量很大，建议使用 annotate + filter
-        
+
         filter_kwargs = {
             'properties__test_config__name__icontains': keyword,
             'properties__test_config__standard__icontains': std,
             f'properties__value__{lookup_expr}': value
         }
-        
+
         return queryset.filter(**filter_kwargs).distinct()
 
 # 3. 原材料类型过滤器
