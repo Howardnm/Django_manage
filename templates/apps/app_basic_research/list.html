@@ -10,8 +10,8 @@
             <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
-                    <!-- 1. 项目名称 -->
-                    <th>
+                    <!-- 1. 项目名称 (加宽) -->
+                    <th style="width: 40%;">
                         <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
                             项目名称
                             {% if current_sort == 'name' %}
@@ -29,17 +29,7 @@
                         </a>
                     </th>
 
-                    <!-- 3. 负责人 -->
-                    <th>
-                        <a href="?{% url_replace sort='manager'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
-                            负责人
-                            {% if current_sort == 'manager' %}
-                                <i class="ti ti-arrow-up icon-sm"></i>
-                            {% elif current_sort == '-manager' %}
-                                <i class="ti ti-arrow-down icon-sm"></i>
-                            {% endif %}
-                        </a>
-                    </th>
+                    {# 关键修改：移除负责人表头 #}
 
                     <th style="width: 15%;">进度概览</th>
                     
@@ -64,23 +54,22 @@
                 {% for project in page_obj %}
                     <tr>
                         <td>
-                            <a href="{% url 'basic_research_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ project.name }}">
+                            {# 关键修改：移除 max-width 限制，让其自由伸展 #}
+                            <a href="{% url 'basic_research_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
+                            {# 关键修改：在项目名称下方显示负责人 #}
+                            <div class="text-purple small d-flex align-items-center mt-1">
+                                <i class="ti ti-user-circle me-1"></i>
+                                <span>{{ project.manager.username }}</span>
+                            </div>
                         </td>
                         
                         <td>
                             <span class="text-muted">{{ project.code }}</span>
                         </td>
                         
-                        <td>
-                            <div class="d-flex align-items-center">
-                                <span class="avatar avatar-xs rounded me-2" style="background-image: url(...)">{{ project.manager.username|slice:":1"|upper }}</span>
-                                <div class="flex-fill">
-                                    <div class="font-weight-medium">{{ project.manager.username }}</div>
-                                </div>
-                            </div>
-                        </td>
+                        {# 关键修改：移除负责人单元格 #}
                         
                         <td>
                             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -125,7 +114,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5">
+                        <td colspan="6" class="text-center py-5">
                             <div class="empty">
                                 <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-25"></i></div>
                                 <p class="empty-title">没有找到预研项目</p>
