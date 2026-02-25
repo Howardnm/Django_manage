@@ -29,6 +29,7 @@
                 <div class="card-body p-0">
                     <div class="list-group list-group-flush">
                         {% for notification in notifications %}
+                            {# 关键修改：应用与 header 一致的布局 #}
                             <a href="{% url 'notification_mark_as_read' notification.pk %}"
                                class="list-group-item list-group-item-action {% if not notification.unread %}text-secondary{% endif %}">
                                 <div class="row align-items-center">
@@ -39,20 +40,38 @@
                                             <span class="status-dot bg-secondary d-block"></span>
                                         {% endif %}
                                     </div>
-                                    <div class="col text-truncate">
-                                        <div>
-                                            <span class="fw-bold">{{ notification.actor.username|default:"系统" }}</span>
+                                    <div class="col">
+                                        {# --- 第一行：谁，关于什么项目 --- #}
+                                        <div class="d-flex align-items-center mb-1">
+                                            <span class="fw-bold text-truncate" style="max-width: 80px;">{{ notification.actor.username|default:"系统" }}</span>
+                                            {% if notification.action_object %}
+                                                <span class="badge bg-blue-lt ms-2 me-auto text-truncate" title="项目名称">
+                                                    <i class="ti ti-folder-filled me-1 opacity-50"></i>{{ notification.action_object.name }}
+                                                </span>
+                                                <span class="badge bg-orange-lt text-truncate" title="项目负责人">
+                                                    <i class="ti ti-user-circle me-1 opacity-50"></i>{{ notification.action_object.manager.username }}
+                                                </span>
+                                            {% endif %}
+                                        </div>
+
+                                        {# --- 第二行：核心动作 --- #}
+                                        <div class="text-secondary text-truncate mb-1">
                                             {{ notification.verb }}
                                         </div>
-                                        <div class="d-flex justify-content-between align-items-center mt-1">
-                                            <div class="text-secondary text-truncate" title="{{ notification.action_object|default:notification.target }}">
-                                                {% if notification.action_object %}
-                                                    "{{ notification.action_object }}"
-                                                {% elif notification.target %}
-                                                    "{{ notification.target }}"
+
+                                        {# --- 第三行：状态与时间 --- #}
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div class="text-secondary">
+                                                {% if notification.target %}
+                                                    <span class="badge bg-purple-lt">
+                                                        第{{ notification.target.round }}轮
+                                                    </span>
+                                                    <span class="badge {{ notification.target.status_css_class }} me-2" style="min-width: 55px;">
+                                                        {{ notification.target.get_status_display }}
+                                                    </span>
                                                 {% endif %}
                                             </div>
-                                            <div class="text-secondary small ms-2">{{ notification.timestamp|timesince }}前</div>
+                                            <div class="small">{{ notification.timestamp|timesince }}前</div>
                                         </div>
                                     </div>
                                 </div>
@@ -68,8 +87,7 @@
                     </div>
                 </div>
             </div>
-            
-            {# 关键修复：移除手动编写的分页代码，改用标准 include 组件 #}
+
             <br>
             {% include 'apps/list_modules/paginator.html' %}
 
