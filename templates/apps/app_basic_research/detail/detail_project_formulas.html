@@ -61,8 +61,9 @@
                                    data-type="formula"
                                    {% if f.pk in cart_formula_ids %}checked{% endif %}>
                         </td>
+                        {# 关键修改：为单元格设置最小宽度，并移除链接上的截断样式 #}
                         <td>
-                            <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="fw-bold text-reset d-block text-truncate" style="max-width: 150px;" title="{{ f.name }}">
+                            <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="fw-bold text-reset d-block" title="{{ f.name }}">
                                 {{ f.name|default:"未命名配方" }}
                             </a>
                             <div class="text-muted small">{{ f.code }}</div>
