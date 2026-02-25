@@ -35,7 +35,7 @@
                             {% if project.repository.customer %}
                                 <div class="d-flex align-items-center">
                                     <span class="avatar avatar-xs bg-blue-lt rounded me-2">{{ project.repository.customer.company_name|slice:":1" }}</span>
-                                    <span class="text-reset text-truncate" style="max-width: 120px;" title="{{ project.repository.customer.company_name }}">
+                                    <span class="text-reset text-truncate" style="max-width: 150px;" title="{{ project.repository.customer.company_name }}">
                                         {{ project.repository.customer.short_name|default:project.repository.customer.company_name }}
                                     </span>
                                 </div>
