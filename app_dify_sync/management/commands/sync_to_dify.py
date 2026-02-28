@@ -1,33 +1,22 @@
-import os
 import time
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
 from django.db import transaction
 from django.conf import settings
-from django.apps import apps
 
 from app_dify_sync.models import DifySyncRecord
-from app_dify_sync.dify_api import create_dataset_in_dify, create_document_in_dify, update_document_in_dify, delete_document_in_dify
+from app_dify_sync.dify_api import create_document_in_dify, update_document_in_dify, delete_document_in_dify
 from app_dify_sync.utils import get_document_content
 
 class Command(BaseCommand):
-    """
-    python manage.py sync_to_dify
-    """
-    help = '检查并创建Dify数据集，然后同步数据到Dify知识库'
+    help = '同步数据到 Dify 知识库。假定所有数据集ID已在settings.py中正确配置。'
 
     def handle(self, *args, **kwargs):
         self.api_key = settings.DIFY_SYNC_CONFIG.get('API_KEY')
         if not self.api_key or 'YOUR_DIFY_API_KEY' in self.api_key:
             raise CommandError("请在 settings.py 中配置一个有效的 DIFY_API_KEY。")
 
-        self.stdout.write(self.style.HTTP_INFO('--- 步骤 1/2: 准备 Dify 数据集 ---'))
-        
-        prepared_datasets = self._prepare_datasets()
-        if prepared_datasets is None:
-            return
-
-        self.stdout.write(self.style.HTTP_INFO('\n--- 步骤 2/2: 开始同步文档数据 ---'))
+        self.stdout.write(self.style.HTTP_INFO('--- 开始同步文档数据到 Dify ---'))
         
         records_to_process = DifySyncRecord.objects.filter(
             status__in=[
@@ -55,7 +44,7 @@ class Command(BaseCommand):
                     locked_record.status = DifySyncRecord.SyncStatus.SYNCING
                     locked_record.save(update_fields=['status'])
                     
-                    self.process_record(locked_record, prepared_datasets)
+                    self.process_record(locked_record)
 
                 except DifySyncRecord.DoesNotExist:
                     continue
@@ -67,53 +56,17 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('\n✅ 同步完成！'))
 
-    def _prepare_datasets(self):
-        dataset_configs = settings.DIFY_SYNC_CONFIG.get('DATASETS', {})
-        real_dataset_ids = {}
-        all_ok = True
+    def process_record(self, record: DifySyncRecord):
+        self.stdout.write(f'\n  -> 正在处理: {record.content_object} (状态: {record.status})')
 
-        for model_key, dataset_id in dataset_configs.items():
-            # 关键修复：自动去除 dataset_id 前后的空格
-            dataset_id = dataset_id.strip()
-
-            try:
-                app_label, model_name = model_key.split('.')
-                model = apps.get_model(app_label, model_name)
-                model_verbose_name = model._meta.verbose_name
-            except (ValueError, LookupError):
-                self.stdout.write(self.style.ERROR(f"配置错误：无效的模型 '{model_key}'。"))
-                all_ok = False
-                continue
-
-            if "YOUR_" in dataset_id or not dataset_id:
-                self.stdout.write(f"  -> 为模型 '{model_verbose_name}' 自动创建数据集中...")
-                success, result = create_dataset_in_dify(self.api_key, name=f"Django - {model_verbose_name}")
-                if success:
-                    new_id = result.get('id')
-                    real_dataset_ids[model_key] = new_id
-                    self.stdout.write(self.style.SUCCESS(f"     - 成功创建数据集，ID: {new_id}"))
-                    self.stdout.write(self.style.WARNING(f"     - 请将此ID更新到 settings.py 的 '{model_key}' 中。"))
-                else:
-                    self.stdout.write(self.style.ERROR(f"     - 创建数据集失败: {result}"))
-                    all_ok = False
-            else:
-                real_dataset_ids[model_key] = dataset_id
-                self.stdout.write(f"  -> 数据集 '{model_verbose_name}' 已配置，ID: {dataset_id}")
+        dataset_id = record.dify_dataset_id.strip() if record.dify_dataset_id else None
         
-        return real_dataset_ids if all_ok else None
-
-    def process_record(self, record: DifySyncRecord, prepared_datasets: dict):
-        dataset_id = record.dify_dataset_id
-        if not dataset_id:
-            model_key = f"{record.content_type.app_label}.{record.content_type.model}"
-            dataset_id = prepared_datasets.get(model_key)
-            if not dataset_id:
-                record.status = DifySyncRecord.SyncStatus.FAILED
-                record.error_message = f"找不到模型 {model_key} 的数据集ID"
-                record.save()
-                return
-            record.dify_dataset_id = dataset_id.strip() # 确保回填时也去除空格
-            record.save(update_fields=['dify_dataset_id'])
+        if not dataset_id or "YOUR_" in dataset_id:
+            self.stdout.write(self.style.ERROR(f'     - 错误：记录 {record.pk} 的数据集ID无效或未配置，无法同步。'))
+            record.status = DifySyncRecord.SyncStatus.FAILED
+            record.error_message = "数据集ID无效或未在引导步骤中正确设置。"
+            record.save()
+            return
 
         if record.status == DifySyncRecord.SyncStatus.DELETED:
             if not record.dify_document_id:
@@ -131,7 +84,7 @@ class Command(BaseCommand):
         if not source_object:
             record.status = DifySyncRecord.SyncStatus.DELETED
             record.save()
-            self.process_record(record, prepared_datasets)
+            self.process_record(record)
             return
 
         name, text = get_document_content(source_object)

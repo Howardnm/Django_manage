@@ -6,7 +6,7 @@
 #
 # 使用方法:
 # 1. 确保您已进入项目的 Python 虚拟环境。
-# 2. 确保数据库连接信息和 Dify 配置在 settings.py 中已正确填写。
+# 2. 确保数据库连接信息和 Dify API Key 在 settings.py 中已配置正确。
 # 3. 在项目根目录下运行此脚本: ./Initialize.sh
 #
 # ==============================================================================
@@ -35,7 +35,7 @@ python manage.py migrate
 
 # 检查迁移是否成功
 if [ $? -ne 0 ]; then
-    echo -e "\033[1;31m❌ 数据库迁移失败，请检查错误信息并修复。脚本已中止。\033[0m"
+    print_error "数据库迁移失败，请检查错误信息并修复。脚本已中止。"
     exit 1
 fi
 print_success "数据库迁移完成。"
@@ -59,18 +59,24 @@ print_success "基础数据导入完成。"
 
 # --- 步骤 3: Dify 知识库首次初始化 ---
 print_info "步骤 3/5: 正在初始化 Dify 知识库..."
-print_warning "此步骤将清空本地的 Dify 同步记录，然后为所有现有数据创建新的同步任务。"
-read -p "这是一个一次性操作，您确定要继续吗？ (输入 'yes' 继续): " confirm
+print_warning "此步骤将引导您完成 Dify 知识库的首次配置和数据填充。"
+read -p "您确定要开始 Dify 初始化流程吗？ (输入 'yes' 继续): " confirm
 if [[ "$confirm" != "yes" ]]; then
     print_warning "操作已取消。跳过 Dify 初始化。"
 else
-    echo "  -> (1/3) 清理本地旧的同步记录..."
+    echo "  -> (1/4) 准备数据集：检查并创建 Dify 知识库..."
+    python manage.py prepare_dify_datasets
+    
+    print_warning "\n请根据上面的输出，将新生成的 Dataset ID 填入 settings.py 文件中。"
+    read -p "完成后，请按 Enter键 继续..."
+
+    echo "  -> (2/4) 清理本地旧的同步记录..."
     python manage.py cleanup_dify_records --confirm
     
-    echo "  -> (2/3) 引导创建新的同步任务..."
+    echo "  -> (3/4) 引导创建新的同步任务..."
     python manage.py bootstrap_dify_sync_records
     
-    echo "  -> (3/3) 首次执行同步..."
+    echo "  -> (4/4) 首次执行同步..."
     python manage.py sync_to_dify
     
     print_success "Dify 知识库首次数据填充完成。"
