@@ -17,16 +17,36 @@ if not USE_MOCK_API:
         raise ImproperlyConfigured("请在 settings.py 的 DIFY_SYNC_CONFIG 中配置 DIFY_API_BASE_URL。")
 
 # --- 模拟 API 调用 ---
-def mock_api_call(success_rate=0.95, is_create_dataset=False):
-    time.sleep(0.5)
+def mock_api_call(success_rate=0.95, is_create_dataset=False, is_get_dataset=False):
+    time.sleep(0.1)
     if time.time() % 100 < success_rate * 100:
         if is_create_dataset:
             return True, {"id": f"dataset-mock-{uuid.uuid4().hex[:12]}", "name": "Mock Dataset"}
+        if is_get_dataset:
+            return True, {"id": "mock-id", "name": "Mock Dataset"}
         return True, "模拟操作成功"
     else:
         return False, "模拟API请求失败"
 
 # --- API 客户端函数 ---
+
+def get_dataset_in_dify(api_key: str, dataset_id: str) -> (bool, dict):
+    """获取单个数据集的信息，用于检查其是否存在"""
+    if USE_MOCK_API:
+        # 模拟：如果ID包含 "fail"，则模拟失败
+        if "fail" in dataset_id:
+            return False, "模拟：找不到数据集"
+        return mock_api_call(is_get_dataset=True)
+
+    headers = {"Authorization": f"Bearer {api_key}"}
+    url = f"{DIFY_API_BASE_URL}/datasets/{dataset_id}"
+    try:
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        return True, response.json()
+    except requests.exceptions.RequestException as e:
+        return False, str(e)
+
 
 def create_dataset_in_dify(api_key: str, name: str) -> (bool, dict):
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -41,11 +61,6 @@ def create_dataset_in_dify(api_key: str, name: str) -> (bool, dict):
 
 
 def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str, doc_id: int) -> (bool, str):
-    """在 Dify 数据集中通过文本创建一个新文档"""
-    if USE_MOCK_API:
-        success, _ = mock_api_call()
-        return (True, f"doc_{uuid.uuid4().hex}") if success else (False, "模拟创建文档失败")
-
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     url = f"{DIFY_API_BASE_URL}/datasets/{dataset_id}/document/create-by-text"
     payload = {
@@ -67,12 +82,7 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
 
 
 def update_document_in_dify(api_key: str, dataset_id: str, document_id: str, name: str, text: str) -> (bool, str):
-    """更新 Dify 数据集中的一个现有文档"""
-    if USE_MOCK_API:
-        return mock_api_call()
-
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    # 关键修复：使用您文档中指定的、用于更新的端点和 POST 方法
     url = f"{DIFY_API_BASE_URL}/datasets/{dataset_id}/documents/{document_id}/update-by-text"
     payload = {"name": name, "text": text}
     try:
@@ -84,11 +94,6 @@ def update_document_in_dify(api_key: str, dataset_id: str, document_id: str, nam
 
 
 def delete_document_in_dify(api_key: str, dataset_id: str, document_id: str) -> (bool, str):
-    """从 Dify 数据集中删除一个文档"""
-    if USE_MOCK_API:
-        return mock_api_call()
-
-    # 关键修复：确保删除请求也使用了正确的认证头
     headers = {"Authorization": f"Bearer {api_key}"}
     url = f"{DIFY_API_BASE_URL}/datasets/{dataset_id}/documents/{document_id}"
     try:
