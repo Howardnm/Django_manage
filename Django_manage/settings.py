@@ -235,7 +235,7 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登�
 DIFY_SYNC_CONFIG = {
     'API_KEY': os.environ.get('DIFY_API_KEY', 'dataset-GmZtWu4D3mRPpxFE4Pyp00vI'),
     'API_BASE_URL': os.environ.get('DIFY_API_BASE_URL', 'http://192.168.123.17/v1'),
-    # 'USE_MOCK_API': DEBUG, # 在开发模式下使用模拟API
+    'USE_MOCK_API': False,
     'DATASETS': {
         'app_project.project': '7d382ccb-9349-4a39-8d7a-27c666e4c31c',
         'app_repository.materiallibrary': 'b3a76e11-7f01-4f00-b4f1-403313ed32de',

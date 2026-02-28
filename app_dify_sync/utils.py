@@ -8,6 +8,7 @@ from app_process.models import ProcessProfile
 
 def _format_project(instance: Project):
     name = f"项目 - {instance.name}"
+    
     repo = getattr(instance, 'repository', None)
     
     info_lines = [f"- **项目ID**: {instance.pk}", f"- **负责人**: {instance.manager.username}"]
