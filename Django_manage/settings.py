@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
     'app_notification.apps.AppNotificationConfig', # 通知中心
+    'app_dify_sync.apps.AppDifySyncConfig', # Dify 数据同步
     # 【新增】配方与工艺管理
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
@@ -229,3 +230,17 @@ AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数
 # Session 配置
 SESSION_COOKIE_AGE = 36000  # 保持登录10小时 (10 * 60 * 60)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登录 (除非勾选"保持登录")
+
+# --- Dify 同步配置 ---
+DIFY_SYNC_CONFIG = {
+    'API_KEY': os.environ.get('DIFY_API_KEY', 'dataset-GmZtWu4D3mRPpxFE4Pyp00vI'),
+    'API_BASE_URL': os.environ.get('DIFY_API_BASE_URL', 'http://192.168.123.17/v1'),
+    # 'USE_MOCK_API': DEBUG, # 在开发模式下使用模拟API
+    'DATASETS': {
+        'app_project.project': '7d382ccb-9349-4a39-8d7a-27c666e4c31c',
+        'app_repository.materiallibrary': 'b3a76e11-7f01-4f00-b4f1-403313ed32de',
+        'app_raw_material.rawmaterial': '45d9ab89-1c14-4467-823c-5e9a456eafde',
+        'app_formula.labformula': '2254b151-7485-4cde-a436-d6d26f1a1da1',
+        'app_process.processprofile': '715b683a-7451-49f8-b21d-88c183d7b695',
+    }
+}
