@@ -67,8 +67,8 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
         "name": name,
         "text": text,
         "indexing_technique": "high_quality",
-        "doc_form": "qa_model",
-        "doc_language": "Chinese",
+        "doc_form": "hierarchical_model", # text_model、hierarchical_model、qa_model
+        "doc_language": "Chinese", # 只有开启qa_model，才会使用到这个参数
         "process_rule": {
             "mode": "custom",
             "rules": {
@@ -78,9 +78,21 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
                 ],
                 "segmentation": {
                     "separator": "\n",
-                    "max_tokens": 1000
+                    "max_tokens": 2000
+                },
+                "parent_mode": "full-doc",
+                "subchunk_segmentation": {
+                    "separator": "##",
+                    "max_tokens": 500,
+                    "chunk_overlap": 100
                 }
             }
+        },
+        "retrieval_model": {
+            "search_method": "hybrid_search",
+            "reranking_enable": True,
+            "reranking_mode": "reranking_model",
+            "top_k": 2
         }
     }
     try:
