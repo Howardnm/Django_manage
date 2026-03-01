@@ -91,6 +91,7 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
         "retrieval_model": {
             "search_method": "hybrid_search",
             "reranking_enable": True,
+            "reranking_mode": "reranking_model",
             "top_k": 2,
             "score_threshold_enabled": False,  # 如果不需要阈值过滤，设为 False
             "score_threshold": 0.5 # 即使 enabled 为 False，建议也保留这个字段作为占位，防止校验失败
