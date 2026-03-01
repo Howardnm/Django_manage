@@ -67,7 +67,17 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
         "name": name,
         "text": text,
         "indexing_technique": "high_quality",
-        "process_rule": {"mode": "automatic"}
+        "doc_form": "qa_model",
+        "doc_language": "Chinese",
+        "process_rule": {
+            "mode": "custom",
+            "rules": {
+                "segmentation": {
+                    "separator": "\n",
+                    "max_tokens": "2000"
+                }
+            }
+        }
     }
     try:
         response = requests.post(url, headers=headers, json=payload, timeout=30)
