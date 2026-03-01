@@ -94,7 +94,7 @@ def _format_lab_formula(instance: LabFormula):
     
     results_string = "\n".join([f"- {res.test_config.name}: {res.value or res.value_text} {res.test_config.unit}" for res in instance.test_results.select_related('test_config').all()]) or "无"
 
-    name = f"配方 - {instance.name}"
+    name = f"配方 - {instance.name} - 基材【{instance.material_type.name}】"
     text = f"""
 # 配方: {instance.name}
 - **配方ID**: {instance.pk}
