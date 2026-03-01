@@ -72,9 +72,13 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
         "process_rule": {
             "mode": "custom",
             "rules": {
+                "pre_processing_rules": [
+                    {"id": "remove_extra_spaces", "enabled": True},
+                    {"id": "remove_urls_emails", "enabled": True}
+                ],
                 "segmentation": {
                     "separator": "\n",
-                    "max_tokens": "2000"
+                    "max_tokens": 1000
                 }
             }
         }
