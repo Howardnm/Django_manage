@@ -77,21 +77,23 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
                     {"id": "remove_urls_emails", "enabled": True}
                 ],
                 "segmentation": {
-                    "separator": "\n",
+                    "separator": "\n\n",
                     "max_tokens": 2000
                 },
                 "parent_mode": "full-doc",
                 "subchunk_segmentation": {
                     "separator": "##",
                     "max_tokens": 500,
-                    "chunk_overlap": 100
+                    "chunk_overlap": 150
                 }
             }
         },
         "retrieval_model": {
             "search_method": "hybrid_search",
             "reranking_enable": True,
-            "top_k": 2
+            "top_k": 2,
+            "score_threshold_enabled": False,  # 如果不需要阈值过滤，设为 False
+            "score_threshold": 0.5 # 即使 enabled 为 False，建议也保留这个字段作为占位，防止校验失败
         }
     }
     try:
