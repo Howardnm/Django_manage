@@ -91,7 +91,6 @@ def create_document_in_dify(api_key: str, dataset_id: str, name: str, text: str,
         "retrieval_model": {
             "search_method": "hybrid_search",
             "reranking_enable": True,
-            "reranking_mode": "reranking_model",
             "top_k": 2
         }
     }
