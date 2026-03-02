@@ -107,6 +107,18 @@
                     {% include "sidebar_modules/_raw_material.html" %}
                 {% endif %}
 
+                {# 关键修改：将新菜单项插入到列表末尾 #}
+                <li class="{% if request.resolver_match.view_name == 'dify_chatbot' %}active{% endif %}">
+                    <a class="nav-link" href="{% url 'dify_chatbot' %}">
+                        <span class="nav-link-icon d-md-none d-lg-inline-block">
+                            <i class="ti ti-robot"></i>
+                        </span>
+                        <span class="nav-link-title">
+                            AI 智能助手
+                        </span>
+                    </a>
+                </li>
+
                 <!-- 分割线：系统管理 -->
                 {% if perms.auth.view_user or user.is_staff %}
                     <li class="nav-item mt-4 mb-1">
