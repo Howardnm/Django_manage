@@ -9,7 +9,7 @@
 - `app_panel`: 核心仪表盘和主页。
 - `app_project`: 项目管理模块。
 - `app_user`: 用户管理、认证和权限控制。
-- `app_repository`: 原料库管理。
+- `app_repository`: 项目材料管理。
 - `app_notification`: 通知中心。
 - `app_dify_sync`: 与 Dify 平台进行数据同步。
 - `app_raw_material`: 原材料管理。
