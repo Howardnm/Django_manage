@@ -100,20 +100,35 @@
 
 - **`prepare_dify_datasets`**:
   在 Dify 平台为项目中需要同步的模型创建对应的知识库（Dataset）。首次配置时运行。
+  ```bash
+  python manage.py prepare_dify_datasets
+  ```
 
 - **`bootstrap_dify_sync_records`**:
   在本地数据库中为所有需要同步的数据模型创建同步任务记录。在 `prepare_dify_datasets` 之后运行。
+  ```bash
+  python manage.py bootstrap_dify_sync_records
+  ```
 
 - **`sync_to_dify`**:
-  执行数据同步。该命令会查找本地发生变化（新增或修改）的数据，并将其同步到 Dify 对应的知识库中。你可以设置一个定时任务（如 Cron Job）来定期执行此命令，以保持数据同步。
+  执行增量数据同步。该命令会查找本地发生变化（新增或修改）的数据，并将其同步到 Dify 对应的知识库中。建议设置定时任务（如 Cron Job）来定期执行。
+  ```bash
+  python manage.py sync_to_dify
+  ```
 
 - **`cleanup_dify_records`**:
   清理本地的 Dify 同步记录。当 Dify 端的知识库 ID 发生变化，或你想重新建立同步关系时使用。
+  ```bash
+  python manage.py cleanup_dify_records --confirm
+  ```
 
 ### `app_notification` (通知中心)
 
 - **`cleanup_notifications`**:
-  清理旧的已读通知，以保持通知表不会无限增长。默认会删除30天前的已读通知。你可以设置一个定时任务（如 Cron Job）来定期执行此命令。
+  清理旧的已读通知，以保持通知表不会无限增长。默认会删除30天前的已读通知。建议设置定时任务（如 Cron Job）来定期执行。
+  ```bash
+  python manage.py cleanup_notifications
+  ```
 
 ## 部署
 
@@ -121,7 +136,7 @@
 
 - **关闭 DEBUG 模式**: 在 `Django_manage/settings.py` 中，设置 `DEBUG = False`。
 - **配置 `ALLOWED_HOSTS`**: 同样在 `settings.py` 中，将你的域名或服务器 IP 地址添加到 `ALLOWED_HOSTS` 列表中。
-- **收集静态文件**: 运行 `python manage.py collectstatic`，确保所有静态文件都已收集到 `STATIC_ROOT` 指定的目录（默认为 `staticfiles`）。
+- **收集静态文件**: 运行 `python manage.py collectstatic --noinput`，确保所有静态文件都已收集到 `STATIC_ROOT` 指定的目录（默认为 `staticfiles`）。
 
 ### 使用 Gunicorn + Nginx 部署
 
