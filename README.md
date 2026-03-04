@@ -117,4 +117,60 @@
 
 ## 部署
 
-本项目已包含 `Dockerfile` 和 `gunicorn`，可以方便地进行容器化部署。在生产环境中，建议将 `settings.py` 中的 `DEBUG` 设置为 `False`，并配置好 `ALLOWED_HOSTS`。
+### 生产环境建议
+
+- **关闭 DEBUG 模式**: 在 `Django_manage/settings.py` 中，设置 `DEBUG = False`。
+- **配置 `ALLOWED_HOSTS`**: 同样在 `settings.py` 中，将你的域名或服务器 IP 地址添加到 `ALLOWED_HOSTS` 列表中。
+- **收集静态文件**: 运行 `python manage.py collectstatic`，确保所有静态文件都已收集到 `STATIC_ROOT` 指定的目录（默认为 `staticfiles`）。
+
+### 使用 Gunicorn + Nginx 部署
+
+在生产环境中，推荐使用 Nginx 作为反向代理，并将请求转发给 Gunicorn。
+
+1.  **使用 Gunicorn 启动应用**
+
+    在项目根目录下，运行以下命令来启动服务：
+    ```bash
+    gunicorn --workers 3 --bind 0.0.0.0:8000 Django_manage.wsgi:application
+    ```
+    - `--workers 3`: 指定工作进程的数量。通常建议设置为 `2 * CPU核心数 + 1`。
+    - `--bind 0.0.0.0:8000`: 绑定监听的地址和端口。Gunicorn 将只在本地监听，等待 Nginx 的请求。
+    - `Django_manage.wsgi:application`: 指向项目的 WSGI 应用。
+
+2.  **配置 Nginx**
+
+    下面是一个基础的 Nginx 配置示例。它将处理静态文件请求，并将其他所有请求代理到 Gunicorn。
+
+    ```nginx
+    server {
+        listen 80;
+        server_name your_domain.com; # 替换为你的域名
+
+        # 静态文件映射
+        # 当请求的 URL 以 /static/ 开头时，Nginx 会直接从文件系统提供服务
+        location /static/ {
+            # 'alias' 指向你通过 collectstatic 命令收集的静态文件目录
+            alias /path/to/your/project/staticfiles/;
+            expires 30d; # 缓存静态文件
+        }
+
+        # 媒体文件映射 (如果你的项目有用户上传的文件)
+        # location /media/ {
+        #     alias /path/to/your/project/media/;
+        # }
+
+        # 将所有其他请求转发给 Gunicorn
+        location / {
+            proxy_pass http://127.0.0.1:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+    }
+    ```
+    **注意**: 请务必将 `/path/to/your/project/staticfiles/` 替换为你项目中 `staticfiles` 目录的**绝对路径**。
+
+### 容器化部署
+
+本项目已包含 `Dockerfile`，可以方便地进行容器化部署。你可以根据自己的需求修改 `Dockerfile`，然后构建并运行 Docker 镜像。
