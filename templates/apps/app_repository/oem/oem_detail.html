@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load project_extras %}
 
 {% block title %}主机厂详情: {{ oem.name }}{% endblock %}
 
@@ -68,8 +69,9 @@
         </div>
     </div>
 
-    <!-- 右侧：标准文件 -->
+    <!-- 右侧：标准文件 和 关联项目 -->
     <div class="col-lg-8">
+        <!-- 1. 主机厂标准文件 -->
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">主机厂标准文件</h3>
@@ -117,6 +119,78 @@
                     </tbody>
                 </table>
             </div>
+        </div>
+
+        <!-- 2. 关联项目卡片 -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">关联项目 ({{ paginator.count }})</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>项目名称</th>
+                            <th style="width: 25%;">项目进度</th>
+                            <th>直接客户 (Tier 1)</th>
+                            <th>业务员</th>
+                            <th>创建时间</th>
+                            <th>进度更新时间</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for repo in page_obj %}
+                        <tr>
+                            <td><a href="{% url 'project_detail' repo.project.id %}">{{ repo.project.name }}</a></td>
+                            <td>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <div class="text-truncate" style="max-width: 120px;">
+                                        {% if repo.project.is_terminated %}
+                                            <span class="badge bg-red-lt">已终止</span>
+                                        {% elif repo.project.progress_percent == 100 %}
+                                            <span class="badge bg-green-lt">已完成</span>
+                                        {% else %}
+                                            <span class="text-blue small fw-bold">{{ repo.project.get_current_stage_display }}</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-muted small">{{ repo.project.progress_percent }}%</div>
+                                </div>
+                                <div class="progress progress-sm">
+                                    <div class="progress-bar {% if repo.project.is_terminated %}bg-danger{% elif repo.project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                         style="width: {{ repo.project.progress_percent }}%" role="progressbar" aria-valuenow="{{ repo.project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ repo.customer|default:"--" }}</td>
+                            <td>{{ repo.salesperson.name|default:"--" }}</td>
+                            <td>{{ repo.project.created_at|date:"Y-m-d" }}</td>
+                            <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"--" }}</td>
+                            <td class="text-end">
+                                <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-sm btn-ghost-primary">档案</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="empty">
+                                    <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                                    <p class="empty-title">暂无关联项目</p>
+                                    <p class="empty-subtitle text-muted">
+                                        可以在 <a href="{% url 'repo_list' %}">项目档案库</a> 中关联此主机厂。
+                                    </p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% if is_paginated %}
+            <div class="card-footer d-flex align-items-center">
+                {% include 'apps/list_modules/paginator.html' %}
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

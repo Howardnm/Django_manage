@@ -43,6 +43,7 @@
                     </th>
                     <th>电话 / 邮箱</th>
                     <th>技术对接 (QA/Tech)</th>
+                    <th class="text-center">项目状态</th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -50,10 +51,12 @@
                 {% for customer in page_obj %}
                     <tr>
                         <td>
-                            <div class="fw-bold text-primary">{{ customer.company_name }}</div>
-                            {% if customer.short_name %}
-                                <div class="small text-muted">{{ customer.short_name }}</div>
-                            {% endif %}
+                            <a href="{% url 'repo_customer_detail' customer.pk %}" class="text-reset">
+                                <div class="fw-bold text-primary">{{ customer.company_name }}</div>
+                                {% if customer.short_name %}
+                                    <div class="small text-muted">{{ customer.short_name }}</div>
+                                {% endif %}
+                            </a>
                         </td>
                         <td>
                             <div class="d-flex align-items-center">
@@ -79,7 +82,17 @@
                                 <span class="text-muted">-</span>
                             {% endif %}
                         </td>
+                        <td class="text-center">
+                            <span class="text-green fw-bold">{{ customer.completed_project_count }}</span>
+                            <span class="text-muted mx-1">/</span>
+                            <span class="text-blue fw-bold">{{ customer.inprogress_project_count }}</span>
+                            <span class="text-muted mx-1">/</span>
+                            <span class="text-red fw-bold">{{ customer.terminated_project_count }}</span>
+                        </td>
                         <td>
+                            <a href="{% url 'repo_customer_detail' customer.pk %}" class="btn btn-sm btn-icon btn-ghost-info" title="查看详细">
+                                <i class="ti ti-eye"></i>
+                            </a>
                             <a href="{% url 'repo_customer_edit' customer.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
                                 <i class="ti ti-edit"></i>
                             </a>
@@ -87,7 +100,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-5">
+                        <td colspan="6" class="text-center py-5">
                             <div class="empty">
                                 <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
                                 <p class="empty-title">暂无客户数据</p>

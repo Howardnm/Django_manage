@@ -92,9 +92,11 @@
                         <td>
                             <div class="d-flex flex-column">
                                 {% if repo.customer %}
-                                    <div class="fw-bold text-primary text-truncate" style="max-width: 150px;" title="Tier 1: {{ repo.customer.company_name }}">
-                                        {{ repo.customer.company_name }}
-                                    </div>
+                                    <a href="{% url 'repo_customer_detail' repo.customer.pk %}" class="text-reset" title="查看客户详情">
+                                        <div class="fw-bold text-primary text-truncate" style="max-width: 150px;" title="Tier 1: {{ repo.customer.company_name }}">
+                                            {{ repo.customer.company_name }}
+                                        </div>
+                                    </a>
                                 {% else %}
                                     <span class="text-muted small">-</span>
                                 {% endif %}
@@ -114,8 +116,10 @@
                         <!-- 3. 材料 (复合) -->
                         <td>
                             {% if repo.material %}
-                                <div class="fw-bold">{{ repo.material.grade_name }}</div>
-                                <div class="small text-muted">{{ repo.material.manufacturer }}</div>
+                                <a href="{% url 'repo_material_detail' repo.material.pk %}" class="text-reset" title="查看材料详情">
+                                    <div class="fw-bold">{{ repo.material.grade_name }}</div>
+                                    <div class="small text-muted">{{ repo.material.manufacturer }}</div>
+                                </a>
                             {% else %}
                                 <span class="badge bg-secondary-lt">未选材</span>
                             {% endif %}
@@ -140,20 +144,20 @@
                             </div>
                         </td>
 
-                        <!-- 5. 人员 (头像组) -->
+                        <!-- 5. 人员 (徽章样式) -->
                         <td>
-                            <div class="d-flex align-items-center">
+                            <div class="d-flex align-items-center gap-1">
                                 <!-- PM -->
-                                <span class="avatar avatar-xs rounded bg-blue-lt me-1" title="项目经理: {{ repo.project.manager.username }}">
-                                {{ repo.project.manager.username|slice:":1"|upper }}
-                            </span>
+                                <span class="badge bg-blue-lt" title="项目经理: {{ repo.project.manager.username }}">
+                                    {{ repo.project.manager.username }}
+                                </span>
                                 <!-- Sales -->
                                 {% if repo.salesperson %}
-                                    <span class="avatar avatar-xs rounded bg-purple-lt" title="业务员: {{ repo.salesperson.name }}">
-                                    {{ repo.salesperson.name|slice:":1" }}
-                                </span>
+                                    <span class="badge bg-purple-lt" title="业务员: {{ repo.salesperson.name }}">
+                                        {{ repo.salesperson.name }}
+                                    </span>
                                 {% else %}
-                                    <span class="avatar avatar-xs rounded bg-secondary-lt opacity-50" title="无业务员">?</span>
+                                    <span class="badge bg-secondary-lt opacity-50" title="无业务员">?</span>
                                 {% endif %}
                             </div>
                         </td>

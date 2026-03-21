@@ -42,7 +42,7 @@
                         <div class="p-2 border rounded h-100">
                             <div class="small fw-bold mb-1">直接客户 (Tier 1)</div>
                             {% if repo.customer %}
-                                <a href="{% url 'repo_customer_edit' repo.customer.pk %}" target="_blank" class="fw-bold text-primary text-decoration-none text-truncate d-block">
+                                <a href="{% url 'repo_customer_detail' repo.customer.pk %}" target="_blank" class="fw-bold text-primary text-decoration-none text-truncate d-block">
                                     {{ repo.customer.company_name }}
                                 </a>
                             {% else %}

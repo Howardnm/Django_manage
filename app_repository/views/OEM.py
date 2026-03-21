@@ -1,11 +1,14 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.paginator import Paginator
+from django.db.models import Max
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, View
 
+from app_project.models import ProjectNode
 from app_repository.forms import OEMForm, OEMStandardFileForm
-from app_repository.models import OEM, OEMStandardFile
+from app_repository.models import OEM, OEMStandardFile, ProjectRepository
 from app_repository.utils.filters import OEMFilter
 
 # ==========================================
@@ -40,6 +43,36 @@ class OEMDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().prefetch_related('standard_files__uploader')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f'主机厂详情: {self.object.name}'
+
+        # --- 关联项目分页逻辑 (参考CustomerDetailView) ---
+        related_projects_list = ProjectRepository.objects.filter(oem=self.object).select_related(
+            'project', 'customer', 'salesperson'
+        ).order_by('-project__created_at')
+
+        paginator = Paginator(related_projects_list, 10)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        project_ids = [repo.project.id for repo in page_obj]
+        latest_updates = ProjectNode.objects.filter(
+            project_id__in=project_ids
+        ).values('project_id').annotate(
+            max_updated_at=Max('updated_at')
+        )
+        latest_node_map = {item['project_id']: item['max_updated_at'] for item in latest_updates}
+
+        for repo in page_obj:
+            repo.project.latest_node_update = latest_node_map.get(repo.project.id)
+
+        context['page_obj'] = page_obj
+        context['paginator'] = paginator
+        context['is_paginated'] = page_obj.has_other_pages()
+
+        return context
 
 # ==========================================
 # 3. 创建与更新

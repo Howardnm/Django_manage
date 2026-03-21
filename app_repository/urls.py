@@ -17,6 +17,7 @@ urlpatterns = [
     # 客户库
     path('customers/', CustomerListView.as_view(), name='repo_customer_list'),
     path('customers/add/', CustomerCreateView.as_view(), name='repo_customer_add'),
+    path('customers/<int:pk>/', CustomerDetailView.as_view(), name='repo_customer_detail'),
     path('customers/<int:pk>/edit/', CustomerUpdateView.as_view(), name='repo_customer_edit'),
 
     # 材料库

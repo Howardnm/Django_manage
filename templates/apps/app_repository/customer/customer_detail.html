@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load project_extras %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">{{ customer.short_name|default:customer.company_name }}</h2>
+            <div class="text-muted mt-1">{{ customer.company_name }}</div>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'repo_customer_list' %}" class="btn btn-outline-secondary">
+                <i class="ti ti-arrow-left"></i> 返回列表
+            </a>
+            <a href="{% url 'repo_customer_edit' customer.pk %}" class="btn btn-primary">
+                <i class="ti ti-edit"></i> 编辑
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">基础信息</h3>
+                </div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">公司全称</div>
+                            <div class="datagrid-content">{{ customer.company_name }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">公司简称</div>
+                            <div class="datagrid-content">{{ customer.short_name|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">公司地址</div>
+                            <div class="datagrid-content">{{ customer.address|default:"--" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">联系人信息</h3>
+                </div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">商务联系人</div>
+                            <div class="datagrid-content">{{ customer.contact_name|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">手机</div>
+                            <div class="datagrid-content">{{ customer.phone|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">邮箱</div>
+                            <div class="datagrid-content">{{ customer.email|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">技术/质量对接人</div>
+                            <div class="datagrid-content">{{ customer.tech_contact|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">技术联系电话</div>
+                            <div class="datagrid-content">{{ customer.tech_phone|default:"--" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">关联项目 ({{ paginator.count }})</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap">
+                        <thead>
+                            <tr>
+                                <th>项目名称</th>
+                                <th style="width: 25%;">项目进度</th>
+                                <th>终端 (OEM)</th>
+                                <th>业务员</th>
+                                <th>创建时间</th>
+                                <th>进度更新时间</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for repo in page_obj %}
+                            <tr>
+                                <td><a href="{% url 'project_detail' repo.project.id %}">{{ repo.project.name }}</a></td>
+                                <td>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <div class="text-truncate" style="max-width: 120px;">
+                                            {% if repo.project.is_terminated %}
+                                                <span class="badge bg-red-lt">已终止</span>
+                                            {% elif repo.project.progress_percent == 100 %}
+                                                <span class="badge bg-green-lt">已完成</span>
+                                            {% else %}
+                                                <span class="text-blue small fw-bold">{{ repo.project.get_current_stage_display }}</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-muted small">{{ repo.project.progress_percent }}%</div>
+                                    </div>
+                                    <div class="progress progress-sm">
+                                        <div class="progress-bar {% if repo.project.is_terminated %}bg-danger{% elif repo.project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                             style="width: {{ repo.project.progress_percent }}%" role="progressbar" aria-valuenow="{{ repo.project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>{{ repo.oem.short_name|default:"--" }}</td>
+                                <td>{{ repo.salesperson.name|default:"--" }}</td>
+                                <td>{{ repo.project.created_at|date:"Y-m-d" }}</td>
+                                <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"--" }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-sm btn-ghost-primary">档案</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center py-5">
+                                    <div class="empty">
+                                        <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                                        <p class="empty-title">暂无关联项目</p>
+                                        <p class="empty-subtitle text-muted">
+                                            可以在 <a href="{% url 'repo_list' %}">项目档案库</a> 中关联此客户。
+                                        </p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if is_paginated %}
+                <div>
+                    {% include 'apps/list_modules/paginator.html' %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
