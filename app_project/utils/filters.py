@@ -1,7 +1,8 @@
 import django_filters
 from django.db.models import Q
 from django import forms
-from django.contrib.auth.models import Group  # 【新增】
+from django.contrib.auth.models import Group, User, Permission
+from django.contrib.contenttypes.models import ContentType
 from app_project.models import Project, ProjectNode, ProjectStage
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
@@ -33,11 +34,14 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         widget=forms.HiddenInput
     )
 
-    # 3. 负责人筛选
-    manager = django_filters.ChoiceFilter(
-        method='filter_manager',
+    # 3. 负责人筛选 (最终方案：使用 ModelChoiceFilter)
+    manager = django_filters.ModelChoiceFilter(
+        queryset=User.objects.filter(
+            Q(groups__permissions__codename='change_project') |
+            Q(user_permissions__codename='change_project')
+        ).distinct().order_by('username'),
+        field_name='manager',
         label='负责人',
-        choices=[('me', '只看我的')],
         empty_label="所有负责人",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
@@ -51,10 +55,10 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 5. 【新增】用户组筛选
+    # 5. 用户组筛选
     group = django_filters.ModelChoiceFilter(
         queryset=Group.objects.all(),
-        field_name='manager__groups',  # 筛选项目负责人的组
+        field_name='manager__groups',
         label='所属组',
         empty_label="所有组",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -62,7 +66,6 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
 
     class Meta:
         model = Project
-        # start_date, end_date 来自 DateRangeFilterMixin
         fields = ['q', 'manager', 'group', 'stage', 'start_date', 'end_date']
 
     def filter_search(self, queryset, name, value):
@@ -73,8 +76,3 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
             Q(manager__username__icontains=value) |
             Q(description__icontains=value)
         )
-
-    def filter_manager(self, queryset, name, value):
-        if value == 'me':
-            return queryset.filter(manager=self.request.user)
-        return queryset
