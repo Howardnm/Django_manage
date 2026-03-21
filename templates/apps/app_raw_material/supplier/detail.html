@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% load project_extras %}
+
+{% block page_title %}{{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">{{ supplier.name }}</h2>
+            <div class="text-muted mt-1">供应商详情</div>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'raw_supplier_list' %}" class="btn btn-outline-secondary">
+                <i class="ti ti-arrow-left"></i> 返回列表
+            </a>
+            <a href="{% url 'raw_supplier_edit' supplier.pk %}" class="btn btn-primary ms-2">
+                <i class="ti ti-edit"></i> 编辑
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="row g-3">
+        <!-- 基础信息 -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">基础信息</h3></div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">供应商名称</div>
+                            <div class="datagrid-content">{{ supplier.name }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">评级</div>
+                            <div class="datagrid-content">{{ supplier.get_rating_display }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">主营产品</div>
+                            <div class="datagrid-content">
+                                {% for cat in supplier.product_categories.all %}
+                                    <span class="badge bg-secondary-lt">{{ cat.name }}</span>
+                                {% empty %}
+                                    --
+                                {% endfor %}
+                            </div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">销售联系人</div>
+                            <div class="datagrid-content">{{ supplier.sales_contact|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">销售电话</div>
+                            <div class="datagrid-content">{{ supplier.sales_phone|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">技术联系人</div>
+                            <div class="datagrid-content">{{ supplier.tech_contact|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">技术电话</div>
+                            <div class="datagrid-content">{{ supplier.tech_phone|default:"--" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">备注</div>
+                            <div class="datagrid-content">{{ supplier.notes|default:"--" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 关联原材料 -->
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">供应的原材料 ({{ paginator.count }})</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap">
+                        <thead>
+                            <tr>
+                                <th>原材料名称</th>
+                                <th>型号</th>
+                                <th>内部编码</th>
+                                <th>类型</th>
+                                <th>适用体系</th>
+                                <th>成本价</th>
+                                <th>文档</th>
+                                <th>创建时间</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for material in page_obj %}
+                            <tr>
+                                <td><a href="{% url 'raw_material_detail' material.pk %}">{{ material.name }}</a></td>
+                                <td>{{ material.model_name|default:"--" }}</td>
+                                <td>{{ material.warehouse_code|default:"--" }}</td>
+                                <td><span class="badge bg-blue-lt">{{ material.category.name }}</span></td>
+                                <td>
+                                    {% for type in material.suitable_materials.all %}
+                                        <span class="badge bg-green-lt">{{ type.name }}</span>
+                                    {% empty %}
+                                        --
+                                    {% endfor %}
+                                </td>
+                                <td class="text-orange fw-bold">
+                                    {% if material.cost_price %}¥{{ material.cost_price }}{% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    <div class="d-flex gap-1">
+                                        {% if material.file_tds %}
+                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_tds' %}" target="_blank" class="text-azure" title="TDS" data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
+                                        {% endif %}
+                                        {% if material.file_msds %}
+                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_msds' %}" target="_blank" class="text-red" title="MSDS" data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
+                                        {% endif %}
+                                        {% if material.file_rohs %}
+                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_rohs' %}" target="_blank" class="text-green" title="RoHS" data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                                <td>{{ material.created_at|date:"Y-m-d" }}</td>
+                                <td class="text-end">
+                                    <a href="{% url 'raw_material_edit' material.pk %}" class="btn btn-sm btn-ghost-primary">编辑</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-5">
+                                    <div class="empty">
+                                        <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                                        <p class="empty-title">暂无关联的原材料</p>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if is_paginated %}
+                <div class="card-footer d-flex align-items-center">
+                    {% include 'apps/list_modules/paginator.html' %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

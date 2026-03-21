@@ -8,6 +8,7 @@ urlpatterns = [
     # 供应商
     path('suppliers/', SupplierListView.as_view(), name='raw_supplier_list'),
     path('suppliers/add/', SupplierCreateView.as_view(), name='raw_supplier_add'),
+    path('suppliers/<int:pk>/', SupplierDetailView.as_view(), name='raw_supplier_detail'),
     path('suppliers/<int:pk>/edit/', SupplierUpdateView.as_view(), name='raw_supplier_edit'),
 
     # 原材料类型

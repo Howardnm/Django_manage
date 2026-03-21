@@ -40,7 +40,13 @@
                         <dd class="col-7"><span class="badge bg-blue-lt">{{ material.category.name }}</span></dd>
                         
                         <dt class="col-5 text-muted">供应商</dt>
-                        <dd class="col-7">{{ material.supplier.name|default:"-" }}</dd>
+                        <dd class="col-7">
+                            {% if material.supplier %}
+                                <a href="{% url 'raw_supplier_detail' material.supplier.pk %}">{{ material.supplier.name }}</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </dd>
                         
                         <dt class="col-5 text-muted">内部编码</dt>
                         <dd class="col-7">{{ material.warehouse_code|default:"-" }}</dd>

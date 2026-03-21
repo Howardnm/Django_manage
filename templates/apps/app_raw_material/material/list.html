@@ -161,7 +161,7 @@
                         <td>
                             <div>{{ material.model_name|default:"-" }}</div>
                             {% if material.supplier %}
-                                <div class="text-muted small">{{ material.supplier.name }}</div>
+                                <a href="{% url 'raw_supplier_detail' material.supplier.pk %}" class="text-muted small">{{ material.supplier.name }}</a>
                             {% endif %}
                         </td>
                         <td><span class="badge bg-blue-lt">{{ material.category.name }}</span></td>
@@ -315,7 +315,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 labelField: 'text',
                 searchField: 'text',
                 load: function (query, callback) {
-                    var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                    var url = "{% url 'raw_material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
                     fetch(url)
                         .then(response => response.json())
                         .then(json => {
@@ -358,7 +358,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 labelField: 'text',
                 searchField: 'text',
                 load: function (query, callback) {
-                    var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                    var url = "{% url 'raw_material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
                     fetch(url)
                         .then(response => response.json())
                         .then(json => {
