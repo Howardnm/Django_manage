@@ -7,8 +7,8 @@ from app_repository.models import MaterialLibrary, ApplicationScenario, Material
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin, DateRangeUpdatedFilterMixin
 
 
-# 1. 项目档案列表过滤器 (使用 Updated 时间)
-class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, django_filters.FilterSet):
+# 1. 项目档案列表过滤器 (修改为按项目创建日期筛选)
+class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
     customer = django_filters.ModelChoiceFilter(
@@ -29,13 +29,26 @@ class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, dj
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # 【新增】用户组筛选 (筛选项目负责人的组)
     group = django_filters.ModelChoiceFilter(
         queryset=Group.objects.all(),
-        field_name='project__manager__groups',  # 注意这里的跨表查询路径
+        field_name='project__manager__groups',
         label='所属组',
         empty_label="所有组",
         widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    # --- 新增：手动定义日期范围筛选 ---
+    start_date = django_filters.DateFilter(
+        field_name='project__created_at',
+        lookup_expr='gte',
+        label='开始日期',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
+    )
+    end_date = django_filters.DateFilter(
+        field_name='project__created_at',
+        lookup_expr='lte',
+        label='结束日期',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
     )
 
     sort = django_filters.OrderingFilter(
@@ -44,6 +57,7 @@ class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, dj
             ('updated_at', 'updated_at'),
             ('customer__company_name', 'customer'),
             ('material__grade_name', 'material'),
+            ('project__created_at', 'project_created_at'), # 新增排序选项
         ),
         widget=forms.HiddenInput
     )
@@ -62,8 +76,7 @@ class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, dj
         )
 
 
-# 2. 客户过滤器 (使用 Created 时间 - 假设 Customer 有 created_at，如果没有可以去掉 DateRangeFilterMixin)
-# 假设 Customer 没有 created_at 字段，或者我们不关心时间筛选，这里只用 TablerFilterMixin
+# 2. 客户过滤器
 class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -88,7 +101,7 @@ class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 
-# 3. 材料过滤器 (使用 Created 时间)
+# 3. 材料过滤器
 class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -106,20 +119,15 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # --- 性能指标范围筛选 ---
-    # 熔指
     melt_min = django_filters.NumberFilter(method='filter_metric', label='熔指 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     melt_max = django_filters.NumberFilter(method='filter_metric', label='熔指 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
-    # 拉伸强度
     tensile_min = django_filters.NumberFilter(method='filter_metric', label='拉伸 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     tensile_max = django_filters.NumberFilter(method='filter_metric', label='拉伸 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
-    # 弯曲模量
     flex_modulus_min = django_filters.NumberFilter(method='filter_metric', label='弯模 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     flex_modulus_max = django_filters.NumberFilter(method='filter_metric', label='弯模 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
-    # 冲击
     impact_min = django_filters.NumberFilter(method='filter_metric', label='冲击 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     impact_max = django_filters.NumberFilter(method='filter_metric', label='冲击 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
 
@@ -151,15 +159,11 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
         )
 
     def filter_metric(self, queryset, name, value):
-        """
-        通用指标筛选逻辑 (与 LabFormulaFilter 保持一致)
-        """
         if value is None:
             return queryset
 
         parts = name.split('_')
-        operator = parts[-1] # min 或 max
-        # 重新组合 metric_key，因为 flex_modulus 包含下划线
+        operator = parts[-1]
         metric_key = '_'.join(parts[:-1])
 
         keyword_map = {
@@ -172,13 +176,10 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
         if not keyword:
             return queryset
 
-        # 获取当前标准 (从 request.GET 中获取)
-        # 注意：MaterialListView 中初始化 filterset 时需要传入 request
         std = 'ISO'
         if hasattr(self, 'request') and self.request:
             std = self.request.GET.get('std', 'ISO')
 
-        # 构建子查询
         subquery = Subquery(
             MaterialDataPoint.objects.filter(
                 material=OuterRef('pk'),
