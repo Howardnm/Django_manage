@@ -26,6 +26,7 @@
                     <th>姓名</th>
                     <th>手机号</th>
                     <th>邮箱</th>
+                    <th class="text-center">项目状态</th>
                     <th class="w-1">操作</th>
                 </tr>
                 </thead>
@@ -33,14 +34,23 @@
                 {% for person in page_obj %}
                     <tr>
                         <td>
-                            <div class="d-flex align-items-center">
-                                <span class="avatar avatar-xs me-2 bg-azure-lt">{{ person.name|slice:":1" }}</span>
-                                <div class="fw-bold">{{ person.name }}</div>
-                            </div>
+                            <a href="{% url 'repo_sales_detail' person.pk %}" class="fw-bold text-primary">
+                                {{ person.name }}
+                            </a>
                         </td>
                         <td>{{ person.phone|default:"-" }}</td>
                         <td>{{ person.email|default:"-" }}</td>
+                        <td class="text-center">
+                            <span class="text-green fw-bold">{{ person.completed_project_count }}</span>
+                            <span class="text-muted mx-1">/</span>
+                            <span class="text-blue fw-bold">{{ person.inprogress_project_count }}</span>
+                            <span class="text-muted mx-1">/</span>
+                            <span class="text-red fw-bold">{{ person.terminated_project_count }}</span>
+                        </td>
                         <td>
+                            <a href="{% url 'repo_sales_detail' person.pk %}" class="btn btn-sm btn-icon btn-ghost-info" title="查看详细">
+                                <i class="ti ti-eye"></i>
+                            </a>
                             <a href="{% url 'repo_sales_edit' person.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
                                 <i class="ti ti-edit"></i>
                             </a>
@@ -48,7 +58,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-5">
+                        <td colspan="5" class="text-center py-5">
                             <div class="empty">
                                 <div class="empty-icon"><i class="ti ti-users-off fs-1 opacity-50"></i></div>
                                 <p class="empty-title">暂无业务员数据</p>

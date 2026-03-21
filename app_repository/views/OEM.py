@@ -1,6 +1,6 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator
-from django.db.models import Max
+from django.db.models import Max, Count, Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -22,7 +22,20 @@ class OEMListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset().order_by('name')
+        qs = super().get_queryset().annotate(
+            completed_project_count=Count(
+                'projectrepository',
+                filter=Q(projectrepository__project__progress_percent=100, projectrepository__project__is_terminated=False)
+            ),
+            inprogress_project_count=Count(
+                'projectrepository',
+                filter=Q(projectrepository__project__progress_percent__lt=100, projectrepository__project__is_terminated=False)
+            ),
+            terminated_project_count=Count(
+                'projectrepository',
+                filter=Q(projectrepository__project__is_terminated=True)
+            )
+        ).order_by('name')
         self.filterset = OEMFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 

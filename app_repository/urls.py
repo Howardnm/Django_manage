@@ -52,6 +52,7 @@ urlpatterns = [
     # 业务员库
     path('sales/', SalespersonListView.as_view(), name='repo_sales_list'),
     path('sales/add/', SalespersonCreateView.as_view(), name='repo_sales_add'),
+    path('sales/<int:pk>/', SalespersonDetailView.as_view(), name='repo_sales_detail'),
     path('sales/<int:pk>/edit/', SalespersonUpdateView.as_view(), name='repo_sales_edit'),
 
     # 主机厂 (OEM)
