@@ -40,6 +40,7 @@
                             {% endif %}
                         </a>
                     </th>
+                    <th class="text-center">材料数量</th>
                     <th>技术要求</th>
                     <th class="w-1">操作</th>
                 </tr>
@@ -56,6 +57,13 @@
                             <div class="fw-bold">{{ item.name }}</div>
                         </div>
                     </td>
+                    <td class="text-center">
+                        {% if item.material_count > 0 %}
+                            <span class="badge bg-purple-lt">{{ item.material_count }}</span>
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
+                    </td>
                     <td class="text-wrap" style="max-width: 450px;">
                         {% if item.requirements %}
                             <div class="text-secondary small">{{ item.requirements }}</div>
@@ -71,7 +79,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="4" class="text-center py-5">
+                    <td colspan="5" class="text-center py-5">
                         <div class="empty">
                             <div class="empty-icon"><i class="ti ti-layout-off fs-1 opacity-50"></i></div>
                             <p class="text-muted">暂无场景数据</p>

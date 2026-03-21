@@ -49,6 +49,7 @@
                             {% endif %}
                         </a>
                     </th>
+                    <th class="text-center">材料数量</th>
                     <th>描述</th>
                     <th class="w-1">操作</th>
                 </tr>
@@ -62,6 +63,13 @@
                     </td>
                     <td>
                         <span class="badge bg-azure-lt">{{ type.get_classification_display }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% if type.material_count > 0 %}
+                            <span class="badge bg-purple-lt">{{ type.material_count }}</span>
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
                     </td>
                     <td class="text-wrap" style="max-width: 400px;">
                         {% if type.description %}
@@ -79,7 +87,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" class="text-center py-5">
+                    <td colspan="6" class="text-center py-5">
                         <div class="empty">
                             <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
                             <p class="text-muted">暂无类型数据</p>

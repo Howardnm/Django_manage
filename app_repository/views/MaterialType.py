@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -14,15 +15,15 @@ from app_repository.utils.filters import MaterialTypeFilter
 class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     permission_required = 'app_repository.view_materialtype'
     model = MaterialType
-    # 注意：建议检查路径是否有空格，通常是 material_info
     template_name = 'apps/app_repository/materialtype/type_list.html'
     context_object_name = 'types'
     paginate_by = 10
 
     def get_queryset(self):
-        # 基础查询集
-        qs = super().get_queryset().order_by('name')
-        # 接入 Filter
+        # 使用 annotate 和 Count 来计算每个类型关联的材料数量
+        qs = super().get_queryset().annotate(
+            material_count=Count('materiallibrary')
+        ).order_by('name')
         self.filterset = MaterialTypeFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
@@ -30,7 +31,6 @@ class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filterset
         context['current_sort'] = self.request.GET.get('sort', '')
-        # 页面标题，方便模板调用
         context['page_title'] = '材料类型管理'
         return context
 
@@ -40,7 +40,7 @@ class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, Create
     raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
-    template_name = 'apps/app_repository/form_generic.html'  # 复用通用模板
+    template_name = 'apps/app_repository/form_generic.html'
     success_url = reverse_lazy('repo_type_list')
 
     def get_context_data(self, **kwargs):

@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
@@ -19,7 +20,9 @@ class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset().order_by('name')
+        qs = super().get_queryset().annotate(
+            material_count=Count('materials')
+        ).order_by('name')
         self.filterset = ScenarioFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
