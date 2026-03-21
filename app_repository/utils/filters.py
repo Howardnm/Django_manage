@@ -15,7 +15,11 @@ class ProjectRepositoryFilter(TablerFilterMixin, DateRangeUpdatedFilterMixin, dj
         queryset=Customer.objects.all(),
         label='客户',
         empty_label="所有客户",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={
+            'class': 'form-select remote-search',
+            'data-model': 'customer',
+            'style': 'width: 250px;'
+        })
     )
 
     salesperson = django_filters.ModelChoiceFilter(
@@ -90,7 +94,10 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
 
     scenarios = django_filters.ModelMultipleChoiceFilter(
         queryset=ApplicationScenario.objects.all(),
-        widget=forms.SelectMultiple(attrs={'class': 'form-select form-select-search'}),
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-select remote-search tomselect-multi-remote',
+            'data-model': 'applicationscenario'
+        }),
         conjoined=False
     )
 

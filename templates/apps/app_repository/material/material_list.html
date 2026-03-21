@@ -296,3 +296,55 @@
         }
     </script>
 {% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    if (window.TomSelect) {
+        // 多选远程搜索
+        document.querySelectorAll('.remote-search.tomselect-multi-remote').forEach(function (el) {
+            var modelType = el.getAttribute('data-model');
+            if (!modelType) return;
+
+            new TomSelect(el, {
+                mode: 'multi',
+                valueField: 'value',
+                labelField: 'text',
+                searchField: 'text',
+                load: function (query, callback) {
+                    var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(json => {
+                            callback(json);
+                        })
+                        .catch(() => {
+                            callback();
+                        });
+                },
+                copyClassesToDropdown: false,
+                dropdownParent: 'body',
+                create: false,
+                placeholder: '请输入应用场景...',
+                preload: 'focus',
+                plugins: ['remove_button'],
+                render: {
+                    option: function (data, escape) {
+                        return '<div>' + escape(data.text) + '</div>';
+                    },
+                    item: function (data, escape) {
+                        return '<div>' + escape(data.text) + '</div>';
+                    },
+                    no_results: function (data, escape) {
+                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                    },
+                    loading: function (data, escape) {
+                        return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                    }
+                }
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
