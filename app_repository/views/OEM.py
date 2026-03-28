@@ -159,8 +159,6 @@ class OEMStandardFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, Vie
         file_obj = get_object_or_404(OEMStandardFile, pk=pk)
         oem_pk = file_obj.oem.pk
         file_obj.delete()
-        # 【HTMX优化】返回特殊响应，刷新文件列表
-        return HttpResponse(status=204, headers={
-            'HX-Trigger': 'fileDeleted', # 触发一个自定义事件
-            'HX-Refresh': 'true' # 刷新整个页面，或者更精确地刷新文件列表容器
-        })
+        
+        # 删除后直接重定向回详情页，确保页面刷新
+        return redirect(reverse('repo_oem_detail', kwargs={'pk': oem_pk}))

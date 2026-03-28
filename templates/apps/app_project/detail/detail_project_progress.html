@@ -1,6 +1,12 @@
 <div class="card">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title">执行进度追踪</h3>
+        <div class="btn-list">
+             <a href="{% url 'repo_project_file_detail' project.repository.id %}" class="btn btn-outline-purple btn-sm">
+                <i class="ti ti-files me-1"></i>查看全部资料
+                <span class="badge bg-purple-lt ms-1">{{ project.repository.files.count }}</span>
+            </a>
+        </div>
     </div>
     <div class="card-body">
         <ul class="steps steps-vertical">
@@ -51,8 +57,8 @@
                         </div>
                     {% endif %}
 
-                    <!-- 按钮组保持不变，依然使用 node.can_xxx 属性 -->
-                    <div class="mt-2 btn-list">
+                    <!-- 按钮组：使用 d-flex 配合 ms-auto 将上传按钮推向右侧 -->
+                    <div class="mt-2 btn-list d-flex">
                         {% if node.can_update_status %}
                             <button class="btn btn-sm btn-outline-secondary"
                                     data-bs-toggle="modal"
@@ -82,6 +88,16 @@
                                 客户意见
                             </button>
                         {% endif %}
+
+                        <!-- 【调整】上传资料按钮移至最后，并使用 ms-auto 置右 -->
+                        <button class="btn btn-sm btn-outline-purple ms-auto"
+                                data-bs-toggle="modal"
+                                data-bs-target="#modal-generic"
+                                hx-get="{% url 'repo_file_add' project.repository.id %}?node_id={{ node.id }}"
+                                hx-target="#modal-content-placeholder">
+                            <i class="ti ti-upload me-1"></i>上传资料
+                            <span class="badge bg-purple-lt ms-1">{{ node.files.count }}</span>
+                        </button>
                     </div>
                 </li>
             {% endfor %}

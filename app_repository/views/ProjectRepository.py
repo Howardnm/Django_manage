@@ -1,14 +1,14 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
-from django.views.generic import ListView, UpdateView, CreateView
-from django.db.models import Q
+from django.views.generic import ListView, UpdateView, CreateView, DetailView
+from django.db.models import Q, Count
 from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
-from app_project.models import Project
+from app_project.models import Project, ProjectNode
 from app_repository.models import ProjectRepository, ProjectFile
 from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig, MaterialType, ApplicationScenario # 导入 ApplicationScenario
 from app_project.mixins import ProjectPermissionMixin
@@ -81,7 +81,48 @@ class ProjectRepositoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, P
         return context
 
 
-# 2. 图纸文件上传视图
+# 【新增】项目资料详细页面
+class ProjectFileDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, DetailView):
+    permission_required = 'app_repository.view_projectrepository'
+    model = ProjectRepository
+    template_name = 'apps/app_repository/project_repo/project_file_detail.html'
+    context_object_name = 'repo'
+
+    def get_object(self, queryset=None):
+        repo = super().get_object(queryset)
+        self.check_project_permission(repo.project)
+        return repo
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # 按节点分组文件
+        files = self.object.files.all().select_related('node').order_by('node__order', '-uploaded_at')
+        
+        # 使用列表存储分组，包含节点对象，方便模板访问属性
+        grouped_list = []
+        node_map = {} # node_id -> index in grouped_list
+        general_files = []
+        
+        for file in files:
+            if file.node:
+                if file.node.id not in node_map:
+                    node_map[file.node.id] = len(grouped_list)
+                    grouped_list.append({
+                        'node': file.node,
+                        'files': []
+                    })
+                idx = node_map[file.node.id]
+                grouped_list[idx]['files'].append(file)
+            else:
+                general_files.append(file)
+        
+        context['grouped_files'] = grouped_list # 现在是列表
+        context['general_files'] = general_files
+        context['project'] = self.object.project
+        return context
+
+
+# 2. 文件上传视图
 class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, CreateView):
     permission_required = 'app_repository.add_projectfile'
     model = ProjectFile
@@ -89,31 +130,46 @@ class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Project
     template_name = 'apps/app_repository/project_repo/project_file_form.html'
 
     def dispatch(self, request, *args, **kwargs):
-        # 【安全修复】在 dispatch 阶段就检查权限
-        # 因为 get_context_data 和 form_valid 都会用到 repo，不如直接在这里查一次
         repo_id = self.kwargs.get('repo_id')
         self.repo = get_object_or_404(ProjectRepository, pk=repo_id)
-        
-        # 检查关联项目的权限
         self.check_project_permission(self.repo.project)
-        
         return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['repository'] = self.repo
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        node_id = self.request.GET.get('node_id')
+        if node_id:
+            initial['node'] = node_id
+        return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # 直接使用 dispatch 里查到的 self.repo
         context['repo'] = self.repo
         context['page_title'] = '上传项目资料'
         return context
 
+    def get_template_names(self):
+        # 修复模态框内容不显示的问题：明确区分普通页面请求和 HTMX 模态框请求
+        if self.request.headers.get('HX-Request'):
+            return ['apps/app_repository/project_repo/modal_project_file_form.html']
+        return [self.template_name]
+
     def form_valid(self, form):
-        # 直接使用 dispatch 里查到的 self.repo
         form.instance.repository = self.repo
+        self.object = form.save()
+        
+        if self.request.headers.get('HX-Request'):
+            return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+            
         messages.success(self.request, "文件上传成功")
         return super().form_valid(form)
 
     def get_success_url(self):
-        # 【修改】上传成功后，跳转回项目详情页
         return reverse('project_detail', kwargs={'pk': self.object.repository.project.id})
 
 
@@ -124,14 +180,14 @@ class ProjectFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, Project
     def post(self, request, pk):
         file_obj = get_object_or_404(ProjectFile, pk=pk)
         project = file_obj.repository.project
-        
-        # 【安全修复】检查权限
         self.check_project_permission(project)
         
-        project_id = project.id
         file_obj.delete()
         messages.success(request, "文件已删除")
-        return redirect('project_detail', pk=project_id)
+        
+        # 支持从不同页面返回
+        next_url = request.META.get('HTTP_REFERER', reverse('project_detail', kwargs={'pk': project.id}))
+        return redirect(next_url)
 
 
 class RepoAutocompleteView(LoginRequiredMixin, View):
@@ -140,7 +196,7 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
     URL: /repository/api/search/?model=material&q=keyword
     """
     # 这个接口只返回基础数据（材料、客户等），不涉及项目敏感信息，
-    # 且通常所有登录用户都有权查看基础库，所以不需要 ProjectPermissionMixin。
+    #且通常所有登录用户都有权查看基础库，所以不需要 ProjectPermissionMixin。
     
     def get(self, request):
         model_type = request.GET.get('model')

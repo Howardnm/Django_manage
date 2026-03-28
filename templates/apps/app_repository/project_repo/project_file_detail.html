@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">档案管理</div>
+                <h2 class="page-title">{{ project.name }} - 项目资料库</h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'project_detail' project.id %}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>返回项目
+                    </a>
+                    <button class="btn btn-primary d-none d-sm-inline-block"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modal-generic"
+                            hx-get="{% url 'repo_file_add' repo.id %}"
+                            hx-target="#modal-content-placeholder">
+                        <i class="ti ti-upload me-1"></i>上传新资料
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-cards">
+            <!-- 通用资料部分 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">通用项目资料</h3>
+                    </div>
+                    {% if general_files %}
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>文件名称</th>
+                                        <th>类型</th>
+                                        <th>上传时间</th>
+                                        <th>版本</th>
+                                        <th>备注说明</th>
+                                        <th class="w-1"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for file in general_files %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'secure_download' 'app_repository' 'ProjectFile' file.id 'file' %}" target="_blank">
+                                                    {{ file.name|default:file.filename }}
+                                                </a>
+                                            </td>
+                                            <td class="text-secondary">{{ file.get_file_type_display }}</td>
+                                            <td class="text-secondary">{{ file.uploaded_at|date:"Y-m-d H:i" }}</td>
+                                            <td class="text-secondary">V{{ file.version }}</td>
+                                            <td class="text-secondary small">{{ file.description|truncatechars:30 }}</td>
+                                            <td>
+                                                <div class="btn-list flex-nowrap">
+                                                    <form method="post" action="{% url 'repo_file_delete' file.id %}" onsubmit="return confirm('确定删除此文件吗？');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                                                    </form>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="card-body py-4 text-center">
+                            <div class="text-secondary">暂无通用资料</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 分节点资料部分 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">进度节点关联资料</h3>
+                    </div>
+                    <div class="card-body">
+                        {% if grouped_files %}
+                            <div class="space-y-3">
+                                {% for group in grouped_files %}
+                                    <div class="card card-sm">
+                                        <div class="card-header py-1 px-3 {{ group.node.status_css_class }} {% if group.node.status == 'TERMINATED' or group.node.status == 'FEEDBACK' %}text-white{% endif %}">
+                                            <div class="card-title" style="font-size: 0.875rem;">
+                                                {{ forloop.counter }}、{{ group.node.get_stage_display }}
+                                                {% if group.node.round > 1 %}
+                                                    <span class="badge bg-secondary-lt ms-1">第{{ group.node.round }}轮</span>
+                                                {% endif %}
+                                                <small class="ms-2 fw-normal opacity-75">[{{ group.node.get_status_display }}]</small>
+                                            </div>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-vcenter card-table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>文件名称</th>
+                                                        <th>类型</th>
+                                                        <th>上传时间</th>
+                                                        <th>版本</th>
+                                                        <th>备注说明</th>
+                                                        <th class="w-1"></th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for file in group.files %}
+                                                        <tr>
+                                                            <td>
+                                                                <a href="{% url 'secure_download' 'app_repository' 'ProjectFile' file.id 'file' %}" target="_blank">
+                                                                    {{ file.name|default:file.filename }}
+                                                                </a>
+                                                            </td>
+                                                            <td>{{ file.get_file_type_display }}</td>
+                                                            <td>{{ file.uploaded_at|date:"Y-m-d H:i" }}</td>
+                                                            <td>V{{ file.version }}</td>
+                                                            <td class="text-secondary small">{{ file.description|truncatechars:30 }}</td>
+                                                            <td>
+                                                                <form method="post" action="{% url 'repo_file_delete' file.id %}" onsubmit="return confirm('确定删除此文件吗？');">
+                                                                    {% csrf_token %}
+                                                                    <button type="submit" class="btn btn-sm btn-ghost-danger">删除</button>
+                                                                </form>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4 text-secondary">暂无节点关联资料</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 通用模态框 -->
+<div class="modal modal-blur fade" id="modal-generic" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" id="modal-content-placeholder">
+            <div class="p-3 text-center">
+                <div class="spinner-border text-primary"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

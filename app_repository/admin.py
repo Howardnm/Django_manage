@@ -2,7 +2,7 @@ from django.contrib import admin
 from .models import (
     MaterialType, ApplicationScenario, OEM, Salesperson,
     MetricCategory, TestConfig, MaterialLibrary, MaterialDataPoint,
-    MaterialFile, Customer, ProjectRepository, ProjectFile
+    MaterialFile, Customer, ProjectRepository, ProjectFile, OEMStandardFile
 )
 
 # ==========================================
@@ -23,6 +23,12 @@ class ApplicationScenarioAdmin(admin.ModelAdmin):
 class OEMAdmin(admin.ModelAdmin):
     list_display = ('name', 'short_name', 'description')
     search_fields = ('name', 'short_name')
+
+@admin.register(OEMStandardFile)
+class OEMStandardFileAdmin(admin.ModelAdmin):
+    list_display = ('name', 'oem', 'file_type', 'version', 'uploaded_at')
+    list_filter = ('file_type', 'oem')
+    search_fields = ('name', 'oem__name')
 
 @admin.register(Salesperson)
 class SalespersonAdmin(admin.ModelAdmin):
@@ -52,6 +58,7 @@ class MaterialDataPointInline(admin.TabularInline):
 
 class MaterialFileInline(admin.TabularInline):
     model = MaterialFile
+    fields = ('file', 'name', 'file_type', 'version', 'description')
     extra = 1
 
 @admin.register(MaterialLibrary)
@@ -72,9 +79,9 @@ class MaterialDataPointAdmin(admin.ModelAdmin):
 
 @admin.register(MaterialFile)
 class MaterialFileAdmin(admin.ModelAdmin):
-    list_display = ('material', 'file_type', 'description', 'uploaded_at')
+    list_display = ('name', 'material', 'file_type', 'version', 'uploaded_at')
     list_filter = ('file_type', 'uploaded_at')
-    search_fields = ('material__grade_name', 'description')
+    search_fields = ('material__grade_name', 'name', 'description')
     autocomplete_fields = ['material']
 
 # ==========================================
@@ -91,6 +98,7 @@ class CustomerAdmin(admin.ModelAdmin):
 
 class ProjectFileInline(admin.TabularInline):
     model = ProjectFile
+    fields = ('file', 'name', 'file_type', 'version', 'description')
     extra = 1
 
 @admin.register(ProjectRepository)
@@ -103,7 +111,7 @@ class ProjectRepositoryAdmin(admin.ModelAdmin):
 
 @admin.register(ProjectFile)
 class ProjectFileAdmin(admin.ModelAdmin):
-    list_display = ('repository', 'file_type', 'description', 'uploaded_at')
+    list_display = ('name', 'repository', 'file_type', 'version', 'uploaded_at')
     list_filter = ('file_type', 'uploaded_at')
-    search_fields = ('repository__project__name', 'description')
+    search_fields = ('repository__project__name', 'name', 'description')
     autocomplete_fields = ['repository']

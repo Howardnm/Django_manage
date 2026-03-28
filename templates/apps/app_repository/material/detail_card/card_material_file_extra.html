@@ -38,15 +38,21 @@
 
                     <!-- 2. 文件信息 (紧凑排版) -->
                     <div class="flex-fill overflow-hidden lh-1">
-                        <a href="{% url 'secure_download' 'app_repository' 'materialfile' file.pk 'file' %}"
-                           target="_blank"
-                           class="text-body fw-bold text-truncate d-block text-decoration-none"
-                           style="font-size: 12px; margin-bottom: 2px;"
-                           title="{{ file.description|default:file.filename }}">
-                            {{ file.description|default:file.filename }}
-                        </a>
+                        <div class="d-flex align-items-center mb-1">
+                            <a href="{% url 'secure_download' 'app_repository' 'materialfile' file.pk 'file' %}"
+                               target="_blank"
+                               class="text-body fw-bold text-truncate text-decoration-none"
+                               style="font-size: 12px;"
+                               title="{{ file.name|default:file.filename }}">
+                                {{ file.name|default:file.filename }}
+                            </a>
+                            <span class="badge bg-secondary-lt ms-2" style="font-size: 9px; padding: 1px 4px;">V{{ file.version }}</span>
+                        </div>
                         <div class="text-muted text-truncate" style="font-size: 10px;">
                             {{ file.uploaded_at|date:"Y/m/d" }} <span class="mx-1">·</span> {{ file.get_file_type_display }}
+                            {% if file.description %}
+                                <span class="mx-1">·</span> <span title="{{ file.description }}">{{ file.description|truncatechars:20 }}</span>
+                            {% endif %}
                         </div>
                     </div>
 

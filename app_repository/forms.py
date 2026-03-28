@@ -3,6 +3,7 @@ from .models import Customer, ProjectRepository, MaterialType, ApplicationScenar
 from django.forms import inlineformset_factory
 from .models import MaterialLibrary, MaterialDataPoint, MaterialFile, TestConfig
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
+from app_project.models import ProjectNode
 
 # ==============================================================================
 # 1. 客户表单
@@ -89,7 +90,7 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
                 self.fields['value_select'].widget.attrs['data-current-value'] = self.instance.value_text
 
         # 【关键修复】如果是 POST 请求，必须重新填充 choices，否则 Django 验证会失败
-        # 因为 ChoiceField 默认验证提交的值必须在 choices 中
+        # 因为 ChoiceField 默认验证提交的值 must in choices 中
         if self.data:
             # 尝试从 POST 数据中获取 test_config ID
             # 字段名格式通常是: properties-0-test_config
@@ -120,14 +121,15 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
 
 MaterialDataFormSet = inlineformset_factory(MaterialLibrary, MaterialDataPoint, form=MaterialDataPointForm, extra=0, can_delete=True)
 
-# 【新增】材料附件上传表单
+# 【新增】材料附件上传表单 (适配新字段)
 class MaterialFileForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialFile
-        fields = ['file_type', 'file', 'description']
+        fields = ['file_type', 'file', 'version', 'description']
         widgets = {
             'file_type': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.TextInput(attrs={'placeholder': '例如：2024年最新UL黄卡'}),
+            'version': forms.NumberInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': '版本变更说明...'}),
         }
 
 # ==============================================================================
@@ -164,20 +166,32 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
             else: self.fields['salesperson'].queryset = Salesperson.objects.none()
         self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
 
-        # 注意：如果是 POST 请求 (self.data 存在)，不要动 queryset
+        # 注意：如果是 POST 请求 (self.data存在)，不要动 queryset
         # Django 需要用完整的 .all() (或者包含提交值的 queryset) 来验证数据有效性
         # 但因为 ModelChoiceField 默认就是 .all()，所以不需要额外写代码
 
 
-# 4. 【新增】项目文件上传表单
+# 4. 【新增】项目文件上传表单 (适配新字段)
 class ProjectFileForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = ProjectFile
-        fields = ['file_type', 'file', 'description']
+        fields = ['node', 'file_type', 'file', 'version', 'description']
         widgets = {
+            'node': forms.Select(attrs={'class': 'form-select'}),
             'file_type': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.TextInput(attrs={'placeholder': '例如：V1.0版本图纸'}),
+            'version': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '数字，如: 1'}),
+            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': '版本变更说明...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        repository = kwargs.pop('repository', None)
+        super().__init__(*args, **kwargs)
+        if repository:
+            # 限制 node 只能选当前项目的
+            self.fields['node'].queryset = ProjectNode.objects.filter(project=repository.project).order_by('order')
+            # 自定义下拉框显示文本：节点阶段名称 + 轮次
+            self.fields['node'].label_from_instance = lambda obj: f"{obj.get_stage_display()} (第{obj.round}轮)"
+            self.fields['node'].empty_label = "--- 不关联具体节点 (通用资料) ---"
 
 
 # 【新增】业务员管理表单
@@ -200,13 +214,15 @@ class OEMForm(TablerFormMixin, forms.ModelForm):
             'cooperation_level': forms.Select(attrs={'class': 'form-select'}),
         }
 
+# 主机厂标准文件表单 (适配新字段)
 class OEMStandardFileForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = OEMStandardFile
-        fields = ['name', 'file_type', 'file', 'description']
+        fields = ['file_type', 'file', 'version', 'description']
         widgets = {
             'file_type': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '文件说明/摘要...'}),
+            'version': forms.NumberInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': '版本变更说明...'}),
         }
 
 

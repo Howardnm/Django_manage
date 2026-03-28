@@ -28,45 +28,40 @@
                 </div>
 
                 <div class="card-body">
-                    <!-- 显示错误信息 -->
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-                    {% endif %}
-
-                    <!-- 1. 文件类型 -->
+                    <!-- 1. 进度节点 -->
                     <div class="mb-3">
-                        <label class="form-label required">文件类型</label>
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-category"></i></span>
-                            {{ form.file_type }}
-                        </div>
-                        <small class="form-hint">请正确分类，以便后续检索。</small>
+                        <label class="form-label">关联进度节点</label>
+                        {{ form.node }}
+                        <small class="form-hint">关联后，文件将显示在对应的进度节点下。</small>
                     </div>
 
-                    <!-- 2. 文件上传控件 -->
+                    <!-- 2. 文件类型 -->
                     <div class="mb-3">
-                        <label class="form-label required">选择文件</label>
+                        <label class="form-label required">文件类型</label>
+                        {{ form.file_type }}
+                    </div>
+
+                    <!-- 3. 选择文件 -->
+                    <div class="mb-3">
+                        <label class="form-label required">选择文件附件</label>
                         {{ form.file }}
                         {% if form.file.errors %}
                             <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
                         {% endif %}
                     </div>
 
-                    <!-- 3. 文件描述 -->
+                    <!-- 4. 文件说明 -->
                     <div class="mb-3">
                         <label class="form-label">文件说明 / 备注</label>
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-file-description"></i></span>
-                            {{ form.description }}
-                        </div>
-                        <small class="form-hint">例如：V2.0版图纸，包含最新变更。</small>
+                        {{ form.description }}
+                        <small class="form-hint">例如：V1.0版本图纸。</small>
                     </div>
                 </div>
 
                 <!-- 底部操作栏 -->
                 <div class="card-footer text-end">
-                    <!-- 取消按钮：跳转回档案编辑页 -->
-                    <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-link link-secondary">
+                    <!-- 取消按钮：跳转回项目详情页 -->
+                    <a href="{% url 'project_detail' repo.project.id %}" class="btn btn-link link-secondary">
                         取消
                     </a>
                     <button type="submit" class="btn btn-yellow ms-auto">

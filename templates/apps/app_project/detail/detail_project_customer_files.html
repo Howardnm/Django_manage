@@ -35,7 +35,7 @@
         <div class="card-body p-0">
 
             <!-- 1. 信息矩阵：商业 & 成本 (保留你喜欢的紧凑版) -->
-            <div class="p-2 border-bottom">
+            <div class="p-2">
                 <div class="row g-2">
                     <!-- 第一行：客户与OEM -->
                     <div class="col-6">
@@ -103,72 +103,8 @@
                     {% endif %}
                 </div>
             </div>
-
-            <!-- ============================================================ -->
-            <!-- 2. 文件资料区 (高度压缩版) -->
-            <!-- ============================================================ -->
-            <div class="d-flex align-items-center justify-content-between px-3 py-1 bg-light-lt border-bottom">
-
-                <!-- 标题：字号微调到 11px 以匹配窄行 -->
-                <div class="font-weight-bold fw-bold text-body" style="font-size: 11px; letter-spacing: 0.5px;">
-                    <i class="ti ti-folder me-1"></i>文件资料 ({{ repo.files.count }})
-                </div>
-
-                <!-- 按钮修改：
-                     1. btn-ghost-primary: 去掉边框背景，悬浮变蓝，视觉负担最小
-                     2. height: 22px: 强制压扁，适应 py-1 的行高
-                     3. font-size: 10px: 字体极小化
-                -->
-                <a href="{% url 'repo_file_add' repo.id %}"
-                   class="btn btn-sm btn-primary px-2"
-                   style="height: 22px; line-height: 22px; font-size: 10px; min-height: 0; padding-top: 0; padding-bottom: 0;"
-                   title="上传新文件">
-                    <i class="ti ti-plus me-1" style="font-size: 10px;"></i> 添加
-                </a>
-            </div>
-
-            <div class="p-2">
-                <div class="row g-2">
-                    {% for file in repo.files.all %}
-                        <div class="col-lg-6 col-12">
-                            <!-- 极简文件块 -->
-                            <div class="d-flex align-items-center bg-white border rounded p-1 ps-2 shadow-sm">
-                                <!-- 图标 -->
-                                <div class="me-2">
-                                    {% if file.file_type == 'DRAWING_2D' %}<i class="ti ti-photo text-azure fs-3"></i>
-                                    {% elif file.file_type == 'DRAWING_3D' %}<i class="ti ti-box-model-2 text-orange fs-3"></i>
-                                    {% elif file.file_type == 'STANDARD' %}<i class="ti ti-book text-green fs-3"></i>
-                                    {% elif file.file_type == 'QUOTE' %}<i class="ti ti-currency-yen text-yellow fs-3"></i>
-                                    {% elif file.file_type == 'REPORT' %}<i class="ti ti-report text-purple fs-3"></i>
-                                    {% else %}<i class="ti ti-file text-secondary fs-3"></i>
-                                    {% endif %}
-                                </div>
-
-                                <!-- 文件名 -->
-                                <div class="flex-fill overflow-hidden" style="line-height: 1.2;">
-                                    <a href="{% url 'secure_download' 'app_repository' 'projectfile' file.pk 'file' %}" target="_blank"
-                                       class="text-reset d-block text-truncate small fw-bold" title="{{ file.description|default:file.filename }}">
-                                        {{ file.description|default:file.filename }}
-                                    </a>
-                                    <div class="text-muted" style="font-size: 9px;">{{ file.uploaded_at|date:"Y-m-d H:i" }}</div>
-                                </div>
-
-                                <!-- 删除 -->
-                                <form action="{% url 'repo_file_delete' file.pk %}" method="POST" onsubmit="return confirm('删除不可恢复，确定吗？');">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-link btn-sm text-muted p-1" title="删除">
-                                        <i class="ti ti-x"></i>
-                                    </button>
-                                </form>
-                            </div>
-                        </div>
-                    {% empty %}
-                        <div class="col-12 text-center text-muted small py-2 opacity-50">
-                            暂无资料
-                        </div>
-                    {% endfor %}
-                </div>
-            </div>
+            
+            <!-- 文件资料显示已移除 -->
 
         </div>
     {% else %}

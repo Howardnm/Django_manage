@@ -2,7 +2,7 @@ import os
 
 from django.db import models
 from django.core.validators import FileExtensionValidator
-from app_project.models import Project
+from app_project.models import Project, ProjectNode
 from common_utils.upload_file_path import upload_file_path
 from common_utils.validators import validate_file_size
 from django.contrib.auth.models import User
@@ -98,16 +98,28 @@ class OEMStandardFile(models.Model):
     ]
 
     oem = models.ForeignKey(OEM, on_delete=models.CASCADE, related_name='standard_files', verbose_name="所属主机厂")
-    name = models.CharField("文件名称", max_length=100)
+    name = models.CharField("文件名称", max_length=100, blank=True) 
     file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='MATERIAL')
-    description = models.TextField("文件描述/摘要", blank=True)
-
+    description = models.TextField("备注/详细说明", blank=True) 
     uploader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="上传人")
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
 
+    # 版本管理字段
+    version = models.PositiveIntegerField("版本号", default=1)
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        
+        # 核心逻辑：在文件保存后，提取经过清洗和冲突处理后的真实文件名并回填
+        if is_new and self.file:
+            self.name = os.path.basename(self.file.name)
+            # 使用 update 避免触发信号和递归保存
+            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
+
     def __str__(self):
-        return self.name
+        return f"{self.name} (V{self.version})"
 
     class Meta:
         verbose_name = "主机厂标准文件"
@@ -153,7 +165,7 @@ class MetricCategory(models.Model):
 
 class TestConfig(models.Model):
     """
-    【核心配置】测试项目定义
+    【核心配置】测试项目 definition
     将 指标+标准+条件+单位 打包成一个选项
     """
     category = models.ForeignKey(MetricCategory, on_delete=models.CASCADE, verbose_name="所属分类")
@@ -351,17 +363,31 @@ FILE_TYPE_CHOICES = [
 
 class MaterialFile(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files')
+    name = models.CharField("文件名称", max_length=100, blank=True) 
     file = models.FileField(upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField(max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
-    description = models.CharField(max_length=100, blank=True)
+    description = models.TextField("备注/详细说明", blank=True) 
     uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    # 版本管理字段
+    version = models.PositiveIntegerField("版本号", default=1)
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        
+        # 核心逻辑：在文件保存后，提取真实的最终文件名回填到 name 字段
+        if is_new and self.file:
+            self.name = os.path.basename(self.file.name)
+            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
 
     def filename(self):
         import os
         return os.path.basename(self.file.name)
 
     def __str__(self):
-        return self.description or self.filename()
+        desc = self.name or self.filename()
+        return f"{desc} (V{self.version})"
 
     class Meta:
         verbose_name = "材料附件"
@@ -459,16 +485,34 @@ class ProjectFile(models.Model):
     ]
 
     repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='files', verbose_name="所属档案")
+    
+    # 【新增】关联进度节点 (可选)
+    node = models.ForeignKey(ProjectNode, on_delete=models.SET_NULL, null=True, blank=True, related_name='files', verbose_name="关联节点")
+
+    name = models.CharField("文件名称", max_length=100, blank=True) 
     file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField("文件类型", max_length=20, choices=FILE_TYPE_CHOICES, default='OTHER')
-    description = models.CharField("文件说明", max_length=100, blank=True)
+    description = models.TextField("备注/详细说明", blank=True) 
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
+
+    # 版本管理字段
+    version = models.PositiveIntegerField("版本号", default=1)
+
+    def save(self, *args, **kwargs):
+        is_new = self._state.adding
+        super().save(*args, **kwargs)
+        
+        # 核心逻辑：在文件保存后，提取真实的最终文件名回填到 name 字段
+        if is_new and self.file:
+            self.name = os.path.basename(self.file.name)
+            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
 
     def filename(self):
         return os.path.basename(self.file.name)
 
     def __str__(self):
-        return self.description or self.filename()
+        desc = self.name or self.filename()
+        return f"{desc} (V{self.version})"
 
     class Meta:
         verbose_name = "项目文件"
@@ -479,5 +523,6 @@ class ProjectFile(models.Model):
             models.Index(fields=['-uploaded_at']),
             # 2. 针对高频筛选的外键添加索引 (解决筛选慢)
             models.Index(fields=['repository']),
+            models.Index(fields=['node']),
         ]
         ordering = ['-uploaded_at']

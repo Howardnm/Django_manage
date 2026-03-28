@@ -30,6 +30,7 @@ urlpatterns = [
 
     # 项目档案
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
+    path('project/repo/<int:pk>/detail/', ProjectFileDetailView.as_view(), name='repo_project_file_detail'), # 【新增】资料详情页
     path('api/search/', RepoAutocompleteView.as_view(), name='repo_api_search'),
     path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
     path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
