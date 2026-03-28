@@ -1,12 +1,8 @@
 from django.urls import path
 from .views.ProjectRepository import *
-from .views.Material import *
-from .views.MaterialType import *
 from .views.Customer import *
 from .views.OEM import *
-from .views.Scenario import *
 from .views.Salesperson import *
-from .views.TestConfig import *
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
@@ -20,35 +16,12 @@ urlpatterns = [
     path('customers/<int:pk>/', CustomerDetailView.as_view(), name='repo_customer_detail'),
     path('customers/<int:pk>/edit/', CustomerUpdateView.as_view(), name='repo_customer_edit'),
 
-    # 材料库
-    path('materials/', MaterialListView.as_view(), name='repo_material_list'),
-    path('materials/add/', MaterialCreateView.as_view(), name='repo_material_add'),
-    path('materials/<int:pk>/', MaterialDetailView.as_view(), name='repo_material_detail'),
-    path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='repo_material_edit'),
-    path('material/<int:material_id>/file/add/', MaterialFileUploadView.as_view(), name='repo_material_file_add'),
-    path('material/file/<int:pk>/delete/', MaterialFileDeleteView.as_view(), name='repo_material_file_delete'),
-
     # 项目档案
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
     path('project/repo/<int:pk>/detail/', ProjectFileDetailView.as_view(), name='repo_project_file_detail'), # 【新增】资料详情页
     path('api/search/', RepoAutocompleteView.as_view(), name='repo_api_search'),
     path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
     path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
-
-    # 材料类型
-    path('types/', MaterialTypeListView.as_view(), name='repo_type_list'),
-    path('types/add/', MaterialTypeCreateView.as_view(), name='repo_type_add'),
-    path('types/<int:pk>/edit/', MaterialTypeUpdateView.as_view(), name='repo_type_edit'),
-
-    # 应用场景
-    path('scenarios/', ScenarioListView.as_view(), name='repo_scenario_list'),
-    path('scenarios/add/', ScenarioCreateView.as_view(), name='repo_scenario_add'),
-    path('scenarios/<int:pk>/edit/', ScenarioUpdateView.as_view(), name='repo_scenario_edit'),
-
-    # 测试标准配置
-    path('test-configs/', TestConfigListView.as_view(), name='repo_test_config_list'),
-    path('test-configs/add/', TestConfigCreateView.as_view(), name='repo_test_config_add'),
-    path('test-configs/<int:pk>/edit/', TestConfigUpdateView.as_view(), name='repo_test_config_edit'),
 
     # 业务员库
     path('sales/', SalespersonListView.as_view(), name='repo_sales_list'),

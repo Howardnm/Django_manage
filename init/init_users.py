@@ -11,7 +11,8 @@ django.setup()
 from django.contrib.auth.models import User, Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from app_project.models import Project
-from app_repository.models import MaterialLibrary, ProjectRepository
+from app_repository.models import ProjectRepository
+from app_material.models import MaterialLibrary
 from app_process.models import ProcessProfile
 from app_formula.models import LabFormula
 

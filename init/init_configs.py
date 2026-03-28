@@ -8,7 +8,7 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Django_manage.settings')
 django.setup()
 
-from app_repository.models import MetricCategory, TestConfig
+from app_material.models import MetricCategory, TestConfig
 
 
 def run():

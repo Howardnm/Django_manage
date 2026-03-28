@@ -3,7 +3,8 @@ from django import forms
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_raw_material.models import Supplier, RawMaterial, RawMaterialType, RawMaterialProperty
-from app_repository.models import MaterialType
+from app_material.models import MaterialType
+
 
 # 1. 供应商过滤器
 class SupplierFilter(TablerFilterMixin, django_filters.FilterSet):

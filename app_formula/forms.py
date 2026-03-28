@@ -3,7 +3,7 @@ from django.forms import inlineformset_factory, BaseInlineFormSet
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
-from app_repository.models import MaterialLibrary, TestConfig
+from app_material.models import TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_basic_research.models import ResearchProject
 

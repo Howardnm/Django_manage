@@ -1,7 +1,8 @@
 import os
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from app_repository.models import MetricCategory, TestConfig
+from app_material.models import MetricCategory, TestConfig
+
 
 class Command(BaseCommand):
     """

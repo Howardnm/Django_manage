@@ -38,6 +38,7 @@ urlpatterns = [
     path('research/', include('app_basic_research.urls')),
     path('user/', include('app_user.urls')),
     path('repository/', include('app_repository.urls')),
+    path('material/', include('app_material.urls')),
     path('raw-material/', include('app_raw_material.urls')),
     path('process/', include('app_process.urls')),
     path('formula/', include('app_formula.urls')),

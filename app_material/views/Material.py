@@ -7,9 +7,9 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 
-from app_repository.forms import MaterialForm, MaterialDataFormSet, MaterialFileForm
-from app_repository.models import MaterialLibrary, MaterialDataPoint, MaterialFile
-from app_repository.utils.filters import MaterialFilter
+from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialFileForm
+from app_material.models import MaterialLibrary, MaterialDataPoint, MaterialFile
+from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult # 引入配方测试结果模型
 
 

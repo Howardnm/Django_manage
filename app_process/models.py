@@ -1,5 +1,5 @@
 from django.db import models
-from app_repository.models import MaterialType  # 引入材料类型模型
+from app_material.models import MaterialType
 from common_utils.upload_file_path import upload_file_path
 from common_utils.validators import validate_file_size  # 引入文件大小验证器
 

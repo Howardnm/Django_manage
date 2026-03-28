@@ -3,9 +3,10 @@ from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
-from app_repository.forms import MaterialTypeForm
-from app_repository.models import MaterialType
-from app_repository.utils.filters import MaterialTypeFilter
+from app_material.forms import MaterialTypeForm
+from app_material.models import MaterialType
+from app_material.utils.filters import MaterialTypeFilter
+
 
 # ==========================================
 # 4. 材料类型管理 (MaterialType)

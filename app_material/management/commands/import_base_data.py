@@ -1,7 +1,8 @@
 import os
 from django.core.management.base import BaseCommand
 from django.conf import settings
-from app_repository.models import MaterialType, ApplicationScenario
+from app_material.models import MaterialType, ApplicationScenario
+
 
 class Command(BaseCommand):
     """

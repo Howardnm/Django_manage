@@ -3,7 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
-from app_repository.models import MaterialLibrary, TestConfig
+from app_material.models import TestConfig, MaterialLibrary
 from app_formula.models import LabFormula
 from app_raw_material.models import RawMaterial
 from collections import defaultdict

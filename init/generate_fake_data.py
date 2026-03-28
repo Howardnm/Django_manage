@@ -16,14 +16,14 @@ django.setup()
 # ==========================================
 COUNT_SALESPERSON = 0      # 业务员数量
 COUNT_CUSTOMER = 0         # 客户数量
-COUNT_MATERIAL = 5         # 成品材料库数量
+COUNT_MATERIAL = 0         # 成品材料库数量
 COUNT_SUPPLIER = 0         # 供应商数量
 COUNT_RAW_MATERIAL = 0     # 原材料数量
 COUNT_MACHINE = 0          # 机台型号数量
-COUNT_SCREW = 0            # 螺杆组合数量
-COUNT_PROFILE = 0          # 工艺方案数量
-COUNT_PROJECT = 0          # 研发项目数量
-COUNT_FORMULA = 0          # 实验配方数量
+COUNT_SCREW = 50            # 螺杆组合数量
+COUNT_PROFILE = 50          # 工艺方案数量
+COUNT_PROJECT = 200          # 研发项目数量
+COUNT_FORMULA = 200          # 实验配方数量
 
 # 尝试导入 Faker，如果没有则使用简单的随机生成
 try:
@@ -48,10 +48,10 @@ from django.utils import timezone
 
 # App Models
 from app_repository.models import (
-    MaterialType, ApplicationScenario, OEM, Salesperson, 
-    MetricCategory, TestConfig, MaterialLibrary, MaterialDataPoint, 
+    OEM, Salesperson,
     Customer, ProjectRepository
 )
+from app_material.models import MaterialType, ApplicationScenario, MetricCategory, TestConfig, MaterialLibrary, MaterialDataPoint
 from app_project.models import Project, ProjectNode, ProjectStage
 from app_raw_material.models import RawMaterialType, Supplier, RawMaterial, RawMaterialProperty
 from app_process.models import MachineModel, ScrewCombination, ProcessProfile

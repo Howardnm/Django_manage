@@ -1,7 +1,7 @@
 from django import forms
 from django.forms import inlineformset_factory
 from .models import Supplier, RawMaterialType, RawMaterial, RawMaterialProperty
-from app_repository.models import TestConfig
+from app_material.models import TestConfig
 from django.utils.text import Truncator
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 

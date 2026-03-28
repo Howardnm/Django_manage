@@ -8,7 +8,7 @@ sys.path.append(BASE_DIR)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Django_manage.settings')
 django.setup()
 
-from app_repository.models import MaterialType, ApplicationScenario
+from app_material.models import MaterialType, ApplicationScenario
 
 
 def run():

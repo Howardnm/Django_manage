@@ -2,7 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from decimal import Decimal
 from django.utils import timezone
-from app_repository.models import MaterialType, TestConfig, MaterialLibrary
+from app_material.models import MaterialType, TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_process.models import ProcessProfile
 from app_basic_research.models import ResearchProject

@@ -7,7 +7,7 @@ from .models import DifySyncRecord
 from .utils import get_document_content
 
 from app_project.models import Project, ProjectNode
-from app_repository.models import MaterialLibrary
+from app_material.models import MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_formula.models import LabFormula
 from app_process.models import ProcessProfile

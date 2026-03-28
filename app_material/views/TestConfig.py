@@ -5,8 +5,8 @@ from django.views.generic import ListView, CreateView, UpdateView
 from django.db.models import Q
 from django import forms
 
-from app_repository.models import TestConfig, MetricCategory
-from app_repository.forms import TestConfigForm
+from app_material.models import MetricCategory, TestConfig
+from app_material.forms import TestConfigForm
 from common_utils.filters import TablerFilterMixin
 import django_filters
 

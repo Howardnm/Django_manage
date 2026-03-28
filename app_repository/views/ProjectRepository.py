@@ -10,7 +10,8 @@ from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project, ProjectNode
 from app_repository.models import ProjectRepository, ProjectFile
-from app_repository.models import MaterialLibrary, Customer, OEM, Salesperson, TestConfig, MaterialType, ApplicationScenario # 导入 ApplicationScenario
+from app_repository.models import Customer, OEM, Salesperson  # 导入 ApplicationScenario
+from app_material.models import MaterialType, ApplicationScenario, TestConfig, MaterialLibrary
 from app_project.mixins import ProjectPermissionMixin
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial

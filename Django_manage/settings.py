@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
+    'app_material.apps.AppMaterialConfig',
     'app_notification.apps.AppNotificationConfig', # 通知中心
     'app_dify_sync.apps.AppDifySyncConfig', # Dify 数据同步
     # 【新增】配方与工艺管理

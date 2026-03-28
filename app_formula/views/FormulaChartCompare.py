@@ -6,7 +6,7 @@ from django.db.models import Q
 from collections import defaultdict
 
 from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
-from app_repository.models import TestConfig
+from app_material.models import TestConfig
 from app_raw_material.models import RawMaterial
 
 class FormulaChartCompareView(LoginRequiredMixin, TemplateView):

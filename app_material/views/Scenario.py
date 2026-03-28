@@ -3,9 +3,10 @@ from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
-from app_repository.forms import ApplicationScenarioForm
-from app_repository.models import ApplicationScenario
-from app_repository.utils.filters import ScenarioFilter
+from app_material.forms import ApplicationScenarioForm
+from app_material.models import ApplicationScenario
+from app_material.utils.filters import ScenarioFilter
+
 
 # ==========================================
 # 5. 应用场景管理 (ApplicationScenario)

@@ -9,7 +9,7 @@ from django.db.models import Subquery, OuterRef, FloatField, DecimalField, Q
 from app_formula.models import LabFormula, FormulaTestResult
 from app_formula.forms import LabFormulaForm, FormulaBOMFormSet, FormulaTestResultFormSet
 from app_formula.utils.filters import LabFormulaFilter
-from app_repository.models import MaterialLibrary
+from app_material.models import MaterialLibrary
 from app_basic_research.models import ResearchProject
 
 class LabFormulaListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):

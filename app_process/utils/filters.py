@@ -3,7 +3,8 @@ from django import forms
 from django.db.models import Q
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_process.models import MachineModel, ScrewCombination, ProcessProfile
-from app_repository.models import MaterialType
+from app_material.models import MaterialType
+
 
 # 2. 机台型号过滤器
 class MachineModelFilter(TablerFilterMixin, django_filters.FilterSet):

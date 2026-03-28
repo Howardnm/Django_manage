@@ -6,7 +6,7 @@ from django.utils import timezone # Import timezone from Django's utilities
 
 # 导入相关模型
 from app_project.models import Project
-from app_repository.models import MaterialLibrary
+from app_material.models import MaterialLibrary
 from app_formula.models import LabFormula
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial
