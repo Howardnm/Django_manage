@@ -33,7 +33,7 @@
         <div class="mb-3">
             <label class="form-label required">选择文件附件</label>
             {{ form.file }}
-            <small class="form-hint text-primary fw-bold">系统将自动提取此文件名作为档案标题，相同文件名的文件将被视为同一份文件的不同版本。</small>
+            <small class="form-hint text-primary fw-bold">系统将自动提取此文件名作为档案标题。</small>
             {% if form.file.errors %}
                 <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
             {% endif %}
