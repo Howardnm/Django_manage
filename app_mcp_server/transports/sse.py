@@ -13,29 +13,32 @@ async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, Non
     """
     生成符合 MCP 规范的 SSE 事件流。
     """
-    # 1. 初始化 AnyIO 内存流
+    # 1. 初始化流
     read_from_client_send, read_from_client_receive = anyio.create_memory_object_stream(100)
     write_from_server_send, write_from_server_receive = anyio.create_memory_object_stream(100)
     
-    # 2. 注册会话到管理中心
+    # 2. 注册会话
     session_manager.register_session(session_id, read_from_client_send)
 
-    # 3. 发送首个 'endpoint' 事件给 AI Agent
-    messages_url = request.build_absolute_uri("../messages/") + f"?sessionId={session_id}"
-    logger.info(f"SSE [{session_id}]: Client connected. Endpoint: {messages_url}")
+    # 3. 构造消息 URL (处理 Nginx 反代导致 127.0.0.1 的问题)
+    # 优先获取 X-Forwarded-Host 或 Host 头
+    host = request.get_host() 
+    scheme = 'https' if request.is_secure() or request.headers.get('X-Forwarded-Scheme') == 'https' else 'http'
+    
+    # 手动拼接路径，确保不再出现 127.0.0.1
+    path = request.path.replace('/sse/', '/messages/')
+    messages_url = f"{scheme}://{host}{path}?sessionId={session_id}"
+    
+    logger.info(f"SSE [{session_id}]: Final Message URL: {messages_url}")
     yield f"event: endpoint\ndata: {messages_url}\n\n"
     
-    # 4. 启动 MCP Server 任务
+    # 4. 启动 Server 任务
     def handle_server_done(t):
-        """处理任务结束，优雅忽略取消异常"""
         try:
             if not t.cancelled():
                 t.result()
-                logger.info(f"SSE [{session_id}]: MCP Server Task finished.")
-            else:
-                logger.debug(f"SSE [{session_id}]: MCP Server Task was cancelled during cleanup.")
         except Exception as e:
-            logger.error(f"SSE [{session_id}]: MCP Server Task error: {e}", exc_info=True)
+            logger.error(f"SSE [{session_id}]: Server Task error: {e}")
 
     server_task = asyncio.create_task(mcp_server.run(
         read_from_client_receive,
@@ -52,29 +55,18 @@ async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, Non
     server_task.add_done_callback(handle_server_done)
 
     try:
-        # 5. 消息转发循环
         async with write_from_server_receive:
             async for message in write_from_server_receive:
-                # 序列化逻辑
                 inner = getattr(message, "message", message)
-                if hasattr(inner, "model_dump_json"):
-                    json_payload = inner.model_dump_json()
-                else:
-                    json_payload = mcp_json_dumps(inner)
-                
+                json_payload = inner.model_dump_json() if hasattr(inner, "model_dump_json") else mcp_json_dumps(inner)
                 yield f"event: message\ndata: {json_payload}\n\n"
-    except Exception as e:
-        logger.warning(f"SSE [{session_id}]: Stream disconnected: {e}")
+    except Exception:
+        pass
     finally:
-        # 6. 清理资源
         if not server_task.done():
             server_task.cancel()
-        
-        # 关闭流以通知 Server 停止
         try:
             read_from_client_send.close()
         except:
             pass
-            
         session_manager.unregister_session(session_id)
-        logger.info(f"SSE [{session_id}]: Session cleanup complete.")
