@@ -1,4 +1,5 @@
 import logging
+import json
 from django.conf import settings
 from django.http import StreamingHttpResponse, HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.views.decorators.csrf import csrf_exempt
@@ -8,6 +9,14 @@ from .core.sessions import session_manager
 
 # 设置日志
 logger = logging.getLogger("app_mcp_server.views")
+
+def add_cors_headers(response):
+    """为响应添加通用的 CORS 允许头"""
+    response['Access-Control-Allow-Origin'] = '*'
+    response['Access-Control-Allow-Methods'] = 'GET, POST, OPTIONS'
+    response['Access-Control-Allow-Headers'] = 'Content-Type, X-MCP-API-KEY, Authorization'
+    response['Access-Control-Expose-Headers'] = '*'
+    return response
 
 def check_auth(request):
     """安全认证拦截器 (X-MCP-API-KEY)"""
@@ -21,7 +30,6 @@ async def sse_endpoint(request):
     if not check_auth(request):
         return HttpResponseForbidden("Authentication Required")
 
-    # 创建新的会话 ID 并启动生成器
     session_id = session_manager.create_session()
     logger.info(f"Establishing MCP SSE Connection. Session ID: {session_id}")
 
@@ -30,40 +38,34 @@ async def sse_endpoint(request):
         content_type="text/event-stream"
     )
     
-    # SSE 标准响应头，优化实时性和禁用代理缓存
+    # SSE 标准响应头
     response['Cache-Control'] = 'no-cache'
-    response['X-Accel-Buffering'] = 'no'
-    response['Access-Control-Allow-Origin'] = '*'
-    return response
+    response['X-Accel-Buffering'] = 'no' # 告知 Nginx 不要缓冲
+    return add_cors_headers(response)
 
 @csrf_exempt
 async def messages_endpoint(request):
     """处理消息发送: POST /mcp/messages/"""
-    if not check_auth(request):
-        return HttpResponseForbidden("Auth Required")
-
     if request.method == "OPTIONS":
-        response = HttpResponse()
-        response['Access-Control-Allow-Origin'] = '*'
-        response['Access-Control-Allow-Methods'] = 'POST, OPTIONS'
-        response['Access-Control-Allow-Headers'] = 'Content-Type, X-MCP-API-KEY'
-        return response
+        return add_cors_headers(HttpResponse())
+
+    if not check_auth(request):
+        return add_cors_headers(HttpResponseForbidden("Auth Required"))
 
     if request.method != "POST":
-        return HttpResponse(status=405)
+        return add_cors_headers(HttpResponse(status=405))
 
     session_id = request.GET.get("sessionId")
     if not session_id:
-        return HttpResponseBadRequest("Missing Session ID")
+        return add_cors_headers(HttpResponseBadRequest("Missing Session ID"))
         
     try:
-        # 通过传输层分发消息
         success = await process_mcp_message(session_id, request.body)
         if success:
-            return HttpResponse(status=202)
+            return add_cors_headers(HttpResponse(status=202))
         else:
-            return HttpResponseBadRequest("Invalid or Expired Session ID")
-
+            return add_cors_headers(HttpResponseBadRequest("Invalid or Expired Session ID"))
+            
     except Exception as e:
         logger.error(f"Error handling message for {session_id}: {str(e)}", exc_info=True)
-        return HttpResponse(content=str(e), status=400)
+        return add_cors_headers(HttpResponse(content=str(e), status=400))
