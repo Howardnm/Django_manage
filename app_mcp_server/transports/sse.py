@@ -11,7 +11,7 @@ logger = logging.getLogger("app_mcp_server.transports.sse")
 
 async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, None]:
     """
-    生成符合 MCP 规范的 SSE 事件流。
+    生成符合 MCP 规范的 SSE 事件流，支持针对非标准 Nginx 代理的 Host 修复。
     """
     # 1. 初始化流
     read_from_client_send, read_from_client_receive = anyio.create_memory_object_stream(100)
@@ -20,16 +20,25 @@ async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, Non
     # 2. 注册会话
     session_manager.register_session(session_id, read_from_client_send)
 
-    # 3. 构造消息 URL (处理 Nginx 反代导致 127.0.0.1 的问题)
-    # 优先获取 X-Forwarded-Host 或 Host 头
-    host = request.get_host() 
-    scheme = 'https' if request.is_secure() or request.headers.get('X-Forwarded-Scheme') == 'https' else 'http'
+    # 3. 构造消息 URL (处理特殊 Nginx 反代配置)
+    # 优先检测您 Nginx 发送的自定义 X-Host 字段
+    custom_host = request.headers.get('X-Host')
+    if custom_host:
+        host = custom_host
+    else:
+        host = request.get_host()
     
-    # 手动拼接路径，确保不再出现 127.0.0.1
-    path = request.path.replace('/sse/', '/messages/')
-    messages_url = f"{scheme}://{host}{path}?sessionId={session_id}"
+    # 检测协议 (识别您的 X-Scheme)
+    scheme = 'https' if request.is_secure() or request.headers.get('X-Scheme') == 'https' else 'http'
     
-    logger.info(f"SSE [{session_id}]: Final Message URL: {messages_url}")
+    # 确保路径拼接正确
+    # 将当前的 /mcp/sse/ 路径替换为 /mcp/messages/
+    base_path = request.path.replace('/sse/', '/messages/')
+    messages_url = f"{scheme}://{host}{base_path}?sessionId={session_id}"
+    
+    logger.info(f"SSE [{session_id}]: Transport Protocol: {scheme}, Host: {host}")
+    logger.info(f"SSE [{session_id}]: Endpoint URL: {messages_url}")
+
     yield f"event: endpoint\ndata: {messages_url}\n\n"
     
     # 4. 启动 Server 任务
