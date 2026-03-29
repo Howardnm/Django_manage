@@ -61,7 +61,8 @@ INSTALLED_APPS = [
     'app_formula.apps.AppFormulaConfig',
     'app_basic_research.apps.AppBasicResearchConfig',
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
-    "debug_toolbar", # 这是debug_toolbar的配置
+    "debug_toolbar",
+    'app_mcp_server.apps.AppMcpServerConfig'  # 这是debug_toolbar的配置
 ]
 
 MIDDLEWARE = [
@@ -245,3 +246,7 @@ DIFY_SYNC_CONFIG = {
         'app_process.processprofile': '715b683a-7451-49f8-b21d-88c183d7b695',
     }
 }
+
+# --- MCP Server 配置 ---
+# 设置 API 访问密钥，保护 AI 数据接口
+# MCP_API_KEY = 'mcp-secret-token-2024'

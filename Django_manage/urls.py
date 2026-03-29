@@ -44,6 +44,10 @@ urlpatterns = [
     path('formula/', include('app_formula.urls')),
     path('notifications/', include('app_notification.urls')),
     path('dify-sync/', include('app_dify_sync.urls')), # 新增：Dify App 的 URL
+    
+    # 【新增】MCP Server HTTP/SSE 接口
+    path('mcp/', include('app_mcp_server.urls')),
+
     # 通用下载路由
     path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),
     # 添加无权限页面的 URL 模式

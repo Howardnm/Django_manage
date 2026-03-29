@@ -1,0 +1,1 @@
+# MCP Core Infrastructure Layer
