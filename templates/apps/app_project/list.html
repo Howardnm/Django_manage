@@ -59,6 +59,8 @@
                                         <span class="badge bg-red-lt">已终止</span>
                                     {% elif project.progress_percent == 100 %}
                                         <span class="badge bg-green-lt">已完成</span>
+                                    {% elif project.is_paused %}
+                                        <span class="badge bg-warning-lt">暂停中</span>
                                     {% else %}
                                         <span class="text-blue small fw-bold">{{ project.get_current_stage_display }}</span>
                                     {% endif %}
@@ -66,7 +68,7 @@
                                 <div class="text-muted small">{{ project.progress_percent }}%</div>
                             </div>
                             <div class="progress progress-sm">
-                                <div class="progress-bar {% if project.is_terminated %}bg-danger{% elif project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
+                                <div class="progress-bar {{ project.progress_bar_css_class }}"
                                      style="width: {{ project.progress_percent }}%" role="progressbar" aria-valuenow="{{ project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
                                 </div>
                             </div>
