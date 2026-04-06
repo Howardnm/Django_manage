@@ -53,16 +53,15 @@ INSTALLED_APPS = [
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
     'app_material.apps.AppMaterialConfig',
-    'app_notification.apps.AppNotificationConfig', # 通知中心
-    'app_dify_sync.apps.AppDifySyncConfig', # Dify 数据同步
-    # 【新增】配方与工艺管理
+    'app_notification.apps.AppNotificationConfig',      # 通知中心
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
     'app_formula.apps.AppFormulaConfig',
     'app_basic_research.apps.AppBasicResearchConfig',
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
-    "debug_toolbar",
-    'app_mcp_server.apps.AppMcpServerConfig'  # 这是debug_toolbar的配置
+    "debug_toolbar",                                    # 这是debug_toolbar的配置
+    'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
+    # 'app_dify_sync.apps.AppDifySyncConfig',           # Dify 数据同步
 ]
 
 MIDDLEWARE = [
