@@ -1,8 +1,8 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from app_project.models import Project, ProjectNode, ProjectStage
+from django.db.models import Max
+from app_project.models import Project, ProjectNode, ProjectStage, NodeScoreRule
 
-# 4. 信号量：创建项目时，自动生成9个节点
 @receiver(post_save, sender=Project)
 def create_project_nodes(sender, instance, created, **kwargs):
     if created:
@@ -11,58 +11,85 @@ def create_project_nodes(sender, instance, created, **kwargs):
             if code not in ['FEEDBACK']:
                 nodes_to_create.append(
                     ProjectNode(
-                        project=instance,
-                        stage=code,
-                        order=i + 1,
-                        round=1,
-                        status='PENDING'
+                        project=instance, stage=code, order=i + 1, round=1, status='PENDING'
                     )
                 )
         ProjectNode.objects.bulk_create(nodes_to_create)
 
-
-# 信号量：更新父级 Project 的冗余字段
 @receiver([post_save, post_delete], sender=ProjectNode)
 def update_project_status_fields(sender, instance, **kwargs):
+    # 1. 计算节点分
+    _calculate_node_final_score(instance)
+    # 2. 更新项目全局字段及冗余质量分
     _update_project_current_stage(instance.project)
+
+@receiver([post_save, post_delete], sender=NodeScoreRule)
+def trigger_global_score_recalculation(sender, instance, **kwargs):
+    affected_nodes = ProjectNode.objects.filter(status__in=['DONE', 'FAILED', 'TERMINATED'])
+    
+    affected_projects = set()
+    for node in affected_nodes:
+        _calculate_node_final_score(node)
+        affected_projects.add(node.project)
+    
+    for project in affected_projects:
+        _update_project_current_stage(project)
+
+
+def _calculate_node_final_score(node):
+    """
+    自动评分引擎：判定单个节点的得分
+    """
+    if node.status not in ['DONE', 'FAILED', 'TERMINATED']:
+        if node.final_score != 0:
+            ProjectNode.objects.filter(pk=node.pk).update(final_score=0)
+        return
+
+    is_multiple = node.round > 1
+    
+    rule = NodeScoreRule.objects.filter(
+        trigger_status=node.status, 
+        trigger_stage=node.stage, 
+        is_multiple_rounds=is_multiple
+    ).first()
+    
+    if not rule:
+        from django.db.models import Q
+        rule = NodeScoreRule.objects.filter(
+            Q(trigger_stage__isnull=True) | Q(trigger_stage=''),
+            trigger_status=node.status, 
+            is_multiple_rounds=is_multiple
+        ).first()
+
+    new_score = rule.score_value if rule else 0
+    ProjectNode.objects.filter(pk=node.pk).update(final_score=new_score)
 
 
 def _update_project_current_stage(project):
     """
     重新计算并更新 Project 的冗余字段。
-    修复逻辑：精确识别‘暂停’节点作为当前阶段。
     """
-    # 重新从数据库获取最新的节点列表，避免缓存干扰
     all_nodes = project.nodes.all().order_by('order')
-
-    # --- A. 定位当前阶段 (核心修复) ---
     
-    # 1. 优先判断是否有“已终止”节点，如果有，项目阶段锁定在该节点
+    # --- A. 定位当前阶段 ---
     terminated_node = all_nodes.filter(status='TERMINATED').last()
-    
     if terminated_node:
         current_node = terminated_node
     else:
-        # 2. 排除掉“已结束”性质的状态，剩下的第一个就是当前活跃/待办阶段
-        # 排除状态：DONE(完成), FAILED(失败迭代), FEEDBACK(已提意见)
-        # 包含状态：DOING(进行中), PAUSED(暂停), PENDING(未开始)
         current_node = all_nodes.exclude(status__in=['DONE', 'FAILED', 'FEEDBACK']).first()
 
     new_stage = ProjectStage.INIT
     new_remark = ""
-
     if current_node:
         new_stage = current_node.stage
         new_remark = current_node.remark or ""
     else:
-        # 如果所有节点都处理完了，取最后一个
         last_node = all_nodes.last()
         if last_node:
             new_stage = last_node.stage
             new_remark = last_node.remark or ""
 
     # --- B. 计算进度百分比 ---
-    # 这里的逻辑保持不变：只计算 DONE 节点的占比
     valid_nodes = [n for n in all_nodes if n.stage != 'FEEDBACK' and n.status != 'FAILED']
     total = len(valid_nodes)
     if total < 9: total = 9
@@ -72,20 +99,26 @@ def _update_project_current_stage(project):
     # --- C. 计算是否终止 ---
     new_is_terminated = terminated_node is not None
 
-    # --- D. 批量更新 ---
-    update_fields = []
+    # --- D. 【核心修复】项目质量分逻辑调整 ---
+    # 不再取全局 Max，而是取“最近一个已有结果节点”的得分
+    # 逻辑：在所有状态为 DONE, FAILED, TERMINATED 的节点中，取 order 最大的那个
+    last_terminal_node = all_nodes.filter(status__in=['DONE', 'FAILED', 'TERMINATED']).last()
+    current_quality_score = last_terminal_node.final_score if last_terminal_node else 0
 
+    # --- E. 批量更新 ---
+    update_fields = []
     if project.current_stage != new_stage:
         project.current_stage = new_stage
         update_fields.append('current_stage')
-
     if project.progress_percent != new_percent:
         project.progress_percent = new_percent
         update_fields.append('progress_percent')
-
     if project.is_terminated != new_is_terminated:
         project.is_terminated = new_is_terminated
         update_fields.append('is_terminated')
+    if project.quality_score != current_quality_score:
+        project.quality_score = current_quality_score
+        update_fields.append('quality_score')
 
     new_remark = new_remark[:190]
     if project.latest_remark != new_remark:

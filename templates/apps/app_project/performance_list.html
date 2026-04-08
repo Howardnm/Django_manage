@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">成员协同绩效看板</h2>
+                <div class="text-muted small mt-1">基于项目阶段权重与成员工作量占比的加权得分统计</div>
+            </div>
+            <!-- 【新增】管理入口按钮 -->
+            <div class="col-auto ms-auto">
+                <a href="{% url 'project_score_rule_list' %}" class="btn btn-outline-primary">
+                    <i class="ti ti-settings me-1"></i>配置评分规则
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <!-- 1. 绩效排行榜 -->
+    <div class="col-12">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-vcenter table-mobile-md card-table">
+                    <thead>
+                        <tr>
+                            <th>成员</th>
+                            <th>参与项目</th>
+                            <th>角色分布</th>
+                            <th class="text-end">累计绩效得分 (S_member)</th>
+                            <th class="w-1">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in performance_data %}
+                        <tr>
+                            <td data-label="成员">
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar avatar-sm rounded me-2">{{ item.user.username|slice:":1"|upper }}</span>
+                                    <div class="flex-fill">
+                                        <div class="font-weight-medium">{{ item.user.username }}</div>
+                                        <div class="text-muted small">{{ item.user.profile.department|default:"研发部" }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td data-label="参与项目">
+                                <div>{{ item.project_count }} 个项目</div>
+                                <div class="progress progress-xs mt-2">
+                                    <div class="progress-bar bg-blue" style="width: 100%"></div>
+                                </div>
+                            </td>
+                            <td data-label="角色分布">
+                                <div class="btn-list">
+                                    <span class="badge bg-purple-lt">主导: {{ item.roles.LEAD }}</span>
+                                    <span class="badge bg-blue-lt">实验: {{ item.roles.RND }}</span>
+                                    <span class="badge bg-secondary-lt">其他: {{ item.roles.OTHER }}</span>
+                                </div>
+                            </td>
+                            <td class="text-end" data-label="得分">
+                                <div class="h2 m-0 text-primary font-weight-bold">{{ item.total_score|floatformat:1 }}</div>
+                            </td>
+                            <td>
+                                <div class="btn-list flex-nowrap">
+                                    <a href="#" class="btn btn-ghost-primary btn-sm">
+                                        查看详情
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-5 text-muted">暂无绩效数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. 说明卡片 -->
+    <div class="col-md-6">
+        <div class="card bg-primary-lt">
+            <div class="card-body">
+                <h3 class="card-title text-primary"><i class="ti ti-info-circle me-1"></i>评分说明</h3>
+                <ul class="list-unstyled small text-secondary" style="line-height: 1.8;">
+                    <li>1. <strong>项目总分 (S_project)</strong>：取项目已完成节点中最高的业务分值。</li>
+                    <li>2. <strong>个人得分 (S_member)</strong>：项目总分 × 成员在该项目中的工作量占比。</li>
+                    <li>3. <strong>自动更新</strong>：系统会在节点状态更新后自动重算，无需人工干预。</li>
+                    <li>4. <strong>数据范围</strong>：仅统计当前系统中已分配成员的项目数据。</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

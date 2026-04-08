@@ -23,6 +23,13 @@
                                 {% if node.round > 1 %}
                                     <span class="badge bg-secondary-lt">第{{ node.round }}轮</span>
                                 {% endif %}
+
+                                <!-- 【新增】绩效评分展示：当节点已有最终判定得分时显示 -->
+                                {% if node.final_score > 0 %}
+                                    <span class="badge bg-yellow-lt ms-2" title="系统判定业务得分">
+                                        <i class="ti ti-star-filled me-1"></i>得分: {{ node.final_score|floatformat:0 }}
+                                    </span>
+                                {% endif %}
                             </span>
 
                         <!-- 【优化】直接调用 Model 属性获取样式类 -->

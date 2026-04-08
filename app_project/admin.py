@@ -1,36 +1,30 @@
 from django.contrib import admin
-from .models import Project, ProjectNode
+from .models import Project, ProjectNode, ProjectMember, NodeScoreRule
 
-# 1. 项目节点内联
 class ProjectNodeInline(admin.TabularInline):
     model = ProjectNode
     extra = 0
-    fields = ('stage', 'round', 'order', 'status', 'remark', 'updated_at')
-    readonly_fields = ('updated_at',)
-    ordering = ('order',)
+    fields = ['stage', 'status', 'round', 'order', 'final_score', 'updated_at']
+    readonly_fields = ['updated_at']
 
-# 2. 项目主表 Admin
+class ProjectMemberInline(admin.TabularInline):
+    model = ProjectMember
+    extra = 1
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ('name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at')
-    list_filter = ('current_stage', 'is_terminated', 'created_at', 'manager')
-    search_fields = ('name', 'manager__username', 'description')
-    readonly_fields = ('created_at', 'current_stage', 'progress_percent', 'is_terminated', 'latest_remark')
-    inlines = [ProjectNodeInline]
-    
-    fieldsets = (
-        ('基本信息', {
-            'fields': ('name', 'manager', 'description')
-        }),
-        ('进度概览 (自动更新)', {
-            'fields': ('current_stage', 'progress_percent', 'is_terminated', 'latest_remark', 'created_at')
-        }),
-    )
+    list_display = ['name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at']
+    list_filter = ['current_stage', 'is_terminated', 'manager']
+    search_fields = ['name', 'description']
+    inlines = [ProjectMemberInline, ProjectNodeInline]
 
-# 3. 项目节点 Admin (可选)
-@admin.register(ProjectNode)
-class ProjectNodeAdmin(admin.ModelAdmin):
-    list_display = ('project', 'stage', 'round', 'order', 'status', 'updated_at')
-    list_filter = ('stage', 'status', 'updated_at')
-    search_fields = ('project__name', 'remark')
-    ordering = ('project', 'order')
+@admin.register(NodeScoreRule)
+class NodeScoreRuleAdmin(admin.ModelAdmin):
+    list_display = ['name', 'score_value', 'trigger_stage', 'trigger_status', 'is_multiple_rounds']
+    list_filter = ['trigger_status', 'trigger_stage', 'is_multiple_rounds']
+    search_fields = ['name', 'description']
+
+@admin.register(ProjectMember)
+class ProjectMemberAdmin(admin.ModelAdmin):
+    list_display = ['project', 'user', 'role', 'workload_share']
+    list_filter = ['role', 'user']

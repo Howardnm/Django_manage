@@ -1,0 +1,119 @@
+<!-- 模态框：增加前端计算校验逻辑 -->
+<div class="modal-header">
+    <h5 class="modal-title">
+        {% if member_id %} 编辑协同成员 {% else %} 添加协同成员 {% endif %}
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<!-- 提交路径指向 manage 视图 -->
+<form id="project-member-form" hx-post="{% url 'project_member_manage' project.id %}" hx-swap="none">
+    {% csrf_token %}
+    <div class="modal-body">
+
+        <!-- 后端返回的业务错误提示 (如数据库冲突) -->
+        <div id="backend-errors">
+            {% if form.errors %}
+            <div class="alert alert-important alert-danger">
+                <div class="d-flex">
+                    <div><i class="ti ti-alert-circle me-2"></i></div>
+                    <div>{% for field, errors in form.errors.items %}{% for error in errors %}{{ error }}<br>{% endfor %}{% endfor %}</div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- 前端实时计算警告区 (默认隐藏) -->
+        <div id="frontend-warning" class="alert alert-warning d-none">
+            <div class="d-flex">
+                <div><i class="ti ti-info-circle me-2"></i></div>
+                <div id="warning-text"></div>
+            </div>
+        </div>
+
+        {% if member_id %}
+            <input type="hidden" name="member_id" value="{{ member_id }}">
+        {% endif %}
+
+        <div class="mb-3">
+            <label class="form-label required">选择成员</label>
+            <select name="user" class="form-select" required>
+                <option value="">请选择系统用户...</option>
+                {% for choice in form.fields.user.queryset %}
+                    <option value="{{ choice.id }}" {% if form.user.value|add:0 == choice.id %}selected{% endif %}>
+                        {{ choice.username }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="mb-3">
+                    <label class="form-label required">成员角色</label>
+                    <select name="role" class="form-select">
+                        {% for code, label in form.fields.role.choices %}
+                            <option value="{{ code }}" {% if form.role.value == code %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="mb-3">
+                    <label class="form-label required">工作量权重 (0-1.0)</label>
+                    <!-- 【修改】默认值改为 0.00 -->
+                    <input type="number" name="workload_share" id="input-workload" step="0.01" min="0" max="1" class="form-control"
+                           value="{{ form.workload_share.value|default:'0.00' }}" required>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <div class="modal-footer">
+        <div class="me-auto text-muted small">
+            项目已分配: <span id="current-total-text" class="fw-bold">0%</span>
+        </div>
+        <button type="button" class="btn btn-link" data-bs-dismiss="modal">取消</button>
+        <button type="submit" id="btn-save-member" class="btn btn-primary">保存成员</button>
+    </div>
+</form>
+
+<script>
+(function() {
+    let existingSum = 0;
+    {% for m in project.members.all %}
+        {% if m.id|stringformat:"s" != member_id %}
+            existingSum += parseFloat("{{ m.workload_share }}");
+        {% endif %}
+    {% endfor %}
+
+    const inputWorkload = document.getElementById('input-workload');
+    const btnSave = document.getElementById('btn-save-member');
+    const warningBox = document.getElementById('frontend-warning');
+    const warningText = document.getElementById('warning-text');
+    const currentTotalText = document.getElementById('current-total-text');
+
+    function validate() {
+        const newValue = parseFloat(inputWorkload.value) || 0;
+        const total = existingSum + newValue;
+
+        currentTotalText.textContent = (total * 100).toFixed(0) + '%';
+
+        if (total > 1.0001) {
+            warningBox.classList.remove('d-none');
+            warningText.innerHTML = `<strong>权重超标！</strong> 总工作量将达到 <b>${(total*100).toFixed(0)}%</b>，请调减。`;
+            btnSave.disabled = true;
+            inputWorkload.classList.add('is-invalid');
+        } else {
+            warningBox.classList.add('d-none');
+            btnSave.disabled = false;
+            inputWorkload.classList.remove('is-invalid');
+        }
+    }
+
+    inputWorkload.addEventListener('input', validate);
+    validate();
+})();
+</script>

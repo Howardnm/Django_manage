@@ -26,82 +26,59 @@ class Project(models.Model):
     manager = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="项目负责人")
     description = models.TextField("项目描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    # 【新增】当前阶段字段 (冗余字段，用于加速查询和筛选)
+    
+    # 进度冗余字段
     current_stage = models.CharField("当前阶段", max_length=20, choices=ProjectStage.choices, default=ProjectStage.INIT)
-    # 【新增】冗余字段，用于极速列表展示
     progress_percent = models.PositiveIntegerField("进度百分比", default=0)
     is_terminated = models.BooleanField("是否终止", default=False)
-    # 【新增】最新节点备注 (冗余字段，用于列表展示)
     latest_remark = models.CharField("最新进展", max_length=200, blank=True, help_text="自动同步当前活跃节点的备注")
+    
+    # 【核心优化】新增：项目质量分冗余字段 (用于绩效统计性能优化)
+    quality_score = models.DecimalField("项目质量得分", max_digits=5, decimal_places=2, default=0.00)
 
     class Meta:
-        verbose_name = "项目"  # 给这个模型起一个名称。
-        # 【核心优化】添加索引
+        verbose_name = "项目"
         indexes = [
-            # 1. 默认排序索引 (已存在)
             models.Index(fields=['-created_at']),
-            # 2. 【新增】阶段筛选索引 (解决按阶段筛选/排序卡顿)
             models.Index(fields=['current_stage']),
-            # 3. 【新增】负责人索引 (解决只看我的/权限过滤卡顿)
             models.Index(fields=['manager']),
-            # 4. 【新增】名称索引 (解决搜索卡顿)
             models.Index(fields=['name']),
         ]
-        ordering = ['-created_at']  # 定义排序规则，给created_at字段倒序排序，“-”号为倒序，等价于.order_by('-created_at')
+        ordering = ['-created_at']
 
     def __str__(self):
         return self.name
 
-    # --- 辅助方法 (针对 N+1 优化) ---
     @cached_property
     def cached_nodes(self):
-        """获取当前项目的节点列表。将节点按 order 正序排序缓存到内存中，供后续计算使用"""
         return sorted(self.nodes.all(), key=lambda x: x.order)
 
     @cached_property
     def current_active_node(self):
-        """
-        确定当前活跃的节点。
-        逻辑：找到第一个状态为 'DOING', 'PENDING', 'PAUSED' 的节点。
-        如果所有节点都已完成或终止，则返回 None。
-        """
         for node in self.cached_nodes:
             if node.status in ['DOING', 'PENDING', 'PAUSED']:
                 return node
-        return None # 所有节点都已完成或终止
+        return None
 
     @property
     def is_paused(self):
-        """判断项目当前是否处于暂停状态"""
         node = self.current_active_node
         return node.status == 'PAUSED' if node else False
 
     @property
     def progress_bar_css_class(self):
-        """根据项目状态返回进度条的 CSS 类"""
-        if self.is_terminated:
-            return "bg-danger"
-        if self.progress_percent == 100:
-            return "bg-success"
-        if self.is_paused:
-            return "bg-warning"
+        if self.is_terminated: return "bg-danger"
+        if self.progress_percent == 100: return "bg-success"
+        if self.is_paused: return "bg-warning"
         return "bg-primary"
 
     # --- 业务逻辑封装 ---
     def add_iteration_node(self, stage_code, after_node_order):
-        '''
-        在指定的 order 之后插入一个新节点
-        :param stage_code: 新节点的阶段代码 (如 'RND' '研发阶段')
-        :param after_node_order: 在哪个排序号之后插入
-        '''
         with transaction.atomic():
-            # 1. 把所有排在后面的节点，order 全部 +1 (腾出位置)
             from django.db.models import F
             self.nodes.filter(order__gt=after_node_order).update(order=F('order') + 1)
-            # 2. 计算这是该阶段的第几轮
             current_count = self.nodes.filter(stage=stage_code).count()
             new_round = current_count + 1
-            # 3. 创建新节点
             ProjectNode.objects.create(
                 project=self,
                 stage=stage_code,
@@ -112,42 +89,22 @@ class Project(models.Model):
             )
 
     def handle_customer_feedback(self, current_node, feedback_type, content):
-        '''
-        统一处理客户反馈逻辑
-        :param current_node: 当前触发反馈的节点对象
-        :param feedback_type: 'STOP'(终止) 或 其他(仅记录意见)
-        :param content: 反馈的具体内容
-        '''
         with transaction.atomic():
             if feedback_type == 'STOP':
-                # 1. 终止当前正在进行的节点
                 current_node.status = 'TERMINATED'
                 current_node.save()
-                # 2. 终止整个项目流程
                 self.terminate_project(current_node.order, content)
             else:
-                # 1. 插入一个新的占位节点 (类型为 FEEDBACK)
                 self.add_iteration_node(ProjectStage.FEEDBACK, current_node.order)
-
-                # 2. 找到刚才插入的那个节点
                 feedback_node = self.nodes.filter(order=current_node.order + 1).first()
-
                 if feedback_node:
                     feedback_node.status = 'FEEDBACK'
                     feedback_node.remark = content
                     feedback_node.save()
 
     def terminate_project(self, current_node_order, reason):
-        '''
-        终止项目：
-        1. 清除当前节点之后的所有 PENDING 节点
-        2. 插入一个“客户终止”节点作为结局
-        '''
         with transaction.atomic():
-            # 1. 删除后续所有未开始的节点
             self.nodes.filter(order__gt=current_node_order, status='PENDING').delete()
-
-            # 2. 插入一个“客户意见”节点作为最后一个节点
             ProjectNode.objects.create(
                 project=self,
                 stage=ProjectStage.FEEDBACK,
@@ -163,7 +120,7 @@ class ProjectNode(models.Model):
     STATUS_CHOICES = [
         ('PENDING', '未开始'),
         ('DOING', '进行中'),
-        ('PAUSED', '暂停'),  # 【新增】暂停状态
+        ('PAUSED', '暂停'),
         ('DONE', '已完成'),
         ('FEEDBACK', '客户意见'),
         ('FAILED', '异常/节点迭代'),
@@ -177,75 +134,50 @@ class ProjectNode(models.Model):
     status = models.CharField("状态", max_length=10, choices=STATUS_CHOICES, default='PENDING')
     updated_at = models.DateTimeField("更新时间", auto_now=True)
     remark = models.TextField("备注/批注", blank=True, null=True)
+    
+    # 绩效得分
+    final_score = models.DecimalField("节点绩效得分", max_digits=5, decimal_places=2, default=0.00)
 
     class Meta:
         verbose_name = "项目进度节点"
         ordering = ['order']
 
     def __str__(self):
-        return self.project.name
+        return f"{self.project.name}-{self.get_stage_display()}"
 
-    # --- 逻辑判断属性 ---
     @property
     def is_active(self):
-        # 暂停状态也属于活跃项目的一部分，允许操作
         return self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
 
     @property
     def is_active_status(self):
-        """是否节点已完成、进行中或暂停"""
         return self.status in ['DONE', 'DOING', 'PAUSED']
 
     @property
     def can_update_status(self):
-        """
-        判断是否可以显示“常规更新”按钮。
-        逻辑：
-        1. 节点状态不能是 'DONE', 'TERMINATED', 'FAILED', 'FEEDBACK'。
-        2. 必须是当前活跃节点。
-        """
-        # 检查是否是当前活跃节点
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-
         return is_current_node and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
 
     @property
     def can_report_failure(self):
-        """
-        判断是否可以“申报不合格”。
-        逻辑：
-        1. 必须是活跃状态 (非 DONE, TERMINATED, FAILED, FEEDBACK)。
-        2. 阶段必须是 研发 或 小试。
-        3. 必须是当前活跃节点。
-        """
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-
         allowed_stages = [ProjectStage.RND, ProjectStage.PILOT, ProjectStage.MID_TEST]
         return is_current_node and self.is_active and (self.stage in allowed_stages)
 
     @property
     def can_add_feedback(self):
-        """
-        判断是否可以“客户干预”。
-        逻辑：
-        1. 节点状态不能是 'TERMINATED', 'DONE', 'FAILED'。
-        2. 当前节点本身不是反馈节点。
-        3. 必须是当前活跃节点。
-        """
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-
         return is_current_node and (self.status not in ['TERMINATED', 'DONE', 'FAILED']) and (self.stage != ProjectStage.FEEDBACK)
 
-    # --- 新增：UI 辅助属性 (把 HTML 里的 if/else 移到这里) ---
     @property
     def status_css_class(self):
         mapping = {
             'PENDING': 'bg-secondary-lt',
             'DOING': 'bg-blue-lt',
-            'PAUSED': 'bg-warning-lt',  # 【新增】黄色/橙色表示暂停
+            'PAUSED': 'bg-warning-lt',
             'DONE': 'bg-green-lt',
             'FEEDBACK': 'bg-yellow text-white',
             'FAILED': 'bg-red-lt',
@@ -255,11 +187,10 @@ class ProjectNode(models.Model):
 
     @property
     def title_status_css_class(self):
-        """返回状态对应的 Tabler 颜色类"""
         mapping = {
             'PENDING': 'text-secondary',
             'DOING': 'text-primary',
-            'PAUSED': 'text-warning',   # 【新增】
+            'PAUSED': 'text-warning',
             'DONE': 'text-primary',
             'FEEDBACK': 'badge bg-yellow text-white',
             'FAILED': 'text-primary',
@@ -269,33 +200,57 @@ class ProjectNode(models.Model):
 
     @property
     def row_active_class(self):
-        """控制步骤条是否点亮"""
-        # 暂停状态在进度条上也应该是亮起的
-        if self.status not in ['DONE', 'FAILED', 'FEEDBACK']:
-            return "active"
+        if self.status not in ['DONE', 'FAILED', 'FEEDBACK']: return "active"
         return ""
 
     @property
     def is_feedback_stage(self):
         return self.stage == ProjectStage.FEEDBACK
 
-    # --- 业务操作封装 ---
     def perform_failure_logic(self, reason):
-        """处理申报不合格的完整逻辑"""
         with transaction.atomic():
             self.status = 'FAILED'
             self.remark = reason
             self.save()
-
         project = self.project
-        # 根据当前阶段决定插入哪些节点
         if self.stage in ['RND', 'PILOT', 'MID_TEST']:
-            # 1. 必插研发
             project.add_iteration_node(ProjectStage.RND, self.order)
-            # 2. 如果是中试失败，还要补中试（先插中试，再插小试，确保小试在中试的前面）
             if self.stage == 'MID_TEST':
                 project.add_iteration_node(ProjectStage.MID_TEST, self.order + 1)
-            # 3. 如果是小试失败，还要补一个小试
             if self.stage in ['PILOT', 'MID_TEST']:
-                # 基准是 +1 (刚插了一个研发)
                 project.add_iteration_node(ProjectStage.PILOT, self.order + 1)
+
+
+# 4. 项目协同成员模型
+class ProjectMember(models.Model):
+    ROLE_CHOICES = [
+        ('LEAD', '项目主导'),
+        ('RND', '实验研发'),
+        ('PROCESS', '工艺支持'),
+        ('SALES', '商务跟进'),
+        ('ASSIST', '辅助/资料'),
+    ]
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='members', verbose_name="关联项目")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="成员用户")
+    role = models.CharField("成员角色", max_length=20, choices=ROLE_CHOICES, default='RND')
+    workload_share = models.DecimalField("工作量占比 (0-1.0)", max_digits=3, decimal_places=2, default=1.00)
+
+    class Meta:
+        verbose_name = "项目成员"
+        unique_together = ('project', 'user')
+
+
+# 5. 评分规则配置模型
+class NodeScoreRule(models.Model):
+    name = models.CharField("规则名称", max_length=100)
+    score_value = models.PositiveIntegerField("对应得分", default=0)
+    trigger_stage = models.CharField("触发阶段", max_length=20, choices=ProjectStage.choices, blank=True, null=True)
+    trigger_status = models.CharField("触发状态", max_length=20, choices=ProjectNode.STATUS_CHOICES)
+    is_multiple_rounds = models.BooleanField("是否为多轮次 (返工)", default=False)
+    description = models.TextField("规则描述/判定逻辑", blank=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.score_value}分)"
+
+    class Meta:
+        verbose_name = "绩效评分规则"

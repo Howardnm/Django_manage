@@ -1,6 +1,6 @@
 <!-- 项目管理模块 -->
 <!-- 定义该模块包含的所有 URL name -->
-{% with route_names='project_list project_create project_detail' %}
+{% with route_names='project_list project_create project_detail project_performance_list' %}
 
 <li class="nav-item dropdown">
     <!-- 父级菜单高亮逻辑 -->
@@ -20,6 +20,12 @@
                 <a class="dropdown-item {% if request.resolver_match.url_name == 'project_list' %}active{% endif %}"
                    href="{% url 'project_list' %}">
                    项目列表
+                </a>
+
+                <!-- 【新增】协同绩效入口 -->
+                <a class="dropdown-item {% if request.resolver_match.url_name == 'project_performance_list' %}active{% endif %}"
+                   href="{% url 'project_performance_list' %}">
+                   协同绩效统计
                 </a>
 
             </div>
