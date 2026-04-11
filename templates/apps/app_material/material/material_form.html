@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    {% if form.instance.pk %}编辑：{{ form.instance.grade_name }}{% else %}录入新材料{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<form action="" method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <div class="row row-cards">
+        <!-- 左侧：基础信息 -->
+        <div class="col-lg-8">
+            {% include 'apps/app_material/material/form_card/form_info.html' %}
+
+            <!-- 性能数据 (EAV) -->
+            {% include 'apps/app_material/material/form_card/form_data.html' %}
+        </div>
+
+        <!-- 右侧：文件与描述 -->
+        <div class="col-lg-4 vstack gap-3">
+            <!-- 文件上传 -->
+            {% include 'apps/app_material/material/form_card/form_file.html' %}
+
+            <!-- 描述 -->
+            {% include 'apps/app_material/material/form_card/form_description.html' %}
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const table = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+    const addBtn = document.getElementById('add-row');
+    const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
+
+    addBtn.addEventListener('click', function() {
+        const rowCount = parseInt(totalForms.value);
+        const template = table.querySelector('.form-row').cloneNode(true);
+
+        // 清空新行的值
+        template.querySelectorAll('input, select, textarea').forEach(input => {
+            const name = input.name.replace(/-\d+-/, `-${rowCount}-`);
+            const id = input.id.replace(/-\d+-/, `-${rowCount}-`);
+            input.name = name;
+            input.id = id;
+            input.value = '';
+
+            // 如果是 Tom Select 复制过来的，需要移除 TS 的 DOM
+            if (input.classList.contains('tomselected')) {
+                input.classList.remove('tomselected');
+                const tsWrapper = input.nextSibling;
+                if (tsWrapper && tsWrapper.classList && tsWrapper.classList.contains('ts-wrapper')) {
+                    tsWrapper.remove();
+                }
+                input.style.display = ''; // 恢复原始显示
+            }
+        });
+
+        // 移除新行的错误提示
+        template.querySelectorAll('.text-danger').forEach(err => err.remove());
+        template.classList.remove('table-danger');
+
+        table.appendChild(template);
+        totalForms.value = rowCount + 1;
+
+        // 对新行的 select 初始化 Tom Select
+        const newSelect = template.querySelector('.form-select-search');
+        if (newSelect && window.TomSelect) {
+            new TomSelect(newSelect, {
+                copyClassesToDropdown: false,
+                dropdownParent: 'body',
+                render: {
+                    no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>'
+                }
+            });
+            // 绑定事件
+            newSelect.addEventListener('change', function() {
+                toggleValueInput(this);
+            });
+        }
+    });
+
+    // 为现有的 select 绑定事件
+    document.querySelectorAll('.form-select-search').forEach(select => {
+        select.addEventListener('change', function() {
+            toggleValueInput(this);
+        });
+    });
+});
+</script>
+{% endblock %}

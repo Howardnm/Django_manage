@@ -1,0 +1,156 @@
+<!-- ============================================================ -->
+<!-- 【核心修改】板块 2：性能数据录入 (动态 FormSet) -->
+<!-- ============================================================ -->
+<div class="card mb-3">
+    <div class="card-header bg-blue-lt">
+        <h3 class="card-title">2. 性能指标数据 (EAV)</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table" id="data-table">
+            <thead>
+            <tr>
+                <th class="w-40 required">测试项目 (指标 | 标准 | 条件)</th>
+                <th class="w-25">数值 / 结果</th>
+                <th class="w-25">备注</th>
+                <th class="w-1">删</th>
+            </tr>
+            </thead>
+            <tbody>
+            <!-- 管理表单，必须有！ -->
+            {{ data_formset.management_form }}
+
+            {% for subform in data_formset %}
+                <tr class="form-row {% if subform.errors %}table-danger{% endif %}">
+                    <!-- 隐藏字段 (如 ID) -->
+                    {% for hidden in subform.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+
+                    <td>
+                        {{ subform.test_config }}
+                        {% if subform.test_config.errors %}
+                            <div class="text-danger small">{{ subform.test_config.errors.0 }}</div>{% endif %}
+                    </td>
+                    <td>
+                        <!-- 数值输入框 -->
+                        {{ subform.value }}
+                        <!-- 文本输入框 -->
+                        {{ subform.value_text }}
+                        <!-- 选择框 -->
+                        {{ subform.value_select }}
+
+                        {% if subform.value.errors %}
+                            <div class="text-danger small">{{ subform.value.errors.0 }}</div>{% endif %}
+                    </td>
+                    <td>{{ subform.remark }}</td>
+                    <td>
+                        {% if subform.instance.pk %}
+                            <div class="form-check m-0 d-flex justify-content-center">
+                                {{ subform.DELETE }}
+                                <label class="form-check-label visually-hidden" for="{{ subform.DELETE.id_for_label }}">删除</label>
+                            </div>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer">
+        <button type="button" class="btn btn-sm btn-primary" id="add-row">
+            <i class="ti ti-plus"></i> 添加一行数据
+        </button>
+        <span class="text-muted small ms-3">
+                    <i class="ti ti-info-circle me-1"></i> 每行代表一个测试项目的数值。
+                </span>
+    </div>
+</div>
+
+<script>
+    // 预加载所有 TestConfig 的数据类型信息
+    const testConfigMeta = {};
+    {% for config in data_formset.form.fields.test_config.queryset %}
+        testConfigMeta['{{ config.id }}'] = {
+            type: '{{ config.data_type }}',
+            options: {{ config.get_options_list|safe }}
+        };
+    {% endfor %}
+
+    function toggleValueInput(selectElement) {
+        const row = selectElement.closest('tr');
+        const valueInput = row.querySelector('.value-number');
+        const textInput = row.querySelector('.value-text');
+        const selectInput = row.querySelector('.value-select');
+        const configId = selectElement.value;
+
+        if (!configId) return;
+
+        const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+
+        // 重置显示
+        valueInput.style.display = 'none';
+        textInput.style.display = 'none';
+        selectInput.style.display = 'none';
+
+        if (meta.type === 'NUMBER') {
+            valueInput.style.display = 'block';
+            if (selectElement.dataset.initialized === 'true') {
+                 textInput.value = '';
+                 selectInput.value = '';
+            }
+        } else if (meta.type === 'TEXT') {
+            textInput.style.display = 'block';
+            if (selectElement.dataset.initialized === 'true') {
+                valueInput.value = '';
+                selectInput.value = '';
+            }
+        } else if (meta.type === 'SELECT') {
+            selectInput.style.display = 'block';
+            if (selectElement.dataset.initialized === 'true') {
+                valueInput.value = '';
+                textInput.value = '';
+            }
+
+            if (selectInput.options.length <= 1) {
+                const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
+                selectInput.innerHTML = '';
+                const emptyOpt = document.createElement('option');
+                emptyOpt.value = '';
+                emptyOpt.text = '---------';
+                selectInput.appendChild(emptyOpt);
+
+                meta.options.forEach(opt => {
+                    const option = document.createElement('option');
+                    option.value = opt;
+                    option.text = opt;
+                    if (opt === currentValue) {
+                        option.selected = true;
+                    }
+                    selectInput.appendChild(option);
+                });
+            }
+        }
+        selectElement.dataset.initialized = 'true';
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        setTimeout(() => {
+            document.querySelectorAll('.form-select-search').forEach(select => {
+                if (select.value) {
+                    const row = select.closest('tr');
+                    const selectInput = row.querySelector('.value-select');
+                    const textInput = row.querySelector('.value-text');
+                    const configId = select.value;
+                    const meta = testConfigMeta[configId];
+
+                    if (meta && meta.type === 'SELECT') {
+                        if (textInput.value) {
+                            selectInput.setAttribute('data-current-value', textInput.value);
+                        }
+                    }
+                    toggleValueInput(select);
+                }
+            });
+        }, 100);
+    });
+</script>

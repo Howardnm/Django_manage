@@ -12,17 +12,14 @@
             </h1>
         </div>
 
-        <div class="d-flex">
-        </div>
-
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
 
-                {# 新增独立的首页链接 #}
+                {# 1. 首页 #}
                 <li class="nav-item {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}">
                     <a class="nav-link" href="{% url 'panel_home' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <i class="ti ti-home"></i> {# 使用一个家庭图标 #}
+                            <i class="ti ti-home"></i>
                         </span>
                         <span class="nav-link-title">
                             首页
@@ -30,84 +27,86 @@
                     </a>
                 </li>
 
-                {# 如果用户有任何看板权限，则显示“系统看板”标题和下拉菜单 #}
-                {% if perms.app_project.view_project or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial %}
+                {# 2. 系统全景看板 (纯化权限检查) #}
+                {% if perms.app_project.view_project or perms.app_material.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial %}
                     <li class="nav-item mt-3 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">系统全景看板</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
-
-                    <!-- 【模块 1：看板下拉菜单】 -->
                     {% include "sidebar_modules/_dashboard.html" %}
                 {% endif %}
 
 
-                <!-- 分割线：项目管理部 -->
+                <!-- 3. 项目管理部 -->
                 {% if perms.app_project.view_project or perms.app_repository.view_projectrepository %}
                     <li class="nav-item mt-3 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">项目管理部</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
 
-                    <!-- 【模块 2：项目管理】 -->
                     {% if perms.app_project.view_project %}
                         {% include "sidebar_modules/_projects.html" %}
                     {% endif %}
 
-                    <!-- 【模块 3：项目资料库】 -->
                     {% if perms.app_repository.view_projectrepository %}
                         {% include "sidebar_modules/_repository.html" %}
                     {% endif %}
                 {% endif %}
 
 
-                <!-- 分割线：研发技术部 -->
-                {% if perms.app_basic_research.view_researchproject or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula %}
+                <!-- 4. 研发技术部 (纯化权限检查) -->
+                {% if perms.app_basic_research.view_researchproject or perms.app_material.view_materiallibrary or perms.app_formula.view_labformula %}
                     <li class="nav-item mt-4 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">研发技术部</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
 
-                    <!-- 【新增模块：基础预研项目】 -->
                     {% if perms.app_basic_research.view_researchproject %}
                         {% include "sidebar_modules/_basic_research.html" %}
                     {% endif %}
 
-                    <!-- 【模块 4：公共材料库】 -->
-                    {% if perms.app_repository.view_materiallibrary %}
+                    {% if perms.app_material.view_materiallibrary %}
                         {% include "sidebar_modules/_material_db.html" %}
                     {% endif %}
 
-                    <!-- 【模块 7：配方数据库】 -->
                     {% if perms.app_formula.view_labformula %}
                         {% include "sidebar_modules/_formula.html" %}
                     {% endif %}
                 {% endif %}
 
-                <!-- 分割线：工艺技术部 -->
+                <!-- 5. 工艺技术部 -->
                 {% if perms.app_process.view_processprofile %}
                     <li class="nav-item mt-4 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">工艺技术部</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
 
-                    <!-- 【模块 6：工艺数据库】 -->
-                    {% include "sidebar_modules/_process.html" %}
+                    {% if perms.app_process.view_processprofile %}
+                        {% include "sidebar_modules/_process.html" %}
+                    {% endif %}
                 {% endif %}
 
 
-                <!-- 分割线：供应链与资源 -->
+                <!-- 6. 供应链与资源 -->
                 {% if perms.app_raw_material.view_rawmaterial %}
                     <li class="nav-item mt-4 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">供应链与资源</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
 
-                    <!-- 【模块 5：原材料库】 -->
-                    {% include "sidebar_modules/_raw_material.html" %}
+                    {% if perms.app_raw_material.view_rawmaterial %}
+                        {% include "sidebar_modules/_raw_material.html" %}
+                    {% endif %}
                 {% endif %}
 
-                {# 关键修改：将新菜单项插入到列表末尾 #}
+                <!-- 7. 对外展示与服务 -->
+                <li class="nav-item mt-4 mb-1">
+                    <div class="text-muted text-uppercase small fw-bold ps-3">对外展示与服务</div>
+                </li>
+                <hr class="my-1 mx-3 opacity-25"/>
+
+                {% include "sidebar_modules/_catalog.html" %}
+
                 <li class="{% if request.resolver_match.view_name == 'dify_chatbot' %}active{% endif %}">
                     <a class="nav-link" href="{% url 'dify_chatbot' %}">
                         <span class="nav-link-icon d-md-none d-lg-inline-block">
@@ -119,14 +118,12 @@
                     </a>
                 </li>
 
-                <!-- 分割线：系统管理 -->
+                <!-- 8. 系统管理 -->
                 {% if perms.auth.view_user or user.is_staff %}
                     <li class="nav-item mt-4 mb-1">
                         <div class="text-muted text-uppercase small fw-bold ps-3">系统管理</div>
                     </li>
                     <hr class="my-1 mx-3 opacity-25"/>
-
-                    <!-- 【模块 8：用户管理】 -->
                     {% include "sidebar_modules/_users.html" %}
                 {% endif %}
 

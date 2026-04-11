@@ -16,8 +16,9 @@
             <!-- 2. 项目档案&文件 -->
             {% include 'apps/app_project/detail/detail_project_customer_files.html' %}
 
-            <!-- 3. 【移动至此】材料全性能卡片 -->
-            {% include 'apps/app_project/detail/detail_project_material.html' %}
+            <!-- 3. 材料全性能卡片 -->
+            {% include 'apps/app_project/detail/detail_project_material.html' with material=material project_repo=project_repo %}
+
             <!-- 1. 顶部：甘特图 -->
             {% include 'apps/app_project/detail/detail_project_gantt.html' %}
 

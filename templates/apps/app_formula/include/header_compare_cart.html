@@ -108,7 +108,8 @@
                     if (materials.length > 0) {
                         itemsContainer.insertAdjacentHTML('beforeend', '<div class="list-group-header sticky-top bg-white">材料 (' + materials.length + ')</div>');
                         materials.forEach(item => {
-                            const url = "{% url 'repo_material_detail' 0 %}".replace('0', item.id);
+                            // 修正：使用新的 material_detail 路由
+                            const url = "{% url 'material_detail' 0 %}".replace('0', item.id);
                             itemsContainer.insertAdjacentHTML('beforeend', renderItem(item, 'bg-blue-lt', '材料', 'material', url));
                         });
                     }
@@ -126,7 +127,6 @@
                     const checkboxes = document.querySelectorAll('.compare-checkbox');
                     checkboxes.forEach(cb => {
                         let cbType = cb.getAttribute('data-type');
-                        // 简单的类型推断兜底
                         if (!cbType) {
                             if (window.location.pathname.includes('formula')) cbType = 'formula';
                             else if (window.location.pathname.includes('raw_material')) cbType = 'raw_material';
@@ -141,7 +141,6 @@
                     
                 } else {
                     itemsContainer.innerHTML = '<div class="list-group-item text-center text-muted py-3">暂无对比项目</div>';
-                    // 清空复选框
                     document.querySelectorAll('.compare-checkbox').forEach(cb => {
                         cb.checked = false;
                     });
@@ -157,7 +156,6 @@
         formData.append('id', id);
         formData.append('type', type);
         
-        // 动态获取 CSRF Token
         let csrfToken = '{{ csrf_token }}';
         const csrfInput = document.querySelector('[name=csrfmiddlewaretoken]');
         if (csrfInput) {

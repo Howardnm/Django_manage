@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_material.forms import MaterialTypeForm
-from app_material.models import MaterialType
+from app_material.models.material import MaterialType
 from app_material.utils.filters import MaterialTypeFilter
 
 
@@ -12,16 +12,14 @@ from app_material.utils.filters import MaterialTypeFilter
 # 4. 材料类型管理 (MaterialType)
 # ==========================================
 
-# 1. 材料类型列表
 class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'app_repository.view_materialtype'
+    permission_required = 'app_material.view_materialtype'
     model = MaterialType
-    template_name = 'apps/app_repository/materialtype/type_list.html'
+    template_name = 'apps/app_material/materialtype/type_list.html'
     context_object_name = 'types'
     paginate_by = 10
 
     def get_queryset(self):
-        # 使用 annotate 和 Count 来计算每个类型关联的材料数量
         qs = super().get_queryset().annotate(
             material_count=Count('materiallibrary')
         ).order_by('name')
@@ -37,12 +35,12 @@ class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
 
 
 class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
-    permission_required = 'app_repository.add_materialtype'
+    permission_required = 'app_material.add_materialtype'
     raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
-    template_name = 'apps/app_repository/form_generic.html'
-    success_url = reverse_lazy('repo_type_list')
+    template_name = 'apps/app_material/form_generic.html'
+    success_url = reverse_lazy('type_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -51,12 +49,12 @@ class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, Create
 
 
 class MaterialTypeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
-    permission_required = 'app_repository.change_materialtype'
+    permission_required = 'app_material.change_materialtype'
     raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
-    template_name = 'apps/app_repository/form_generic.html'
-    success_url = reverse_lazy('repo_type_list')
+    template_name = 'apps/app_material/form_generic.html'
+    success_url = reverse_lazy('type_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

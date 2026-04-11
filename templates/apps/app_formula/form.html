@@ -231,13 +231,9 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <!-- 数值输入框 -->
                                         {{ form.value }}
-                                        <!-- 文本输入框 -->
                                         {{ form.value_text }}
-                                        <!-- 选择框 -->
                                         {{ form.value_select }}
-                                        
                                         {% if form.value.errors %}
                                             <div class="invalid-feedback d-block">{{ form.value.errors.0 }}</div>
                                         {% endif %}
@@ -312,7 +308,6 @@
     </script>
 
     <script>
-        // 预加载所有 TestConfig 的数据类型信息
         const testConfigMeta = {};
         {% for config in test_formset.form.fields.test_config.queryset %}
             testConfigMeta['{{ config.id }}'] = {
@@ -329,10 +324,8 @@
             const configId = selectElement.value;
             
             if (!configId) return;
-            
             const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
             
-            // 重置显示
             valueInput.style.display = 'none';
             textInput.style.display = 'none';
             selectInput.style.display = 'none';
@@ -355,81 +348,61 @@
                     valueInput.value = '';
                     textInput.value = '';
                 }
-                
-                // 动态填充选项
                 if (selectInput.options.length <= 1) {
                     const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
-                    
                     selectInput.innerHTML = '';
                     const emptyOpt = document.createElement('option');
                     emptyOpt.value = '';
                     emptyOpt.text = '---------';
                     selectInput.appendChild(emptyOpt);
-                    
                     meta.options.forEach(opt => {
                         const option = document.createElement('option');
                         option.value = opt;
                         option.text = opt;
-                        if (opt === currentValue) {
-                            option.selected = true;
-                        }
+                        if (opt === currentValue) option.selected = true;
                         selectInput.appendChild(option);
                     });
                 }
             }
-            
             selectElement.dataset.initialized = 'true';
         }
 
         document.addEventListener('DOMContentLoaded', function () {
-            // 1. 初始化远程搜索 (针对主表单字段)
             if (window.TomSelect) {
                 document.querySelectorAll('.remote-search').forEach(function (el) {
                     var modelType = el.getAttribute('data-model');
+                    // 分流搜索 URL
+                    var searchUrl = "{% url 'material_api_search' %}";
+                    if (['customer', 'oem', 'salesperson'].includes(modelType)) {
+                        searchUrl = "{% url 'repo_api_search' %}";
+                    }
+
                     new TomSelect(el, {
                         valueField: 'value',
                         labelField: 'text',
                         searchField: 'text',
                         load: function (query, callback) {
-                            var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            var url = searchUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
                             fetch(url)
                                 .then(response => response.json())
-                                .then(json => {
-                                    callback(json);
-                                })
-                                .catch(() => {
-                                    callback();
-                                });
+                                .then(json => callback(json))
+                                .catch(() => callback());
                         },
                         copyClassesToDropdown: false,
                         dropdownParent: 'body',
                         create: false,
                         placeholder: '请输入关键词搜索...',
-                        preload: 'focus', // 关键：点击时才加载
+                        preload: 'focus',
                         render: {
-                            option: function (data, escape) {
-                                // 【修复】单行显示，更紧凑
-                                let extra = '';
-                                if (data.extra) {
-                                    extra = ` <span class="text-muted small">(${escape(data.extra)})</span>`;
-                                }
-                                return `<div>${escape(data.text)}${extra}</div>`;
-                            },
-                            item: function (data, escape) {
-                                return `<div>${escape(data.text)}</div>`;
-                            },
-                            no_results: function (data, escape) {
-                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                            },
-                            loading: function (data, escape) {
-                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
-                            }
+                            option: (data, escape) => `<div>${escape(data.text)}</div>`,
+                            item: (data, escape) => `<div>${escape(data.text)}</div>`,
+                            no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>',
+                            loading: (data, escape) => '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'
                         }
                     });
                 });
             }
 
-            // 2. 通用添加行函数
             function setupFormSet(prefix, btnId, containerId, templateId) {
                 const addBtn = document.getElementById(btnId);
                 const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
@@ -442,11 +415,8 @@
                     container.insertAdjacentHTML('beforeend', newRow);
                     totalForms.value = count + 1;
 
-                    // 重新初始化 Tom Select (针对新添加的行)
                     if (window.TomSelect) {
                         const newRowElement = container.lastElementChild;
-
-                        // A. 初始化普通搜索框 (如 test_config)
                         newRowElement.querySelectorAll('.form-select-search').forEach(el => {
                             new TomSelect(el, {
                                 copyClassesToDropdown: false,
@@ -454,56 +424,34 @@
                                 controlInput: '<input>',
                                 create: false,
                                 placeholder: '输入搜索...',
-                                onChange: function(value) {
-                                    // 触发 toggleValueInput
-                                    if (typeof toggleValueInput === 'function') {
-                                        toggleValueInput(el);
-                                    }
-                                }
+                                onChange: () => toggleValueInput(el)
                             });
                         });
 
-                        // B. 初始化远程搜索框 (如 raw_material)
                         newRowElement.querySelectorAll('.remote-search').forEach(el => {
                             var modelType = el.getAttribute('data-model');
+                            var searchUrl = "{% url 'material_api_search' %}";
+                            if (['customer', 'oem', 'salesperson'].includes(modelType)) {
+                                searchUrl = "{% url 'repo_api_search' %}";
+                            }
                             new TomSelect(el, {
                                 valueField: 'value',
                                 labelField: 'text',
                                 searchField: 'text',
                                 load: function (query, callback) {
-                                    var url = "{% url 'repo_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                                    var url = searchUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
                                     fetch(url)
                                         .then(response => response.json())
-                                        .then(json => {
-                                            callback(json);
-                                        })
-                                        .catch(() => {
-                                            callback();
-                                        });
+                                        .then(json => callback(json))
+                                        .catch(() => callback());
                                 },
                                 copyClassesToDropdown: false,
                                 dropdownParent: 'body',
                                 create: false,
-                                placeholder: '请输入关键词搜索...',
                                 preload: 'focus',
                                 render: {
-                                    option: function (data, escape) {
-                                        // 【修复】单行显示，更紧凑
-                                        let extra = '';
-                                        if (data.extra) {
-                                            extra = ` <span class="text-muted small">(${escape(data.extra)})</span>`;
-                                        }
-                                        return `<div>${escape(data.text)}${extra}</div>`;
-                                    },
-                                    item: function (data, escape) {
-                                        return `<div>${escape(data.text)}</div>`;
-                                    },
-                                    no_results: function (data, escape) {
-                                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                                    },
-                                    loading: function (data, escape) {
-                                        return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
-                                    }
+                                    option: (data, escape) => `<div>${escape(data.text)}</div>`,
+                                    item: (data, escape) => `<div>${escape(data.text)}</div>`
                                 }
                             });
                         });
@@ -514,21 +462,17 @@
             setupFormSet('bom', 'add-bom', 'bom-formset', 'bom-empty-form');
             setupFormSet('test', 'add-test', 'test-formset', 'test-empty-form');
             
-            // 初始化现有行的显示状态
             setTimeout(() => {
                 document.querySelectorAll('.form-select-search').forEach(select => {
                     if (select.value) {
-                        // 尝试恢复 SELECT 类型的值
                         const row = select.closest('tr');
                         const selectInput = row.querySelector('.value-select');
                         const textInput = row.querySelector('.value-text');
                         const configId = select.value;
                         const meta = testConfigMeta[configId];
-                        
                         if (meta && meta.type === 'SELECT' && textInput.value) {
                             selectInput.setAttribute('data-current-value', textInput.value);
                         }
-                        
                         toggleValueInput(select);
                     }
                 });

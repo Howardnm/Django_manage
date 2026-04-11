@@ -1,38 +1,38 @@
-{% if repo.material %}
+{% if material %}
     <div class="card mb-3">
         <!-- ============================================================ -->
-        <!-- 头部：材料身份信息 (绿色主题) -->
+        <!-- 头部：材料身份信息 (红色主题) -->
         <!-- ============================================================ -->
         <div class="card-header bg-danger-lt">
             <div class="d-flex align-items-center w-100">
                 <!-- 左侧：头像 -->
                 <span class="avatar bg-white text-danger rounded me-3">
-                    {{ repo.material.grade_name|slice:":1" }}
+                    {{ material.grade_name|slice:":1" }}
                 </span>
 
                 <!-- 中间：牌号 & 厂商 -->
                 <div class="flex-fill overflow-hidden">
                     <h3 class="card-title m-0">
-                        <a href="{% url 'repo_material_detail' repo.material.pk %}" target="_blank" class="text-danger text-decoration-none" title="点击查看详情">
-                            {{ repo.material.grade_name }}
+                        <a href="{% url 'material_detail' material.pk %}" target="_blank" class="text-danger text-decoration-none" title="点击查看详情">
+                            {{ material.grade_name }}
                         </a>
                     </h3>
                     <div class="small text-truncate">
-                        {{ repo.material.manufacturer }}
+                        {{ material.manufacturer }}
                     </div>
                 </div>
 
                 <!-- 右侧：类型 & 阻燃 -->
                 <div class="ms-auto d-flex align-items-center gap-2 me-3">
-                    <span class="badge bg-green text-white">{{ repo.material.category.name }}</span>
-                    {% if repo.material.flammability %}
+                    <span class="badge bg-green text-white">{{ material.category.name }}</span>
+                    {% if material.flammability %}
                         <span class="badge bg-orange text-white">
-                            {{ repo.material.flammability }}
+                            {{ material.flammability }}
                         </span>
                     {% endif %}
                 </div>
                 <div class="ms-auto">
-                    <a href="{% url 'repo_material_detail' repo.material.pk %}" class="btn btn-icon btn-danger" title="编辑">
+                    <a href="{% url 'material_edit' material.pk %}" class="btn btn-icon btn-danger" title="编辑">
                         <i class="ti ti-edit"></i>
                     </a>
                 </div>
@@ -46,7 +46,7 @@
             <!-- 场景行 -->
             <div class="mb-2 d-flex align-items-center flex-wrap gap-1">
                 <span class="text-body small fw-bold me-1">适用场景:</span>
-                {% for s in repo.material.scenarios.all %}
+                {% for s in material.scenarios.all %}
                     <span class="badge bg-blue-lt text-blue">{{ s.name }}</span>
                 {% empty %}
                     <span class="text-muted small fst-italic">通用场景</span>
@@ -56,25 +56,25 @@
             <!-- 描述 -->
             <div class="text-secondary small mb-2 text-truncate">
                 <i class="ti ti-info-circle me-1"></i>
-                {{ repo.material.description|default:"暂无特性描述" }}
+                {{ material.description|default:"暂无特性描述" }}
             </div>
 
             <!-- 文件按钮 -->
             <div class="btn-list">
-                {% if repo.material.file_tds %}
-                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_tds' %}" target="_blank"
+                {% if material.file_tds %}
+                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' material.pk 'file_tds' %}" target="_blank"
                        class="btn btn-sm btn-pill btn-outline-primary">
                         <i class="ti ti-file-text me-1"></i> TDS
                     </a>
                 {% endif %}
-                {% if repo.material.file_msds %}
-                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_msds' %}" target="_blank"
+                {% if material.file_msds %}
+                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' material.pk 'file_msds' %}" target="_blank"
                        class="btn btn-sm btn-pill btn-outline-danger">
                         <i class="ti ti-flask me-1"></i> MSDS
                     </a>
                 {% endif %}
-                {% if repo.material.file_rohs %}
-                    <a href="{% url 'secure_download' 'app_repository' 'materiallibrary' repo.material.pk 'file_rohs' %}" target="_blank"
+                {% if material.file_rohs %}
+                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' material.pk 'file_rohs' %}" target="_blank"
                        class="btn btn-sm btn-pill btn-outline-success">
                         <i class="ti ti-leaf me-1"></i> RoHS
                     </a>
@@ -86,10 +86,10 @@
         <!-- 下半部分：全维物性指标 (Performance Matrix) -->
         <!-- ============================================================ -->
         <div class="card-body p-0">
-            {% for group in repo.material.get_grouped_properties %}
+            {% for group in material.get_grouped_properties %}
                 <div class="p-2 {% if not forloop.last %}border-bottom{% endif %}">
 
-                    <!-- 分类标题：紧凑型全宽胶囊 -->
+                    <!-- 分类标题 -->
                     <div class="mb-2">
                         {% if "物理" in group.category_name %}
                             <span class="badge bg-blue-lt w-100 py-1 justify-content-start rounded text-blue fs-5">
@@ -114,26 +114,20 @@
                         {% endif %}
                     </div>
 
-                    <!-- 指标列表：极简胶囊风格 -->
-                    <!-- 【修改】g-2 改为 g-1，进一步缩小行间距 -->
+                    <!-- 指标列表 -->
                     <div class="row row-cards g-1">
                         {% for item in group.items %}
                             <div class="col-6">
                                 <div class="border rounded px-2 py-1 d-flex align-items-center justify-content-between bg-white h-100 position-relative">
-
-                                    <!-- 左侧：名称与标准 (紧凑堆叠) -->
                                     <div class="text-truncate fw-bold text-dark" style="font-size: 13px" title="{{ item.name }}">
                                         {{ item.name }}
                                     </div>
-                                    <!-- 右侧：数值 (高亮加粗) -->
                                     <div class="text-end lh-1 ms-1">
                                         <div class="fw-bolder fs-4 
                                             {% if '物理' in group.category_name %}text-blue
                                             {% elif '机械' in group.category_name %}text-orange
                                             {% elif '热学' in group.category_name %}text-red
                                             {% else %}text-purple{% endif %}">
-                                            
-                                            <!-- 【修改】数值格式化逻辑 -->
                                             {% if item.data_type == 'NUMBER' %}
                                                 {% if "密度" in item.name or "比重" in item.name %}
                                                     {{ item.value|floatformat:3 }}
@@ -141,30 +135,24 @@
                                                     {{ item.value|floatformat:2 }}
                                                 {% endif %}
                                             {% else %}
-                                                <!-- 非数字内容直接显示 -->
                                                 {{ item.value }}
                                             {% endif %}
                                         </div>
                                         {% if item.unit %}
                                             <div class="text-muted small text-black" style="font-size: 9px">
                                                 {{ item.standard }}
-                                                {% if item.condition %}
-                                                    <span class="mx-1">·</span>{{ item.condition }}
-                                                {% endif %}
+                                                {% if item.condition %}<span class="mx-1">·</span>{{ item.condition }}{% endif %}
                                                 <span class="mx-2">·</span>{{ item.unit }}
                                             </div>
                                         {% endif %}
                                     </div>
-
                                 </div>
                             </div>
                         {% endfor %}
                     </div>
                 </div>
             {% empty %}
-                <div class="p-3 text-center text-muted small">
-                    暂无性能数据
-                </div>
+                <div class="p-3 text-center text-muted small">暂无性能数据</div>
             {% endfor %}
         </div>
     </div>

@@ -1,0 +1,113 @@
+{% extends "apps/app_catalog/base_catalog.html" %}
+
+{% block title %}牌号列表 - {{ scenario.name|default:"搜索结果" }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <!-- 面包屑导航 -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{% url 'app_catalog:home' %}">首页</a></li>
+                        {% if scenario %}
+                        <li class="breadcrumb-item"><a href="{% url 'app_catalog:scenario_categories' scenario.id %}">{{ scenario.name }}</a></li>
+                        {% endif %}
+                        <li class="breadcrumb-item active" aria-current="page">
+                            {% if current_category %}{{ current_category.name }}{% else %}搜索结果{% endif %}
+                        </li>
+                    </ol>
+                </nav>
+                <h2 class="page-title h1">
+                    {% if current_category %}{{ current_category.name }} 牌号列表{% else %}全局搜索结果{% endif %}
+                </h2>
+                {% if scenario %}
+                <div class="text-muted mt-1">领域：{{ scenario.name }} | 系列：{{ current_category.name }}</div>
+                {% endif %}
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="text-muted">共 {{ page_obj.paginator.count }} 个匹配牌号</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <!-- 过滤器侧边栏 (主要用于搜索模式下的精细筛选) -->
+    <div class="col-md-3">
+        <form action="{% url 'app_catalog:search' %}" method="get" class="card shadow-sm border-0">
+            <div class="card-header bg-light">
+                <h3 class="card-title">快速检索</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">关键词</label>
+                    <input type="text" name="q" class="form-control" value="{{ request.GET.q|default:'' }}" placeholder="搜索牌号...">
+                </div>
+                <div class="mt-4">
+                    <button type="submit" class="btn btn-primary w-100">开始搜索</button>
+                    {% if scenario %}
+                    <a href="{% url 'app_catalog:scenario_categories' scenario.id %}" class="btn btn-link w-100 mt-2 text-muted">返回系列</a>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- 牌号列表展示 -->
+    <div class="col-md-9">
+        <div class="row row-cards">
+            {% for product in products %}
+            <div class="col-sm-6 col-lg-4">
+                <div class="card h-100 shadow-sm border-0 category-card">
+                    <div class="card-body p-4">
+                        <div class="d-flex align-items-center mb-3">
+                            <span class="badge bg-primary-lt">{{ product.category.name }}</span>
+                            {% if product.is_featured %}
+                            <span class="ms-auto"><i class="ti ti-star-filled text-yellow"></i></span>
+                            {% endif %}
+                        </div>
+                        <h3 class="card-title h3 mb-1">
+                            <a href="{% url 'app_catalog:product_detail' product.pk %}" class="text-dark">{{ product.display_name }}</a>
+                        </h3>
+                        <p class="text-muted small">点击查看技术指标</p>
+
+                        <div class="d-flex align-items-center mt-4 pt-3 border-top">
+                            <div class="text-muted small">
+                                <i class="ti ti-eye me-1"></i> {{ product.view_count }}
+                            </div>
+                            <div class="ms-auto">
+                                <a href="{% url 'app_catalog:product_detail' product.pk %}" class="btn btn-ghost-primary btn-sm">查看详情</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="card text-center py-5 text-muted shadow-sm border-0">
+                    <i class="ti ti-ghost icon-lg mb-2"></i>
+                    <p>在该筛选条件下暂无公开牌号。</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- 分页 -->
+        {% if is_paginated %}
+        <div class="mt-5 d-flex justify-content-center">
+            <ul class="pagination">
+                {% if page_obj.has_previous %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}"><i class="ti ti-chevron-left"></i></a></li>
+                {% endif %}
+                <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
+                {% if page_obj.has_next %}
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}"><i class="ti ti-chevron-right"></i></a></li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

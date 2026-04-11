@@ -19,9 +19,6 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
     permission_required = 'app_project.view_project'
 
     def get(self, request):
-        # 1. 基础查询集深度优化
-        # 【优化】利用冗余字段后，列表页不再需要 prefetch_related('nodes')
-        # 也不再 defer('description')，因为我们可以在列表页显示项目描述
         base_qs = Project.objects.select_related(
             'manager',
             'repository',
@@ -30,14 +27,9 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
             'repository__material'
         ).order_by('-created_at')
 
-        # 2. 权限过滤 (你的 Mixin)
         projects_qs = self.get_permitted_queryset(base_qs)
-
-        # 3. 接入 Filter
         filter_set = ProjectFilter(request.GET, queryset=projects_qs, request=request)
         queryset = filter_set.qs
-
-        # 4. 分页
         paginator = Paginator(queryset, 10)
         page_obj = paginator.get_page(request.GET.get('page'))
 
@@ -52,7 +44,6 @@ class ProjectListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermis
 class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
     permission_required = 'app_project.add_project'
     raise_exception = True
-
     model = Project
     form_class = ProjectForm
     template_name = 'apps/app_project/project_form.html'
@@ -62,14 +53,12 @@ class ProjectCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView)
         return super().form_valid(form)
 
     def get_success_url(self):
-        # 【修改】创建成功后，跳转到该项目的详情页
         return reverse('project_detail', kwargs={'pk': self.object.pk})
 
 
 class ProjectUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
     permission_required = 'app_project.change_project'
     raise_exception = True
-
     model = Project
     form_class = ProjectForm
     template_name = 'apps/app_project/project_form.html'
@@ -87,7 +76,6 @@ class ProjectDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPerm
     template_name = 'apps/app_project/detail.html'
     context_object_name = 'project'
 
-    # 详情页依然需要加载所有节点信息，保持不变
     queryset = Project.objects.select_related(
         'manager',
         'repository',
@@ -99,7 +87,7 @@ class ProjectDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPerm
     ).prefetch_related(
         'nodes',
         'repository__files',
-        'repository__material__scenarios',  # 多对多必须用 prefetch
+        'repository__material__scenarios',
         'repository__material__additional_files'
     )
 
@@ -112,9 +100,13 @@ class ProjectDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPerm
         context = super().get_context_data(**kwargs)
         project = self.object
 
+        project_repo = getattr(project, 'repository', None)
+        material = project_repo.material if project_repo else None
+
         context.update({
             'nodes': project.cached_nodes,
-            'repo': getattr(project, 'repository', None),
+            'project_repo': project_repo, # 将 ProjectRepository 实例命名为 project_repo
+            'material': material,         # 直接将 material 实例传递给模板
             'gantt_data_json': get_project_gantt_data(project)
         })
         return context

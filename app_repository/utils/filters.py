@@ -2,7 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from django.contrib.auth.models import Group
-from app_repository.models import Customer, OEM, Salesperson, ProjectRepository
+from ..models import Customer, OEM, Salesperson, ProjectRepository # 修正导入路径
 from common_utils.filters import TablerFilterMixin
 
 
@@ -56,7 +56,7 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
             ('updated_at', 'updated_at'),
             ('customer__company_name', 'customer'),
             ('material__grade_name', 'material'),
-            ('project__created_at', 'project_created_at'),  # 新增排序选项
+            ('project__created_at', 'project_created_at'),
         ),
         widget=forms.HiddenInput
     )

@@ -206,7 +206,7 @@
                             {% if formula.related_materials.exists %}
                                 <div class="d-flex flex-wrap gap-1" style="max-width: 150px;">
                                     {% for mat in formula.related_materials.all|slice:":2" %}
-                                        <a href="{% url 'repo_material_detail' mat.pk %}" target="_blank" class="badge bg-blue-lt text-truncate" style="max-width: 100px;">
+                                        <a href="{% url 'material_detail' mat.pk %}" target="_blank" class="badge bg-blue-lt text-truncate" style="max-width: 100px;">
                                             {{ mat.grade_name }}
                                         </a>
                                     {% endfor %}
@@ -250,7 +250,6 @@
             }
         }
         
-        // 【修改】批量加入对比 - 改为一次性调用 API
         function addSelectedToCompare() {
             const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
             if (checkboxes.length === 0) {
@@ -259,16 +258,12 @@
             }
             
             const ids = Array.from(checkboxes).map(cb => cb.value);
-            
-            // 构建 FormData
             const formData = new FormData();
             formData.append('action', 'add_multiple');
-            formData.append('type', 'formula'); // 明确指定类型为配方
-            // 将 ID 列表转换为 JSON 字符串传递
-            formData.append('ids', JSON.stringify(ids)); // 注意：后端现在接收 'ids' 而不是 'formula_ids'
+            formData.append('type', 'formula');
+            formData.append('ids', JSON.stringify(ids));
             formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
             
-            // 发送请求
             fetch("{% url 'formula_compare_cart' %}", {
                 method: 'POST',
                 body: formData
@@ -276,15 +271,12 @@
             .then(response => response.json())
             .then(data => {
                 if (data.status === 'success') {
-                    // 刷新 Header 购物车 (如果存在该函数)
                     if (typeof refreshCompareCart === 'function') {
                         refreshCompareCart();
                     }
-                    // 取消勾选
                     checkboxes.forEach(cb => cb.checked = false);
                     const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
                     if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
-                    
                     alert('已成功加入 ' + ids.length + ' 个配方到对比清单');
                 } else {
                     alert('加入失败，请重试');

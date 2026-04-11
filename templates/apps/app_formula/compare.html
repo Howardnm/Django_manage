@@ -9,7 +9,7 @@
         </div>
         <div class="col-auto ms-auto">
             {% if material %}
-            <a href="{% url 'repo_material_detail' material.pk %}" class="btn btn-outline-secondary">
+            <a href="{% url 'material_detail' material.pk %}" class="btn btn-outline-secondary">
                 <i class="ti ti-arrow-left me-1"></i> 返回材料详情
             </a>
             {% else %}
@@ -62,7 +62,7 @@
                                 {% if col.type == 'material' %}
                                     <div class="badge bg-blue-lt mb-2">基准材料</div>
                                     <div class="fw-bold fs-4 text-wrap">
-                                        <a href="{% url 'repo_material_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.grade_name }}</a>
+                                        <a href="{% url 'material_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.grade_name }}</a>
                                     </div>
                                     <div class="small text-muted text-truncate" title="{{ col.obj.manufacturer }}">{{ col.obj.manufacturer }}</div>
                                 {% elif col.type == 'raw_material' %}

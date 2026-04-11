@@ -1,0 +1,66 @@
+{% extends "apps/app_catalog/base_catalog.html" %}
+
+{% block title %}{{ scenario.name }} - 材质系列选择{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-4">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-2">
+                        <li class="breadcrumb-item"><a href="{% url 'app_catalog:home' %}">首页</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ scenario.name }}</li>
+                    </ol>
+                </nav>
+                <h2 class="page-title h1">
+                    {{ scenario.name }}：材质系列选择
+                </h2>
+                <div class="text-muted mt-1">在该应用领域下，我们为您提供了以下材质系列：</div>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'app_catalog:home' %}" class="btn btn-ghost-primary">
+                    <i class="ti ti-arrow-left me-1"></i>返回
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards g-4">
+    {% for cat in categories %}
+    <div class="col-md-4 col-lg-3">
+        <a href="{% url 'app_catalog:product_list' scenario.id cat.id %}" class="card card-link border-0 shadow-sm category-card">
+            <div class="card-body p-4 text-center">
+                <div class="mb-3">
+                    <span class="avatar avatar-lg bg-blue-lt">
+                        <i class="ti ti-{{ cat.get_icon }} icon-lg"></i>
+                    </span>
+                </div>
+                <h3 class="h2 font-weight-bold mb-2">{{ cat.name }}</h3>
+                <p class="text-muted small mb-0">点击查看该场景下的 {{ cat.name }} 具体牌号</p>
+            </div>
+        </a>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="card p-5 text-center text-muted">
+            <i class="ti ti-info-circle icon-lg mb-2"></i>
+            <p>该场景下暂未同步相关物料。</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- 底部场景技术说明 -->
+<div class="row mt-5">
+    <div class="col-12">
+        <div class="card bg-primary-lt border-0">
+            <div class="card-body">
+                <h3 class="h3 mb-3"><i class="ti ti-info-square-rounded me-2"></i>{{ scenario.name }} 应用要求说明</h3>
+                <p class="mb-0">{{ scenario.requirements|default:"针对该行业应用，我们严格筛选了符合其技术规范的各类高性能材料。" }}</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

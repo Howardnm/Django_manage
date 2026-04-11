@@ -4,7 +4,7 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_material.forms import ApplicationScenarioForm
-from app_material.models import ApplicationScenario
+from app_material.models.material import ApplicationScenario
 from app_material.utils.filters import ScenarioFilter
 
 
@@ -12,11 +12,10 @@ from app_material.utils.filters import ScenarioFilter
 # 5. 应用场景管理 (ApplicationScenario)
 # ==========================================
 
-# 2. 应用场景列表
 class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'app_repository.view_applicationscenario'
+    permission_required = 'app_material.view_applicationscenario'
     model = ApplicationScenario
-    template_name = 'apps/app_repository/scenario/scenario_list.html'
+    template_name = 'apps/app_material/scenario/scenario_list.html'
     context_object_name = 'scenarios'
     paginate_by = 10
 
@@ -36,12 +35,12 @@ class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
 
 class ScenarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
-    permission_required = 'app_repository.add_applicationscenario'
+    permission_required = 'app_material.add_applicationscenario'
     raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
-    template_name = 'apps/app_repository/form_generic.html'
-    success_url = reverse_lazy('repo_scenario_list')
+    template_name = 'apps/app_material/form_generic.html'
+    success_url = reverse_lazy('scenario_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -50,12 +49,12 @@ class ScenarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
 
 
 class ScenarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
-    permission_required = 'app_repository.change_applicationscenario'
+    permission_required = 'app_material.change_applicationscenario'
     raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
-    template_name = 'apps/app_repository/form_generic.html'
-    success_url = reverse_lazy('repo_scenario_list')
+    template_name = 'apps/app_material/form_generic.html'
+    success_url = reverse_lazy('scenario_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

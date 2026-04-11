@@ -2,11 +2,11 @@
 检测当前 URL 是否属于子菜单模块，用于高亮父菜单
 {% endcomment %}
 
-{% if perms.app_project.view_project or perms.app_repository.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial or perms.app_basic_research.view_researchproject %}
+{% if perms.app_project.view_project or perms.app_material.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial or perms.app_basic_research.view_researchproject %}
 <li class="nav-item dropdown {% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'basic_research_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}active{% endif %}">
     <a class="nav-link dropdown-toggle" href="#navbar-submenu" data-bs-toggle="dropdown" data-bs-auto-close="false" role="button" aria-expanded="{% if request.resolver_match.url_name == 'project_overview' or request.resolver_match.url_name == 'basic_research_overview' or request.resolver_match.url_name == 'material_library' or request.resolver_match.url_name == 'formula_library' or request.resolver_match.url_name == 'process_library' or request.resolver_match.url_name == 'raw_material_library' %}true{% else %}false{% endif %}">
         <span class="nav-link-icon d-md-none d-lg-inline-block">
-            <i class="ti ti-layout-grid"></i> {# 使用一个网格图标，表示子菜单 #}
+            <i class="ti ti-layout-grid"></i>
         </span>
         <span class="nav-link-title">
             系统全景看板
@@ -27,7 +27,7 @@
                     </a>
                 {% endif %}
 
-                {% if perms.app_repository.view_materiallibrary %}
+                {% if perms.app_material.view_materiallibrary %}
                     <a class="dropdown-item {% if request.resolver_match.url_name == 'material_library' %}active{% endif %}" href="{% url 'material_library' %}">
                         材料库看板
                     </a>

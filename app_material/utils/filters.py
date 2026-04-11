@@ -2,7 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 
-from app_material.models import ApplicationScenario, MaterialType, MaterialLibrary, MaterialDataPoint
+from ..models import ApplicationScenario, MaterialType, MaterialLibrary, MaterialDataPoint
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
 
