@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>{% block title %}产品电子手册{% endblock %}</title>
-    <!-- 引入基础静态资源 (确保目标系统 static 下有这些文件) -->
+    <!-- 引入基础静态资源 -->
     <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
     <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
 
@@ -39,10 +39,7 @@
         </a>
         <div class="d-flex align-items-center">
             <a href="{% url 'app_catalog:search' %}" class="btn btn-ghost-primary me-2">全线产品</a>
-            <!-- 修正：仅在内部集成模式下显示管理后台入口 -->
-            {% if user.is_staff %}
-            <a href="/admin/" class="btn btn-primary d-none d-md-inline-block">管理后台</a>
-            {% endif %}
+            <!-- 彻底解耦：移除所有针对 user 的判断逻辑，确保在无数据库环境下也能渲染头部 -->
         </div>
     </div>
 </nav>
@@ -66,7 +63,6 @@
                 <h4 class="mb-3">快速链接</h4>
                 <ul class="list-unstyled">
                     <li class="mb-2"><a href="{% url 'app_catalog:search' %}" class="footer-link">全线产品</a></li>
-                    <!-- 修正：使用更通用的返回链接，或在独立系统中移除此项 -->
                     <li class="mb-2"><a href="/" class="footer-link">返回门户</a></li>
                 </ul>
             </div>
