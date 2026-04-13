@@ -9,7 +9,7 @@
         <div class="dropdown-menu-columns">
             <div class="dropdown-menu-column">
                 <a class="dropdown-item {% if request.resolver_match.url_name == 'material_list' %}active{% endif %}" href="{% url 'material_list' %}">
-                    物料档案库
+                    材料产品库
                 </a>
                 <a class="dropdown-item {% if 'characteristic' in request.path %}active{% endif %}" href="{% url 'characteristic_list' %}">
                     特征属性定义
