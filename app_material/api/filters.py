@@ -3,15 +3,18 @@ from ..models.material import MaterialLibrary
 
 class MaterialLibraryFilter(filters.FilterSet):
     """
-    为 MaterialLibrary 模型定义过滤器，专门针对多对多关联进行优化
+    全能 API 过滤器：支持场景、分类、特征属性的精确过滤
     """
-    # 针对应用场景场景 ID 的过滤
-    # 当传递 ?scenarios=1 时，会执行 MaterialLibrary.objects.filter(scenarios__id=1)
+    # 场景过滤 (?scenarios=ID)
     scenarios = filters.NumberFilter(field_name='scenarios', lookup_expr='id')
     
-    # 针对材质分类 ID 的过滤
+    # 材质分类过滤 (?category=ID)
     category = filters.NumberFilter(field_name='category', lookup_expr='id')
+
+    # 【新增】特征属性过滤 (?characteristics=ID)
+    # 支持多选过滤：如果传入 ?characteristics=1&characteristics=2，将返回具备任一特征的材料
+    characteristics = filters.BaseInFilter(field_name='characteristics__id', lookup_expr='in')
 
     class Meta:
         model = MaterialLibrary
-        fields = ['scenarios', 'category', 'grade_name', 'manufacturer']
+        fields = ['scenarios', 'category', 'characteristics', 'grade_name', 'manufacturer']

@@ -1,0 +1,16 @@
+<div class="card shadow-sm border-0">
+    <div class="card-header"><h3 class="card-title">产品特性说明</h3></div>
+    <div class="card-body">
+        <div class="text-muted fs-4" style="line-height: 1.8;">
+            {% if remote_material.description %}
+                {{ remote_material.description|linebreaks }}
+            {% else %}
+                <div class="empty py-4">
+                    <div class="empty-icon"><i class="ti ti-notes-off"></i></div>
+                    <p class="empty-title">暂无详细描述</p>
+                    <p class="empty-subtitle text-muted">该牌号暂未录入详细的产品特性描述文本。</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>

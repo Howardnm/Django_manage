@@ -1,5 +1,5 @@
 import logging
-from rest_framework import viewsets, permissions
+from rest_framework import viewsets, permissions, filters # 导入 DRF 原生 filters
 from django.conf import settings
 from django_filters.rest_framework import DjangoFilterBackend
 from ..models.material import MaterialType, ApplicationScenario, MetricCategory, TestConfig, MaterialLibrary, MaterialDataPoint, MaterialFile
@@ -34,32 +34,40 @@ class MetricCategoryViewSet(viewsets.ReadOnlyModelViewSet):
     permission_classes = [InternalApiTokenPermission]
 
 class TestConfigViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = TestConfig.objects.all().select_related('category') # 优化：预加载分类
+    queryset = TestConfig.objects.all().select_related('category')
     serializer_class = TestConfigSerializer
     permission_classes = [InternalApiTokenPermission]
 
 class MaterialLibraryViewSet(viewsets.ReadOnlyModelViewSet):
-    # 核心优化：深度预加载所有关联数据，避免 N+1 查询
+    """
+    材料库核心 API：支持多维度过滤 + 全局模糊搜索
+    """
     queryset = MaterialLibrary.objects.all().select_related(
-        'category' # MaterialType
+        'category'
     ).prefetch_related(
-        'scenarios', # ApplicationScenario (M2M)
-        'additional_files', # MaterialFile (Reverse FK)
-        'properties', # MaterialDataPoint (Reverse FK)
-        'properties__test_config', # MaterialDataPoint -> TestConfig
-        'properties__test_config__category' # MaterialDataPoint -> TestConfig -> MetricCategory
+        'scenarios', 
+        'characteristics', # 补充特征预加载
+        'additional_files', 
+        'properties', 
+        'properties__test_config', 
+        'properties__test_config__category'
     )
     serializer_class = MaterialLibrarySerializer
     permission_classes = [InternalApiTokenPermission]
-    filter_backends = [DjangoFilterBackend]
+    
+    # 启用过滤器和搜索后端
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter] 
     filterset_class = MaterialLibraryFilter
+    
+    # 定义搜索字段：支持对牌号名和厂家的模糊匹配
+    search_fields = ['grade_name', 'manufacturer']
 
 class MaterialDataPointViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = MaterialDataPoint.objects.all().select_related('material', 'test_config', 'test_config__category') # 优化：预加载关联
+    queryset = MaterialDataPoint.objects.all().select_related('material', 'test_config', 'test_config__category')
     serializer_class = MaterialDataPointSerializer
     permission_classes = [InternalApiTokenPermission]
 
 class MaterialFileViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = MaterialFile.objects.all().select_related('material') # 优化：预加载材料
+    queryset = MaterialFile.objects.all().select_related('material')
     serializer_class = MaterialFileSerializer
     permission_classes = [InternalApiTokenPermission]

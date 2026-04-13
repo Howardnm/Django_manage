@@ -1,0 +1,42 @@
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-header border-0"><h3 class="card-title">详细物理/机械性能</h3></div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>测试项目</th>
+                    <th>测试标准</th>
+                    <th>测试条件</th>
+                    <th class="text-end">典型值</th>
+                    <th>单位</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if remote_material.grouped_properties %}
+                    {% for group in remote_material.grouped_properties %}
+                    <tr class="bg-light">
+                        <td colspan="5" class="fw-bold text-dark"><i class="ti ti-list-check me-1"></i>{{ group.category_name }}</td>
+                    </tr>
+                    {% for item in group.items %}
+                    <tr>
+                        <td class="ps-4">{{ item.test_config.name }}</td>
+                        <td class="small text-muted">{{ item.test_config.standard|default:"-" }}</td>
+                        <td class="small text-muted">{{ item.test_config.condition|default:"-" }}</td>
+                        <td class="text-end fw-bold text-primary">
+                            {% if item.test_config.data_type == 'NUMBER' %}
+                                {{ item.value|floatformat:2 }}
+                            {% else %}
+                                {{ item.value_text }}
+                            {% endif %}
+                        </td>
+                        <td class="small">{{ item.unit|default:"-" }}</td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="5" class="text-center py-5 text-muted">暂未同步物性指标数据</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>

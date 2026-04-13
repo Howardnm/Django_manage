@@ -1,0 +1,30 @@
+<header class="navbar navbar-expand-md navbar-light bg-white border-bottom d-print-none shadow-sm" style="height: 80px;">
+    <div class="container-xl">
+        <a href="{% url 'app_catalog:home' %}" class="navbar-brand d-flex align-items-center">
+            <span class="avatar bg-primary-lt text-primary me-2 rounded">
+                <i class="ti ti-book-2"></i>
+            </span>
+            <div class="d-flex flex-column lh-1">
+                <span class="h2 m-0 fw-bold text-dark">材料产品电子手册</span>
+                <small class="text-muted" style="font-size: 10px; letter-spacing: 1px;">MATERIAL SOLUTIONS</small>
+            </div>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-menu">
+            <ul class="navbar-nav ms-auto fw-bold">
+                <li class="nav-item active">
+                    <a class="nav-link" href="{% url 'app_catalog:home' %}">
+                        <i class="ti ti-smart-home me-1"></i> 首页
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link text-primary" href="https://www.sunwill.com.cn/" target="_blank">
+                        <i class="ti ti-world me-1"></i> 官方网站
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</header>

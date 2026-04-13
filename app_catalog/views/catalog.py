@@ -1,120 +1,82 @@
-from django.views.generic import ListView, DetailView, TemplateView
-from django.shortcuts import render
-from django.http import Http404
-from django.core.cache import cache # 引入缓存
-from ..models import CatalogProduct, CatalogCategory, VisitorLog
+from django.views.generic import ListView, DetailView
+from django.core.cache import cache
+from ..models import CatalogProduct, CatalogCategory, VisitorLog, MirrorScenario, MirrorCharacteristic
 from ..services.material_api import client
-
-class CatalogHomeView(TemplateView):
-    """
-    一级导航：展示所有应用场景 (主菜单)
-    """
-    template_name = 'apps/app_catalog/home.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        
-        # 缓存应用场景列表 (1小时)
-        scenarios = cache.get('catalog_scenarios')
-        if scenarios is None:
-            scenarios_data = client.get_scenarios()
-            if isinstance(scenarios_data, dict):
-                scenarios = scenarios_data.get('results', [])
-            else:
-                scenarios = scenarios_data if scenarios_data else []
-            cache.set('catalog_scenarios', scenarios, 3600)
-            
-        context['scenarios'] = scenarios
-        context['featured_products'] = CatalogProduct.objects.filter(is_published=True, is_featured=True)[:6]
-        return context
-
-class ScenarioCategoryView(TemplateView):
-    """
-    二级导航：指定场景下的材质系列 (子菜单)
-    """
-    template_name = 'apps/app_catalog/scenario_categories.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        scenario_id = self.kwargs.get('scenario_id')
-        
-        # 缓存该场景的基础信息
-        scenarios = cache.get('catalog_scenarios')
-        if not scenarios:
-            scenarios = self.get_scenarios_from_api()
-            
-        current_scenario = next((s for s in scenarios if s['id'] == scenario_id), None)
-        if not current_scenario:
-            raise Http404("未找到应用场景")
-        context['scenario'] = current_scenario
-
-        # 获取该场景下的材质分类
-        remote_results = client.get_material_list(scenarios=scenario_id)
-        if remote_results and 'results' in remote_results:
-            remote_type_ids = set(item['category']['id'] for item in remote_results['results'])
-            context['categories'] = CatalogCategory.objects.filter(remote_type_id__in=remote_type_ids, is_active=True)
-        else:
-            context['categories'] = []
-            
-        return context
-
-    def get_scenarios_from_api(self):
-        data = client.get_scenarios()
-        res = data.get('results', []) if isinstance(data, dict) else data
-        cache.set('catalog_scenarios', res, 3600)
-        return res
+from collections import defaultdict
 
 class CatalogListView(ListView):
-    """
-    三级导航：显示具体的牌号列表
-    """
     model = CatalogProduct
     template_name = 'apps/app_catalog/product_list.html'
     context_object_name = 'products'
-    paginate_by = 15
+    paginate_by = 10
 
     def get_queryset(self):
-        qs = CatalogProduct.objects.filter(is_published=True)
-        scenario_id = self.kwargs.get('scenario_id')
-        category_id = self.kwargs.get('category_id')
+        qs = CatalogProduct.objects.filter(is_published=True).select_related('category').prefetch_related('scenarios', 'characteristics')
+        s_id = self.request.GET.get('s')
+        t_id = self.request.GET.get('t')
+        c_id = self.request.GET.get('c')
+        q = self.request.GET.get('q')
         
-        if scenario_id and category_id:
-            qs = qs.filter(category_id=category_id)
-            remote_results = client.get_material_list(scenarios=scenario_id)
-            if remote_results and 'results' in remote_results:
-                remote_ids = [item['id'] for item in remote_results['results']]
-                qs = qs.filter(remote_material_id__in=remote_ids)
-            else:
-                qs = qs.none()
-        
-        search_query = self.request.GET.get('q')
-        if search_query:
-            remote_results = client.get_material_list(search=search_query)
-            if remote_results and 'results' in remote_results:
-                remote_ids = [item['id'] for item in remote_results['results']]
-                qs = qs.filter(remote_material_id__in=remote_ids)
-            else:
-                qs = qs.none()
+        if s_id: qs = qs.filter(scenarios__remote_id=s_id)
+        if c_id: qs = qs.filter(characteristics__remote_id=c_id)
+        if t_id: qs = qs.filter(category_id=t_id)
+        if q: qs = qs.filter(display_name__icontains=q)
 
-        return qs.distinct()
+        return qs.distinct().order_by('-published_at', '-id')
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        scenario_id = self.kwargs.get('scenario_id')
-        if scenario_id:
-            scenarios = cache.get('catalog_scenarios') or self.get_scenarios_from_api()
-            context['scenario'] = next((s for s in scenarios if s['id'] == scenario_id), None)
         
-        category_id = self.kwargs.get('category_id')
-        if category_id:
-            context['current_category'] = CatalogCategory.objects.filter(pk=category_id).first()
-            
+        nav_tree = cache.get('catalog_nav_tree_structured_v1')
+        if not nav_tree:
+            nav_tree = self._build_nav_tree_from_local()
+            cache.set('catalog_nav_tree_structured_v1', nav_tree, 3600)
+        
+        context['nav_tree'] = nav_tree
+        
+        # 提取当前筛选名称，用于标题展示
+        s_id = self.request.GET.get('s')
+        t_id = self.request.GET.get('t')
+        c_id = self.request.GET.get('c')
+        
+        context['current_s_obj'] = MirrorScenario.objects.filter(remote_id=s_id).first() if s_id else None
+        context['current_t_obj'] = CatalogCategory.objects.filter(pk=t_id).first() if t_id else None
+        context['current_c_obj'] = MirrorCharacteristic.objects.filter(remote_id=c_id).first() if c_id else None
+        
+        context['current_s'] = s_id
+        context['current_t'] = t_id
+        context['current_c'] = c_id
+        
         return context
 
+    def _build_nav_tree_from_local(self):
+        all_products = CatalogProduct.objects.filter(is_published=True).select_related('category').prefetch_related('scenarios', 'characteristics')
+        raw_tree = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+        sce_names = {}
+        type_names = {}
+        char_names = {}
+        for p in all_products:
+            t_id = p.category_id
+            type_names[t_id] = p.category.name
+            for s in p.scenarios.all():
+                s_rem_id = s.remote_id
+                sce_names[s_rem_id] = s.name
+                for c in p.characteristics.all():
+                    c_rem_id = c.remote_id
+                    char_names[c_rem_id] = c.name
+                    raw_tree[s_rem_id][t_id][c_rem_id] += 1
+        tree = []
+        for s_rem_id, types in raw_tree.items():
+            sce_node = {'id': s_rem_id, 'name': sce_names[s_rem_id], 'count': sum(sum(chars.values()) for chars in types.values()), 'types': []}
+            for t_id, chars in types.items():
+                type_node = {'id': t_id, 'name': type_names[t_id], 'count': sum(chars.values()), 'characteristics': []}
+                for c_rem_id, count in chars.items():
+                    type_node['characteristics'].append({'id': c_rem_id, 'name': char_names[c_rem_id], 'count': count})
+                sce_node['types'].append(type_node)
+            tree.append(sce_node)
+        return sorted(tree, key=lambda x: x['name'])
+
 class CatalogDetailView(DetailView):
-    """
-    详情页：增加 API 数据缓存逻辑，减少主系统压力
-    """
     model = CatalogProduct
     template_name = 'apps/app_catalog/product_detail.html'
     context_object_name = 'product'
@@ -122,22 +84,29 @@ class CatalogDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         remote_id = self.object.remote_material_id
-        cache_key = f'material_detail_{remote_id}'
-        
-        remote_data = cache.get(cache_key)
-        if remote_data is None:
-            try:
-                remote_data = client.get_material_detail(remote_id)
-                if remote_data:
-                    # 缓存 10 分钟 (详情页数据可能变动，不宜缓存太久)
-                    cache.set(cache_key, remote_data, 600)
-                else:
-                    context['api_error'] = True
-            except Exception:
+        try:
+            remote_data = client.get_material_detail(remote_id)
+            if remote_data:
+                context['remote_material'] = remote_data
+            else:
+                # 触发镜像回退逻辑
                 context['api_error'] = True
-        
-        context['remote_material'] = remote_data
+                context['remote_material'] = self._get_fallback_data()
+        except Exception:
+            context['api_error'] = True
+            context['remote_material'] = self._get_fallback_data()
         return context
+
+    def _get_fallback_data(self):
+        """当 API 宕机时，返回本地镜像数据进行兜底展示"""
+        return {
+            'grade_name': self.object.display_name,
+            'description': self.object.description, # 本地镜像描述
+            'category': {'name': self.object.category.name},
+            'characteristics': [{'name': c.name} for c in self.object.characteristics.all()],
+            'manufacturer': 'SUNWILL (Offline Cache)',
+            'is_offline': True # 标记为离线模式
+        }
 
     def get(self, request, *args, **kwargs):
         response = super().get(request, *args, **kwargs)

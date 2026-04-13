@@ -1,113 +1,108 @@
-{% extends "apps/app_catalog/base_catalog.html" %}
+{% extends "apps/app_catalog/layouts/base.html" %}
+{% load static %}
 
-{% block title %}牌号列表 - {{ scenario.name|default:"搜索结果" }}{% endblock %}
+{% block title %}产品目录 - 材料产品电子手册{% endblock %}
 
 {% block content %}
-<div class="page-header d-print-none mb-4">
-    <div class="container-xl">
-        <div class="row g-2 align-items-center">
-            <div class="col">
-                <!-- 面包屑导航 -->
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb mb-2">
-                        <li class="breadcrumb-item"><a href="{% url 'app_catalog:home' %}">首页</a></li>
-                        {% if scenario %}
-                        <li class="breadcrumb-item"><a href="{% url 'app_catalog:scenario_categories' scenario.id %}">{{ scenario.name }}</a></li>
-                        {% endif %}
-                        <li class="breadcrumb-item active" aria-current="page">
-                            {% if current_category %}{{ current_category.name }}{% else %}搜索结果{% endif %}
-                        </li>
-                    </ol>
-                </nav>
-                <h2 class="page-title h1">
-                    {% if current_category %}{{ current_category.name }} 牌号列表{% else %}全局搜索结果{% endif %}
-                </h2>
-                {% if scenario %}
-                <div class="text-muted mt-1">领域：{{ scenario.name }} | 系列：{{ current_category.name }}</div>
-                {% endif %}
-            </div>
-            <div class="col-auto ms-auto d-print-none">
-                <div class="text-muted">共 {{ page_obj.paginator.count }} 个匹配牌号</div>
-            </div>
-        </div>
-    </div>
-</div>
+<div class="container-xl">
+    <div class="row g-4">
 
-<div class="row row-cards">
-    <!-- 过滤器侧边栏 (主要用于搜索模式下的精细筛选) -->
-    <div class="col-md-3">
-        <form action="{% url 'app_catalog:search' %}" method="get" class="card shadow-sm border-0">
-            <div class="card-header bg-light">
-                <h3 class="card-title">快速检索</h3>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <label class="form-label">关键词</label>
-                    <input type="text" name="q" class="form-control" value="{{ request.GET.q|default:'' }}" placeholder="搜索牌号...">
-                </div>
-                <div class="mt-4">
-                    <button type="submit" class="btn btn-primary w-100">开始搜索</button>
-                    {% if scenario %}
-                    <a href="{% url 'app_catalog:scenario_categories' scenario.id %}" class="btn btn-link w-100 mt-2 text-muted">返回系列</a>
-                    {% endif %}
-                </div>
-            </div>
-        </form>
-    </div>
+        <aside class="col-lg-3">
+            {% include "apps/app_catalog/includes/sidebar.html" %}
+        </aside>
 
-    <!-- 牌号列表展示 -->
-    <div class="col-md-9">
-        <div class="row row-cards">
-            {% for product in products %}
-            <div class="col-sm-6 col-lg-4">
-                <div class="card h-100 shadow-sm border-0 category-card">
-                    <div class="card-body p-4">
-                        <div class="d-flex align-items-center mb-3">
-                            <span class="badge bg-primary-lt">{{ product.category.name }}</span>
-                            {% if product.is_featured %}
-                            <span class="ms-auto"><i class="ti ti-star-filled text-yellow"></i></span>
+        <div class="col-lg-9">
+            <!-- 动态路径标题 -->
+            <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb breadcrumb-arrows mb-2">
+                                <li class="breadcrumb-item"><a href="?">产品库</a></li>
+                                {% if current_s_obj %}
+                                    <li class="breadcrumb-item active">{{ current_s_obj.name }}</li>
+                                {% endif %}
+                                {% if current_t_obj %}
+                                    <li class="breadcrumb-item active">{{ current_t_obj.name }}</li>
+                                {% endif %}
+                            </ol>
+                        </nav>
+                        <h1 class="h2 mb-0 fw-bold">
+                            {% if current_c_obj %}
+                                {{ current_c_obj.name }} 特征 -
                             {% endif %}
-                        </div>
-                        <h3 class="card-title h3 mb-1">
-                            <a href="{% url 'app_catalog:product_detail' product.pk %}" class="text-dark">{{ product.display_name }}</a>
-                        </h3>
-                        <p class="text-muted small">点击查看技术指标</p>
+                            {% if current_t_obj %}
+                                {{ current_t_obj.name }} 牌号列表
+                            {% elif current_s_obj %}
+                                {{ current_s_obj.name }} 适用方案
+                            {% else %}
+                                全线牌号目录
+                            {% endif %}
+                        </h1>
+                    </div>
+                    <div class="text-muted small">
+                        共 <strong>{{ page_obj.paginator.count }}</strong> 款材料
+                    </div>
+                </div>
+            </div>
 
-                        <div class="d-flex align-items-center mt-4 pt-3 border-top">
-                            <div class="text-muted small">
-                                <i class="ti ti-eye me-1"></i> {{ product.view_count }}
+            <div class="vstack gap-3">
+                {% for product in products %}
+                <div class="product-card card shadow-none">
+                    <div class="card-body p-0">
+                        <div class="row g-0 align-items-stretch">
+                            <div class="col-md-3 pane-divider p-4">
+                                <div class="brand-tag mb-1">{{ product.manufacturer|default:"SUNWILL" }}</div>
+                                <h3 class="product-title mb-3">
+                                    <a href="{% url 'app_catalog:product_detail' product.pk %}" class="text-dark text-decoration-none">{{ product.display_name }}</a>
+                                </h3>
+                                <div class="vstack gap-2">
+                                    <div><span class="badge bg-blue text-white w-100">系列: {{ product.category.name }}</span></div>
+                                    <div class="d-flex flex-column gap-1">
+                                        {% for s in product.scenarios.all|slice:":2" %}
+                                            <span class="badge bg-azure-lt small w-100 text-start px-2 py-1"><i class="ti ti-map-pin me-1"></i>{{ s.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        {% for c in product.characteristics.all|slice:":3" %}
+                                            <span class="badge bg-purple-lt small">{{ c.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
                             </div>
-                            <div class="ms-auto">
-                                <a href="{% url 'app_catalog:product_detail' product.pk %}" class="btn btn-ghost-primary btn-sm">查看详情</a>
+                            <div class="col-md-6 pane-divider p-4 d-flex flex-column justify-content-center">
+                                <div class="desc-text line-clamp-3">
+                                    {{ product.description|default:"暂无详细特性描述。该牌号是经过严格测试的高性能改性材料，具备优异的综合机械性能与加工稳定性。" }}
+                                </div>
+                                <div class="mt-3">
+                                    <small class="text-muted"><i class="ti ti-clock me-1"></i>更新日期: {{ product.published_at|date:"Y-m-d" }}</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 p-4 bg-light-lt d-flex flex-column justify-content-center text-center">
+                                <div class="mb-3">
+                                    <div class="text-muted small mb-1">访问统计</div>
+                                    <div class="h3 mb-0">{{ product.view_count }} <small class="text-muted fw-normal">Views</small></div>
+                                </div>
+                                <a href="{% url 'app_catalog:product_detail' product.pk %}" class="btn btn-primary btn-view w-100 mb-2">查看详情</a>
+                                <div class="brand-tag mt-2 text-uppercase" style="font-size: 9px;">Technical data sheet</div>
                             </div>
                         </div>
                     </div>
                 </div>
-            </div>
-            {% empty %}
-            <div class="col-12">
-                <div class="card text-center py-5 text-muted shadow-sm border-0">
-                    <i class="ti ti-ghost icon-lg mb-2"></i>
-                    <p>在该筛选条件下暂无公开牌号。</p>
+                {% empty %}
+                <div class="card p-5 text-center border-dashed">
+                    <p class="h3">当前目录下暂无产品</p>
+                    <a href="?" class="btn btn-outline-primary mt-3">重置筛选条件</a>
                 </div>
+                {% endfor %}
             </div>
-            {% endfor %}
-        </div>
 
-        <!-- 分页 -->
-        {% if is_paginated %}
-        <div class="mt-5 d-flex justify-content-center">
-            <ul class="pagination">
-                {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}"><i class="ti ti-chevron-left"></i></a></li>
-                {% endif %}
-                <li class="page-item active"><span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span></li>
-                {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}"><i class="ti ti-chevron-right"></i></a></li>
-                {% endif %}
-            </ul>
+            {% if is_paginated %}
+            <div class="mt-5 d-flex justify-content-center">
+                {% include "apps/list_modules/paginator.html" %}
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </div>
 </div>
 {% endblock %}

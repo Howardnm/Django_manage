@@ -1,0 +1,47 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>{% block title %}材料产品电子手册{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
+    <style>
+        :root {
+            --brand-blue: #0054a6;
+            --bg-gray: #f4f7f9;
+        }
+        /* 彻底消除侧边间隙 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            overflow-x: hidden;
+            background-color: var(--bg-gray);
+            color: #333;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
+        main { width: 100%; }
+        .line-clamp-3 { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body class="layout-fluid">
+    {% include "apps/app_catalog/includes/header.html" %}
+
+    <main class="py-4">
+        {% block content %}{% endblock %}
+    </main>
+
+    {% include "apps/app_catalog/includes/footer.html" %}
+
+    <script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

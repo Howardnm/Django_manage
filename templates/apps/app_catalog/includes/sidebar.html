@@ -1,0 +1,83 @@
+<div class="sidebar-tree">
+
+    <!-- 1. 搜索框 -->
+    <div class="mb-3">
+        <form action="." method="get">
+            <div class="input-icon">
+                <span class="input-icon-addon"><i class="ti ti-search"></i></span>
+                <input type="text" name="q" class="form-control" value="{{ request.GET.q|default:'' }}" placeholder="搜索全线牌号...">
+            </div>
+            {% if current_s %}<input type="hidden" name="s" value="{{ current_s }}">{% endif %}
+            {% if current_t %}<input type="hidden" name="t" value="{{ current_t }}">{% endif %}
+            {% if current_c %}<input type="hidden" name="c" value="{{ current_c }}">{% endif %}
+        </form>
+    </div>
+
+    <!-- 2. 三级导航树 -->
+    <div class="bg-white shadow-sm border rounded overflow-hidden">
+        <div class="p-3 bg-primary text-white fw-bold d-flex align-items-center justify-content-between">
+            <span><i class="ti ti-filter me-2"></i>材料选型</span>
+            <span class="badge bg-white-lt text-white" style="font-size: 10px;">PRO</span>
+        </div>
+
+        <div class="accordion accordion-flush" id="navTreeAccordion">
+            {% for sce in nav_tree %}
+            <!-- 一级：应用场景 -->
+            <div class="accordion-item border-bottom">
+                <h2 class="accordion-header">
+                    <button class="accordion-button {% if current_s != sce.id|stringformat:'i' %}collapsed{% endif %} py-3"
+                            type="button" data-bs-toggle="collapse" data-bs-target="#sce-{{ sce.id }}">
+                        <div class="d-flex align-items-center justify-content-between w-100 pe-3">
+                            <span class="text-truncate fw-bold" style="max-width: 180px;"><i class="ti ti-map-pin me-2 text-primary"></i> {{ sce.name }}</span>
+                            <span class="badge bg-blue-lt text-primary" style="font-size: 10px;">{{ sce.count }}</span>
+                        </div>
+                    </button>
+                </h2>
+                <div id="sce-{{ sce.id }}" class="accordion-collapse collapse {% if current_s == sce.id|stringformat:'i' %}show{% endif %}"
+                     data-bs-parent="#navTreeAccordion">
+                    <div class="accordion-body p-0">
+                        <!-- 二级：材质类型/系列 -->
+                        <div class="list-group list-group-flush">
+                            {% for type in sce.types %}
+                            <div class="list-group-item border-0 p-0">
+                                <a class="d-flex align-items-center justify-content-between p-3 ps-4 bg-light-lt text-dark text-decoration-none fw-medium border-start border-3 {% if current_t == type.id|stringformat:'i' and current_s == sce.id|stringformat:'i' %}border-primary bg-blue-lt text-primary{% else %}border-transparent{% endif %}"
+                                   data-bs-toggle="collapse" href="#type-{{ sce.id }}-{{ type.id }}">
+                                    <span><i class="ti ti-box me-2"></i>{{ type.name }}</span>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-white border text-muted me-2" style="font-size: 9px;">{{ type.count }}</span>
+                                        <i class="ti ti-chevron-down small"></i>
+                                    </div>
+                                </a>
+                                <div id="type-{{ sce.id }}-{{ type.id }}" class="collapse {% if current_t == type.id|stringformat:'i' and current_s == sce.id|stringformat:'i' %}show{% endif %}">
+                                    <!-- 三级：材料特性 -->
+                                    <div class="list-group list-group-flush border-top border-bottom">
+                                        <!-- 特性级增加"全部"选项 -->
+                                        <a href="?s={{ sce.id }}&t={{ type.id }}"
+                                           class="list-group-item list-group-item-action ps-5 py-2 small {% if not current_c and current_t == type.id|stringformat:'i' %}text-primary fw-bold{% endif %}">
+                                            <i class="ti ti-circle-dot me-2"></i>全部特性
+                                        </a>
+                                        {% for char in type.characteristics %}
+                                        <a href="?s={{ sce.id }}&t={{ type.id }}&c={{ char.id }}"
+                                           class="list-group-item list-group-item-action ps-5 py-2 small d-flex align-items-center justify-content-between {% if current_c == char.id|stringformat:'i' and current_t == type.id|stringformat:'i' and current_s == sce.id|stringformat:'i' %}active{% endif %}">
+                                            <span><i class="ti ti-tag me-2"></i>{{ char.name }}</span>
+                                            <span class="badge bg-secondary-lt">{{ char.count }}</span>
+                                        </a>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <div class="p-3 border-top bg-light-lt text-center">
+            <a href="?" class="btn btn-ghost-secondary w-100 btn-sm">
+                <i class="ti ti-refresh me-1"></i>重置选型
+            </a>
+        </div>
+    </div>
+</div>

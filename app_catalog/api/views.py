@@ -3,8 +3,9 @@ import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-from django.conf import settings # 导入 settings
-from ..models import CatalogCategory, CatalogProduct
+from django.conf import settings
+from django.db import transaction
+from ..models import CatalogCategory, CatalogProduct, MirrorScenario, MirrorCharacteristic
 from ..services.material_api import client
 
 logger = logging.getLogger(__name__)
@@ -13,14 +14,12 @@ logger = logging.getLogger(__name__)
 @require_http_methods(["POST"])
 def material_webhook_receiver(request):
     """
-    完善后的 Webhook 接收端：支持安全校验、自动补全分类
+    Webhook 接收端：实现结构化关系镜像同步
     """
-    # 【新增】安全性校验：验证 Webhook Secret
     webhook_secret = request.headers.get('X-Webhook-Secret')
     expected_secret = getattr(settings, 'WEBHOOK_SECRET_KEY', None)
     
     if not expected_secret or webhook_secret != expected_secret:
-        logger.warning(f"Webhook 拒绝访问：无效的 Secret Key。来源IP: {request.META.get('REMOTE_ADDR')}")
         return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=401)
 
     try:
@@ -30,79 +29,70 @@ def material_webhook_receiver(request):
         remote_id = data.get('id')
 
         if not event_type or not remote_id:
-            return JsonResponse({'status': 'error', 'message': 'Invalid payload structure'}, status=400)
+            return JsonResponse({'status': 'error', 'message': 'Invalid payload'}, status=400)
 
-        # 分流处理
-        if event_type.startswith('material_'):
-            return _handle_material_event(event_type, remote_id)
-        elif event_type.startswith('type_'):
-            return _handle_type_event(event_type, remote_id)
-        
-        return JsonResponse({'status': 'error', 'message': 'Unknown event type'}, status=400)
+        if event_type == 'material_deleted':
+            CatalogProduct.objects.filter(remote_material_id=remote_id).delete()
+            return JsonResponse({'status': 'success', 'action': 'deleted'})
+
+        if event_type in ['material_created', 'material_updated']:
+            return _sync_material_relations(remote_id)
+            
+        return JsonResponse({'status': 'success', 'message': 'Ignored event type'})
 
     except Exception as e:
-        logger.exception(f"Webhook 严重处理异常: {str(e)}")
+        logger.exception(f"Webhook 处理失败: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-def _get_or_sync_category(remote_category_id):
-    try:
-        category = CatalogCategory.objects.get(remote_type_id=remote_category_id)
-        return category
-    except CatalogCategory.DoesNotExist:
-        logger.info(f"本地缺失分类 ID {remote_category_id}，正在尝试从远程 API 同步...")
-        remote_type_data = client._get(f'types/{remote_category_id}/')
-        if remote_type_data:
-            category, created = CatalogCategory.objects.get_or_create(
-                remote_type_id=remote_category_id,
-                defaults={
-                    'name': remote_type_data.get('name', '未命名分类'),
-                    'is_active': True
-                }
-            )
-            return category
-    return None
-
-def _handle_material_event(event_type, remote_id):
-    if event_type == 'material_deleted':
-        CatalogProduct.objects.filter(remote_material_id=remote_id).delete()
-        return JsonResponse({'status': 'success', 'action': 'deleted'})
-
+def _sync_material_relations(remote_id):
+    """
+    关系同步核心逻辑
+    """
     remote_data = client.get_material_detail(remote_id)
     if not remote_data:
-        return JsonResponse({'status': 'error', 'message': 'Remote data fetch failed'}, status=404)
+        return JsonResponse({'status': 'error', 'message': 'Fetch remote detail failed'}, status=404)
 
-    remote_cat_id = remote_data.get('category', {}).get('id')
-    local_category = _get_or_sync_category(remote_cat_id)
-    
-    if not local_category:
-        return JsonResponse({'status': 'error', 'message': f'Category {remote_cat_id} synchronization failed'}, status=500)
-
-    product, created = CatalogProduct.objects.update_or_create(
-        remote_material_id=remote_id,
-        defaults={
-            'category': local_category,
-            'display_name': remote_data.get('grade_name', '未知牌号'),
-        }
-    )
-    
-    return JsonResponse({
-        'status': 'success', 
-        'action': 'synced', 
-        'is_new': created,
-        'display_name': product.display_name
-    })
-
-def _handle_type_event(event_type, remote_id):
-    if event_type == 'type_deleted':
-        CatalogCategory.objects.filter(remote_type_id=remote_id).delete()
-        return JsonResponse({'status': 'success', 'action': 'category_deleted'})
-
-    remote_type_data = client._get(f'types/{remote_id}/')
-    if remote_type_data:
-        category, created = CatalogCategory.objects.update_or_create(
-            remote_type_id=remote_id,
-            defaults={'name': remote_type_data.get('name')}
+    with transaction.atomic():
+        # 1. 处理分类
+        remote_cat = remote_data.get('category', {})
+        local_category, _ = CatalogCategory.objects.get_or_create(
+            remote_type_id=remote_cat.get('id'),
+            defaults={'name': remote_cat.get('name', '未分类')}
         )
-        return JsonResponse({'status': 'success', 'action': 'category_synced', 'is_new': created})
-    
-    return JsonResponse({'status': 'error', 'message': 'Remote category data fetch failed'}, status=404)
+
+        # 2. 处理物料主表
+        product, created = CatalogProduct.objects.update_or_create(
+            remote_material_id=remote_id,
+            defaults={
+                'display_name': remote_data.get('grade_name'),
+                'category': local_category,
+                'description': remote_data.get('description', ''),
+            }
+        )
+
+        # 3. 处理镜像场景关系 (M2M)
+        scenario_objs = []
+        for s in remote_data.get('scenarios', []):
+            sce_obj, _ = MirrorScenario.objects.update_or_create(
+                remote_id=s['id'],
+                defaults={'name': s['name']}
+            )
+            scenario_objs.append(sce_obj)
+        product.scenarios.set(scenario_objs)
+
+        # 4. 处理镜像特征关系 (M2M)
+        char_objs = []
+        for c in remote_data.get('characteristics', []):
+            char_obj, _ = MirrorCharacteristic.objects.update_or_create(
+                remote_id=c['id'],
+                defaults={'name': c['name']}
+            )
+            char_objs.append(char_obj)
+        product.characteristics.set(char_objs)
+
+    # 5. 清理缓存
+    from django.core.cache import cache
+    cache.delete('catalog_nav_tree_mirror_v1')
+    cache.delete('catalog_nav_tree_optimized')
+
+    return JsonResponse({'status': 'success', 'action': 'synced', 'id': product.id})

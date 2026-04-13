@@ -1,0 +1,70 @@
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-header"><h3 class="card-title">技术参数概览</h3></div>
+    <div class="card-body">
+        <div class="datagrid">
+            <div class="datagrid-item">
+                <div class="datagrid-title">牌号</div>
+                <div class="datagrid-content fw-bold text-primary">{{ remote_material.grade_name|default:product.display_name }}</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">生产厂商</div>
+                <div class="datagrid-content">{{ remote_material.manufacturer|default:"SUNWILL PREMIUM" }}</div>
+            </div>
+            <div class="datagrid-item">
+                <div class="datagrid-title">材质系列</div>
+                <div class="datagrid-content"><span class="badge bg-blue text-white">{{ product.category.name }}</span></div>
+            </div>
+
+            <!-- 特征展示：支持 API 实时数据与镜像兜底 -->
+            <div class="datagrid-item">
+                <div class="datagrid-title">特征属性</div>
+                <div class="datagrid-content">
+                    <div class="d-flex flex-wrap gap-1">
+                        {% if remote_material.characteristics %}
+                            {% for char in remote_material.characteristics %}
+                                <span class="badge bg-purple-lt small">{{ char.name }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <!-- 镜像兜底 -->
+                            {% for char in product.characteristics.all %}
+                                <span class="badge bg-purple-lt small">{{ char.name }}</span>
+                            {% empty %}
+                                <span class="text-muted small">标准级</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- 应用场景展示 -->
+            <div class="datagrid-item">
+                <div class="datagrid-title">推荐场景</div>
+                <div class="datagrid-content">
+                    <div class="d-flex flex-wrap gap-1">
+                        {% if remote_material.scenarios %}
+                            {% for sce in remote_material.scenarios %}
+                                <span class="badge bg-azure-lt small"><i class="ti ti-map-pin me-1"></i>{{ sce.name }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <!-- 镜像兜底 -->
+                            {% for sce in product.scenarios.all %}
+                                <span class="badge bg-azure-lt small"><i class="ti ti-map-pin me-1"></i>{{ sce.name }}</span>
+                            {% empty %}
+                                <span class="text-muted small">通用领域</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="datagrid-item">
+                <div class="datagrid-title">阻燃等级</div>
+                <div class="datagrid-content">
+                    {% if remote_material.flammability %}
+                        <span class="badge bg-orange-lt">{{ remote_material.flammability }}</span>
+                    {% else %}-{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
