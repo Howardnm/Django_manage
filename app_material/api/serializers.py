@@ -1,6 +1,12 @@
 from rest_framework import serializers
-from ..models.material import MaterialType, ApplicationScenario, MetricCategory, TestConfig, MaterialLibrary, MaterialDataPoint, MaterialFile
+from ..models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig, 
+                                MaterialLibrary, MaterialDataPoint, MaterialFile, MaterialCharacteristic)
 from collections import defaultdict
+
+class MaterialCharacteristicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MaterialCharacteristic
+        fields = '__all__'
 
 class MaterialTypeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -29,7 +35,6 @@ class MaterialDataPointSerializer(serializers.ModelSerializer):
         model = MaterialDataPoint
         fields = ('id', 'test_config', 'value', 'value_text', 'remark')
 
-# 补全缺失的 MaterialFileSerializer
 class MaterialFileSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialFile
@@ -38,11 +43,10 @@ class MaterialFileSerializer(serializers.ModelSerializer):
 class MaterialLibrarySerializer(serializers.ModelSerializer):
     category = MaterialTypeSerializer(read_only=True)
     scenarios = ApplicationScenarioSerializer(many=True, read_only=True)
+    # 新增：特征属性序列化
+    characteristics = MaterialCharacteristicSerializer(many=True, read_only=True)
     
-    # 核心增强：返回按类别分组的性能数据，减少客户端计算压力
     grouped_properties = serializers.SerializerMethodField()
-
-    # 核心增强：确保文件字段返回绝对 URL (包含域名)
     file_tds = serializers.SerializerMethodField()
     file_msds = serializers.SerializerMethodField()
     file_rohs = serializers.SerializerMethodField()
@@ -50,7 +54,7 @@ class MaterialLibrarySerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialLibrary
         fields = (
-            'id', 'grade_name', 'manufacturer', 'category', 'scenarios',
+            'id', 'grade_name', 'manufacturer', 'category', 'scenarios', 'characteristics',
             'flammability', 'description', 'file_tds', 'file_msds', 'file_rohs',
             'created_at', 'grouped_properties'
         )
@@ -69,17 +73,12 @@ class MaterialLibrarySerializer(serializers.ModelSerializer):
     def get_file_rohs(self, obj): return self._get_absolute_url(obj, 'file_rohs')
 
     def get_grouped_properties(self, obj):
-        """预处理分组数据，供 Catalog 详情页直接渲染"""
         grouped = defaultdict(list)
-        # 预加载优化已在 ViewSet 中处理
         points = obj.properties.all().order_by('test_config__category__order', 'test_config__order')
-
         for point in points:
             cat_name = point.test_config.category.name
             grouped[cat_name].append(MaterialDataPointSerializer(point, context=self.context).data)
-
         result = []
-        # 保持分类顺序
         seen_cats = []
         for point in points:
             cat_name = point.test_config.category.name

@@ -39,58 +39,116 @@
 {% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function() {
-    const table = document.getElementById('data-table').getElementsByTagName('tbody')[0];
-    const addBtn = document.getElementById('add-row');
-    const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
+    // 1. 初始化远程异步搜索 (针对 应用场景 和 特征属性)
+    if (window.TomSelect) {
+        document.querySelectorAll('.remote-search').forEach(function (el) {
+            var modelType = el.getAttribute('data-model');
+            if (!modelType) return;
 
-    addBtn.addEventListener('click', function() {
-        const rowCount = parseInt(totalForms.value);
-        const template = table.querySelector('.form-row').cloneNode(true);
-
-        // 清空新行的值
-        template.querySelectorAll('input, select, textarea').forEach(input => {
-            const name = input.name.replace(/-\d+-/, `-${rowCount}-`);
-            const id = input.id.replace(/-\d+-/, `-${rowCount}-`);
-            input.name = name;
-            input.id = id;
-            input.value = '';
-
-            // 如果是 Tom Select 复制过来的，需要移除 TS 的 DOM
-            if (input.classList.contains('tomselected')) {
-                input.classList.remove('tomselected');
-                const tsWrapper = input.nextSibling;
-                if (tsWrapper && tsWrapper.classList && tsWrapper.classList.contains('ts-wrapper')) {
-                    tsWrapper.remove();
+            new TomSelect(el, {
+                valueField: 'value',
+                labelField: 'text',
+                searchField: 'text',
+                // 配置异步加载逻辑
+                load: function (query, callback) {
+                    var url = "{% url 'material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(json => {
+                            callback(json);
+                        })
+                        .catch(() => {
+                            callback();
+                        });
+                },
+                copyClassesToDropdown: false,
+                dropdownParent: 'body',
+                create: false,
+                placeholder: '请输入关键词搜索...',
+                preload: 'focus', // 聚焦时加载初始推荐数据
+                plugins: ['remove_button'], // 支持删除标签
+                render: {
+                    option: function (data, escape) {
+                        return '<div>' + escape(data.text) + '</div>';
+                    },
+                    item: function (data, escape) {
+                        return '<div>' + escape(data.text) + '</div>';
+                    },
+                    no_results: function (data, escape) {
+                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+                    },
+                    loading: function (data, escape) {
+                        return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
+                    }
                 }
-                input.style.display = ''; // 恢复原始显示
-            }
+            });
         });
 
-        // 移除新行的错误提示
-        template.querySelectorAll('.text-danger').forEach(err => err.remove());
-        template.classList.remove('table-danger');
-
-        table.appendChild(template);
-        totalForms.value = rowCount + 1;
-
-        // 对新行的 select 初始化 Tom Select
-        const newSelect = template.querySelector('.form-select-search');
-        if (newSelect && window.TomSelect) {
-            new TomSelect(newSelect, {
+        // 2. 初始化性能数据表中的普通搜索框 (TestConfig 选择)
+        document.querySelectorAll('.form-select-search').forEach(function (el) {
+            new TomSelect(el, {
                 copyClassesToDropdown: false,
                 dropdownParent: 'body',
                 render: {
                     no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>'
                 }
             });
-            // 绑定事件
-            newSelect.addEventListener('change', function() {
-                toggleValueInput(this);
-            });
-        }
-    });
+        });
+    }
 
-    // 为现有的 select 绑定事件
+    // 3. 性能数据动态增行逻辑
+    const table = document.getElementById('data-table').getElementsByTagName('tbody')[0];
+    const addBtn = document.getElementById('add-row');
+    const totalForms = document.getElementById('id_properties-TOTAL_FORMS');
+
+    if (addBtn) {
+        addBtn.addEventListener('click', function() {
+            const rowCount = parseInt(totalForms.value);
+            const template = table.querySelector('.form-row').cloneNode(true);
+
+            // 清空并重新索引新行
+            template.querySelectorAll('input, select, textarea').forEach(input => {
+                const name = input.name.replace(/-\d+-/, `-${rowCount}-`);
+                const id = input.id.replace(/-\d+-/, `-${rowCount}-`);
+                input.name = name;
+                input.id = id;
+                input.value = '';
+
+                // 清理可能复制过来的 TomSelect 遗留 DOM
+                if (input.classList.contains('tomselected')) {
+                    input.classList.remove('tomselected');
+                    const tsWrapper = input.nextSibling;
+                    if (tsWrapper && tsWrapper.classList && tsWrapper.classList.contains('ts-wrapper')) {
+                        tsWrapper.remove();
+                    }
+                    input.style.display = '';
+                }
+            });
+
+            template.querySelectorAll('.text-danger').forEach(err => err.remove());
+            template.classList.remove('table-danger');
+
+            table.appendChild(template);
+            totalForms.value = rowCount + 1;
+
+            // 为新行初始化 TomSelect
+            const newSelect = template.querySelector('.form-select-search');
+            if (newSelect && window.TomSelect) {
+                new TomSelect(newSelect, {
+                    copyClassesToDropdown: false,
+                    dropdownParent: 'body',
+                    onChange: function() {
+                        toggleValueInput(this);
+                    }
+                });
+                newSelect.addEventListener('change', function() {
+                    toggleValueInput(this);
+                });
+            }
+        });
+    }
+
+    // 4. 绑定性能项变更事件 (显示/隐藏 数值/文本/选择 框)
     document.querySelectorAll('.form-select-search').forEach(select => {
         select.addEventListener('change', function() {
             toggleValueInput(this);

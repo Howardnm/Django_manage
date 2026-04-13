@@ -7,7 +7,7 @@
         <div class="datagrid">
             <div class="datagrid-item">
                 <div class="datagrid-title">生产厂家</div>
-                <div class="datagrid-content fw-bold">{{ material.manufacturer }}</div>
+                <div class="datagrid-content fw-bold">{{ material.manufacturer|default:"-" }}</div>
             </div>
             <div class="datagrid-item">
                 <div class="datagrid-title">所属类型</div>
@@ -15,29 +15,45 @@
                     <span class="badge bg-green-lt">{{ material.category.name }}</span>
                 </div>
             </div>
+
+            <!-- 特征属性展示 (新增) -->
             <div class="datagrid-item">
-                <div class="datagrid-title">适用场景</div>
+                <div class="datagrid-title">特征属性</div>
                 <div class="datagrid-content">
-                    {% if material.scenarios.exists %}
-                        <div class="d-flex flex-wrap gap-2">
-                            {% for s in material.scenarios.all %}
-                                <span class="badge bg-blue-lt">{{ s.name }}</span>
+                    {% if material.characteristics.exists %}
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for c in material.characteristics.all %}
+                                <span class="badge bg-purple-lt">{{ c.name }}</span>
                             {% endfor %}
                         </div>
+                    {% else %}
+                        <span class="text-muted small">未定义特征</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="datagrid-item">
+                <div class="datagrid-title">阻燃等级</div>
+                <div class="datagrid-content">
+                    {% if material.flammability %}
+                        <span class="badge bg-orange-lt">{{ material.flammability }}</span>
                     {% else %}
                         <span class="text-muted">-</span>
                     {% endif %}
                 </div>
             </div>
+
             <div class="datagrid-item">
-                <div class="datagrid-title">阻燃等级</div>
+                <div class="datagrid-title">适用场景</div>
                 <div class="datagrid-content">
-                    {% if material.flammability %}
-                        <span class="badge bg-orange-lt">
-                                    {{ material.flammability }}
-                                </span>
+                    {% if material.scenarios.exists %}
+                        <div class="d-flex flex-wrap gap-1">
+                            {% for s in material.scenarios.all %}
+                                <span class="badge bg-blue-lt">{{ s.name }}</span>
+                            {% endfor %}
+                        </div>
                     {% else %}
-                        <span class="text-muted">-</span>
+                        <span class="text-muted small">通用场景</span>
                     {% endif %}
                 </div>
             </div>

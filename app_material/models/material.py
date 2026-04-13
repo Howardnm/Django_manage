@@ -28,6 +28,19 @@ class MaterialType(models.Model):
         verbose_name_plural = "材料类型库"
 
 # ==========================================
+# 新增：材料特征属性 (如：高流动、耐候、加纤、抗冲)
+# ==========================================
+class MaterialCharacteristic(models.Model):
+    """材料特征属性主数据"""
+    name = models.CharField("特征名称", max_length=50, unique=True)
+    description = models.TextField("特征描述", blank=True)
+
+    def __str__(self): return self.name
+    class Meta:
+        verbose_name = "材料特征"
+        verbose_name_plural = "材料特征库"
+
+# ==========================================
 # 2. 应用场景库
 # ==========================================
 class ApplicationScenario(models.Model):
@@ -82,7 +95,13 @@ class MaterialLibrary(models.Model):
     grade_name = models.CharField("材料牌号", max_length=100, unique=True)
     manufacturer = models.CharField("生产厂家", max_length=100, blank=True)
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
+    
+    # 关联场景
     scenarios = models.ManyToManyField(ApplicationScenario, blank=True, verbose_name="适用场景", related_name="materials")
+    
+    # 新增：关联特征属性
+    characteristics = models.ManyToManyField(MaterialCharacteristic, blank=True, verbose_name="特征属性", related_name="materials")
+
     flammability = models.CharField("阻燃等级", max_length=20, blank=True,
                                     choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
     description = models.TextField("特性描述", blank=True)

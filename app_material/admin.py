@@ -4,8 +4,13 @@ from django.utils.html import format_html
 from django.urls import reverse, path
 from django.shortcuts import get_object_or_404, redirect
 from .models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig, 
-                    MaterialDataPoint, MaterialFile, MaterialLibrary)
+                    MaterialDataPoint, MaterialFile, MaterialLibrary, MaterialCharacteristic)
 from .models.sync import WebhookTask
+
+@admin.register(MaterialCharacteristic)
+class MaterialCharacteristicAdmin(admin.ModelAdmin):
+    list_display = ('name', 'description')
+    search_fields = ('name',)
 
 @admin.register(MaterialType)
 class MaterialTypeAdmin(admin.ModelAdmin):
@@ -42,11 +47,10 @@ class MaterialFileInline(admin.TabularInline):
 
 @admin.register(MaterialLibrary)
 class MaterialLibraryAdmin(admin.ModelAdmin):
-    # 精简 list_display，直接显示 FileField 字段名，Django 会自动生成下载链接
     list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'file_tds', 'file_msds', 'file_rohs', 'created_at')
     search_fields = ('grade_name', 'manufacturer')
-    list_filter = ('category', 'flammability', 'scenarios', 'created_at')
-    filter_horizontal = ('scenarios',)
+    list_filter = ('category', 'flammability', 'scenarios', 'characteristics', 'created_at')
+    filter_horizontal = ('scenarios', 'characteristics') # 使用横向多选小部件
     inlines = [MaterialDataPointInline, MaterialFileInline]
     autocomplete_fields = ['category']
 

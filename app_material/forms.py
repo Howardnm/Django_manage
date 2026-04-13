@@ -1,7 +1,8 @@
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models.material import MaterialLibrary, ApplicationScenario, MaterialDataPoint, TestConfig, MaterialFile, MaterialType # 修正导入路径
+from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint, 
+                               TestConfig, MaterialFile, MaterialType, MaterialCharacteristic)
 from common_utils.filters import TablerFormMixin
 
 
@@ -11,7 +12,14 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
         fields = '__all__'
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
-            'scenarios': forms.SelectMultiple(attrs={'class': 'form-select remote-search tomselect-multi-remote', 'data-model': 'applicationscenario'}),
+            'scenarios': forms.SelectMultiple(attrs={
+                'class': 'form-select remote-search tomselect-multi-remote', 
+                'data-model': 'scenario'
+            }),
+            'characteristics': forms.SelectMultiple(attrs={
+                'class': 'form-select remote-search tomselect-multi-remote', 
+                'data-model': 'characteristic' 
+            }),
             'flammability': forms.Select(attrs={'class': 'form-select'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
         }
@@ -21,9 +29,15 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
         if not self.data:
             instance = kwargs.get('instance')
             qs_scenarios = ApplicationScenario.objects.none()
+            qs_characteristics = MaterialCharacteristic.objects.none()
             if instance and instance.pk:
                 qs_scenarios = instance.scenarios.all()
+                qs_characteristics = instance.characteristics.all()
             self.fields['scenarios'].queryset = qs_scenarios
+            self.fields['characteristics'].queryset = qs_characteristics
+        else:
+            self.fields['scenarios'].queryset = ApplicationScenario.objects.all()
+            self.fields['characteristics'].queryset = MaterialCharacteristic.objects.all()
 
 
 class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
@@ -109,6 +123,15 @@ class ApplicationScenarioForm(TablerFormMixin, forms.ModelForm):
         fields = ['name', 'requirements']
         widgets = {
             'requirements': forms.Textarea(attrs={'rows': 3, 'placeholder': '例如：耐高温、抗冲击...'}),
+        }
+
+# 新增：特征属性表单
+class MaterialCharacteristicForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = MaterialCharacteristic
+        fields = ['name', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '填写该特征的详细描述...'}),
         }
 
 

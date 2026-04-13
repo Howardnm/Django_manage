@@ -1,5 +1,5 @@
 <!-- ============================================================ -->
-<!-- 板块 1：核心身份信息 (Card) - 保持不变 -->
+<!-- 板块 1：核心身份信息 (Card) -->
 <!-- ============================================================ -->
 <div class="card mb-3">
     <div class="card-header bg-info-lt">
@@ -7,30 +7,40 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <!-- 第一行：牌号 (重点) + 厂家 -->
+            <!-- 第一行：牌号 + 厂家 -->
             <div class="col-md-6 mb-3">
                 <label class="form-label required">材料牌号 (Grade Name)</label>
                 {{ form.grade_name }}
                 {% if form.grade_name.errors %}
-                    <div class="invalid-feedback d-block">{{ form.grade_name.errors.0 }}</div>{% endif %}
+                    <div class="invalid-feedback d-block">{{ form.grade_name.errors.0 }}</div>
+                {% endif %}
             </div>
             <div class="col-md-6 mb-3">
                 <label class="form-label">生产厂家 (Manufacturer)</label>
                 {{ form.manufacturer }}
             </div>
 
-            <!-- 第二行：分类 + 场景 + 阻燃 -->
-            <div class="col-md-4 mb-3">
+            <!-- 第二行：分类 + 阻燃 -->
+            <div class="col-md-6 mb-3">
                 <label class="form-label required">所属类型</label>
                 {{ form.category }}
             </div>
-            <div class="col-md-4 mb-3">
-                <label class="form-label">主要应用场景</label>
-                {{ form.scenarios }}
-            </div>
-            <div class="col-md-4 mb-3">
+            <div class="col-md-6 mb-3">
                 <label class="form-label">阻燃等级</label>
                 {{ form.flammability }}
+            </div>
+
+            <!-- 第三行：特征属性 (新增) -->
+            <div class="col-md-12 mb-3">
+                <label class="form-label">材料特征属性</label>
+                {{ form.characteristics }}
+                <small class="form-hint">选择该材料的核心卖点或特性，如：高流动、耐水解、玻纤增强等。</small>
+            </div>
+
+            <!-- 第四行：应用场景 -->
+            <div class="col-md-12 mb-3">
+                <label class="form-label">主要应用场景</label>
+                {{ form.scenarios }}
             </div>
         </div>
     </div>
