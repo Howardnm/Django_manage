@@ -8,41 +8,46 @@ logger = logging.getLogger(__name__)
 
 def send_material_webhook(event_type, instance):
     """
-    Webhook 任务入队入口：将变更事件保存到数据库任务队列中
+    Webhook 任务入队入口
+    支持物料变更事件和维度数据(场景/特征)变更事件
     """
     try:
-        # 构造 Payload
-        # 注意：这里只传基础信息，手册系统接收到后会再通过 API 抓取完整详情
+        # 根据模型类型构造数据负载
+        data = {'id': instance.id}
+        
+        if hasattr(instance, 'grade_name'):
+            data['name'] = instance.grade_name
+            data['model'] = 'material'
+        elif hasattr(instance, 'name'):
+            data['name'] = instance.name
+            # 判断模型属于场景还是特征
+            data['model'] = 'scenario' if 'Scenario' in instance.__class__.__name__ else 'characteristic'
+
         payload_data = {
             'event_type': event_type,
-            'data': {
-                'id': instance.id,
-                'grade_name': getattr(instance, 'grade_name', str(instance)),
-            }
+            'data': data
         }
         
-        # 创建异步任务记录
+        # 保存到任务队列
         WebhookTask.objects.create(
             event_type=event_type,
             payload=json.dumps(payload_data, ensure_ascii=False),
             status='PENDING'
         )
-        logger.info(f"Webhook Task queued: {event_type} for ID {instance.id}")
+        logger.info(f"Webhook Task Qued: {event_type} for {data['model']} {instance.id}")
         return True
     except Exception as e:
         logger.error(f"Failed to queue Webhook Task: {e}")
         return False
 
 def perform_webhook_send(task):
-    """
-    执行实际的网络发送逻辑 (由管理命令或后台进程调用)
-    """
+    """由守护进程或管理命令调用，执行实际发送"""
     webhook_url = getattr(settings, 'CATALOG_WEBHOOK_URL', None)
     webhook_secret = getattr(settings, 'WEBHOOK_SECRET_KEY', None)
 
     if not webhook_url:
         task.status = 'FAILED'
-        task.last_error = "CATALOG_WEBHOOK_URL not configured."
+        task.last_error = "Target URL not configured."
         task.save()
         return False
 
@@ -52,29 +57,15 @@ def perform_webhook_send(task):
     }
 
     try:
-        response = requests.post(
-            webhook_url, 
-            data=task.payload, 
-            headers=headers, 
-            timeout=10
-        )
+        response = requests.post(webhook_url, data=task.payload, headers=headers, timeout=10)
         response.raise_for_status()
-        
         task.status = 'SUCCESS'
         task.save()
-        logger.info(f"Webhook Task {task.id} sent successfully.")
         return True
-        
     except Exception as e:
         task.retry_count += 1
         task.last_error = str(e)
-        
         if task.retry_count >= task.max_retries:
             task.status = 'FAILED'
-            logger.error(f"Webhook Task {task.id} failed after {task.max_retries} retries: {e}")
-        else:
-            task.status = 'PENDING'
-            logger.warning(f"Webhook Task {task.id} retry {task.retry_count}/{task.max_retries} due to: {e}")
-            
         task.save()
         return False

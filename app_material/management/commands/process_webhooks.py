@@ -1,41 +1,37 @@
 import time
-import signal
+import logging
 from django.core.management.base import BaseCommand
-from ...models import WebhookTask
-from ...integration.webhooks import perform_webhook_send # 更新导入路径
+from ...models.sync import WebhookTask
+from ...integration.webhooks import perform_webhook_send
+
+logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
-    help = '后台处理 Webhook 异步任务队列'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.running = True
-        signal.signal(signal.SIGINT, self.handle_exit)
-        signal.signal(signal.SIGTERM, self.handle_exit)
-
-    def handle_exit(self, sig, frame):
-        self.stdout.write(self.style.WARNING('\n正在停止 Webhook 处理器...'))
-        self.running = False
+    help = '后台异步处理 Webhook 发送任务队列'
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.SUCCESS('Webhook 后台处理器已启动 (集成层模式)...'))
+        self.stdout.write(self.style.SUCCESS('🚀 Webhook 处理器已启动，正在监听任务...'))
         
-        while self.running:
+        while True:
+            # 1. 获取所有待处理或需要重试的任务
+            # 这里的逻辑：状态为 PENDING 且重试次数未达上限
             tasks = WebhookTask.objects.filter(status='PENDING').order_by('created_at')[:10]
             
             if not tasks:
-                time.sleep(5)
+                # 如果没任务，休眠 3 秒再查，避免过度消耗 CPU
+                time.sleep(3)
                 continue
 
             for task in tasks:
-                if not self.running:
-                    break
+                self.stdout.write(f"  - 正在处理任务 {task.id}: {task.event_type}...")
                 
+                # 执行发送
                 success = perform_webhook_send(task)
                 
-                status_msg = self.style.SUCCESS("成功") if success else self.style.ERROR(f"失败: {task.last_error}")
-                self.stdout.write(f"处理任务 {task.id} [{task.event_type}]: {status_msg}")
-            
-            time.sleep(1)
+                if success:
+                    self.stdout.write(self.style.SUCCESS(f"    [OK] 任务 {task.id} 发送成功"))
+                else:
+                    self.stdout.write(self.style.ERROR(f"    [FAIL] 任务 {task.id} 发送失败，已记录错误。"))
 
-        self.stdout.write(self.style.SUCCESS('Webhook 处理器已安全退出。'))
+            # 批处理完后稍微休息下
+            time.sleep(1)
