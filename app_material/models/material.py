@@ -26,7 +26,7 @@ class MaterialType(models.Model):
     class Meta:
         verbose_name = "材料类型"
         verbose_name_plural = "材料类型库"
-        ordering = ['name'] # 修正：添加默认排序
+        ordering = ['name']
 
 # ==========================================
 # 2. 材料特征属性
@@ -40,7 +40,7 @@ class MaterialCharacteristic(models.Model):
     class Meta:
         verbose_name = "材料特征"
         verbose_name_plural = "材料特征库"
-        ordering = ['name'] # 修正：添加默认排序
+        ordering = ['name']
 
 # ==========================================
 # 3. 应用场景库
@@ -52,7 +52,7 @@ class ApplicationScenario(models.Model):
     class Meta:
         verbose_name = "应用场景"
         verbose_name_plural = "应用场景库"
-        ordering = ['name'] # 修正：添加默认排序
+        ordering = ['name']
 
 # ==========================================
 # 4. 指标分类
@@ -100,6 +100,10 @@ class MaterialLibrary(models.Model):
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
     scenarios = models.ManyToManyField(ApplicationScenario, blank=True, verbose_name="适用场景", related_name="materials")
     characteristics = models.ManyToManyField(MaterialCharacteristic, blank=True, verbose_name="特征属性", related_name="materials")
+    
+    # 新增：对外发布开关 (用于控制电子手册是否显示)
+    is_published = models.BooleanField("对外发布", default=False, help_text="勾选后，该材料将同步并显示在电子手册系统中。")
+
     flammability = models.CharField("阻燃等级", max_length=20, blank=True,
                                     choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
     description = models.TextField("特性描述", blank=True)

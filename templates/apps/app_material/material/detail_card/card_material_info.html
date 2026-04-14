@@ -1,7 +1,19 @@
 <!-- 1. 基础信息卡片 -->
 <div class="card mb-3">
-    <div class="card-header">
+    <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title">基础档案</h3>
+        <!-- 核心增加：发布状态标识 -->
+        <div class="card-actions">
+            {% if material.is_published %}
+                <span class="badge bg-green-lt">
+                    <span class="status-dot status-dot-animated bg-green me-1"></span> 已发布至手册
+                </span>
+            {% else %}
+                <span class="badge bg-secondary-lt">
+                    <span class="status-dot bg-secondary me-1"></span> 未发布至手册
+                </span>
+            {% endif %}
+        </div>
     </div>
     <div class="card-body">
         <div class="datagrid">
@@ -16,14 +28,14 @@
                 </div>
             </div>
 
-            <!-- 特征属性展示 (新增) -->
+            <!-- 特征属性展示 -->
             <div class="datagrid-item">
                 <div class="datagrid-title">特征属性</div>
                 <div class="datagrid-content">
                     {% if material.characteristics.exists %}
                         <div class="d-flex flex-wrap gap-1">
                             {% for c in material.characteristics.all %}
-                                <span class="badge bg-purple-lt">{{ c.name }}</span>
+                                <span class="badge bg-purple-lt small">{{ c.name }}</span>
                             {% endfor %}
                         </div>
                     {% else %}

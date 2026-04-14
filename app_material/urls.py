@@ -3,7 +3,7 @@ from .views.Material import *
 from .views.MaterialType import *
 from .views.Scenario import *
 from .views.TestConfig import *
-from .views.Characteristic import * # 补全导入
+from .views.Characteristic import *
 from .views.utils import MaterialAutocompleteView
 
 urlpatterns = [
@@ -15,6 +15,9 @@ urlpatterns = [
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='material_edit'),
     path('material/<int:material_id>/file/add/', MaterialFileUploadView.as_view(), name='material_file_add'),
     path('material/file/<int:pk>/delete/', MaterialFileDeleteView.as_view(), name='material_file_delete'),
+    
+    # 【新增】批量发布/下架
+    path('materials/bulk-publish/', MaterialBulkPublishView.as_view(), name='material_bulk_publish'),
 
     # 异步搜索 API (用于 TomSelect)
     path('api/search/', MaterialAutocompleteView.as_view(), name='material_api_search'),

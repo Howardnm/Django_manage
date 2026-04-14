@@ -6,6 +6,8 @@ from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
+from django.http import JsonResponse
+import json
 
 from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialFileForm
 from app_material.models.material import MaterialLibrary, MaterialDataPoint, MaterialFile
@@ -18,9 +20,9 @@ from app_formula.models import FormulaTestResult
 # ==========================================
 
 class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
-    permission_required = 'app_material.view_materiallibrary' # 修正权限码
+    permission_required = 'app_material.view_materiallibrary'
     model = MaterialLibrary
-    template_name = 'apps/app_material/material/material_list.html' # 修正模板路径
+    template_name = 'apps/app_material/material/material_list.html'
     context_object_name = 'materials'
     paginate_by = 10
 
@@ -252,3 +254,36 @@ class MaterialFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
         file_obj.delete()
         messages.success(request, "附件已删除")
         return redirect('material_detail', pk=material_id)
+
+# --- 【新增】批量发布/下架视图 ---
+class MaterialBulkPublishView(LoginRequiredMixin, PermissionRequiredMixin, View):
+    permission_required = 'app_material.change_materiallibrary'
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+            ids = data.get('ids', [])
+            action = data.get('action') # 'publish' or 'unpublish'
+            
+            if not ids or action not in ['publish', 'unpublish']:
+                return JsonResponse({'status': 'error', 'message': '参数错误'}, status=400)
+
+            is_published = (action == 'publish')
+            
+            # 使用事务批量更新
+            with transaction.atomic():
+                updated_count = MaterialLibrary.objects.filter(pk__in=ids).update(is_published=is_published)
+                
+                # 重要：触发 Webhook 同步
+                # 由于 update() 不触发信号，我们需要手动触发或通过 Webhook 任务表
+                # 这里我们采取简单做法：为受影响的物料发送 Webhook (循环发送可能慢，生产环境建议用批量 Webhook)
+                from app_material.integration.webhooks import send_material_webhook
+                for obj in MaterialLibrary.objects.filter(pk__in=ids):
+                    send_material_webhook('material_updated', obj)
+
+            return JsonResponse({
+                'status': 'success', 
+                'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'
+            })
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

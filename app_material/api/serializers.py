@@ -43,7 +43,6 @@ class MaterialFileSerializer(serializers.ModelSerializer):
 class MaterialLibrarySerializer(serializers.ModelSerializer):
     category = MaterialTypeSerializer(read_only=True)
     scenarios = ApplicationScenarioSerializer(many=True, read_only=True)
-    # 新增：特征属性序列化
     characteristics = MaterialCharacteristicSerializer(many=True, read_only=True)
     
     grouped_properties = serializers.SerializerMethodField()
@@ -55,6 +54,7 @@ class MaterialLibrarySerializer(serializers.ModelSerializer):
         model = MaterialLibrary
         fields = (
             'id', 'grade_name', 'manufacturer', 'category', 'scenarios', 'characteristics',
+            'is_published', # 增加该字段
             'flammability', 'description', 'file_tds', 'file_msds', 'file_rohs',
             'created_at', 'grouped_properties'
         )

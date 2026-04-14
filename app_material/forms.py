@@ -12,16 +12,20 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
         fields = '__all__'
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
+            # 应用场景多选
             'scenarios': forms.SelectMultiple(attrs={
                 'class': 'form-select remote-search tomselect-multi-remote', 
                 'data-model': 'scenario'
             }),
+            # 特征属性多选
             'characteristics': forms.SelectMultiple(attrs={
                 'class': 'form-select remote-search tomselect-multi-remote', 
                 'data-model': 'characteristic' 
             }),
             'flammability': forms.Select(attrs={'class': 'form-select'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
+            # 对外发布开关 (使用 Tabler 的 switch 样式，通过 CSS 控制)
+            'is_published': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -125,7 +129,7 @@ class ApplicationScenarioForm(TablerFormMixin, forms.ModelForm):
             'requirements': forms.Textarea(attrs={'rows': 3, 'placeholder': '例如：耐高温、抗冲击...'}),
         }
 
-# 新增：特征属性表单
+# 特征属性表单
 class MaterialCharacteristicForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialCharacteristic

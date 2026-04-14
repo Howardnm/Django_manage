@@ -47,10 +47,12 @@ class MaterialFileInline(admin.TabularInline):
 
 @admin.register(MaterialLibrary)
 class MaterialLibraryAdmin(admin.ModelAdmin):
-    list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'file_tds', 'file_msds', 'file_rohs', 'created_at')
+    # 增加 is_published 到展示列表并允许直接编辑
+    list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'is_published', 'file_tds', 'file_msds', 'file_rohs', 'created_at')
+    list_editable = ('is_published',)
     search_fields = ('grade_name', 'manufacturer')
-    list_filter = ('category', 'flammability', 'scenarios', 'characteristics', 'created_at')
-    filter_horizontal = ('scenarios', 'characteristics') # 使用横向多选小部件
+    list_filter = ('is_published', 'category', 'flammability', 'scenarios', 'characteristics', 'created_at')
+    filter_horizontal = ('scenarios', 'characteristics')
     inlines = [MaterialDataPointInline, MaterialFileInline]
     autocomplete_fields = ['category']
 

@@ -6,109 +6,85 @@
         <div class="row align-items-center">
             <div class="col"><h2 class="page-title">公共材料库</h2></div>
             <div class="col-auto ms-auto">
-                <a href="{% url 'material_add' %}" class="btn btn-primary"><i class="ti ti-plus"></i> 录入</a>
-                <!-- 【新增】加入对比按钮 -->
-                <button type="button" class="btn btn-outline-warning ms-2" onclick="addSelectedToCompare()">
-                    <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
-                </button>
+                <div class="btn-list">
+                    <!-- 批量操作组 -->
+                    <div class="dropdown">
+                        <button type="button" class="btn btn-outline-primary dropdown-toggle" data-bs-toggle="dropdown">
+                            <i class="ti ti-settings me-1"></i> 批量操作
+                        </button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="bulkAction('publish')">
+                                <i class="ti ti-cloud-upload me-2 text-green"></i> 批量发布至手册
+                            </a>
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="bulkAction('unpublish')">
+                                <i class="ti ti-cloud-off me-2 text-red"></i> 批量从手册下架
+                            </a>
+                            <div class="dropdown-divider"></div>
+                            <a class="dropdown-item" href="javascript:void(0)" onclick="addSelectedToCompare()">
+                                <i class="ti ti-shopping-cart-plus me-2 text-warning"></i> 加入对比清单
+                            </a>
+                        </div>
+                    </div>
+
+                    <a href="{% url 'material_add' %}" class="btn btn-primary">
+                        <i class="ti ti-plus me-1"></i> 录入材料
+                    </a>
+                </div>
             </div>
         </div>
     </div>
 
     <div class="card mt-3">
-        <!-- 1. 标准切换 Tabs -->
         <div class="card-header">
             <ul class="nav nav-tabs card-header-tabs">
                 <li class="nav-item">
-                    <a href="?{% url_replace std='ISO' page=1 %}" class="nav-link {% if current_std != 'ASTM' %}active{% endif %}">
-                        ISO / 国标
-                    </a>
+                    <a href="?{% url_replace std='ISO' page=1 %}" class="nav-link {% if current_std != 'ASTM' %}active{% endif %}">ISO / 国标</a>
                 </li>
                 <li class="nav-item">
-                    <a href="?{% url_replace std='ASTM' page=1 %}" class="nav-link {% if current_std == 'ASTM' %}active{% endif %}">
-                        ASTM (美标)
-                    </a>
+                    <a href="?{% url_replace std='ASTM' page=1 %}" class="nav-link {% if current_std == 'ASTM' %}active{% endif %}">ASTM (美标)</a>
                 </li>
             </ul>
         </div>
 
-        <!-- 2. 筛选区域 (替换原有的 include) -->
         <div class="card-body border-bottom py-3">
             <form method="GET" class="row g-2 align-items-center">
-                <!-- 保持当前标准和排序参数 -->
                 <input type="hidden" name="std" value="{{ current_std }}">
-                {% for s in request.GET.getlist.sort %}
-                    <input type="hidden" name="sort" value="{{ s }}">
-                {% endfor %}
-
-                <!-- 基础筛选 -->
+                {% for s in request.GET.getlist.sort %}<input type="hidden" name="sort" value="{{ s }}">{% endfor %}
                 <div class="col-auto">
                     <div class="input-icon">
                         <span class="input-icon-addon"><i class="ti ti-search"></i></span>
                         {{ filter.form.q }}
                     </div>
                 </div>
-                <div class="col-auto">
-                    {{ filter.form.category }}
-                </div>
-                <div class="col-auto" style="min-width: 200px;">
-                    {{ filter.form.scenarios }}
-                </div>
-
-                <!-- 性能范围筛选 (折叠/展开) -->
+                <div class="col-auto">{{ filter.form.category }}</div>
+                <div class="col-auto" style="min-width: 200px;">{{ filter.form.scenarios }}</div>
                 <div class="col-auto">
                     <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
                         <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
                     </button>
                 </div>
-
                 <div class="col-auto ms-auto">
                     <button type="submit" class="btn btn-primary btn-icon"><i class="ti ti-search"></i></button>
-                    <!-- 重置按钮 -->
-                    {% if request.GET %}
-                        <a href="?std={{ current_std }}" class="btn btn-ghost-danger ms-2">重置</a>
-                    {% endif %}
+                    {% if request.GET %}<a href="?std={{ current_std }}" class="btn btn-ghost-danger ms-2">重置</a>{% endif %}
                 </div>
-
-                <!-- 高级筛选面板 -->
                 <div class="collapse w-100 mt-2" id="advanced-filter">
                     <div class="card card-body bg-blue-lt">
                         <div class="row g-3">
-                            <!-- 熔指 -->
                             <div class="col-md-3">
                                 <label class="form-label small">熔融指数</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.melt_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.melt_max }}
-                                </div>
+                                <div class="input-group input-group-sm">{{ filter.form.melt_min }}<span class="input-group-text">-</span>{{ filter.form.melt_max }}</div>
                             </div>
-                            <!-- 拉伸 -->
                             <div class="col-md-3">
                                 <label class="form-label small">拉伸强度 (MPa)</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.tensile_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.tensile_max }}
-                                </div>
+                                <div class="input-group input-group-sm">{{ filter.form.tensile_min }}<span class="input-group-text">-</span>{{ filter.form.tensile_max }}</div>
                             </div>
-                            <!-- 弯曲模量 -->
                             <div class="col-md-3">
                                 <label class="form-label small">弯曲模量 (MPa)</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.flex_modulus_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.flex_modulus_max }}
-                                </div>
+                                <div class="input-group input-group-sm">{{ filter.form.flex_modulus_min }}<span class="input-group-text">-</span>{{ filter.form.flex_modulus_max }}</div>
                             </div>
-                            <!-- 冲击 -->
                             <div class="col-md-3">
                                 <label class="form-label small">冲击强度</label>
-                                <div class="input-group input-group-sm">
-                                    {{ filter.form.impact_min }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form.impact_max }}
-                                </div>
+                                <div class="input-group input-group-sm">{{ filter.form.impact_min }}<span class="input-group-text">-</span>{{ filter.form.impact_max }}</div>
                             </div>
                         </div>
                     </div>
@@ -120,46 +96,33 @@
             <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
                 <thead>
                 <tr>
-                    <th class="w-1"><input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" aria-label="Select all invoices" onclick="toggleAll(this)"></th>
+                    <th class="w-1"><input class="form-check-input m-0 align-middle form-check-input-warning" type="checkbox" onclick="toggleAll(this)"></th>
                     <th><a href="?{% url_replace sort='grade_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">牌号</a></th>
                     <th>类型</th>
                     <th>场景</th>
-
-                    <!-- 动态表头: 物理 -->
                     <th style="width: 60px;"><a href="?{% url_replace sort='density'|sort_toggle:current_sort %}" class="table-sort-header text-reset">密度</a></th>
                     <th style="width: 60px;"><a href="?{% url_replace sort='ash'|sort_toggle:current_sort %}" class="table-sort-header text-reset">灰分</a></th>
                     <th style="width: 80px;"><a href="?{% url_replace sort='melt_index'|sort_toggle:current_sort %}" class="table-sort-header text-reset">M.I</a></th>
-
-                    <!-- 动态表头: 机械 -->
                     <th style="width: 80px;"><a href="?{% url_replace sort='tensile'|sort_toggle:current_sort %}" class="table-sort-header text-reset">拉伸</a></th>
                     <th style="width: 80px;"><a href="?{% url_replace sort='flex_strength'|sort_toggle:current_sort %}" class="table-sort-header text-reset">弯强</a></th>
                     <th style="width: 80px;"><a href="?{% url_replace sort='flex_modulus'|sort_toggle:current_sort %}" class="table-sort-header text-reset">弯模</a></th>
                     <th style="width: 80px;"><a href="?{% url_replace sort='impact'|sort_toggle:current_sort %}" class="table-sort-header text-reset">冲击</a></th>
-
-                    <!-- 动态表头: 热学 -->
                     <th style="width: 80px;"><a href="?{% url_replace sort='hdt'|sort_toggle:current_sort %}" class="table-sort-header text-reset">HDT</a></th>
-
                     <th><a href="?{% url_replace sort='flammability'|sort_toggle:current_sort %}" class="table-sort-header text-reset">阻燃</a></th>
+                    <th>状态</th>
                     <th>文档</th>
-                    <th><a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">录入日期</a></th>
                     <th>操作</th>
                 </tr>
                 </thead>
                 <tbody>
                 {% for mat in page_obj %}
                     <tr>
-                        <td>
-                            <input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" value="{{ mat.pk }}"
-                                   data-type="material"
-                                   {% if mat.pk in cart_material_ids %}checked{% endif %}>
-                        </td>
+                        <td><input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" value="{{ mat.pk }}" data-type="material"></td>
                         <td>
                             <a href="{% url 'material_detail' mat.pk %}" class="fw-bold text-primary text-reset">{{ mat.grade_name }}</a>
                             <div class="small text-muted">{{ mat.manufacturer }}</div>
                         </td>
                         <td><span class="badge bg-green-lt">{{ mat.category.name }}</span></td>
-
-                        <!-- 场景 (前2个) -->
                         <td>
                             {% if mat.scenarios.exists %}
                                 <div class="d-flex flex-wrap gap-1" style="max-width: 150px;">
@@ -170,181 +133,130 @@
                                 </div>
                             {% else %}-{% endif %}
                         </td>
-
-                        <!-- === 动态数据列 (val_xxx) === -->
-                        <!-- 密度 -->
                         <td>{% if mat.val_density %}<div class="fw-bold">{{ mat.val_density|floatformat:3 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 灰分 -->
                         <td>{% if mat.val_ash %}<div class="fw-bold">{{ mat.val_ash|floatformat:1 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- M.I -->
                         <td>{% if mat.val_melt %}<div class="fw-bold">{{ mat.val_melt|floatformat:1 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 拉伸 -->
                         <td>{% if mat.val_tensile %}<div class="fw-bold">{{ mat.val_tensile|floatformat:0 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 弯强 -->
                         <td>{% if mat.val_flex_strength %}<div class="fw-bold">{{ mat.val_flex_strength|floatformat:0 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 弯模 -->
                         <td>{% if mat.val_flex_modulus %}<div class="fw-bold">{{ mat.val_flex_modulus|floatformat:0 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 冲击 -->
                         <td>{% if mat.val_impact %}<div class="fw-bold">{{ mat.val_impact|floatformat:1 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- HDT -->
                         <td>{% if mat.val_hdt %}<div class="fw-bold text-red">{{ mat.val_hdt|floatformat:0 }}</div>{% else %}-{% endif %}</td>
-
-                        <!-- 阻燃 -->
                         <td>{{ mat.flammability|default:"-" }}</td>
-
-                        <!-- 文档 -->
+                        <td>
+                            {% if mat.is_published %}
+                                <span class="status-dot status-dot-animated bg-green" title="已发布"></span> <span class="text-green small">已发布</span>
+                            {% else %}
+                                <span class="status-dot bg-secondary" title="私有"></span> <span class="text-muted small">私有</span>
+                            {% endif %}
+                        </td>
                         <td>
                             <div class="d-flex gap-1">
-                                {% if mat.file_tds %}
-                                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_tds' %}" target="_blank" class="text-azure" title="TDS"
-                                       data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
-                                {% endif %}
-                                {% if mat.file_msds %}
-                                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_msds' %}" target="_blank" class="text-red" title="MSDS"
-                                       data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
-                                {% endif %}
-                                {% if mat.file_rohs %}
-                                    <a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_rohs' %}" target="_blank" class="text-green" title="RoHS"
-                                       data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
-                                {% endif %}
+                                {% if mat.file_tds %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_tds' %}" target="_blank" class="text-azure"><i class="ti ti-file-text"></i></a>{% endif %}
+                                {% if mat.file_msds %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_msds' %}" target="_blank" class="text-red"><i class="ti ti-flask"></i></a>{% endif %}
+                                {% if mat.file_rohs %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_rohs' %}" target="_blank" class="text-green"><i class="ti ti-leaf"></i></a>{% endif %}
                             </div>
                         </td>
-
-                        <!-- 【新增内容】 -->
-                        <td class="text-muted small">
-                            {{ mat.created_at|date:"Y-m-d" }}
-                        </td>
-
-                        <!-- 操作 -->
                         <td>
-                            <a href="{% url 'material_detail' mat.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
-                                <i class="ti ti-list"></i>
-                            </a>
+                            <div class="btn-list flex-nowrap">
+                                <a href="{% url 'material_detail' mat.pk %}" class="btn btn-sm btn-icon btn-ghost-primary"><i class="ti ti-list"></i></a>
+                                <a href="{% url 'material_edit' mat.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary"><i class="ti ti-edit"></i></a>
+                            </div>
                         </td>
                     </tr>
                 {% empty %}
-                    <tr>
-                        <td colspan="14" class="text-center py-4 text-muted">暂无材料数据</td>
-                    </tr>
+                    <tr><td colspan="16" class="text-center py-4 text-muted">暂无材料数据</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
         </div>
     </div>
-
     <br>
     {% include 'apps/list_modules/paginator.html' %}
 
     <script>
+        // 1. 初始化远程搜索 (这一段是您原本最重要的 JS)
+        document.addEventListener("DOMContentLoaded", function () {
+            if (window.TomSelect) {
+                document.querySelectorAll('.remote-search.tomselect-multi-remote').forEach(function (el) {
+                    var modelType = el.getAttribute('data-model');
+                    if (!modelType) return;
+
+                    new TomSelect(el, {
+                        mode: 'multi',
+                        valueField: 'value',
+                        labelField: 'text',
+                        searchField: 'text',
+                        load: function (query, callback) {
+                            var url = "{% url 'material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
+                            fetch(url)
+                                .then(response => response.json())
+                                .then(json => {
+                                    callback(json);
+                                })
+                                .catch(() => {
+                                    callback();
+                                });
+                        },
+                        copyClassesToDropdown: false,
+                        dropdownParent: 'body',
+                        create: false,
+                        placeholder: '请输入...',
+                        preload: 'focus',
+                        plugins: ['remove_button'],
+                        render: {
+                            option: function (data, escape) { return '<div>' + escape(data.text) + '</div>'; },
+                            item: function (data, escape) { return '<div>' + escape(data.text) + '</div>'; },
+                            no_results: function (data, escape) { return '<div class="no-results p-2 text-muted small">无匹配结果</div>'; },
+                            loading: function (data, escape) { return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'; }
+                        }
+                    });
+                });
+            }
+        });
+
+        // 2. 批量全选
         function toggleAll(source) {
             checkboxes = document.getElementsByClassName('compare-checkbox');
-            for(var i=0, n=checkboxes.length;i<n;i++) {
-                checkboxes[i].checked = source.checked;
-            }
+            for(var i=0, n=checkboxes.length;i<n;i++) { checkboxes[i].checked = source.checked; }
         }
 
-        // 【新增】批量加入对比
-        function addSelectedToCompare() {
+        // 3. 批量操作逻辑
+        function bulkAction(action) {
             const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
-            if (checkboxes.length === 0) {
-                alert('请先勾选要对比的材料');
-                return;
-            }
-
+            if (checkboxes.length === 0) { alert('请先勾选需要操作的材料'); return; }
+            const actionText = action === 'publish' ? '发布' : '下架';
+            if (!confirm(`确定要批量${actionText}选中的 ${checkboxes.length} 个牌号吗？`)) return;
             const ids = Array.from(checkboxes).map(cb => cb.value);
-
-            // 构建 FormData
-            const formData = new FormData();
-            formData.append('action', 'add_multiple');
-            formData.append('type', 'material'); // 指定类型为材料
-            formData.append('ids', JSON.stringify(ids));
-            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
-
-            // 发送请求
-            fetch("{% url 'formula_compare_cart' %}", {
+            fetch("{% url 'material_bulk_publish' %}", {
                 method: 'POST',
-                body: formData
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                body: JSON.stringify({ ids: ids, action: action })
             })
             .then(response => response.json())
             .then(data => {
-                if (data.status === 'success') {
-                    // 刷新 Header 购物车 (如果存在该函数)
-                    if (typeof refreshCompareCart === 'function') {
-                        refreshCompareCart();
-                    }
-                    // 取消勾选
-                    checkboxes.forEach(cb => cb.checked = false);
-                    const toggleAllCheckbox = document.querySelector('input[onclick="toggleAll(this)"]');
-                    if (toggleAllCheckbox) toggleAllCheckbox.checked = false;
+                if (data.status === 'success') { alert(data.message); window.location.reload(); }
+                else { alert('操作失败: ' + data.message); }
+            });
+        }
 
+        // 4. 加入对比
+        function addSelectedToCompare() {
+            const checkboxes = document.querySelectorAll('.compare-checkbox:checked');
+            if (checkboxes.length === 0) { alert('请先勾选要对比的材料'); return; }
+            const ids = Array.from(checkboxes).map(cb => cb.value);
+            const formData = new FormData();
+            formData.append('action', 'add_multiple');
+            formData.append('type', 'material');
+            formData.append('ids', JSON.stringify(ids));
+            formData.append('csrfmiddlewaretoken', '{{ csrf_token }}');
+            fetch("{% url 'formula_compare_cart' %}", { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    if (typeof refreshCompareCart === 'function') { refreshCompareCart(); }
                     alert('已成功加入 ' + ids.length + ' 个材料到对比清单');
-                } else {
-                    alert('加入失败，请重试');
                 }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('发生错误，请稍后重试');
             });
         }
     </script>
-{% endblock %}
-
-{% block extra_js %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    if (window.TomSelect) {
-        // 多选远程搜索
-        document.querySelectorAll('.remote-search.tomselect-multi-remote').forEach(function (el) {
-            var modelType = el.getAttribute('data-model');
-            if (!modelType) return;
-
-            new TomSelect(el, {
-                mode: 'multi',
-                valueField: 'value',
-                labelField: 'text',
-                searchField: 'text',
-                load: function (query, callback) {
-                    var url = "{% url 'material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
-                    fetch(url)
-                        .then(response => response.json())
-                        .then(json => {
-                            callback(json);
-                        })
-                        .catch(() => {
-                            callback();
-                        });
-                },
-                copyClassesToDropdown: false,
-                dropdownParent: 'body',
-                create: false,
-                placeholder: '请输入应用场景...',
-                preload: 'focus',
-                plugins: ['remove_button'],
-                render: {
-                    option: function (data, escape) {
-                        return '<div>' + escape(data.text) + '</div>';
-                    },
-                    item: function (data, escape) {
-                        return '<div>' + escape(data.text) + '</div>';
-                    },
-                    no_results: function (data, escape) {
-                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                    },
-                    loading: function (data, escape) {
-                        return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
-                    }
-                }
-            });
-        });
-    }
-});
-</script>
 {% endblock %}
