@@ -11,4 +11,4 @@ class VisitorLog(models.Model):
 
     class Meta:
         verbose_name = "访客记录"
-        verbose_name_plural = "3.访客记录详情"
+        verbose_name_plural = "5.访客记录详情"

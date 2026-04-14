@@ -26,9 +26,10 @@ class MaterialType(models.Model):
     class Meta:
         verbose_name = "材料类型"
         verbose_name_plural = "材料类型库"
+        ordering = ['name'] # 修正：添加默认排序
 
 # ==========================================
-# 新增：材料特征属性 (如：高流动、耐候、加纤、抗冲)
+# 2. 材料特征属性
 # ==========================================
 class MaterialCharacteristic(models.Model):
     """材料特征属性主数据"""
@@ -39,9 +40,10 @@ class MaterialCharacteristic(models.Model):
     class Meta:
         verbose_name = "材料特征"
         verbose_name_plural = "材料特征库"
+        ordering = ['name'] # 修正：添加默认排序
 
 # ==========================================
-# 2. 应用场景库
+# 3. 应用场景库
 # ==========================================
 class ApplicationScenario(models.Model):
     name = models.CharField("场景名称", max_length=100, unique=True)
@@ -50,9 +52,10 @@ class ApplicationScenario(models.Model):
     class Meta:
         verbose_name = "应用场景"
         verbose_name_plural = "应用场景库"
+        ordering = ['name'] # 修正：添加默认排序
 
 # ==========================================
-# 3. 指标分类
+# 4. 指标分类
 # ==========================================
 class MetricCategory(models.Model):
     name = models.CharField("分类名称", max_length=50)
@@ -63,7 +66,7 @@ class MetricCategory(models.Model):
         verbose_name = "指标分类"
 
 # ==========================================
-# 4. 测试配置项
+# 5. 测试配置项
 # ==========================================
 class TestConfig(models.Model):
     category = models.ForeignKey(MetricCategory, on_delete=models.CASCADE, verbose_name="所属分类")
@@ -89,19 +92,14 @@ class TestConfig(models.Model):
         ordering = ['category__order', 'order']
 
 # ==========================================
-# 5. 材料主表 (Material Library)
+# 6. 材料主表 (Material Library)
 # ==========================================
 class MaterialLibrary(models.Model):
     grade_name = models.CharField("材料牌号", max_length=100, unique=True)
     manufacturer = models.CharField("生产厂家", max_length=100, blank=True)
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
-    
-    # 关联场景
     scenarios = models.ManyToManyField(ApplicationScenario, blank=True, verbose_name="适用场景", related_name="materials")
-    
-    # 新增：关联特征属性
     characteristics = models.ManyToManyField(MaterialCharacteristic, blank=True, verbose_name="特征属性", related_name="materials")
-
     flammability = models.CharField("阻燃等级", max_length=20, blank=True,
                                     choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
     description = models.TextField("特性描述", blank=True)
@@ -113,7 +111,6 @@ class MaterialLibrary(models.Model):
     def __str__(self): return f"{self.grade_name}"
 
     def get_grouped_properties(self):
-        """核心业务逻辑：按分类分组获取性能数据，用于全系统展示"""
         grouped = defaultdict(list)
         points = self.properties.select_related('test_config', 'test_config__category').order_by(
             'test_config__category__order', 'test_config__order'
@@ -144,7 +141,7 @@ class MaterialLibrary(models.Model):
         verbose_name = "材料库"
 
 # ==========================================
-# 6. 性能数据子表
+# 7. 性能数据子表
 # ==========================================
 class MaterialDataPoint(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='properties')
@@ -158,7 +155,7 @@ class MaterialDataPoint(models.Model):
         ordering = ['test_config__category__order', 'test_config__order']
 
 # ==========================================
-# 7. 额外附件子表
+# 8. 额外附件子表
 # ==========================================
 class MaterialFile(models.Model):
     material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files')

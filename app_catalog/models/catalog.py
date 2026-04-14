@@ -9,8 +9,8 @@ class CatalogCategory(models.Model):
     is_active = models.BooleanField("是否启用", default=True)
     def __str__(self): return self.name
     class Meta:
-        verbose_name = "手册分类"
-        verbose_name_plural = "1.手册分类管理"
+        verbose_name = "材料类型"
+        verbose_name_plural = "1.材料类型列表"
         ordering = ['order']
 
 class MirrorScenario(models.Model):
@@ -18,12 +18,18 @@ class MirrorScenario(models.Model):
     name = models.CharField("场景名称", max_length=100)
     remote_id = models.IntegerField("远程ID", unique=True)
     def __str__(self): return self.name
+    class Meta:
+        verbose_name = "应用场景"
+        verbose_name_plural = "2.应用场景列表"
 
 class MirrorCharacteristic(models.Model):
     """本地镜像：材料特征"""
     name = models.CharField("特征名称", max_length=100)
     remote_id = models.IntegerField("远程ID", unique=True)
     def __str__(self): return self.name
+    class Meta:
+        verbose_name = "材料特征"
+        verbose_name_plural = "3.材料特征列表"
 
 class CatalogProduct(models.Model):
     """
@@ -52,5 +58,5 @@ class CatalogProduct(models.Model):
 
     class Meta:
         verbose_name = "手册产品"
-        verbose_name_plural = "2.手册产品列表"
+        verbose_name_plural = "4.手册产品列表"
         ordering = ['-published_at', '-id']
