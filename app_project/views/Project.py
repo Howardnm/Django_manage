@@ -100,13 +100,15 @@ class ProjectDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPerm
         context = super().get_context_data(**kwargs)
         project = self.object
 
+        # 核心修复：确保 context 中同时包含 repo 变量
         project_repo = getattr(project, 'repository', None)
         material = project_repo.material if project_repo else None
 
         context.update({
             'nodes': project.cached_nodes,
-            'project_repo': project_repo, # 将 ProjectRepository 实例命名为 project_repo
-            'material': material,         # 直接将 material 实例传递给模板
+            'project_repo': project_repo, 
+            'repo': project_repo,         # 增加 repo 别名以兼容模板
+            'material': material,
             'gantt_data_json': get_project_gantt_data(project)
         })
         return context

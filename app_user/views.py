@@ -1,21 +1,21 @@
 # apps/app_user/views.py
 import json
-import uuid
 from django.shortcuts import render, redirect
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LoginView
 from django.views.generic import CreateView, View, TemplateView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
-from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, ProfileUpdateForm, PasswordResetForm
+from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, PasswordResetForm
 from .utils import generate_captcha, send_verification_email, send_register_success_email
 
+User = get_user_model()
 
-# 1. 登录 (直接继承内置视图)
+# 1. 登录
 class CustomLoginView(LoginView):
     template_name = 'apps/app_user/login.html'
     authentication_form = UserLoginForm
@@ -44,7 +44,7 @@ class CustomLoginView(LoginView):
         else:
             # 如果勾选，使用 settings.SESSION_COOKIE_AGE (默认10小时)
             self.request.session.set_expiry(settings.SESSION_COOKIE_AGE)
-            
+
         return super().form_valid(form)
 
     def form_invalid(self, form):
@@ -107,7 +107,7 @@ def verify_browser(request):
                  return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
 
         # --- 所有验证通过 ---
-        
+
         # 关键步骤：立即销毁令牌，防止重放
         if 'shield_nonce' in request.session:
             del request.session['shield_nonce']
@@ -124,7 +124,7 @@ def send_email_code(request):
     # 检查是否允许注册 (是否有邀请码)
     # 注意：密码重置也可能用到这个接口，如果密码重置不需要邀请码限制，这里需要区分场景
     # 我们可以通过 request.GET.get('type') 来区分是注册还是重置
-    
+
     action_type = request.GET.get('type', 'register')
     
     if action_type == 'register':
@@ -217,11 +217,11 @@ class RegisterView(CreateView):
 
         # 保存用户
         response = super().form_valid(form)
-        
+
         # 发送注册成功邮件
         # self.object 是刚刚创建的 User 对象
         send_register_success_email(self.object, self.request)
-        
+
         return response
 
 
@@ -236,29 +236,17 @@ class ProfileView(LoginRequiredMixin, View):
 
     def get(self, request):
         user_form = UserUpdateForm(instance=request.user)
-        profile_form = ProfileUpdateForm(instance=request.user.profile)
-
-        context = {
-            'user_form': user_form,
-            'profile_form': profile_form
-        }
-        return render(request, self.template_name, context)
+        return render(request, self.template_name, {'user_form': user_form})
 
     def post(self, request):
         user_form = UserUpdateForm(request.POST, instance=request.user)
-        profile_form = ProfileUpdateForm(request.POST, instance=request.user.profile)
 
-        if user_form.is_valid() and profile_form.is_valid():
+        if user_form.is_valid():
             user_form.save()
-            profile_form.save()
             messages.success(request, "个人资料已更新！")
             return redirect('user_profile')
 
-        context = {
-            'user_form': user_form,
-            'profile_form': profile_form
-        }
-        return render(request, self.template_name, context)
+        return render(request, self.template_name, {'user_form': user_form})
 
 # 4. 密码重置视图
 class PasswordResetView(FormView):
@@ -291,9 +279,10 @@ class PasswordResetView(FormView):
             user.save()
             messages.success(self.request, "密码重置成功，请使用新密码登录")
             
-            # 清除 session
-            del self.request.session['reset_email_code']
-            del self.request.session['reset_email']
+            if 'reset_email_code' in self.request.session:
+                del self.request.session['reset_email_code']
+            if 'reset_email' in self.request.session:
+                del self.request.session['reset_email']
             
         except User.DoesNotExist:
             form.add_error('email', "该邮箱未注册用户")

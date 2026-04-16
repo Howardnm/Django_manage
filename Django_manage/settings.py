@@ -125,6 +125,9 @@ DATABASES = {
 #     }
 # }
 
+# 自定义用户模型
+AUTH_USER_MODEL = 'app_user.User'
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},

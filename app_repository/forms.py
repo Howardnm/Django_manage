@@ -1,9 +1,11 @@
 from django import forms
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from .models import Customer, ProjectRepository, ProjectFile, OEM, OEMStandardFile
 from app_material.models.material import MaterialLibrary
 from common_utils.filters import TablerFormMixin
 from app_project.models import ProjectNode
+
+User = get_user_model()
 
 # ==============================================================================
 # 1. 客户表单

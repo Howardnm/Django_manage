@@ -1,10 +1,12 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from django.contrib.auth.models import Group, User
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from ..models import Customer, OEM, ProjectRepository
 from common_utils.filters import TablerFilterMixin
 
+User = get_user_model()
 
 # 1. 项目档案列表过滤器
 class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):

@@ -1,11 +1,13 @@
 import django_filters
 from django.db.models import Q
 from django import forms
-from django.contrib.auth.models import Group, User, Permission
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from app_project.models import Project, ProjectNode, ProjectStage
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
+User = get_user_model()
 
 class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     # 1. 搜索框

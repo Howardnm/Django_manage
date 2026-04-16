@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from decimal import Decimal
 from django.utils import timezone
 from app_material.models import MaterialType, TestConfig, MaterialLibrary
@@ -35,7 +35,7 @@ class LabFormula(models.Model):
     cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料成本自动计算")
     cost_actual = models.DecimalField("BOM实际成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="手动录入实际配方成本")
 
-    creator = models.ForeignKey(User, on_delete=models.PROTECT, verbose_name="实验员")
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="实验员")
     created_at = models.DateTimeField("录入日期", auto_now_add=True)
     description = models.TextField("实验目的/描述", blank=True)
 

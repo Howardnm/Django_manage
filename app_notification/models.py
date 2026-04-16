@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 
@@ -10,10 +10,10 @@ class Notification(models.Model):
          [actor] [verb] (e.g., "系统 产生了月度报告")
     """
     # 通知接收者
-    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications', verbose_name="接收者")
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='notifications', verbose_name="接收者")
     
     # 动作发起者 (可以为空，例如系统通知)
-    actor = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name='actions', verbose_name="发起者")
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='actions', verbose_name="发起者")
     
     # 描述动作的短语
     verb = models.CharField(max_length=255, verbose_name="动作")

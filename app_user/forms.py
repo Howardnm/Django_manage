@@ -1,10 +1,10 @@
 # apps/app_user/forms.py
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm, SetPasswordForm
-from django.contrib.auth.models import User
+from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth import get_user_model
 from django.conf import settings
-from .models import UserProfile
 
+User = get_user_model()
 
 # 1. 登录表单
 class UserLoginForm(AuthenticationForm):
@@ -56,11 +56,14 @@ class UserRegisterForm(UserCreationForm):
         return code
 
 
-# 3. 个人资料修改表单 (User部分)
+# 3. 个人资料修改表单 (合并了原 User 和 Profile 逻辑)
 class UserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
-        fields = ['first_name', 'last_name', 'email']  # 允许改这几项
+        fields = [
+            'first_name', 'last_name', 'email', 
+            'phone', 'company', 'job_title', 'address', 'description'
+        ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -68,18 +71,7 @@ class UserUpdateForm(forms.ModelForm):
             field.widget.attrs.update({'class': 'form-control'})
 
 
-# 4. 个人资料修改表单 (Profile部分)
-class ProfileUpdateForm(forms.ModelForm):
-    class Meta:
-        model = UserProfile
-        fields = ['department', 'phone']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})
-
-# 5. 密码重置表单
+# 4. 密码重置表单
 class PasswordResetForm(forms.Form):
     email = forms.EmailField(label="邮箱地址", required=True)
     new_password = forms.CharField(label="新密码", widget=forms.PasswordInput, required=True)

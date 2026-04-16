@@ -1,12 +1,14 @@
 import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.contrib.auth.models import User, Group
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.db import transaction
 from ..models import Customer, OEM, ProjectRepository # 移除 Salesperson
 from app_project.models import Project
 from app_material_api.integration.webhooks import send_data_sync_webhook
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 def _push_member_to_catalog(instance, role_type):
@@ -33,7 +35,9 @@ def auto_create_customer_user(sender, instance, created, **kwargs):
                     username=username,
                     email=instance.email or f"cust{instance.id}@sunwill.com.cn",
                     password=f"Sunwill@{instance.id}", 
-                    is_staff=False 
+                    is_staff=False,
+                    user_type='CUSTOMER',
+                    company=instance.company_name
                 )
                 instance.user = user
                 instance.save(update_fields=['user'])
@@ -54,7 +58,9 @@ def auto_create_oem_user(sender, instance, created, **kwargs):
                     username=username,
                     email=instance.contact_email or f"oem{instance.id}@sunwill.com.cn",
                     password=f"Oem@{instance.id}",
-                    is_staff=False
+                    is_staff=False,
+                    user_type='OEM',
+                    company=instance.name
                 )
                 instance.user = user
                 instance.save(update_fields=['user'])
@@ -67,7 +73,8 @@ def auto_create_oem_user(sender, instance, created, **kwargs):
 # --- 3. 全量员工同步逻辑 (核心) ---
 @receiver(post_save, sender=User)
 def staff_member_sync(sender, instance, created, **kwargs):
-    if instance.is_staff:
+    # 根据新的 UserType 判定是否同步
+    if instance.user_type in ['ENGINEER', 'SALES', 'ADMIN']:
         data = {
             'token': f"staff_{instance.id}",
             'username': instance.username,

@@ -1,7 +1,7 @@
 import os
 import uuid
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from app_project.models import Project, ProjectNode
 from common_utils.upload_file_path import upload_file_path
 from common_utils.validators import validate_file_size
@@ -11,7 +11,7 @@ from common_utils.validators import validate_file_size
 # 1. 主机厂 (OEM) - 用户画像
 # ==========================================
 class OEM(models.Model):
-    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, 
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
                                 related_name='oem_profile', verbose_name="关联系统账号")
     member_token = models.UUIDField("成员唯一令牌", default=uuid.uuid4, editable=False, unique=True)
     is_active = models.BooleanField("账号启用状态", default=True)
@@ -37,7 +37,7 @@ class OEMStandardFile(models.Model):
     file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
     file_type = models.CharField("文件类型", max_length=20, choices=[('MATERIAL', '材料标准'), ('TEST', '测试标准'), ('QUALITY', '质量协议'), ('OTHER', '其他标准')], default='MATERIAL')
     description = models.TextField("备注/详细说明", blank=True)
-    uploader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="上传人")
+    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="上传人")
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
     version = models.PositiveIntegerField("版本号", default=1)
 
@@ -59,7 +59,7 @@ class OEMStandardFile(models.Model):
 # 2. 客户库 - 用户画像
 # ==========================================
 class Customer(models.Model):
-    user = models.OneToOneField(User, on_delete=models.SET_NULL, null=True, blank=True, 
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
                                 related_name='customer_profile', verbose_name="关联系统账号")
     member_token = models.UUIDField("成员唯一令牌", default=uuid.uuid4, editable=False, unique=True)
     is_active = models.BooleanField("账号启用状态", default=True)
@@ -101,12 +101,17 @@ class ProjectRepository(models.Model):
     oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="终端主机厂 (OEM)")
     
     # 【核心调整】：salesperson 现在直接指向 User 模型 (即内部系统用户)
-    salesperson = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, 
+    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
                                     related_name='managed_project_repos', verbose_name="负责业务员")
     
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
     material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用材料")
+
+    # 【加回缺失字段】
+    target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+
     updated_at = models.DateTimeField("最后更新", auto_now=True)
 
     def __str__(self): return f"{self.project.name} 档案"

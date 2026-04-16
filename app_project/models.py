@@ -1,6 +1,6 @@
 # Create your models here.
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.utils.text import Truncator  # 导入文字截断器
 from django.db import transaction  # 用于事务处理，保证排序修改的安全性
 from django.utils.functional import cached_property  # 引入缓存装饰器
@@ -23,7 +23,7 @@ class ProjectStage(models.TextChoices):
 # 2. 项目主体模型
 class Project(models.Model):
     name = models.CharField("项目名称", max_length=100)
-    manager = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="项目负责人")
+    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="项目负责人")
     description = models.TextField("项目描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     
@@ -231,7 +231,7 @@ class ProjectMember(models.Model):
         ('ASSIST', '辅助/资料'),
     ]
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='members', verbose_name="关联项目")
-    user = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="成员用户")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="成员用户")
     role = models.CharField("成员角色", max_length=20, choices=ROLE_CHOICES, default='RND')
     workload_share = models.DecimalField("工作量占比 (0-1.0)", max_digits=3, decimal_places=2, default=1.00)
 

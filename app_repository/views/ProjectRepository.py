@@ -6,12 +6,14 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView, UpdateView, CreateView, DetailView
 from django.db.models import Q
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile, Customer, OEM
 from app_project.mixins import ProjectPermissionMixin
+
+User = get_user_model()
 
 # ==========================================
 # 3. 项目档案视图 (Project Repository)

@@ -1,9 +1,10 @@
 from django import forms
 from .models import Project, ProjectNode, ProjectMember, NodeScoreRule
-from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 
+User = get_user_model()
 
 class ProjectForm(TablerFormMixin, forms.ModelForm):
     class Meta:

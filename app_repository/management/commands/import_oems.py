@@ -2,13 +2,18 @@ import os
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from django.db import transaction
+from django.contrib.auth import get_user_model
 from app_repository.models import OEM
 
+User = get_user_model()
 
 class Command(BaseCommand):
     """
     运行命令：
     python manage.py import_oems
+    
+    功能：从 init/oem_data.txt 批量同步主机厂信息，并自动生成/更新会员账号。
+    格式要求: 名称;;简称;;描述;;联系人;;联系电话;;电子邮箱;;公司地址
     """
     help = '从 init/oem_data.txt 批量同步主机厂信息，并自动生成/更新会员账号'
 
@@ -31,15 +36,19 @@ class Command(BaseCommand):
 
         for line in lines:
             try:
-                # 预期的格式: 名称;;简称;;描述
+                # 预期的格式: 名称;;简称;;描述;;联系人;;联系电话;;电子邮箱;;公司地址
                 parts = line.split(';;')
                 if len(parts) < 2:
-                    self.stdout.write(self.style.WARNING(f'  [!] 格式不完整，跳过: {line}'))
+                    self.stdout.write(self.style.WARNING(f'  [!] 格式不完整 (至少需要名称和简称)，跳过: {line}'))
                     continue
 
                 name = parts[0].strip()
                 short_name = parts[1].strip()
                 description = parts[2].strip() if len(parts) > 2 else ""
+                contact_name = parts[3].strip() if len(parts) > 3 else ""
+                contact_phone = parts[4].strip() if len(parts) > 4 else ""
+                contact_email = parts[5].strip() if len(parts) > 5 else ""
+                address = parts[6].strip() if len(parts) > 6 else ""
 
                 # 3. 使用事务确保数据一致性
                 # update_or_create 会触发 signals.py 中的 auto_create_oem_user 和 Webhook 同步
@@ -49,6 +58,10 @@ class Command(BaseCommand):
                         defaults={
                             'short_name': short_name,
                             'description': description,
+                            'contact_name': contact_name,
+                            'contact_phone': contact_phone,
+                            'contact_email': contact_email,
+                            'address': address,
                             'is_active': True
                         }
                     )
@@ -77,4 +90,5 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'❌ 失败: {error_count} 个'))
 
         self.stdout.write(self.style.WARNING(
-            '\n提示: 请确保 "python manage.py process_webhooks" 正在运行，以完成向手册系统的实时推送。'))
+            '\n提示: 导入完成后，OEM 账号已通过 signals.py 自动创建。'
+            '\n账号名格式: oem_{id}, 初始密码格式: Oem@{id}'))

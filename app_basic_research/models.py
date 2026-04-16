@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from django.conf import settings
 from django.db import transaction
 from django.utils.functional import cached_property
 from django.utils import timezone
@@ -26,7 +26,7 @@ class ResearchProject(models.Model):
     """
     name = models.CharField("项目名称", max_length=100)
     code = models.CharField("项目编号", max_length=50, unique=True, blank=True, help_text="自动生成，如：RP20231001-01")
-    manager = models.ForeignKey(User, on_delete=models.CASCADE, verbose_name="项目负责人")
+    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="项目负责人")
     description = models.TextField("项目背景/描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
@@ -203,7 +203,7 @@ class ResearchProjectFile(models.Model):
     name = models.CharField("附件名称", max_length=100, blank=True, help_text="如果不填，默认使用文件名")
     description = models.CharField("描述", max_length=200, blank=True)
     uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
-    uploader = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name="上传人")
+    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name="上传人")
 
     class Meta:
         verbose_name = "预研项目附件"
