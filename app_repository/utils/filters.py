@@ -1,12 +1,12 @@
 import django_filters
 from django import forms
 from django.db.models import Q
-from django.contrib.auth.models import Group
-from ..models import Customer, OEM, Salesperson, ProjectRepository # 修正导入路径
+from django.contrib.auth.models import Group, User
+from ..models import Customer, OEM, ProjectRepository
 from common_utils.filters import TablerFilterMixin
 
 
-# 1. 项目档案列表过滤器 (修改为按项目创建日期筛选)
+# 1. 项目档案列表过滤器
 class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -21,8 +21,9 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         })
     )
 
+    # 【重要修正】：业务员现在筛选 User 模型 (is_staff=True)
     salesperson = django_filters.ModelChoiceFilter(
-        queryset=Salesperson.objects.all(),
+        queryset=User.objects.filter(is_staff=True),
         label='业务员',
         empty_label="所有业务员",
         widget=forms.Select(attrs={'class': 'form-select'})
@@ -36,7 +37,6 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    # --- 新增：手动定义日期范围筛选 ---
     start_date = django_filters.DateFilter(
         field_name='project__created_at',
         lookup_expr='gte',
@@ -121,20 +121,4 @@ class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
         return queryset.filter(
             Q(name__icontains=value) |
             Q(short_name__icontains=value)
-        )
-
-
-# 7. 业务员过滤器
-class SalespersonFilter(TablerFilterMixin, django_filters.FilterSet):
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
-
-    class Meta:
-        model = Salesperson
-        fields = ['q']
-
-    def filter_search(self, queryset, name, value):
-        return queryset.filter(
-            Q(name__icontains=value) |
-            Q(phone__icontains=value) |
-            Q(email__icontains=value)
         )

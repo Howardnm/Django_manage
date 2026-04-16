@@ -1,11 +1,13 @@
 import json
 import logging
+import requests
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.conf import settings
 from django.db import transaction
-from ..models import CatalogCategory, CatalogProduct, MirrorScenario, MirrorCharacteristic
+from django.utils import timezone # 导入 timezone
+from ..models import CatalogCategory, CatalogProduct, MirrorScenario, MirrorCharacteristic, CatalogMember, VisitorLog
 from ..services.material_api import client
 
 logger = logging.getLogger(__name__)
@@ -13,9 +15,6 @@ logger = logging.getLogger(__name__)
 @csrf_exempt
 @require_http_methods(["POST"])
 def material_webhook_receiver(request):
-    """
-    完善后的 Webhook 接收端：支持主系统直接控制发布状态
-    """
     webhook_secret = request.headers.get('X-Webhook-Secret')
     if not webhook_secret or webhook_secret != getattr(settings, 'WEBHOOK_SECRET_KEY', ''):
         return JsonResponse({'status': 'error', 'message': 'Unauthorized'}, status=401)
@@ -23,15 +22,17 @@ def material_webhook_receiver(request):
     try:
         payload = json.loads(request.body)
         event_type = payload.get('event_type')
+        model_type = payload.get('model')
         event_data = payload.get('data', {})
-        remote_id = event_data.get('id')
 
-        if not event_type or not remote_id:
+        if not event_type or not event_data:
             return JsonResponse({'status': 'error', 'message': 'Invalid payload'}, status=400)
 
+        if model_type == 'member' and event_type == 'member_sync':
+            return _sync_member_mirror(event_data)
+
         if event_type == 'dimension_updated':
-            # 处理场景/特征名称更新
-            model_type = event_data.get('model')
+            remote_id = event_data.get('id')
             if model_type == 'scenario':
                 MirrorScenario.objects.update_or_create(remote_id=remote_id, defaults={'name': event_data['name']})
             elif model_type == 'characteristic':
@@ -39,13 +40,14 @@ def material_webhook_receiver(request):
             _clear_catalog_caches()
             return JsonResponse({'status': 'success'})
 
+        remote_id = event_data.get('id')
         if event_type == 'material_deleted':
             CatalogProduct.objects.filter(remote_material_id=remote_id).delete()
             _clear_catalog_caches()
             return JsonResponse({'status': 'success'})
 
         if event_type in ['material_created', 'material_updated']:
-            return _sync_with_remote_status(remote_id)
+            return _sync_material_full_relations(remote_id)
             
         return JsonResponse({'status': 'success'})
 
@@ -53,52 +55,63 @@ def material_webhook_receiver(request):
         logger.exception(f"Webhook 处理失败: {str(e)}")
         return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-def _sync_with_remote_status(remote_id):
-    """
-    核心同步逻辑：将主系统的 is_published 状态镜像到本地
-    """
-    remote_data = client.get_material_detail(remote_id)
-    if not remote_data:
-        return JsonResponse({'status': 'error', 'message': 'Fetch remote failed'}, status=404)
-
-    with transaction.atomic():
-        # 1. 分类同步
-        remote_cat = remote_data.get('category', {})
-        local_category, _ = CatalogCategory.objects.get_or_create(
-            remote_type_id=remote_cat.get('id'),
-            defaults={'name': remote_cat.get('name', '未分类')}
-        )
-
-        # 2. 产品主表同步 (核心：同步 is_published)
-        product, _ = CatalogProduct.objects.update_or_create(
-            remote_material_id=remote_id,
+def _sync_member_mirror(data):
+    try:
+        member, created = CatalogMember.objects.update_or_create(
+            remote_member_token=data['token'],
             defaults={
-                'display_name': remote_data.get('grade_name'),
-                'category': local_category,
-                'description': remote_data.get('description', ''),
-                'is_published': remote_data.get('is_published', False) # 自动同步发布状态
+                'username': data['username'],
+                'display_name': data['display_name'],
+                'email': data.get('email', ''),
+                'role': data['role'],
+                'is_active': data.get('is_active', True)
             }
         )
+        return JsonResponse({'status': 'success', 'id': member.id})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
 
-        # 3. 场景关联同步
-        sce_objs = []
-        for s in remote_data.get('scenarios', []):
-            s_obj, _ = MirrorScenario.objects.update_or_create(remote_id=s['id'], defaults={'name': s['name']})
-            sce_objs.append(s_obj)
+# --- 行为日志回传工具 (修复时区警告) ---
+def push_member_activity_feedback(member_token, action, target_name):
+    """
+    将特定的会员行为立即反馈给主系统
+    """
+    payload = {
+        'logs': [
+            {
+                'member_token': member_token,
+                'action': action,
+                'target_name': target_name,
+                'timestamp': timezone.now().isoformat() # 使用带时区的时间
+            }
+        ]
+    }
+    
+    try:
+        url = f"{settings.REMOTE_API_BASE_URL}auth/feedback/"
+        headers = {
+            'X-Internal-Api-Token': settings.INTERNAL_API_TOKEN,
+            'Content-Type': 'application/json'
+        }
+        requests.post(url, json=payload, headers=headers, timeout=5)
+    except Exception as e:
+        logger.error(f"Feedback push failed: {e}")
+
+def _sync_material_full_relations(remote_id):
+    remote_data = client.get_material_detail(remote_id)
+    if not remote_data: return JsonResponse({'status': 'error', 'message': 'Fetch failed'}, status=404)
+    with transaction.atomic():
+        remote_cat = remote_data.get('category', {})
+        local_category, _ = CatalogCategory.objects.get_or_create(remote_type_id=remote_cat.get('id'), defaults={'name': remote_cat.get('name', '未分类')})
+        product, _ = CatalogProduct.objects.update_or_create(remote_material_id=remote_id, defaults={'display_name': remote_data.get('grade_name'), 'category': local_category, 'description': remote_data.get('description', ''), 'is_published': remote_data.get('is_published', False)})
+        sce_objs = [MirrorScenario.objects.update_or_create(remote_id=s['id'], defaults={'name': s['name']})[0] for s in remote_data.get('scenarios', [])]
         product.scenarios.set(sce_objs)
-
-        # 4. 特征关联同步
-        char_objs = []
-        for c in remote_data.get('characteristics', []):
-            char_obj, _ = MirrorCharacteristic.objects.update_or_create(remote_id=c['id'], defaults={'name': c['name']})
-            char_objs.append(char_obj)
+        char_objs = [MirrorCharacteristic.objects.update_or_create(remote_id=c['id'], defaults={'name': c['name']})[0] for c in remote_data.get('characteristics', [])]
         product.characteristics.set(char_objs)
-
     _clear_catalog_caches()
     return JsonResponse({'status': 'success', 'id': product.id})
 
 def _clear_catalog_caches():
     from django.core.cache import cache
-    cache.delete('catalog_nav_tree_structured_v1')
-    cache.delete('catalog_nav_tree_mirror_v1')
+    cache.delete('catalog_nav_tree_structured_v2')
     cache.delete('catalog_scenarios')

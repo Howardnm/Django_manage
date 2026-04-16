@@ -6,23 +6,30 @@ from functools import lru_cache
 logger = logging.getLogger(__name__)
 
 class MaterialApiClient:
-    """远程材料库 API 客户端，支持跨系统解耦调用"""
-    
     def __init__(self):
         self.base_url = getattr(settings, 'REMOTE_API_BASE_URL', 'http://127.0.0.1:8000/api/material/')
         self.timeout = getattr(settings, 'REMOTE_API_TIMEOUT', 10)
-        self.api_token = getattr(settings, 'INTERNAL_API_TOKEN', '') # 获取 Token
-        
+        self.api_token = getattr(settings, 'INTERNAL_API_TOKEN', '')
         self.headers = {
             'Accept': 'application/json',
             'X-Internal-Client': 'Catalog-App',
-            'X-Internal-Api-Token': self.api_token # 携带安全 Token
+            'X-Internal-Api-Token': self.api_token
         }
 
+    def _post(self, endpoint, data=None):
+        url = f"{self.base_url}{endpoint.strip('/')}/"
+        try:
+            return requests.post(url, json=data, headers=self.headers, timeout=self.timeout)
+        except Exception as e:
+            logger.error(f"API POST 失败 [{url}]: {str(e)}")
+            return None
+
     def _get(self, endpoint, params=None):
-        # 兼容完整 URL (分页) 和 相对路径 (Endpoint)
+        # 核心修正：如果 endpoint 已经包含 query 参数（如 materials/?page=2），不要补斜杠
         if endpoint.startswith('http'):
             url = endpoint
+        elif '?' in endpoint:
+            url = f"{self.base_url}{endpoint.lstrip('/')}"
         else:
             url = f"{self.base_url}{endpoint.strip('/')}/"
 
@@ -30,22 +37,21 @@ class MaterialApiClient:
             response = requests.get(url, params=params, headers=self.headers, timeout=self.timeout)
             response.raise_for_status()
             return response.json()
-        except requests.exceptions.RequestException as e:
-            logger.error(f"API 请求失败 [{url}]: {str(e)}")
+        except Exception as e:
+            logger.error(f"API GET 失败 [{url}]: {str(e)}")
             return None
 
-    def get_material_list(self, **kwargs):
-        """获取物料列表及基本信息"""
-        return self._get('materials/', params=kwargs)
-
-    def get_material_detail(self, material_id):
-        """实时获取物料的完整详细数据，包含分组属性和文件 URL"""
-        return self._get(f'materials/{material_id}/')
-
+    def get_material_list(self, **kwargs): return self._get('materials/', params=kwargs)
+    def get_material_detail(self, material_id): return self._get(f'materials/{material_id}/')
     @lru_cache(maxsize=128)
-    def get_scenarios(self):
-        """获取应用场景分类 (使用 LRU 缓存减少 API 调用)"""
-        return self._get('scenarios/')
+    def get_scenarios(self): return self._get('scenarios/')
+    def verify_member_credentials(self, username, password):
+        payload = {'username': username, 'password': password}
+        response = self._post('auth/verify/', data=payload)
+        if response and response.status_code == 200: return response.json()
+        elif response:
+            try: return response.json()
+            except: return {'status': 'error', 'message': f'Server error {response.status_code}'}
+        return {'status': 'error', 'message': 'Connection failed'}
 
-# 全局单例客户端
 client = MaterialApiClient()

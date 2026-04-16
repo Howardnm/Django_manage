@@ -1,8 +1,5 @@
 """
 URL configuration for Django_manage project.
-
-The `urlpatterns` list routes URLs to views. For more information please see:
-    https://docs.djangoproject.com/en/6.0/topics/http/urls/
 """
 from django.contrib import admin
 from django.urls import path, include
@@ -15,7 +12,6 @@ admin.site.site_header = "项目管理系统后台"
 admin.site.site_title = "项目管理系统"
 admin.site.index_title = "欢迎使用项目管理系统"
 
-# 定义一个简单的视图函数来渲染无权限页面
 def permission_denied_view(request):
     return render(request, 'permission_denied.html', status=403)
 
@@ -32,13 +28,15 @@ urlpatterns = [
     path('process/', include('app_process.urls')),
     path('formula/', include('app_formula.urls')),
     path('notifications/', include('app_notification.urls')),
-    path('dify-sync/', include('app_dify_sync.urls')),
     
-    # API 接口 (Material Core)
-    path('api/material/', include('app_material.api.urls')),
+    # 核心 API 重构：由 app_material_api 管控
+    path('api/material/', include('app_material_api.urls')),
 
-    # MCP Server HTTP/SSE 接口
+    # MCP Server 接口
     path('mcp/', include('app_mcp_server.urls')),
+    
+    # 【修复】：重新挂载 Dify 同步与机器人路由
+    path('dify/', include('app_dify_sync.urls')),
 
     # 通用下载路由
     path('download/<str:app_label>/<str:model_name>/<int:pk>/<str:field_name>/', SecureFileDownloadView.as_view(), name='secure_download'),

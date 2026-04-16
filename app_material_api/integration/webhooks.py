@@ -2,46 +2,47 @@ import json
 import logging
 import requests
 from django.conf import settings
-from ..models.sync import WebhookTask
+from app_material.models.sync import WebhookTask # 保持对 app_material.models.sync 的引用
 
 logger = logging.getLogger(__name__)
 
-def send_material_webhook(event_type, instance):
+def send_data_sync_webhook(event_type, model_name, data_payload):
     """
-    Webhook 任务入队入口
-    支持物料变更事件和维度数据(场景/特征)变更事件
+    通用 Webhook 任务入队函数
     """
     try:
-        # 根据模型类型构造数据负载
-        data = {'id': instance.id}
-        
-        if hasattr(instance, 'grade_name'):
-            data['name'] = instance.grade_name
-            data['model'] = 'material'
-        elif hasattr(instance, 'name'):
-            data['name'] = instance.name
-            # 判断模型属于场景还是特征
-            data['model'] = 'scenario' if 'Scenario' in instance.__class__.__name__ else 'characteristic'
-
-        payload_data = {
+        full_payload = {
             'event_type': event_type,
-            'data': data
+            'model': model_name,
+            'data': data_payload
         }
         
-        # 保存到任务队列
+        # 任务表依然留在 app_material 的 models 中，因为它属于核心数据库
         WebhookTask.objects.create(
             event_type=event_type,
-            payload=json.dumps(payload_data, ensure_ascii=False),
+            payload=json.dumps(full_payload, ensure_ascii=False),
             status='PENDING'
         )
-        logger.info(f"Webhook Task Qued: {event_type} for {data['model']} {instance.id}")
+        logger.info(f"Webhook Task Qued: {event_type} for {model_name}")
         return True
     except Exception as e:
-        logger.error(f"Failed to queue Webhook Task: {e}")
+        logger.error(f"Failed to queue Webhook Task for {model_name}: {e}")
         return False
 
+def send_material_webhook(event_type, instance):
+    """
+    发送物料 Webhook：包含发布状态
+    """
+    data = {
+        'id': instance.id,
+        'grade_name': getattr(instance, 'grade_name', str(instance)),
+        'is_published': getattr(instance, 'is_published', False),
+        'model': 'material'
+    }
+    return send_data_sync_webhook(event_type, 'material', data)
+
 def perform_webhook_send(task):
-    """由守护进程或管理命令调用，执行实际发送"""
+    """执行实际的网络发送逻辑"""
     webhook_url = getattr(settings, 'CATALOG_WEBHOOK_URL', None)
     webhook_secret = getattr(settings, 'WEBHOOK_SECRET_KEY', None)
 

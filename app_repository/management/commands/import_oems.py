@@ -1,70 +1,80 @@
 import os
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from django.db import transaction
 from app_repository.models import OEM
+
 
 class Command(BaseCommand):
     """
-    # 只需要在您的项目终端中运行以下命令，即可开始批量导入：
+    运行命令：
     python manage.py import_oems
-
     """
-    help = '从 init/oem_data.txt 文件批量导入或更新主机厂 (OEM) 信息'
+    help = '从 init/oem_data.txt 批量同步主机厂信息，并自动生成/更新会员账号'
 
-    def handle(self, *args, **kwargs):
-        # 构建文件路径
+    def handle(self, *args, **options):
+        # 1. 路径检查
         file_path = os.path.join(settings.BASE_DIR, 'init', 'oem_data.txt')
-
         if not os.path.exists(file_path):
-            self.stdout.write(self.style.ERROR(f'文件未找到: {file_path}'))
+            self.stdout.write(self.style.ERROR(f'❌ 找不到数据文件: {file_path}'))
             return
 
-        self.stdout.write(f'开始从 {file_path} 导入主机厂 (OEM) 数据...')
+        self.stdout.write(self.style.MIGRATE_HEADING(f'🚀 开始从 {file_path} 导入并同步 OEM 数据...'))
 
         created_count = 0
         updated_count = 0
-        skipped_count = 0
+        error_count = 0
 
+        # 2. 读取并处理文件
         with open(file_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                stripped_line = line.strip()
-                if not stripped_line:
+            lines = [line.strip() for line in f if line.strip()]
+
+        for line in lines:
+            try:
+                # 预期的格式: 名称;;简称;;描述
+                parts = line.split(';;')
+                if len(parts) < 2:
+                    self.stdout.write(self.style.WARNING(f'  [!] 格式不完整，跳过: {line}'))
                     continue
 
-                try:
-                    parts = stripped_line.split(';;')
-                    if len(parts) != 3:
-                        self.stdout.write(self.style.WARNING(f'  [!] 格式错误，跳过行: {stripped_line}'))
-                        skipped_count += 1
-                        continue
+                name = parts[0].strip()
+                short_name = parts[1].strip()
+                description = parts[2].strip() if len(parts) > 2 else ""
 
-                    name, short_name, description = [part.strip() for part in parts]
-
-                    if not name:
-                        self.stdout.write(self.style.WARNING(f'  [!] 名称为空，跳过行: {stripped_line}'))
-                        skipped_count += 1
-                        continue
-
-                    # 使用 update_or_create，它会根据 name 查找
-                    # 如果找到，则更新其他字段；如果没找到，则创建新记录
+                # 3. 使用事务确保数据一致性
+                # update_or_create 会触发 signals.py 中的 auto_create_oem_user 和 Webhook 同步
+                with transaction.atomic():
                     obj, created = OEM.objects.update_or_create(
                         name=name,
                         defaults={
                             'short_name': short_name,
                             'description': description,
+                            'is_active': True
                         }
                     )
 
-                    if created:
-                        self.stdout.write(self.style.SUCCESS(f'  [+] 新建: {obj.short_name or obj.name}'))
-                        created_count += 1
-                    else:
-                        self.stdout.write(f'  [*] 更新: {obj.short_name or obj.name}')
-                        updated_count += 1
+                if created:
+                    status_msg = self.style.SUCCESS(f'  [+] [新建并同步] {obj.name}')
+                    created_count += 1
+                else:
+                    status_msg = f'  [*] [更新并同步] {obj.name}'
+                    updated_count += 1
 
-                except Exception as e:
-                    self.stdout.write(self.style.ERROR(f'处理 "{stripped_line}" 时出错: {e}'))
-                    skipped_count += 1
-        
-        self.stdout.write(self.style.SUCCESS('\n导入完成！'))
-        self.stdout.write(f'总计: 新建 {created_count} 个, 更新 {updated_count} 个, 跳过 {skipped_count} 个。')
+                # 检查关联账号状态
+                account_status = " (账号已就绪)" if obj.user else " (等待信号生成账号)"
+                self.stdout.write(f"{status_msg}{account_status}")
+
+            except Exception as e:
+                self.stdout.write(self.style.ERROR(f'  [!] 处理 "{line}" 时出错: {str(e)}'))
+                error_count += 1
+
+        # 4. 结果统计
+        self.stdout.write(self.style.MIGRATE_HEADING('\n--- 导入任务总结 ---'))
+        self.stdout.write(f'✅ 成功处理: {created_count + updated_count} 个')
+        self.stdout.write(f'   - 新增: {created_count}')
+        self.stdout.write(f'   - 更新: {updated_count}')
+        if error_count > 0:
+            self.stdout.write(self.style.ERROR(f'❌ 失败: {error_count} 个'))
+
+        self.stdout.write(self.style.WARNING(
+            '\n提示: 请确保 "python manage.py process_webhooks" 正在运行，以完成向手册系统的实时推送。'))

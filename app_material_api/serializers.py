@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from ..models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig, 
+from app_material.models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig, 
                                 MaterialLibrary, MaterialDataPoint, MaterialFile, MaterialCharacteristic)
 from collections import defaultdict
 
@@ -54,7 +54,7 @@ class MaterialLibrarySerializer(serializers.ModelSerializer):
         model = MaterialLibrary
         fields = (
             'id', 'grade_name', 'manufacturer', 'category', 'scenarios', 'characteristics',
-            'is_published', # 增加该字段
+            'is_published',
             'flammability', 'description', 'file_tds', 'file_msds', 'file_rohs',
             'created_at', 'grouped_properties'
         )

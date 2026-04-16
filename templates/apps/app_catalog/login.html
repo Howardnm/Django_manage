@@ -1,0 +1,50 @@
+{% extends "apps/app_catalog/layouts/base.html" %}
+
+{% block title %}会员登录 - 材料产品电子手册{% endblock %}
+
+{% block content %}
+<div class="page page-center">
+    <div class="container container-tight py-4">
+        <div class="text-center mb-4">
+            <a href="." class="navbar-brand navbar-brand-autodark">
+                <i class="ti ti-book-2 text-primary" style="font-size: 2.5rem;"></i>
+            </a>
+        </div>
+        <div class="card card-md shadow-sm border-0">
+            <div class="card-body">
+                <h2 class="h2 text-center mb-4">会员中心登录</h2>
+                <p class="text-muted text-center small mb-4">使用您在 SUNWILL 主系统的账号进行验证</p>
+
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} small mb-3">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+
+                <form action="." method="post" autocomplete="off" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold">用户名</label>
+                        <input type="text" name="username" class="form-control" placeholder="输入账号" autocomplete="off" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label font-weight-bold">密码</label>
+                        <input type="password" name="password" class="form-control" placeholder="输入密码" autocomplete="off" required>
+                    </div>
+                    <div class="form-footer">
+                        <button type="submit" class="btn btn-primary w-100 font-weight-bold">
+                            立即验证并进入
+                        </button>
+                    </div>
+                </form>
+            </div>
+            <div class="hr-text">提示</div>
+            <div class="card-body py-3">
+                <div class="row small text-muted">
+                    <div class="col">如果您没有账号，请联系对接的 SUNWILL 业务员进行开通。</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -10,9 +10,8 @@ django.setup()
 
 from app_repository.models import OEM
 
-
 def run():
-    print("🚀 开始初始化主机厂 (OEM) 数据 (全球改性塑料行业下游)...")
+    print("🚀 开始初始化主机厂 (OEM) 数据 (支持账号同步自动触发)...")
 
     # 定义主机厂数据
     # 格式: (名称, 简称, 描述)
@@ -27,7 +26,7 @@ def run():
         ('BMW Group', '宝马', '宝马集团，对内饰气味、环保材料有高标准。'),
         ('Mercedes-Benz Group', '奔驰', '梅赛德斯-奔驰，豪华车标杆，对表面处理和质感要求高。'),
         ('Stellantis N.V.', '斯特兰蒂斯', '包括标致、雪铁龙、Jeep、菲亚特等。'),
-        
+
         # 日韩系
         ('Toyota Motor Corporation', '丰田', '丰田汽车，TSM标准，强调成本与性能平衡，供应链稳定。'),
         ('Honda Motor Co., Ltd.', '本田', '本田汽车，HES标准。'),
@@ -106,11 +105,12 @@ def run():
     ]
 
     print(f"\n🔹 正在初始化 {len(oem_data)} 家主机厂 (OEM)...")
-    
+
     count_created = 0
     count_updated = 0
 
     for name, short_name, description in oem_data:
+        # get_or_create 会触发 post_save 信号，从而自动生成 User
         obj, created = OEM.objects.get_or_create(
             name=name,
             defaults={
@@ -118,7 +118,6 @@ def run():
                 'description': description
             }
         )
-        
         if created:
             print(f"   + [新增] {short_name} ({name})")
             count_created += 1
@@ -131,7 +130,7 @@ def run():
             if obj.description != description:
                 obj.description = description
                 updated = True
-            
+
             if updated:
                 obj.save()
                 # print(f"   . [更新] {short_name}")
@@ -139,6 +138,7 @@ def run():
 
     print(f"\n✅ 初始化完成！新增: {count_created}, 更新: {count_updated}")
 
+    print(f"\n✅ 初始化完成！新增/同步: {count_created} 家 OEM。")
 
 if __name__ == '__main__':
     run()

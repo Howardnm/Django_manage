@@ -32,17 +32,22 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django.contrib.postgres', # 用于支持PostgreSQL的高级功能
-    'django_filters',  # django 列表搜索筛选器
+    'django.contrib.postgres',
+    'pgvector.django',
+    'rest_framework',
+    'django_filters',
     'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
-    'axes', # django-axes
-    'pgvector.django', # pgvector
+    'axes', 
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
     'app_material.apps.AppMaterialConfig',
-    'app_notification.apps.AppNotificationConfig',      # 通知中心
+
+    # 【新增】：注册材料库集成服务模块
+    'app_material_api.apps.AppMaterialApiConfig',
+
+    'app_notification.apps.AppNotificationConfig',
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
     'app_formula.apps.AppFormulaConfig',
@@ -231,7 +236,7 @@ LOGGING = {
         'console': {'level': 'DEBUG', 'class': 'logging.StreamHandler', 'formatter': 'simple'},
     },
     'loggers': {
-        'app_material.integration': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
+        'app_material_api.integration': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
         'app_catalog.api': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
     },
 }

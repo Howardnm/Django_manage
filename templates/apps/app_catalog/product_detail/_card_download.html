@@ -1,44 +1,54 @@
 <div class="card mb-3 shadow-sm border-0 overflow-hidden">
     <div class="card-header bg-primary text-white"><h3 class="card-title">技术文档下载</h3></div>
     <div class="list-group list-group-flush">
-        {% if remote_material.file_tds %}
-        <a href="{% url 'app_catalog:material_download' product.pk 'tds' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
-            <span class="avatar bg-red-lt text-red me-3"><i class="ti ti-file-type-pdf"></i></span>
-            <div class="flex-fill">
-                <div class="font-weight-medium text-dark">TDS 技术物性表</div>
-                <div class="text-muted small">Technical Data Sheet</div>
-            </div>
-            <i class="ti ti-download text-muted"></i>
-        </a>
-        {% endif %}
 
-        {% if remote_material.file_msds %}
-        <a href="{% url 'app_catalog:material_download' product.pk 'msds' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
-            <span class="avatar bg-green-lt text-green me-3"><i class="ti ti-shield-check"></i></span>
-            <div class="flex-fill">
-                <div class="font-weight-medium text-dark">MSDS 安全说明书</div>
-                <div class="text-muted small">Material Safety Data Sheet</div>
-            </div>
-            <i class="ti ti-download text-muted"></i>
-        </a>
-        {% endif %}
+        {% if request.session.is_member_authenticated %}
+            <!-- 已登录：正常显示下载链接 -->
+            {% if remote_material.file_tds %}
+            <a href="{% url 'app_catalog:material_download' product.pk 'tds' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
+                <span class="avatar bg-red-lt text-red me-3"><i class="ti ti-file-type-pdf"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium text-dark">TDS 技术物性表</div>
+                    <div class="text-muted small">Technical Data Sheet</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+            {% endif %}
 
-        {% if remote_material.file_rohs %}
-        <a href="{% url 'app_catalog:material_download' product.pk 'rohs' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
-            <span class="avatar bg-teal-lt text-teal me-3"><i class="ti ti-leaf"></i></span>
-            <div class="flex-fill">
-                <div class="font-weight-medium text-dark">RoHS 环保声明书</div>
-                <div class="text-muted small">Environmental Declaration</div>
-            </div>
-            <i class="ti ti-download text-muted"></i>
-        </a>
-        {% endif %}
+            {% if remote_material.file_msds %}
+            <a href="{% url 'app_catalog:material_download' product.pk 'msds' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
+                <span class="avatar bg-green-lt text-green me-3"><i class="ti ti-shield-check"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium text-dark">MSDS 安全说明书</div>
+                    <div class="text-muted small">Material Safety Data Sheet</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+            {% endif %}
 
-        {% if not remote_material.file_tds and not remote_material.file_msds and not remote_material.file_rohs %}
-        <div class="list-group-item text-center text-muted small py-5">
-            <i class="ti ti-file-off fs-1 opacity-25 mb-2 d-block"></i>
-            该牌号暂未提供公开下载文档
-        </div>
+            {% if remote_material.file_rohs %}
+            <a href="{% url 'app_catalog:material_download' product.pk 'rohs' %}" class="list-group-item list-group-item-action d-flex align-items-center py-3">
+                <span class="avatar bg-teal-lt text-teal me-3"><i class="ti ti-leaf"></i></span>
+                <div class="flex-fill">
+                    <div class="font-weight-medium text-dark">RoHS 环保声明书</div>
+                    <div class="text-muted small">Environmental Declaration</div>
+                </div>
+                <i class="ti ti-download text-muted"></i>
+            </a>
+            {% endif %}
+
+            {% if not remote_material.file_tds and not remote_material.file_msds and not remote_material.file_rohs %}
+            <div class="list-group-item text-center text-muted small py-5">该牌号暂未提供公开下载文档</div>
+            {% endif %}
+
+        {% else %}
+            <!-- 未登录：显示会员墙 -->
+            <div class="list-group-item p-4 text-center bg-light-lt">
+                <div class="mb-3"><i class="ti ti-lock fs-1 text-muted"></i></div>
+                <h4 class="mb-2">技术文档受限</h4>
+                <p class="text-muted small mb-3">TDS/MSDS 等核心技术文件仅对认证会员开放下载。</p>
+                <a href="{% url 'app_catalog:login' %}" class="btn btn-primary btn-sm w-100">立即登录解锁</a>
+            </div>
         {% endif %}
     </div>
 </div>
