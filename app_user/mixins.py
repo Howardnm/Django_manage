@@ -1,93 +1,111 @@
-from django.contrib.auth.mixins import AccessMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
 from .models import User
 
 class IdentityConfig:
     """
-    权限对象模块化配置中心。
-    通过定义“角色组”来实现权限逻辑与业务代码的解耦。
-    后续增加角色时，只需在此处更新分组定义即可。
+    业务逻辑分组 (权限集定义)。
+    通过在这里定义分组，实现视图层代码的低耦合。
     """
-    
-    # 1. 基础角色定义 (直接映射 Model)
     R_ENGINEER = User.UserType.ENGINEER
+    R_PROCESS = User.UserType.PROCESS_ENGINEER
     R_SALES = User.UserType.SALES
-    R_CUSTOMER = User.UserType.CUSTOMER
-    R_OEM = User.UserType.OEM
+    R_PURCHASING = User.UserType.PURCHASING
     R_ADMIN = User.UserType.ADMIN
 
-    # 2. 逻辑分组 (权限集)
-    # 内部员工：拥有进入后台管理和查看敏感技术/商务数据的权限
-    INTERNAL_STAFF = [R_ENGINEER, R_SALES, R_ADMIN]
+    # 技术核心：涉及研发、工艺、配方的全员
+    TECH_CORE = [R_ENGINEER, R_PROCESS, R_ADMIN]
     
-    # 技术核心：仅限涉及研发、工艺、配方的技术人员
-    TECH_CORE = [R_ENGINEER, R_ADMIN]
+    # 纯技术研发
+    RND_ONLY = [R_ENGINEER, R_ADMIN]
     
-    # 商务核心：仅限涉及客户、报价、档案的商务人员
-    BUSINESS_CORE = [R_SALES, R_ADMIN]
-    
-    # 外部人员：受限访问，通常仅限查看手册和关联项目
-    EXTERNAL_USERS = [R_CUSTOMER, R_OEM]
+    # 纯工艺工程
+    PROCESS_ONLY = [R_PROCESS, R_ADMIN]
+
+    # 供应链/采购核心
+    SUPPLY_CHAIN = [R_PURCHASING, R_ADMIN]
+
+    # 内部全员 (包含采购)
+    INTERNAL_STAFF = [R_ENGINEER, R_PROCESS, R_SALES, R_PURCHASING, R_ADMIN]
 
 
-class IdentityMixin(AccessMixin):
+class UnifiedAccessMixin(PermissionRequiredMixin):
     """
-    对象模块化设计的权限控制 Mixin。
-    用法示例：
-    class MyView(IdentityMixin, View):
-        # 场景A：仅限内部员工
-        identity_required = IdentityConfig.INTERNAL_STAFF
-        
-        # 场景B：仅限研发
-        identity_required = [IdentityConfig.R_ENGINEER]
+    统一权限架构控制 Mixin (4D-Security-Logic)。
     """
+    # 维度1：负责人关联字段名列表
+    user_link_fields = ['manager', 'creator', 'user', 'owner', 'uploader', 'salesperson']
     
-    # 必填属性：设置允许访问的角色组（参考 IdentityConfig 中的定义）
-    # 默认为空，表示仅需登录，不限制具体角色
+    # 维度2：最低用户等级要求
+    min_level_required = 1
+    
+    # 维度3：部门隔离开关
+    enforce_dept_isolation = True
+
+    # 维度4：允许访问的角色组 (使用 IdentityConfig 中的分组)
     identity_required = []
-    
-    # 是否强制校验超级管理员
-    must_be_superuser = False
 
-    def dispatch(self, request, *args, **kwargs):
-        # 1. 基础鉴权：是否登录
-        if not request.user.is_authenticated:
-            return self.handle_no_permission()
+    def has_permission(self):
+        """核心判定引擎"""
+        user = self.request.user
+        
+        if not user.is_authenticated: return False
+        if user.is_superuser: return True
 
-        # 2. 超级管理员特殊通行证
-        if request.user.is_superuser:
-            return super().dispatch(request, *args, **kwargs)
+        # Django 原生权限 (Dim: Perms)
+        if not super().has_permission(): return False
 
-        # 3. 强制超管逻辑检查
-        if self.must_be_superuser:
-            raise PermissionDenied("此操作仅限系统管理员")
+        # 用户等级 (Dim: Level)
+        if user.user_level < self.min_level_required: return False
 
-        # 4. 角色组校验逻辑
-        if self.identity_required:
-            if request.user.user_type not in self.identity_required:
-                raise PermissionDenied(f"权限不足：该功能仅限 {self._get_role_names()} 访问")
+        # 角色判定 (Dim: Type)
+        if self.identity_required and user.user_type not in self.identity_required:
+            return False
 
-        return super().dispatch(request, *args, **kwargs)
+        return True
 
-    def _get_role_names(self):
-        """内部方法：解析角色代码为人类可读的名称，用于错误提示"""
-        all_choices = dict(User.UserType.choices)
-        return "、".join([all_choices.get(role, role) for role in self.identity_required])
+    def get_queryset(self):
+        """数据范围过滤引擎"""
+        user = self.request.user
+        if self.queryset is not None:
+            qs = self.queryset.all()
+        elif self.model is not None:
+            qs = self.model.objects.all()
+        else:
+            return super().get_queryset()
 
-    # --- 便捷属性扩展 (可在子类逻辑中直接使用) ---
+        if user.is_superuser: return qs
 
-    @property
-    def is_internal(self):
-        return self.request.user.user_type in IdentityConfig.INTERNAL_STAFF
+        if self.enforce_dept_isolation:
+            user_field = self._detect_user_link_field(qs.model)
+            if user_field:
+                if user.department:
+                    return qs.filter(**{f"{user_field}__department": user.department})
+                return qs.filter(**{user_field: user})
+        return qs
 
-    @property
-    def is_tech(self):
-        return self.request.user.user_type in IdentityConfig.TECH_CORE
+    def _detect_user_link_field(self, model):
+        model_fields = [f.name for f in model._meta.get_fields()]
+        for field in self.user_link_fields:
+            if field in model_fields: return field
+        return None
 
-    @property
-    def is_business(self):
-        return self.request.user.user_type in IdentityConfig.BUSINESS_CORE
+    def check_object_permission(self, obj):
+        """对象级细分控制"""
+        user = self.request.user
+        if user.is_superuser: return True
 
-    @property
-    def is_external(self):
-        return self.request.user.user_type in IdentityConfig.EXTERNAL_USERS
+        owner = None
+        for attr in self.user_link_fields:
+            if hasattr(obj, attr):
+                owner = getattr(obj, attr)
+                if owner: break
+
+        if not owner: return True 
+
+        is_owner = (owner == user)
+        is_same_dept = user.department and getattr(owner, 'department', None) == user.department
+
+        if not (is_owner or is_same_dept):
+            raise PermissionDenied("您的账号无权操作其他部门的数据资产")
+        return True

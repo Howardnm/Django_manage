@@ -1,134 +1,158 @@
 {% load static %}
-<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark">
+<aside class="navbar navbar-vertical navbar-expand-lg" data-bs-theme="dark" style="background-color: #1a2234 !important; border-right: 1px solid rgba(255,255,255,0.05);">
     <div class="container-fluid">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu" aria-controls="sidebar-menu" aria-expanded="false"
-                aria-label="Toggle navigation">
+        <!-- 移动端切换按钮 -->
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
             <span class="navbar-toggler-icon"></span>
         </button>
 
-        <div class="d-flex justify-content-center mt-2 mb-2">
-            <h1 class="navbar-brand">
-                <a href="/">项目管理系统</a>
+        <!-- 系统 Logo 区 -->
+        <div class="navbar-brand-container d-flex justify-content-center py-4">
+            <h1 class="navbar-brand m-0">
+                <a href="/" class="d-flex align-items-center text-white text-decoration-none">
+                    <div class="logo-box me-2 d-flex align-items-center justify-content-center">
+                        <i class="ti ti-atom-2 fs-2"></i>
+                    </div>
+                    <span class="fw-bold tracking-tight" style="font-size: 1.15rem; letter-spacing: -0.02em;">项目管理系统</span>
+                </a>
             </h1>
         </div>
 
         <div class="collapse navbar-collapse" id="sidebar-menu">
-            <ul class="navbar-nav pt-lg-3">
+            <ul class="navbar-nav pt-lg-2">
 
-                {# 1. 首页 #}
-                <li class="nav-item {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}">
-                    <a class="nav-link" href="{% url 'panel_home' %}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <i class="ti ti-home"></i>
-                        </span>
-                        <span class="nav-link-title">
-                            首页
-                        </span>
+                {# 1. 固定入口：工作台首页 #}
+                <li class="nav-item mb-2 {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}">
+                    <a class="nav-link rounded-2 mx-2" href="{% url 'panel_home' %}">
+                        <span class="nav-link-icon"><i class="ti ti-smart-home"></i></span>
+                        <span class="nav-link-title fw-bold">工作台首页</span>
                     </a>
                 </li>
 
-                {# 2. 系统全景看板 (纯化权限检查) #}
-                {% if perms.app_project.view_project or perms.app_material.view_materiallibrary or perms.app_formula.view_labformula or perms.app_process.view_processprofile or perms.app_raw_material.view_rawmaterial %}
-                    <li class="nav-item mt-3 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">系统全景看板</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-                    {% include "sidebar_modules/_dashboard.html" %}
-                {% endif %}
-
-
-                <!-- 3. 项目管理部 -->
-                {% if perms.app_project.view_project or perms.app_repository.view_projectrepository %}
-                    <li class="nav-item mt-3 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">项目管理部</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-
-                    {% if perms.app_project.view_project %}
-                        {% include "sidebar_modules/_projects.html" %}
+                {# 2. 动态菜单渲染引擎 #}
+                {% for item in dynamic_sidebar %}
+                    {% if not item.sub_items %}
+                        {# 只有一级的业务模块 #}
+                        <li class="nav-item mb-1 {% if item.is_active %}active{% endif %}">
+                            <a class="nav-link rounded-2 mx-2" href="{{ item.url }}">
+                                <span class="nav-link-icon"><i class="ti {{ item.icon }}"></i></span>
+                                <span class="nav-link-title fw-bold">{{ item.name }}</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        {# 带功能细分的业务模块 #}
+                        <li class="nav-item mb-1">
+                            <a class="nav-link rounded-2 mx-2 fw-bold {% if not item.is_expanded %}collapsed{% endif %}"
+                               href="#menu-{{ forloop.counter }}"
+                               data-bs-toggle="collapse"
+                               role="button"
+                               aria-expanded="{{ item.is_expanded|yesno:'true,false' }}">
+                                <span class="nav-link-icon"><i class="ti {{ item.icon }}"></i></span>
+                                <span class="nav-link-title">{{ item.name }}</span>
+                                <span class="nav-link-arrow"></span>
+                            </a>
+                            <div class="collapse {% if item.is_expanded %}show{% endif %} mt-1" id="menu-{{ forloop.counter }}">
+                                <ul class="navbar-nav nav-sub-tree ms-3 ps-1 border-start border-white-subtle">
+                                    {% for sub in item.sub_items %}
+                                        <li class="nav-item">
+                                            <a class="nav-link py-1 px-3 mb-1 rounded-1 {% if sub.is_active %}active text-white bg-primary-lt{% endif %}"
+                                               href="{{ sub.url }}" style="font-size: 0.85rem;">
+                                                <span class="nav-link-title">{{ sub.name }}</span>
+                                            </a>
+                                        </li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        </li>
                     {% endif %}
+                {% endfor %}
 
-                    {% if perms.app_repository.view_projectrepository %}
-                        {% include "sidebar_modules/_repository.html" %}
-                    {% endif %}
-                {% endif %}
-
-
-                <!-- 4. 研发技术部 (纯化权限检查) -->
-                {% if perms.app_basic_research.view_researchproject or perms.app_material.view_materiallibrary or perms.app_formula.view_labformula %}
-                    <li class="nav-item mt-4 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">研发技术部</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-
-                    {% if perms.app_basic_research.view_researchproject %}
-                        {% include "sidebar_modules/_basic_research.html" %}
-                    {% endif %}
-
-                    {% if perms.app_material.view_materiallibrary %}
-                        {% include "sidebar_modules/_material_db.html" %}
-                    {% endif %}
-
-                    {% if perms.app_formula.view_labformula %}
-                        {% include "sidebar_modules/_formula.html" %}
-                    {% endif %}
-                {% endif %}
-
-                <!-- 5. 工艺技术部 -->
-                {% if perms.app_process.view_processprofile %}
-                    <li class="nav-item mt-4 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">工艺技术部</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-
-                    {% if perms.app_process.view_processprofile %}
-                        {% include "sidebar_modules/_process.html" %}
-                    {% endif %}
-                {% endif %}
-
-
-                <!-- 6. 供应链与资源 -->
-                {% if perms.app_raw_material.view_rawmaterial %}
-                    <li class="nav-item mt-4 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">供应链与资源</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-
-                    {% if perms.app_raw_material.view_rawmaterial %}
-                        {% include "sidebar_modules/_raw_material.html" %}
-                    {% endif %}
-                {% endif %}
-
-                <!-- 7. 对外展示与服务 -->
-                <li class="nav-item mt-4 mb-1">
-                    <div class="text-muted text-uppercase small fw-bold ps-3">对外展示与服务</div>
+                {# 3. 底部固定项 #}
+                <li class="nav-item-header mt-5 mb-2 px-3">
+                    <span class="text-white-50 text-uppercase fw-bold ls-wider" style="font-size: 0.7rem;">辅助工具</span>
                 </li>
-                <hr class="my-1 mx-3 opacity-25"/>
-
-                {% include "sidebar_modules/_catalog.html" %}
-
-                <li class="{% if request.resolver_match.view_name == 'dify_chatbot' %}active{% endif %}">
-                    <a class="nav-link" href="{% url 'dify_chatbot' %}">
-                        <span class="nav-link-icon d-md-none d-lg-inline-block">
-                            <i class="ti ti-robot"></i>
-                        </span>
-                        <span class="nav-link-title">
-                            AI 智能助手
-                        </span>
+                <li class="nav-item mb-2 {% if request.resolver_match.view_name == 'dify_chatbot' %}active{% endif %}">
+                    <a class="nav-link rounded-2 mx-2 fw-bold" href="{% url 'dify_chatbot' %}">
+                        <span class="nav-link-icon text-info"><i class="ti ti-robot"></i></span>
+                        <span class="nav-link-title">AI 智能助手</span>
                     </a>
                 </li>
-
-                <!-- 8. 系统管理 -->
-                {% if perms.auth.view_user or user.is_staff %}
-                    <li class="nav-item mt-4 mb-1">
-                        <div class="text-muted text-uppercase small fw-bold ps-3">系统管理</div>
-                    </li>
-                    <hr class="my-1 mx-3 opacity-25"/>
-                    {% include "sidebar_modules/_users.html" %}
-                {% endif %}
-
             </ul>
         </div>
-
     </div>
 </aside>
+
+<style>
+    /* 深度强化企业级对比度样式 */
+    :root {
+        --sidebar-active-bg: rgba(32, 107, 196, 0.25); /* 增加背景不透明度 */
+        --sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+        --border-white-subtle: rgba(255, 255, 255, 0.12);
+        --sidebar-text: rgba(255, 255, 255, 0.95); /* 极高文字对比度 */
+    }
+
+    .logo-box {
+        width: 34px;
+        height: 34px;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        border-radius: 9px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+
+    .navbar-vertical .nav-link {
+        font-size: 0.92rem;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        color: var(--sidebar-text) !important;
+        padding-top: 0.65rem;
+        padding-bottom: 0.65rem;
+    }
+
+    .navbar-vertical .nav-link:hover {
+        background-color: var(--sidebar-hover-bg);
+        color: #ffffff !important;
+        transform: translateX(2px);
+    }
+
+    /* 激活项深度加亮 */
+    .navbar-vertical .nav-item.active > .nav-link,
+    .navbar-vertical .nav-link.active {
+        background-color: var(--sidebar-active-bg) !important;
+        color: #ffffff !important;
+        box-shadow: inset 2px 0 0 #206bc4; /* 左侧激活指示条 */
+    }
+
+    .nav-sub-tree {
+        border-left: 2px solid var(--border-white-subtle) !important;
+        margin-left: 1.6rem !important;
+    }
+
+    .nav-link-arrow {
+        margin-left: auto;
+        transition: transform .3s ease;
+        opacity: 0.8;
+    }
+
+    .nav-link-arrow:after {
+        content: "";
+        display: inline-block;
+        width: .4rem;
+        height: .4rem;
+        border-bottom: 2px solid currentColor;
+        border-left: 2px solid currentColor;
+        transform: rotate(-45deg);
+    }
+
+    .nav-link[aria-expanded="true"] .nav-link-arrow {
+        transform: rotate(180deg);
+    }
+
+    /* 头部标签对比度 */
+    .ls-wider {
+        letter-spacing: 0.12em;
+        text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    }
+
+    .navbar-vertical .navbar-nav .nav-link {
+        border: none;
+    }
+</style>

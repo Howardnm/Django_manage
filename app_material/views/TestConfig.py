@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 from django.db.models import Q
@@ -8,6 +7,7 @@ from django import forms
 from app_material.models.material import MetricCategory, TestConfig
 from app_material.forms import TestConfigForm
 from common_utils.filters import TablerFilterMixin
+from app_material.mixins import MaterialAccessMixin
 import django_filters
 
 # 过滤器
@@ -33,7 +33,8 @@ class TestConfigFilter(TablerFilterMixin, django_filters.FilterSet):
         )
 
 # 列表视图
-class TestConfigListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class TestConfigListView(MaterialAccessMixin, ListView):
+    """测试配置列表：全员内部可见"""
     permission_required = 'app_material.view_testconfig'
     model = TestConfig
     template_name = 'apps/app_material/test_config/list.html'
@@ -59,14 +60,17 @@ class TestConfigListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
+        context.update({
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'page_title': '测试标准管理'
+        })
         return context
 
 # 创建视图
-class TestConfigCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class TestConfigCreateView(MaterialAccessMixin, CreateView):
+    """新增测试项：需具备对应权限"""
     permission_required = 'app_material.add_testconfig'
-    raise_exception = True
     model = TestConfig
     form_class = TestConfigForm
     template_name = 'apps/app_material/test_config/form.html'
@@ -82,9 +86,9 @@ class TestConfigCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateVi
         return super().form_valid(form)
 
 # 更新视图
-class TestConfigUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class TestConfigUpdateView(MaterialAccessMixin, UpdateView):
+    """编辑测试项：需具备对应权限"""
     permission_required = 'app_material.change_testconfig'
-    raise_exception = True
     model = TestConfig
     form_class = TestConfigForm
     template_name = 'apps/app_material/test_config/form.html'

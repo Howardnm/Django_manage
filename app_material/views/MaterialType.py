@@ -1,4 +1,3 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
@@ -6,13 +5,15 @@ from django.views.generic import ListView, CreateView, UpdateView
 from app_material.forms import MaterialTypeForm
 from app_material.models.material import MaterialType
 from app_material.utils.filters import MaterialTypeFilter
+from app_material.mixins import MaterialAccessMixin
 
 
 # ==========================================
 # 4. 材料类型管理 (MaterialType)
 # ==========================================
 
-class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class MaterialTypeListView(MaterialAccessMixin, ListView):
+    """材料分类列表：全员可见"""
     permission_required = 'app_material.view_materialtype'
     model = MaterialType
     template_name = 'apps/app_material/materialtype/type_list.html'
@@ -28,15 +29,17 @@ class MaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['page_title'] = '材料类型管理'
+        context.update({
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'page_title': '材料类型管理'
+        })
         return context
 
 
-class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class MaterialTypeCreateView(MaterialAccessMixin, CreateView):
+    """新增分类：需 add 权限"""
     permission_required = 'app_material.add_materialtype'
-    raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
     template_name = 'apps/app_material/form_generic.html'
@@ -48,9 +51,9 @@ class MaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, Create
         return context
 
 
-class MaterialTypeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class MaterialTypeUpdateView(MaterialAccessMixin, UpdateView):
+    """编辑分类：需 change 权限"""
     permission_required = 'app_material.change_materialtype'
-    raise_exception = True
     model = MaterialType
     form_class = MaterialTypeForm
     template_name = 'apps/app_material/form_generic.html'

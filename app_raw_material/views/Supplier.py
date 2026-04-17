@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.urls import reverse_lazy
@@ -8,8 +7,11 @@ from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from app_raw_material.models import Supplier, RawMaterial
 from app_raw_material.forms import SupplierForm
 from app_raw_material.utils.filters import SupplierFilter
+from app_raw_material.mixins import RawMaterialAccessMixin
 
-class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+
+class SupplierListView(RawMaterialAccessMixin, ListView):
+    """供应商列表：全员(内部)可见"""
     permission_required = 'app_raw_material.view_supplier'
     model = Supplier
     template_name = 'apps/app_raw_material/supplier/list.html'
@@ -28,7 +30,9 @@ class SupplierListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['filter'] = self.filterset
         return context
 
-class SupplierDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+
+class SupplierDetailView(RawMaterialAccessMixin, DetailView):
+    """供应商详情：展示其提供的原材料清单"""
     permission_required = 'app_raw_material.view_supplier'
     model = Supplier
     template_name = 'apps/app_raw_material/supplier/detail.html'
@@ -38,22 +42,22 @@ class SupplierDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'供应商详情: {self.object.name}'
 
-        # 关联原材料分页逻辑
         related_materials_list = RawMaterial.objects.filter(supplier=self.object).select_related('category').order_by('-created_at')
-
         paginator = Paginator(related_materials_list, 10)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
-        context['page_obj'] = page_obj
-        context['paginator'] = paginator
-        context['is_paginated'] = page_obj.has_other_pages()
-
+        context.update({
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages()
+        })
         return context
 
-class SupplierCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+
+class SupplierCreateView(RawMaterialAccessMixin, CreateView):
+    """新增供应商：采购/管理权限"""
     permission_required = 'app_raw_material.add_supplier'
-    raise_exception = True
     model = Supplier
     form_class = SupplierForm
     template_name = 'apps/app_raw_material/supplier/form.html'
@@ -68,9 +72,10 @@ class SupplierCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         messages.success(self.request, "供应商已添加")
         return super().form_valid(form)
 
-class SupplierUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+
+class SupplierUpdateView(RawMaterialAccessMixin, UpdateView):
+    """编辑供应商：采购/管理权限"""
     permission_required = 'app_raw_material.change_supplier'
-    raise_exception = True
     model = Supplier
     form_class = SupplierForm
     template_name = 'apps/app_raw_material/supplier/form.html'

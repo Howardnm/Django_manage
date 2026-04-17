@@ -1,0 +1,1 @@
+from .menu_processor import sidebar_menu_permissions

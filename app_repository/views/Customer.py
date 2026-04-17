@@ -1,4 +1,3 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Max, Count, Q
 from django.urls import reverse_lazy
@@ -8,11 +7,14 @@ from app_repository.forms import CustomerForm
 from app_repository.models import Customer, ProjectRepository
 from app_project.models import ProjectNode
 from app_repository.utils.filters import CustomerFilter
+from app_repository.mixins import RepositoryAccessMixin
 
-# ==========================================
-# 1. 客户库视图 (Customer)
-# ==========================================
-class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+
+class CustomerListView(RepositoryAccessMixin, ListView):
+    """
+    客户列表：需有 view_customer 权限。
+    由于客户数据量级较大且通常为共享资源，此处默认不执行严格部门隔离。
+    """
     permission_required = 'app_repository.view_customer'
     model = Customer
     template_name = 'apps/app_repository/customer/customer_list.html'
@@ -20,7 +22,6 @@ class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        # 使用条件聚合来分别计算不同状态下的项目数量
         qs = super().get_queryset().annotate(
             completed_project_count=Count(
                 'projectrepository',
@@ -45,9 +46,9 @@ class CustomerListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         return context
 
 
-class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class CustomerCreateView(RepositoryAccessMixin, CreateView):
+    """新增客户：需有 add_customer 权限"""
     permission_required = 'app_repository.add_customer'
-    raise_exception = True
     model = Customer
     form_class = CustomerForm
     template_name = 'apps/app_repository/form_generic.html'
@@ -59,9 +60,9 @@ class CustomerCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         return context
 
 
-class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class CustomerUpdateView(RepositoryAccessMixin, UpdateView):
+    """编辑客户：需有 change_customer 权限"""
     permission_required = 'app_repository.change_customer'
-    raise_exception = True
     model = Customer
     form_class = CustomerForm
     template_name = 'apps/app_repository/form_generic.html'
@@ -73,7 +74,8 @@ class CustomerUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         return context
 
 
-class CustomerDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+class CustomerDetailView(RepositoryAccessMixin, DetailView):
+    """客户详情：需有 view_customer 权限"""
     permission_required = 'app_repository.view_customer'
     model = Customer
     template_name = 'apps/app_repository/customer/customer_detail.html'
@@ -86,31 +88,24 @@ class CustomerDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         # 获取所有关联的项目档案
         related_projects_list = ProjectRepository.objects.filter(customer=self.object).select_related('project', 'oem', 'salesperson').order_by('-project__created_at')
 
-        # --- 手动分页 ---
+        # 分页逻辑保持不变
         paginator = Paginator(related_projects_list, 10)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
-        # --- 为当前页的项目附加最新的节点更新时间 (跨数据库兼容方案) ---
+        # 附加进度信息
         project_ids = [repo.project.id for repo in page_obj]
-        
-        # 使用 annotate 和 Max 来分组获取每个 project_id 的最大 updated_at
         latest_updates = ProjectNode.objects.filter(
             project_id__in=project_ids
-        ).values('project_id').annotate(
-            max_updated_at=Max('updated_at')
-        )
+        ).values('project_id').annotate(max_updated_at=Max('updated_at'))
         
-        # 创建一个 project_id -> max_updated_at 的映射字典
         latest_node_map = {item['project_id']: item['max_updated_at'] for item in latest_updates}
-
-        # 将最新的更新时间附加到项目对象上
         for repo in page_obj:
             repo.project.latest_node_update = latest_node_map.get(repo.project.id)
 
-        # 保持和 ListView 一致的上下文变量
-        context['page_obj'] = page_obj
-        context['paginator'] = paginator
-        context['is_paginated'] = page_obj.has_other_pages()
-
+        context.update({
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages()
+        })
         return context

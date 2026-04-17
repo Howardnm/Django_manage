@@ -1,13 +1,15 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_raw_material.models import RawMaterialType
 from app_raw_material.forms import RawMaterialTypeForm
 from app_raw_material.utils.filters import RawMaterialTypeFilter
+from app_raw_material.mixins import RawMaterialAccessMixin
 
-class RawMaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+
+class RawMaterialTypeListView(RawMaterialAccessMixin, ListView):
+    """类型管理：全员(内部)可见"""
     permission_required = 'app_raw_material.view_rawmaterialtype'
     model = RawMaterialType
     template_name = 'apps/app_raw_material/type/list.html'
@@ -21,14 +23,17 @@ class RawMaterialTypeListView(LoginRequiredMixin, PermissionRequiredMixin, ListV
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['page_title'] = '原材料类型管理'
+        context.update({
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'page_title': '原材料类型管理'
+        })
         return context
 
-class RawMaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+
+class RawMaterialTypeCreateView(RawMaterialAccessMixin, CreateView):
+    """新增类型：需 add 权限"""
     permission_required = 'app_raw_material.add_rawmaterialtype'
-    raise_exception = True
     model = RawMaterialType
     form_class = RawMaterialTypeForm
     template_name = 'apps/app_raw_material/type/form.html'
@@ -43,9 +48,10 @@ class RawMaterialTypeCreateView(LoginRequiredMixin, PermissionRequiredMixin, Cre
         messages.success(self.request, "类型已添加")
         return super().form_valid(form)
 
-class RawMaterialTypeUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+
+class RawMaterialTypeUpdateView(RawMaterialAccessMixin, UpdateView):
+    """编辑类型：需 change 权限"""
     permission_required = 'app_raw_material.change_rawmaterialtype'
-    raise_exception = True
     model = RawMaterialType
     form_class = RawMaterialTypeForm
     template_name = 'apps/app_raw_material/type/form.html'

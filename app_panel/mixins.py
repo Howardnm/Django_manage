@@ -1,14 +1,17 @@
-from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.conf import settings
-from django.shortcuts import redirect
+from app_user.mixins import UnifiedAccessMixin, IdentityConfig
 
-class CustomPermissionRequiredMixin(PermissionRequiredMixin):
+class PanelAccessMixin(UnifiedAccessMixin):
     """
-    自定义权限混入类，当用户没有权限时，重定向到 settings.PERM_DENIED_URL。
+    工作台看板模块权限管控。
+    
+    特点：
+    1. 准入控制：内部全员 (INTERNAL_STAFF) 均可查看个人看板和统计数据。
+    2. 资源性质：看板是综合性的统计展示，不设部门隔离，以便进行跨部门数据汇总。
     """
-    def handle_no_permission(self):
-        if self.request.user.is_authenticated:
-            # 如果用户已认证但没有权限，重定向到自定义的无权限页面
-            return redirect(settings.PERM_DENIED_URL)
-        # 如果用户未认证，则重定向到登录页面
-        return super().handle_no_permission()
+    
+    # 默认允许内部全员准入 (研发、工艺、销售、采购、管理)
+    identity_required = IdentityConfig.INTERNAL_STAFF
+    
+    # 看板通常涉及跨部门统计，关闭部门隔离以显示全局概况（如系统总材料数）
+    # 如果后续需要“部门看板”，可在具体视图中手动开启
+    enforce_dept_isolation = False

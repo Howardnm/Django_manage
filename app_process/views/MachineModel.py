@@ -1,18 +1,22 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_process.models import MachineModel
 from app_process.forms import MachineModelForm
 from app_process.utils.filters import MachineModelFilter
+from app_process.mixins import ProcessAccessMixin
 
-class MachineModelListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+
+class MachineModelListView(ProcessAccessMixin, ListView):
+    """机台型号列表：内部可见，不设部门隔离"""
     permission_required = 'app_process.view_machinemodel'
     model = MachineModel
     template_name = 'apps/app_process/machine/list.html'
     context_object_name = 'machines'
     paginate_by = 20
+    
+    enforce_dept_isolation = False
 
     def get_queryset(self):
         qs = super().get_queryset().prefetch_related('suitable_materials')
@@ -24,9 +28,10 @@ class MachineModelListView(LoginRequiredMixin, PermissionRequiredMixin, ListView
         context['filter'] = self.filterset
         return context
 
-class MachineModelCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+
+class MachineModelCreateView(ProcessAccessMixin, CreateView):
+    """新增机台：需相应权限"""
     permission_required = 'app_process.add_machinemodel'
-    raise_exception = True
     model = MachineModel
     form_class = MachineModelForm
     template_name = 'apps/app_process/machine/form.html'
@@ -41,9 +46,10 @@ class MachineModelCreateView(LoginRequiredMixin, PermissionRequiredMixin, Create
         messages.success(self.request, "机台型号已添加")
         return super().form_valid(form)
 
-class MachineModelUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+
+class MachineModelUpdateView(ProcessAccessMixin, UpdateView):
+    """编辑机台：需相应权限"""
     permission_required = 'app_process.change_machinemodel'
-    raise_exception = True
     model = MachineModel
     form_class = MachineModelForm
     template_name = 'apps/app_process/machine/form.html'
