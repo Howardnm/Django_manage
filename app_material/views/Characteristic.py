@@ -1,4 +1,3 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
@@ -6,6 +5,7 @@ from django.views.generic import ListView, CreateView, UpdateView
 from app_material.forms import MaterialCharacteristicForm
 from app_material.models.material import MaterialCharacteristic
 from common_utils.filters import TablerFilterMixin
+from app_material.mixins import MaterialAccessMixin
 import django_filters
 
 # 过滤器
@@ -16,7 +16,8 @@ class CharacteristicFilter(TablerFilterMixin, django_filters.FilterSet):
         fields = ['q']
 
 # 列表视图
-class CharacteristicListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class CharacteristicListView(MaterialAccessMixin, ListView):
+    """特征列表：全员内部可见"""
     permission_required = 'app_material.view_materialcharacteristic'
     model = MaterialCharacteristic
     template_name = 'apps/app_material/characteristic/list.html'
@@ -32,12 +33,15 @@ class CharacteristicListView(LoginRequiredMixin, PermissionRequiredMixin, ListVi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['page_title'] = '材料特征属性管理'
+        context.update({
+            'filter': self.filterset,
+            'page_title': '材料特征属性管理'
+        })
         return context
 
 # 创建视图
-class CharacteristicCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class CharacteristicCreateView(MaterialAccessMixin, CreateView):
+    """新增特征"""
     permission_required = 'app_material.add_materialcharacteristic'
     model = MaterialCharacteristic
     form_class = MaterialCharacteristicForm
@@ -50,7 +54,8 @@ class CharacteristicCreateView(LoginRequiredMixin, PermissionRequiredMixin, Crea
         return context
 
 # 更新视图
-class CharacteristicUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class CharacteristicUpdateView(MaterialAccessMixin, UpdateView):
+    """编辑特征"""
     permission_required = 'app_material.change_materialcharacteristic'
     model = MaterialCharacteristic
     form_class = MaterialCharacteristicForm

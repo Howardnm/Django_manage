@@ -1,10 +1,13 @@
 from django.shortcuts import render
 from django.views import View
-from django.contrib.auth.mixins import LoginRequiredMixin
-from app_panel.mixins import CustomPermissionRequiredMixin
+from app_material.mixins import MaterialAccessMixin
 
-class MaterialLibraryView(LoginRequiredMixin, CustomPermissionRequiredMixin, View):
-    # 修正权限码
+class MaterialLibraryView(MaterialAccessMixin, View):
+    """
+    成品材料库看板：
+    - 准入：需有 app_material.view_materiallibrary 权限。
+    - 隔离：全员内部可见。
+    """
     permission_required = 'app_material.view_materiallibrary'
 
     def get(self, request):

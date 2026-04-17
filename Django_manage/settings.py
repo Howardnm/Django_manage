@@ -88,6 +88,8 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 # 新增：通知上下文处理器
                 'app_notification.context_processors.notifications',
+                # 核心：侧边栏权限处理器 (新路径)
+                'app_user.context_processors.menu_processor.sidebar_menu_permissions',
             ],
         },
     },

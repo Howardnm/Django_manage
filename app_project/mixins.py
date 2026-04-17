@@ -1,91 +1,65 @@
-# apps/projects/mixins.py
-from django.core.exceptions import PermissionDenied
+from app_user.mixins import UnifiedAccessMixin, IdentityConfig
 from django.db.models import Q
-from django.contrib.auth.models import Permission
 
-
-class ProjectPermissionMixin:
+class ProjectAccessMixin(UnifiedAccessMixin):
     """
-    权限控制混入类：统一管理行级权限
+    项目模块专用的权限管控类。
     
-    核心逻辑：
-    1. 超级管理员：拥有所有权限。
-    2. 个人权限：用户可以访问自己负责的项目。
-    3. 组权限：用户可以访问同组其他成员负责的项目，但前提是该组必须拥有 'app_project.view_project' 权限。
-       这避免了非项目相关的组（如行政组、研发组）成员之间意外获得项目访问权。
+    1. 负责人识别：manager。
+    2. 协同穿透：支持 ProjectMember 访问。
+    3. 准入规则：支持研发工程师、工艺工程师、业务经理、管理员 (INTERNAL_STAFF)。
     """
+    
+    # 明确定义项目模块的负责人字段名
+    user_link_fields = ['manager']
+    
+    # 使用重构后的分组，确保工艺工程师也能进入项目模块
+    identity_required = IdentityConfig.INTERNAL_STAFF
 
-    def _get_valid_groups(self, user):
+    def get_queryset(self):
         """
-        获取用户所属的、且拥有 'app_project.view_project' 权限的组。
+        重写查询集：
+        逻辑 = (本部门项目) OR (我参与协同的项目)
         """
-        # 获取 'app_project.view_project' 权限对象
+        user = self.request.user
+        qs = super().get_queryset() # 已处理：超管放行 + 本部门/本人过滤
+
+        if user.is_superuser:
+            return qs
+
+        # 检查模型是否具有协同成员关联 (members)
+        if hasattr(qs.model, 'members'):
+            user_field = self._detect_user_link_field(qs.model) or 'manager'
+            
+            # 构建部门隔离基础 Q
+            if user.department:
+                base_q = Q(**{f"{user_field}__department": user.department})
+            else:
+                base_q = Q(**{user_field: user})
+                
+            # 构建协同成员 Q
+            member_q = Q(members__user=user)
+            
+            # 返回并集
+            return qs.model.objects.filter(base_q | member_q).distinct()
+            
+        return qs
+
+    def check_object_permission(self, obj):
+        """
+        对象级检查：
+        逻辑 = (负责人/同部门) OR (我参与协同)
+        """
+        user = self.request.user
+        if user.is_superuser:
+            return True
+
+        # 1. 调用基类的标准化检查
         try:
-            perm = Permission.objects.get(content_type__app_label='app_project', codename='view_project')
-        except Permission.DoesNotExist:
-            return user.groups.none()
-
-        # 筛选用户所在的组，且该组拥有 view_project 权限
-        return user.groups.filter(permissions=perm)
-
-    # --- 功能 1：给列表页用 (过滤 QuerySet) ---
-    def get_permitted_queryset(self, queryset, manager_field='manager'):
-        """
-        传入一个 QuerySet，返回当前用户有权查看的 QuerySet。
-        :param queryset: 待过滤的查询集
-        :param manager_field: 指向 User 模型的字段名 (例如 'manager' 或 'project__manager')
-        """
-        user = self.request.user
-
-        # 1. 超级管理员：看所有，不做过滤
-        if user.is_superuser:
-            return queryset
-
-        # 2. 获取有效的组 (即拥有 view_project 权限的组)
-        valid_groups = self._get_valid_groups(user)
-
-        # 3. 构造查询条件
-        # A. 自己负责的项目
-        q_self = Q(**{manager_field: user})
-        
-        # B. 同组(有效组)成员负责的项目
-        # 逻辑：项目的负责人的组 必须在 我的有效组 之中
-        # 注意：这里我们反向思考，只要项目的负责人属于 valid_groups 中的任何一个，我就能看
-        if valid_groups.exists():
-            q_group = Q(**{f"{manager_field}__groups__in": valid_groups})
-            return queryset.filter(q_self | q_group).distinct()
-        else:
-            # 如果我没有任何有效组，只能看自己的
-            return queryset.filter(q_self).distinct()
-
-    # --- 功能 2：给详情/操作页用 (检查单个对象) ---
-    def check_project_permission(self, project):
-        """
-        检查当前用户是否有权操作指定的 project 对象。
-        """
-        user = self.request.user
-
-        # 1. 超级管理员
-        if user.is_superuser:
-            return True
-
-        # 2. 自己是负责人
-        if project.manager == user:
-            return True
-
-        # 3. 检查组权限
-        # 获取我的有效组
-        valid_groups = self._get_valid_groups(user)
-        
-        if not valid_groups.exists():
-            raise PermissionDenied("您没有权限操作此项目。")
-
-        # 获取项目负责人所属的所有组 ID
-        manager_group_ids = project.manager.groups.values_list('id', flat=True)
-        
-        # 检查是否有交集：我的有效组 ID 是否在项目负责人的组 ID 中
-        # filter(id__in=...) 会生成 SQL: WHERE id IN (...)
-        if valid_groups.filter(id__in=manager_group_ids).exists():
-            return True
-
-        raise PermissionDenied("您没有权限操作此项目。")
+            return super().check_object_permission(obj)
+        except Exception:
+            # 2. 备选：检查是否为该项目的协同成员
+            if hasattr(obj, 'members'):
+                if obj.members.filter(user=user).exists():
+                    return True
+            raise

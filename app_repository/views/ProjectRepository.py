@@ -1,6 +1,5 @@
 from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
@@ -11,7 +10,7 @@ from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile, Customer, OEM
-from app_project.mixins import ProjectPermissionMixin
+from app_repository.mixins import RepositoryAccessMixin
 
 User = get_user_model()
 
@@ -19,7 +18,12 @@ User = get_user_model()
 # 3. 项目档案视图 (Project Repository)
 # ==========================================
 
-class ProjectRepositoryListView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, ListView):
+class ProjectRepositoryListView(RepositoryAccessMixin, ListView):
+    """
+    项目档案列表：
+    - 准入：需有 app_repository.view_projectrepository。
+    - 隔离：智能识别 salesperson 字段并进行部门隔离。
+    """
     permission_required = 'app_repository.view_projectrepository'
     model = ProjectRepository
     template_name = 'apps/app_repository/project_repo/repo_list.html'
@@ -27,20 +31,13 @@ class ProjectRepositoryListView(LoginRequiredMixin, PermissionRequiredMixin, Pro
     paginate_by = 10
 
     def get_queryset(self):
-        # 1. 基础查询
-        qs = super().get_queryset().select_related(
+        # 1. 调用 Mixin 自动执行“负责人+部门”双重过滤逻辑
+        base_qs = super().get_queryset().select_related(
             'project', 'project__manager', 'customer', 'oem', 'material', 'salesperson'
         ).prefetch_related('files').order_by('-updated_at')
         
-        # 2. 调用项目权限 Mixin 过滤 (管控研发层面的权限)
-        qs = self.get_permitted_queryset(qs, manager_field='project__manager')
-        
-        # 3. 【权限隔离】业务员层面的行级隔离 (直接对比 User)
-        if not self.request.user.is_superuser:
-            # 只要不是超管，就只能看自己作为业务员负责的项目
-            qs = qs.filter(salesperson=self.request.user)
-
-        self.filterset = ProjectRepositoryFilter(self.request.GET, queryset=qs)
+        # 2. 应用过滤器
+        self.filterset = ProjectRepositoryFilter(self.request.GET, queryset=base_qs)
         return self.filterset.qs
 
     def get_context_data(self, **kwargs):
@@ -50,7 +47,8 @@ class ProjectRepositoryListView(LoginRequiredMixin, PermissionRequiredMixin, Pro
         return context
 
 
-class ProjectRepositoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, UpdateView):
+class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
+    """档案更新：需有 change_projectrepository 权限，且仅限本部门。"""
     permission_required = 'app_repository.change_projectrepository'
     model = ProjectRepository
     form_class = ProjectRepositoryForm
@@ -59,15 +57,12 @@ class ProjectRepositoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, P
     def get_object(self, queryset=None):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, pk=project_id)
-        self.check_project_permission(project)
+        
+        # 获取或创建档案
         repo, created = ProjectRepository.objects.get_or_create(project=project)
         
-        # 【越权检查】直接基于 request.user
-        if not self.request.user.is_superuser:
-            if repo.salesperson and repo.salesperson != self.request.user:
-                from django.core.exceptions import PermissionDenied
-                raise PermissionDenied("您无权编辑其他业务员负责的项目档案")
-                
+        # 核心安全校验：拦截跨部门编辑
+        self.check_object_permission(repo)
         return repo
 
     def form_valid(self, form):
@@ -83,7 +78,8 @@ class ProjectRepositoryUpdateView(LoginRequiredMixin, PermissionRequiredMixin, P
         return context
 
 
-class ProjectFileDetailView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, DetailView):
+class ProjectFileDetailView(RepositoryAccessMixin, DetailView):
+    """项目资料库详情：需有查看权限，拦截跨部门。"""
     permission_required = 'app_repository.view_projectrepository'
     model = ProjectRepository
     template_name = 'apps/app_repository/project_repo/project_file_detail.html'
@@ -91,19 +87,14 @@ class ProjectFileDetailView(LoginRequiredMixin, PermissionRequiredMixin, Project
 
     def get_object(self, queryset=None):
         repo = super().get_object(queryset)
-        self.check_project_permission(repo.project)
-        
-        # 【越权检查】
-        if not self.request.user.is_superuser:
-            if repo.salesperson and repo.salesperson != self.request.user:
-                from django.core.exceptions import PermissionDenied
-                raise PermissionDenied("您无权查看该项目的详细资料")
-                
+        self.check_object_permission(repo) # 拦截
         return repo
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         files = self.object.files.all().select_related('node').order_by('node__order', '-uploaded_at')
+        
+        # 保持原有分组展示逻辑
         grouped_list = []
         node_map = {}
         general_files = []
@@ -116,13 +107,17 @@ class ProjectFileDetailView(LoginRequiredMixin, PermissionRequiredMixin, Project
                 grouped_list[idx]['files'].append(file)
             else:
                 general_files.append(file)
-        context['grouped_files'] = grouped_list
-        context['general_files'] = general_files
-        context['project'] = self.object.project
+                
+        context.update({
+            'grouped_files': grouped_list,
+            'general_files': general_files,
+            'project': self.object.project
+        })
         return context
 
 
-class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, ProjectPermissionMixin, CreateView):
+class ProjectFileUploadView(RepositoryAccessMixin, CreateView):
+    """文件上传：需有 add_projectfile 权限，拦截跨部门操作。"""
     permission_required = 'app_repository.add_projectfile'
     model = ProjectFile
     form_class = ProjectFileForm
@@ -131,14 +126,8 @@ class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Project
     def dispatch(self, request, *args, **kwargs):
         repo_id = self.kwargs.get('repo_id')
         self.repo = get_object_or_404(ProjectRepository, pk=repo_id)
-        self.check_project_permission(self.repo.project)
-        
-        # 【越权检查】
-        if not self.request.user.is_superuser:
-            if self.repo.salesperson and self.repo.salesperson != self.request.user:
-                from django.core.exceptions import PermissionDenied
-                raise PermissionDenied("您无权为其他业务员的项目上传资料")
-                
+        # 检查是否对该档案有操作权
+        self.check_object_permission(self.repo)
         return super().dispatch(request, *args, **kwargs)
 
     def get_form_kwargs(self):
@@ -175,21 +164,27 @@ class ProjectFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Project
         return reverse('project_detail', kwargs={'pk': self.object.repository.project.id})
 
 
-class ProjectFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class ProjectFileDeleteView(RepositoryAccessMixin, View):
+    """文件删除：拦截跨部门。"""
     permission_required = 'app_repository.delete_projectfile'
 
     def post(self, request, pk):
         file_obj = get_object_or_404(ProjectFile, pk=pk)
-        project = file_obj.repository.project
-        self.check_project_permission(project)
+        # 校验权限
+        self.check_object_permission(file_obj.repository)
+        
         file_obj.delete()
         messages.success(request, "文件已删除")
-        next_url = request.META.get('HTTP_REFERER', reverse('project_detail', kwargs={'pk': project.id}))
+        next_url = request.META.get('HTTP_REFERER', reverse('project_detail', kwargs={'pk': file_obj.repository.project.id}))
         return redirect(next_url)
 
 
-class RepoAutocompleteView(LoginRequiredMixin, View):
+class RepoAutocompleteView(View):
+    """搜索接口：内部登录后可用，不做严格部门隔离以便跨组指派。"""
     def get(self, request):
+        if not request.user.is_authenticated:
+            return JsonResponse({'error': 'Unauthorized'}, status=401)
+            
         model_type = request.GET.get('model')
         query = request.GET.get('q', '')
         data = []
@@ -197,14 +192,10 @@ class RepoAutocompleteView(LoginRequiredMixin, View):
         if model_type == 'customer':
             qs = Customer.objects.filter(company_name__icontains=query)[:20]
             data = [{'value': item.pk, 'text': item.company_name} for item in qs]
-
         elif model_type == 'oem':
             qs = OEM.objects.filter(Q(name__icontains=query) | Q(short_name__icontains=query))[:20]
             data = [{'value': item.pk, 'text': f"{item.name} ({item.short_name})" if item.short_name else item.name} for item in qs]
-
         elif model_type == 'salesperson':
-            # 【重要修正】：现在搜索业务员，实际上是搜索内部 User 账号
-            # 我们过滤 is_staff=True 的用户
             qs = User.objects.filter(
                 Q(username__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query),
                 is_staff=True

@@ -1,6 +1,5 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.urls import reverse_lazy, reverse
+from django.urls import reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
 from django.shortcuts import redirect
@@ -9,9 +8,10 @@ from django.db.models import Q, Subquery, OuterRef, DecimalField
 from app_raw_material.models import RawMaterial, RawMaterialProperty
 from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
+from app_raw_material.mixins import RawMaterialAccessMixin
 
-# 列表视图
-class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class RawMaterialListView(RawMaterialAccessMixin, ListView):
+    """原材料列表：全员(内部)可见，不设部门隔离"""
     permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/list.html'
@@ -19,13 +19,13 @@ class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView)
     paginate_by = 20
 
     def get_queryset(self):
-        # 1. 基础查询
-        qs = super().get_queryset().select_related('category', 'supplier').prefetch_related('suitable_materials', 'properties__test_config').order_by('-created_at')
+        # 1. 调用 Mixin 基础查询 (enforce_dept_isolation=False 已在 Mixin 定义)
+        qs = super().get_queryset().select_related('category', 'supplier').prefetch_related(
+            'suitable_materials', 'properties__test_config'
+        ).order_by('-created_at')
         
-        # 2. 获取排序参数
+        # 2. 动态性能排序逻辑 (保持)
         sort_param = self.request.GET.get('sort', '')
-        
-        # 3. 映射表 (与 MaterialListView 保持一致)
         metric_map = {
             'density': ('密度', 'val_density'),
             'ash': ('灰分', 'val_ash'),
@@ -37,45 +37,35 @@ class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView)
             'hdt': ('变形温度', 'val_hdt'),
         }
 
-        # 4. 动态 Annotate (用于排序)
         if sort_param:
             clean_sort = sort_param.lstrip('-')
             if clean_sort in metric_map:
                 keyword, field_name = metric_map[clean_sort]
-                
-                # 获取当前标准
                 current_std = self.request.GET.get('std', 'ISO')
                 std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
-                
                 std_query = Q()
-                for k in std_keywords:
-                    std_query |= Q(test_config__standard__icontains=k)
+                for k in std_keywords: std_query |= Q(test_config__standard__icontains=k)
                 
                 qs = qs.annotate(**{
                     field_name: Subquery(
                         RawMaterialProperty.objects.filter(
-                            std_query,
-                            raw_material=OuterRef('pk'),
+                            std_query, raw_material=OuterRef('pk'),
                             test_config__name__icontains=keyword
                         ).order_by('-id').values('value')[:1],
                         output_field=DecimalField()
                     )
                 })
 
-        # 【修复】传入 request 参数，以便 FilterSet 内部可以访问 self.request (用于性能筛选)
         self.filterset = RawMaterialFilter(self.request.GET, queryset=qs, request=self.request)
         return self.filterset.qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
-        # Python 内存填充数据 (与 MaterialListView 逻辑一致)
         current_std = self.request.GET.get('std', 'ISO')
         std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
 
         for mat in context['materials']:
             props = mat.properties.all()
-
             def find_val_in_memory(keyword):
                 for p in props:
                     if keyword in p.test_config.name:
@@ -92,17 +82,16 @@ class RawMaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView)
             if not hasattr(mat, 'val_impact'): mat.val_impact = find_val_in_memory("冲击")
             if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("热变形")
 
-        # 【新增】传递购物车中的原材料 ID，用于前端回显勾选状态
-        # 使用新的 Session Key: cart_raw_materials_v2
-        context['cart_raw_material_ids'] = self.request.session.get('cart_raw_materials_v2', [])
-
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['current_std'] = current_std
+        context.update({
+            'cart_raw_material_ids': self.request.session.get('cart_raw_materials_v2', []),
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'current_std': current_std
+        })
         return context
 
-# 详情视图
-class RawMaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
+    """详情：全员内部可见"""
     permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/detail.html'
@@ -111,10 +100,9 @@ class RawMaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailV
     def get_queryset(self):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related('properties__test_config')
 
-# 创建视图 (带 FormSet)
-class RawMaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
+    """创建：需 add_rawmaterial 权限，主要供采购/技术经理使用"""
     permission_required = 'app_raw_material.add_rawmaterial'
-    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
@@ -133,7 +121,6 @@ class RawMaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
     def form_valid(self, form):
         context = self.get_context_data()
         property_formset = context['property_formset']
-        
         with transaction.atomic():
             self.object = form.save()
             if property_formset.is_valid():
@@ -141,27 +128,22 @@ class RawMaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateV
                 property_formset.save()
             else:
                 return self.render_to_response(self.get_context_data(form=form))
-                
         messages.success(self.request, "原材料已添加")
-        # 【修改】跳转到详情页
         return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
 
-# 【新增】原材料复制视图
-class RawMaterialDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
+    """复制：需增加权限"""
     permission_required = 'app_raw_material.add_rawmaterial'
-    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
 
     def get_object(self, queryset=None):
-        original_material = super().get_object(queryset)
-        return original_material
+        return super().get_object(queryset)
 
-    # 重新实现为 CreateView 逻辑
     def dispatch(self, request, *args, **kwargs):
         self.original_material = self.get_object()
         return super().dispatch(request, *args, **kwargs)
@@ -169,33 +151,25 @@ class RawMaterialDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, Upda
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '复制原材料'
-        
+
         # 如果是 GET 请求，预填充 FormSet 数据
         if not self.request.POST:
-            # 复制性能指标
-            prop_initial = []
-            for prop in self.original_material.properties.all():
-                prop_initial.append({
-                    'test_config': prop.test_config,
-                    'value': prop.value,
-                    'value_text': prop.value_text,
-                    'test_date': prop.test_date,
-                    'remark': prop.remark,
-                })
+            prop_initial = [{
+                'test_config': p.test_config, 'value': p.value, 'value_text': p.value_text,
+                'test_date': p.test_date, 'remark': p.remark,
+            } for p in self.original_material.properties.all()]
             context['property_formset'] = RawMaterialPropertyFormSet(initial=prop_initial)
             context['property_formset'].extra = len(prop_initial)
         else:
             context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST)
-            
         return context
 
     def get_initial(self):
         initial = super().get_initial()
-        # 预填充主表单数据
         initial.update({
             'name': f"{self.original_material.name} (副本)",
             'model_name': self.original_material.model_name,
-            'warehouse_code': None, # 清空编码
+            'warehouse_code': None,
             'category': self.original_material.category,
             'supplier': self.original_material.supplier,
             'usage_method': self.original_material.usage_method,
@@ -208,28 +182,23 @@ class RawMaterialDuplicateView(LoginRequiredMixin, PermissionRequiredMixin, Upda
     def form_valid(self, form):
         context = self.get_context_data()
         property_formset = context['property_formset']
-        
         with transaction.atomic():
-            # 创建新原材料
-            form.instance.pk = None # 确保是新建
+            form.instance.pk = None 
             self.object = form.save()
-            
             if property_formset.is_valid():
                 property_formset.instance = self.object
                 property_formset.save()
             else:
                 return self.render_to_response(self.get_context_data(form=form))
-                
         messages.success(self.request, "原材料已复制并创建")
         return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
 
-# 更新视图 (带 FormSet)
-class RawMaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
+    """编辑：需 change_rawmaterial 权限"""
     permission_required = 'app_raw_material.change_rawmaterial'
-    raise_exception = True
     model = RawMaterial
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
@@ -248,16 +217,13 @@ class RawMaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateV
     def form_valid(self, form):
         context = self.get_context_data()
         property_formset = context['property_formset']
-        
         with transaction.atomic():
             self.object = form.save()
             if property_formset.is_valid():
                 property_formset.save()
             else:
                 return self.render_to_response(self.get_context_data(form=form))
-                
         messages.success(self.request, "原材料已更新")
-        # 【修改】跳转到详情页
         return redirect(self.get_success_url())
 
     def get_success_url(self):

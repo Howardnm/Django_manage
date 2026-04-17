@@ -1,4 +1,3 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Max, Count, Q
 from django.http import HttpResponse
@@ -10,11 +9,11 @@ from app_project.models import ProjectNode
 from app_repository.forms import OEMForm, OEMStandardFileForm
 from app_repository.models import OEM, OEMStandardFile, ProjectRepository
 from app_repository.utils.filters import OEMFilter
+from app_repository.mixins import RepositoryAccessMixin
 
-# ==========================================
-# 1. 主机厂列表
-# ==========================================
-class OEMListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+
+class OEMListView(RepositoryAccessMixin, ListView):
+    """主机厂列表：内部人员可见"""
     permission_required = 'app_repository.view_oem'
     model = OEM
     template_name = 'apps/app_repository/oem/oem_list.html'
@@ -45,10 +44,9 @@ class OEMListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
         context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
-# ==========================================
-# 2. 主机厂详情
-# ==========================================
-class OEMDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+
+class OEMDetailView(RepositoryAccessMixin, DetailView):
+    """主机厂详情：展示其参与的所有配套项目"""
     permission_required = 'app_repository.view_oem'
     model = OEM
     template_name = 'apps/app_repository/oem/oem_detail.html'
@@ -61,7 +59,6 @@ class OEMDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'主机厂详情: {self.object.name}'
 
-        # --- 关联项目分页逻辑 (参考CustomerDetailView) ---
         related_projects_list = ProjectRepository.objects.filter(oem=self.object).select_related(
             'project', 'customer', 'salesperson'
         ).order_by('-project__created_at')
@@ -73,26 +70,23 @@ class OEMDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
         project_ids = [repo.project.id for repo in page_obj]
         latest_updates = ProjectNode.objects.filter(
             project_id__in=project_ids
-        ).values('project_id').annotate(
-            max_updated_at=Max('updated_at')
-        )
+        ).values('project_id').annotate(max_updated_at=Max('updated_at'))
         latest_node_map = {item['project_id']: item['max_updated_at'] for item in latest_updates}
 
         for repo in page_obj:
             repo.project.latest_node_update = latest_node_map.get(repo.project.id)
 
-        context['page_obj'] = page_obj
-        context['paginator'] = paginator
-        context['is_paginated'] = page_obj.has_other_pages()
-
+        context.update({
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages()
+        })
         return context
 
-# ==========================================
-# 3. 创建与更新
-# ==========================================
-class OEMCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+
+class OEMCreateView(RepositoryAccessMixin, CreateView):
+    """新增主机厂：需 add_oem 权限"""
     permission_required = 'app_repository.add_oem'
-    raise_exception = True
     model = OEM
     form_class = OEMForm
     template_name = 'apps/app_repository/form_generic.html'
@@ -105,9 +99,10 @@ class OEMCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
         context['page_title'] = '新增主机厂 (OEM)'
         return context
 
-class OEMUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+
+class OEMUpdateView(RepositoryAccessMixin, UpdateView):
+    """编辑主机厂：需 change_oem 权限"""
     permission_required = 'app_repository.change_oem'
-    raise_exception = True
     model = OEM
     form_class = OEMForm
     template_name = 'apps/app_repository/form_generic.html'
@@ -120,19 +115,19 @@ class OEMUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
         context['page_title'] = f'编辑主机厂: {self.object.name}'
         return context
 
-# ==========================================
-# 4. 附件管理 (HTMX优化)
-# ==========================================
-class OEMStandardFileFormView(LoginRequiredMixin, PermissionRequiredMixin, View):
-    """【新增】用于HTMX加载模态框内容的视图"""
+
+class OEMStandardFileFormView(RepositoryAccessMixin, View):
+    """加载上传模态框"""
     permission_required = 'app_repository.change_oem'
 
     def get(self, request, pk):
         oem = get_object_or_404(OEM, pk=pk)
         form = OEMStandardFileForm()
-        return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form}) # 传递 form 变量名
+        return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
 
-class OEMStandardFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, View):
+
+class OEMStandardFileUploadView(RepositoryAccessMixin, View):
+    """处理附件上传"""
     permission_required = 'app_repository.change_oem'
 
     def post(self, request, pk):
@@ -143,22 +138,16 @@ class OEMStandardFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Vie
             instance.oem = oem
             instance.uploader = request.user
             instance.save()
-            # 【HTMX优化】成功后返回特殊响应，关闭模态框并刷新文件列表
-            return HttpResponse(status=204, headers={
-                'HX-Trigger': 'fileUploaded', # 触发一个自定义事件
-                'HX-Refresh': 'true' # 刷新整个页面，或者更精确地刷新文件列表容器
-            })
-        else:
-            # 【HTMX优化】如果表单无效，重新渲染模态框内容，显示错误信息
-            return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
+            return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+        return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
 
-class OEMStandardFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
+
+class OEMStandardFileDeleteView(RepositoryAccessMixin, View):
+    """删除主机厂标准文件"""
     permission_required = 'app_repository.change_oem'
 
     def post(self, request, pk):
         file_obj = get_object_or_404(OEMStandardFile, pk=pk)
         oem_pk = file_obj.oem.pk
         file_obj.delete()
-        
-        # 删除后直接重定向回详情页，确保页面刷新
         return redirect(reverse('repo_oem_detail', kwargs={'pk': oem_pk}))

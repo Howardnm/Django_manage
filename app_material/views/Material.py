@@ -1,5 +1,4 @@
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 from django.shortcuts import get_object_or_404, redirect
@@ -13,16 +12,12 @@ from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialFileFo
 from app_material.models.material import MaterialLibrary, MaterialDataPoint, MaterialFile
 from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult
-
-# 核心修正：导入新模块中的 Webhook 发送函数
 from app_material_api.integration.webhooks import send_material_webhook
+from app_material.mixins import MaterialAccessMixin
 
 
-# ==========================================
-# 2. 材料库视图 (Material)
-# ==========================================
-
-class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class MaterialListView(MaterialAccessMixin, ListView):
+    """材料列表：全员内部可见，不设部门隔离。"""
     permission_required = 'app_material.view_materiallibrary'
     model = MaterialLibrary
     template_name = 'apps/app_material/material/material_list.html'
@@ -30,20 +25,17 @@ class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        qs = super().get_queryset() \
-            .select_related('category') \
-            .prefetch_related('scenarios', 'properties', 'properties__test_config')
+        # 基类 super().get_queryset() 已处理 identity_required 和 enforce_dept_isolation=False
+        qs = super().get_queryset().select_related('category').prefetch_related(
+            'scenarios', 'properties', 'properties__test_config'
+        )
 
         sort_param = self.request.GET.get('sort', '')
         metric_map = {
-            'density': ('密度', 'val_density'),
-            'ash': ('灰分', 'val_ash'),
-            'melt_index': ('熔融指数', 'val_melt'),
-            'tensile': ('拉伸强度', 'val_tensile'),
-            'flex_strength': ('弯曲强度', 'val_flex_strength'),
-            'flex_modulus': ('弯曲模量', 'val_flex_modulus'),
-            'impact': ('冲击', 'val_impact'),
-            'hdt': ('变形温度', 'val_hdt'),
+            'density': ('密度', 'val_density'), 'ash': ('灰分', 'val_ash'),
+            'melt_index': ('熔融指数', 'val_melt'), 'tensile': ('拉伸强度', 'val_tensile'),
+            'flex_strength': ('弯曲强度', 'val_flex_strength'), 'flex_modulus': ('弯曲模量', 'val_flex_modulus'),
+            'impact': ('冲击', 'val_impact'), 'hdt': ('变形温度', 'val_hdt'),
         }
 
         if sort_param:
@@ -52,16 +44,13 @@ class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 keyword, field_name = metric_map[clean_sort]
                 current_std = self.request.GET.get('std', 'ISO')
                 std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
-
                 std_query = Q()
-                for k in std_keywords:
-                    std_query |= Q(test_config__standard__icontains=k)
+                for k in std_keywords: std_query |= Q(test_config__standard__icontains=k)
 
                 qs = qs.annotate(**{
                     field_name: Subquery(
                         MaterialDataPoint.objects.filter(
-                            std_query,
-                            material=OuterRef('pk'),
+                            std_query, material=OuterRef('pk'),
                             test_config__name__icontains=keyword
                         ).order_by('-id').values('value')[:1],
                         output_field=DecimalField()
@@ -69,9 +58,7 @@ class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
                 })
 
         self.filterset = MaterialFilter(self.request.GET, queryset=qs, request=self.request)
-        if not sort_param:
-            return self.filterset.qs.order_by('-created_at')
-        return self.filterset.qs
+        return self.filterset.qs.order_by('-created_at') if not sort_param else self.filterset.qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -95,18 +82,19 @@ class MaterialListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
             if not hasattr(mat, 'val_flex_modulus'): mat.val_flex_modulus = find_val_in_memory("弯曲模量")
             if not hasattr(mat, 'val_impact'): mat.val_impact = find_val_in_memory("冲击")
             if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("热变形")
-            if not hasattr(mat, 'val_hdt'): mat.val_hdt = find_val_in_memory("变形温度")
 
-        context['cart_material_ids'] = self.request.session.get('cart_materials_v2', [])
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['current_std'] = current_std
+        context.update({
+            'cart_material_ids': self.request.session.get('cart_materials_v2', []),
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'current_std': current_std
+        })
         return context
 
 
-class MaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class MaterialCreateView(MaterialAccessMixin, CreateView):
+    """录入材料：需具备 add_materiallibrary 权限。"""
     permission_required = 'app_material.add_materiallibrary'
-    raise_exception = True
     model = MaterialLibrary
     form_class = MaterialForm
     template_name = 'apps/app_material/material/material_form.html'
@@ -118,8 +106,7 @@ class MaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         else:
             MaterialDataFormSet.extra = 6
             context['data_formset'] = MaterialDataFormSet(queryset=MaterialDataPoint.objects.none())
-        context['page_title'] = '录入新材料'
-        context['is_edit'] = False
+        context.update({'page_title': '录入新材料', 'is_edit': False})
         return context
 
     def form_valid(self, form):
@@ -138,9 +125,9 @@ class MaterialCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         return reverse('material_detail', kwargs={'pk': self.object.pk})
 
 
-class MaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class MaterialUpdateView(MaterialAccessMixin, UpdateView):
+    """编辑材料：需具备 change_materiallibrary 权限。"""
     permission_required = 'app_material.change_materiallibrary'
-    raise_exception = True
     model = MaterialLibrary
     form_class = MaterialForm
     template_name = 'apps/app_material/material/material_form.html'
@@ -152,8 +139,7 @@ class MaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         else:
             MaterialDataFormSet.extra = 1
             context['data_formset'] = MaterialDataFormSet(instance=self.object)
-        context['page_title'] = f'编辑: {self.object.grade_name}'
-        context['is_edit'] = True
+        context.update({'page_title': f'编辑: {self.object.grade_name}', 'is_edit': True})
         return context
 
     def form_valid(self, form):
@@ -171,7 +157,8 @@ class MaterialUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView
         return reverse('material_detail', kwargs={'pk': self.object.pk})
 
 
-class MaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView):
+class MaterialDetailView(MaterialAccessMixin, DetailView):
+    """详情展示：全员内部可见。"""
     permission_required = 'app_material.view_materiallibrary'
     model = MaterialLibrary
     template_name = 'apps/app_material/material/material_detail.html'
@@ -188,59 +175,54 @@ class MaterialDetailView(LoginRequiredMixin, PermissionRequiredMixin, DetailView
         context['related_projects'] = [repo.project for repo in related_repos]
 
         current_std = self.request.GET.get('std', 'ISO')
-        context['current_std'] = current_std
         std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
         
         def get_val_subquery(keyword):
             std_query = Q()
-            for k in std_keywords:
-                std_query |= Q(test_config__standard__icontains=k)
+            for k in std_keywords: std_query |= Q(test_config__standard__icontains=k)
             return Subquery(
                 FormulaTestResult.objects.filter(std_query, formula=OuterRef('pk'), test_config__name__icontains=keyword).values('value')[:1],
                 output_field=DecimalField()
             )
 
         formulas = self.object.formulas.select_related('creator', 'process').annotate(
-            val_density=get_val_subquery('密度'),
-            val_melt=get_val_subquery('熔融'),
-            val_tensile=get_val_subquery('拉伸强度'),
-            val_flex_strength=get_val_subquery('弯曲强度'),
-            val_flex_modulus=get_val_subquery('弯曲模量'),
-            val_impact=get_val_subquery('冲击'),
+            val_density=get_val_subquery('密度'), val_melt=get_val_subquery('熔融'),
+            val_tensile=get_val_subquery('拉伸强度'), val_flex_strength=get_val_subquery('弯曲强度'),
+            val_flex_modulus=get_val_subquery('弯曲模量'), val_impact=get_val_subquery('冲击'),
             val_hdt=get_val_subquery('热变形'),
         ).order_by('-created_at')
         
-        processed_formulas = []
         for f in formulas:
             f.display_props = {
                 'density': f.val_density, 'melt': f.val_melt, 'tensile': f.val_tensile,
                 'flex_strength': f.val_flex_strength, 'flex_modulus': f.val_flex_modulus,
                 'impact': f.val_impact, 'hdt': f.val_hdt,
             }
-            processed_formulas.append(f)
             
-        context['related_formulas'] = processed_formulas
-        context['cart_formula_ids'] = self.request.session.get('cart_formulas_v2', [])
+        context.update({
+            'related_formulas': formulas,
+            'current_std': current_std,
+            'cart_formula_ids': self.request.session.get('cart_formulas_v2', [])
+        })
         return context
 
 
-class MaterialFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class MaterialFileUploadView(MaterialAccessMixin, CreateView):
+    """上传附件：需具备对应权限。"""
     permission_required = 'app_material.add_materialfile'
     model = MaterialFile
     form_class = MaterialFileForm
     template_name = 'apps/app_material/material/material_file_form.html'
 
     def form_valid(self, form):
-        material_id = self.kwargs.get('material_id')
-        material = get_object_or_404(MaterialLibrary, pk=material_id)
+        material = get_object_or_404(MaterialLibrary, pk=self.kwargs.get('material_id'))
         form.instance.material = material
         messages.success(self.request, "附件上传成功")
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        material_id = self.kwargs.get('material_id')
-        context['material'] = get_object_or_404(MaterialLibrary, pk=material_id)
+        context['material'] = get_object_or_404(MaterialLibrary, pk=self.kwargs.get('material_id'))
         context['page_title'] = '上传材料附件'
         return context
 
@@ -248,7 +230,8 @@ class MaterialFileUploadView(LoginRequiredMixin, PermissionRequiredMixin, Create
         return reverse('material_detail', kwargs={'pk': self.object.material.id})
 
 
-class MaterialFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class MaterialFileDeleteView(MaterialAccessMixin, View):
+    """删除附件：需具备对应权限。"""
     permission_required = 'app_material.delete_materialfile'
 
     def post(self, request, pk):
@@ -259,30 +242,23 @@ class MaterialFileDeleteView(LoginRequiredMixin, PermissionRequiredMixin, View):
         return redirect('material_detail', pk=material_id)
 
 
-class MaterialBulkPublishView(LoginRequiredMixin, PermissionRequiredMixin, View):
+class MaterialBulkPublishView(MaterialAccessMixin, View):
+    """批量发布：需具备编辑权限。"""
     permission_required = 'app_material.change_materiallibrary'
 
     def post(self, request):
         try:
             data = json.loads(request.body)
-            ids = data.get('ids', [])
-            action = data.get('action')
-            
+            ids, action = data.get('ids', []), data.get('action')
             if not ids or action not in ['publish', 'unpublish']:
                 return JsonResponse({'status': 'error', 'message': '参数错误'}, status=400)
 
             is_published = (action == 'publish')
-            
             with transaction.atomic():
                 updated_count = MaterialLibrary.objects.filter(pk__in=ids).update(is_published=is_published)
-                
-                # 修正引用路径：调用 app_material_api 中的同步函数
                 for obj in MaterialLibrary.objects.filter(pk__in=ids):
                     send_material_webhook('material_updated', obj)
 
-            return JsonResponse({
-                'status': 'success', 
-                'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'
-            })
+            return JsonResponse({'status': 'success', 'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'})
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

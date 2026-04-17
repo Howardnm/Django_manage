@@ -1,4 +1,3 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Count
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
@@ -6,13 +5,15 @@ from django.views.generic import ListView, CreateView, UpdateView
 from app_material.forms import ApplicationScenarioForm
 from app_material.models.material import ApplicationScenario
 from app_material.utils.filters import ScenarioFilter
+from app_material.mixins import MaterialAccessMixin
 
 
 # ==========================================
 # 5. 应用场景管理 (ApplicationScenario)
 # ==========================================
 
-class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
+class ScenarioListView(MaterialAccessMixin, ListView):
+    """应用场景列表：内部可见"""
     permission_required = 'app_material.view_applicationscenario'
     model = ApplicationScenario
     template_name = 'apps/app_material/scenario/scenario_list.html'
@@ -28,15 +29,17 @@ class ScenarioListView(LoginRequiredMixin, PermissionRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['page_title'] = '应用场景管理'
+        context.update({
+            'filter': self.filterset,
+            'current_sort': self.request.GET.get('sort', ''),
+            'page_title': '应用场景管理'
+        })
         return context
 
 
-class ScenarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView):
+class ScenarioCreateView(MaterialAccessMixin, CreateView):
+    """新增场景：需 add 权限"""
     permission_required = 'app_material.add_applicationscenario'
-    raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
     template_name = 'apps/app_material/form_generic.html'
@@ -48,9 +51,9 @@ class ScenarioCreateView(LoginRequiredMixin, PermissionRequiredMixin, CreateView
         return context
 
 
-class ScenarioUpdateView(LoginRequiredMixin, PermissionRequiredMixin, UpdateView):
+class ScenarioUpdateView(MaterialAccessMixin, UpdateView):
+    """编辑场景：需 change 权限"""
     permission_required = 'app_material.change_applicationscenario'
-    raise_exception = True
     model = ApplicationScenario
     form_class = ApplicationScenarioForm
     template_name = 'apps/app_material/form_generic.html'
