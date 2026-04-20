@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -34,23 +35,21 @@ class User(AbstractUser):
 
     # --- 1. 核心权限决策字段 ---
     user_type = models.CharField("用户角色", max_length=20, choices=UserType.choices, default=UserType.ENGINEER)
-    user_level = models.PositiveIntegerField("用户等级", default=1, help_text="用于细分权限，如: 11级以上可编辑特定页面")
-    department = models.ForeignKey(
-        Department, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        verbose_name="所属部门",
-        related_name="members"
-    )
+    user_level = models.PositiveIntegerField("用户等级", default=1)
+    department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所属部门")
     
-    # --- 2. 扩展个人信息 ---
+    # --- 外部系统核心识别码 (从业务表迁移至此) ---
+    member_token = models.UUIDField("外部唯一令牌", default=uuid.uuid4, editable=False, unique=True)
+
+    # --- 公司归属关联 ---
+    associated_customer = models.ForeignKey('app_repository.Customer', on_delete=models.SET_NULL, null=True, blank=True, related_name='members', verbose_name="所属客户公司")
+    associated_oem = models.ForeignKey('app_repository.OEM', on_delete=models.SET_NULL, null=True, blank=True, related_name='members', verbose_name="所属主机厂")
+
     job_title = models.CharField("职称/职位", max_length=50, blank=True)
-    company = models.CharField("所属公司/实体名称", max_length=100, blank=True)
-    phone = models.CharField("手机号码", max_length=20, blank=True)
+    phone = models.CharField("个人电话", max_length=20, blank=True)
     email = models.EmailField("电子邮箱", blank=True)
     address = models.CharField("联系地址", max_length=255, blank=True)
-    description = models.TextField("个人/公司描述", blank=True)
+    description = models.TextField("个人备注", blank=True)
 
     class Meta:
         verbose_name = "用户信息"

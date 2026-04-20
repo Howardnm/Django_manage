@@ -2,91 +2,57 @@ import logging
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
 from django.db import transaction
-from ..models import Customer, OEM, ProjectRepository # 移除 Salesperson
+from ..models import ProjectRepository
 from app_project.models import Project
-from app_material_api.integration.webhooks import send_data_sync_webhook
+from app_material_api.services.webhook_service import WebhookService
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-def _push_member_to_catalog(instance, role_type):
-    if not instance.user or not instance.member_token:
-        return
-    data = {
-        'token': str(instance.member_token),
-        'username': instance.user.username,
-        'display_name': str(instance),
-        'email': instance.user.email,
-        'role': role_type,
-        'is_active': instance.is_active
-    }
-    send_data_sync_webhook('member_sync', 'member', data)
-
-# --- 1. 自动为客户创建账号 ---
-@receiver(post_save, sender=Customer)
-def auto_create_customer_user(sender, instance, created, **kwargs):
-    if created and not instance.user:
-        try:
-            with transaction.atomic():
-                username = f"cust_{instance.id}"
-                user = User.objects.create_user(
-                    username=username,
-                    email=instance.email or f"cust{instance.id}@sunwill.com.cn",
-                    password=f"Sunwill@{instance.id}", 
-                    is_staff=False,
-                    user_type='CUSTOMER',
-                    company=instance.company_name
-                )
-                instance.user = user
-                instance.save(update_fields=['user'])
-                group, _ = Group.objects.get_or_create(name='Member_Customer')
-                user.groups.add(group)
-        except Exception as e:
-            logger.error(f"Failed to auto-create User for Customer {instance.id}: {e}")
-    transaction.on_commit(lambda: _push_member_to_catalog(instance, 'CUSTOMER'))
-
-# --- 2. 自动为主机厂创建账号 ---
-@receiver(post_save, sender=OEM)
-def auto_create_oem_user(sender, instance, created, **kwargs):
-    if created and not instance.user:
-        try:
-            with transaction.atomic():
-                username = f"oem_{instance.id}"
-                user = User.objects.create_user(
-                    username=username,
-                    email=instance.contact_email or f"oem{instance.id}@sunwill.com.cn",
-                    password=f"Oem@{instance.id}",
-                    is_staff=False,
-                    user_type='OEM',
-                    company=instance.name
-                )
-                instance.user = user
-                instance.save(update_fields=['user'])
-                group, _ = Group.objects.get_or_create(name='Member_OEM')
-                user.groups.add(group)
-        except Exception as e:
-            logger.error(f"Failed to auto-create User for OEM {instance.id}: {e}")
-    transaction.on_commit(lambda: _push_member_to_catalog(instance, 'OEM'))
-
-# --- 3. 全量员工同步逻辑 (核心) ---
+# ==========================================
+# 1. 统一身份同步 (电子手册会员数据源)
+# ==========================================
 @receiver(post_save, sender=User)
-def staff_member_sync(sender, instance, created, **kwargs):
-    # 根据新的 UserType 判定是否同步
-    if instance.user_type in ['ENGINEER', 'SALES', 'ADMIN']:
-        data = {
-            'token': f"staff_{instance.id}",
-            'username': instance.username,
-            'display_name': instance.get_full_name() or instance.username,
-            'email': instance.email,
-            'role': 'STAFF',
-            'is_active': instance.is_active
-        }
-        transaction.on_commit(lambda: send_data_sync_webhook('member_sync', 'member', data))
+def sync_member_to_catalog(sender, instance, created, **kwargs):
+    """
+    当用户信息、角色或公司归属发生变化时，同步精简画像到电子手册。
+    """
+    # 确定角色类型
+    role = 'CUSTOMER'
+    if instance.is_superuser or instance.is_staff or instance.user_type in [User.UserType.ENGINEER, User.UserType.PROCESS_ENGINEER, User.UserType.SALES, User.UserType.PURCHASING]:
+        role = 'STAFF'
+    elif instance.associated_oem:
+        role = 'OEM'
+    elif instance.associated_customer:
+        role = 'CUSTOMER'
+    else:
+        # 如果既不是员工也没有公司归属，暂不同步（防止同步孤立账号）
+        return
 
-# --- 4. 自动为项目创建档案 ---
+    # 构建 4D 精简画像
+    sync_data = {
+        'token': str(instance.member_token),
+        'display_name': instance.get_full_name() or instance.username,
+        'role': role,
+        'is_active': instance.is_active,
+        # 扩展权限因子 (供子系统 Session 使用)
+        'user_type': instance.user_type,
+        'user_level': instance.user_level,
+        'dept_code': instance.department.code if instance.department else "NONE"
+    }
+
+    # 使用重构后的低代码 WebhookService 执行异步同步
+    transaction.on_commit(lambda: WebhookService.notify_member_sync(sync_data))
+
+
+# ==========================================
+# 2. 项目档案自动化
+# ==========================================
 @receiver(post_save, sender=Project)
-def create_project_repository(sender, instance, created, **kwargs):
+def auto_create_project_repository(sender, instance, created, **kwargs):
+    """
+    立项即开档案。
+    """
     if created:
         ProjectRepository.objects.get_or_create(project=instance)

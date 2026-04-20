@@ -20,9 +20,13 @@ class CustomerListView(RepositoryAccessMixin, ListView):
     template_name = 'apps/app_repository/customer/customer_list.html'
     context_object_name = 'customers'
     paginate_by = 10
+    
+    # 客户库通常对内部全员公开，关闭自动隔离
+    enforce_dept_isolation = False
 
     def get_queryset(self):
-        qs = super().get_queryset().annotate(
+        # 优化：通过 prefetch_related 带出公司的联系人(User)
+        qs = super().get_queryset().prefetch_related('members').annotate(
             completed_project_count=Count(
                 'projectrepository',
                 filter=Q(projectrepository__project__progress_percent=100, projectrepository__project__is_terminated=False)
@@ -47,7 +51,7 @@ class CustomerListView(RepositoryAccessMixin, ListView):
 
 
 class CustomerCreateView(RepositoryAccessMixin, CreateView):
-    """新增客户：需有 add_customer 权限"""
+    """新增客户公司"""
     permission_required = 'app_repository.add_customer'
     model = Customer
     form_class = CustomerForm
@@ -56,12 +60,12 @@ class CustomerCreateView(RepositoryAccessMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['page_title'] = '新增客户'
+        context['page_title'] = '新增客户公司'
         return context
 
 
 class CustomerUpdateView(RepositoryAccessMixin, UpdateView):
-    """编辑客户：需有 change_customer 权限"""
+    """编辑客户公司"""
     permission_required = 'app_repository.change_customer'
     model = Customer
     form_class = CustomerForm
@@ -75,25 +79,34 @@ class CustomerUpdateView(RepositoryAccessMixin, UpdateView):
 
 
 class CustomerDetailView(RepositoryAccessMixin, DetailView):
-    """客户详情：需有 view_customer 权限"""
+    """客户详情：增加了“联系人列表”和“关联项目”的联动展示"""
     permission_required = 'app_repository.view_customer'
     model = Customer
     template_name = 'apps/app_repository/customer/customer_detail.html'
     context_object_name = 'customer'
 
+    def get_queryset(self):
+        # 预加载成员信息
+        return super().get_queryset().prefetch_related('members')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'客户详情: {self.object.company_name}'
 
-        # 获取所有关联的项目档案
-        related_projects_list = ProjectRepository.objects.filter(customer=self.object).select_related('project', 'oem', 'salesperson').order_by('-project__created_at')
+        # 1. 提取关联的系统账号 (联系人)
+        context['contacts'] = self.object.members.all().order_by('username')
 
-        # 分页逻辑保持不变
+        # 2. 获取所有关联的项目档案
+        related_projects_list = ProjectRepository.objects.filter(
+            customer=self.object
+        ).select_related('project', 'oem', 'salesperson').order_by('-project__created_at')
+
+        # 3. 分页逻辑
         paginator = Paginator(related_projects_list, 10)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
-        # 附加进度信息
+        # 4. 进度追踪
         project_ids = [repo.project.id for repo in page_obj]
         latest_updates = ProjectNode.objects.filter(
             project_id__in=project_ids

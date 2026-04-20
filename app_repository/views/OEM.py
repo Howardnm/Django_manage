@@ -19,9 +19,12 @@ class OEMListView(RepositoryAccessMixin, ListView):
     template_name = 'apps/app_repository/oem/oem_list.html'
     context_object_name = 'oems'
     paginate_by = 10
+    
+    enforce_dept_isolation = False
 
     def get_queryset(self):
-        qs = super().get_queryset().annotate(
+        # 预加载联系人账号
+        qs = super().get_queryset().prefetch_related('members').annotate(
             completed_project_count=Count(
                 'projectrepository',
                 filter=Q(projectrepository__project__progress_percent=100, projectrepository__project__is_terminated=False)
@@ -46,20 +49,25 @@ class OEMListView(RepositoryAccessMixin, ListView):
 
 
 class OEMDetailView(RepositoryAccessMixin, DetailView):
-    """主机厂详情：展示其参与的所有配套项目"""
+    """主机厂详情：增加关联联系人列表"""
     permission_required = 'app_repository.view_oem'
     model = OEM
     template_name = 'apps/app_repository/oem/oem_detail.html'
     context_object_name = 'oem'
 
     def get_queryset(self):
-        return super().get_queryset().prefetch_related('standard_files__uploader')
+        return super().get_queryset().prefetch_related('standard_files__uploader', 'members')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['page_title'] = f'主机厂详情: {self.object.name}'
+        oem = self.object
+        context['page_title'] = f'主机厂详情: {oem.name}'
+        
+        # 1. 获取关联的联系人账号
+        context['contacts'] = oem.members.all().order_by('username')
 
-        related_projects_list = ProjectRepository.objects.filter(oem=self.object).select_related(
+        # 2. 获取关联项目列表
+        related_projects_list = ProjectRepository.objects.filter(oem=oem).select_related(
             'project', 'customer', 'salesperson'
         ).order_by('-project__created_at')
 
@@ -85,7 +93,7 @@ class OEMDetailView(RepositoryAccessMixin, DetailView):
 
 
 class OEMCreateView(RepositoryAccessMixin, CreateView):
-    """新增主机厂：需 add_oem 权限"""
+    """新增主机厂公司"""
     permission_required = 'app_repository.add_oem'
     model = OEM
     form_class = OEMForm
@@ -96,12 +104,12 @@ class OEMCreateView(RepositoryAccessMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['page_title'] = '新增主机厂 (OEM)'
+        context['page_title'] = '新增主机厂公司 (OEM)'
         return context
 
 
 class OEMUpdateView(RepositoryAccessMixin, UpdateView):
-    """编辑主机厂：需 change_oem 权限"""
+    """编辑主机厂公司信息"""
     permission_required = 'app_repository.change_oem'
     model = OEM
     form_class = OEMForm
@@ -117,9 +125,7 @@ class OEMUpdateView(RepositoryAccessMixin, UpdateView):
 
 
 class OEMStandardFileFormView(RepositoryAccessMixin, View):
-    """加载上传模态框"""
     permission_required = 'app_repository.change_oem'
-
     def get(self, request, pk):
         oem = get_object_or_404(OEM, pk=pk)
         form = OEMStandardFileForm()
@@ -127,25 +133,20 @@ class OEMStandardFileFormView(RepositoryAccessMixin, View):
 
 
 class OEMStandardFileUploadView(RepositoryAccessMixin, View):
-    """处理附件上传"""
     permission_required = 'app_repository.change_oem'
-
     def post(self, request, pk):
         oem = get_object_or_404(OEM, pk=pk)
         form = OEMStandardFileForm(request.POST, request.FILES)
         if form.is_valid():
             instance = form.save(commit=False)
-            instance.oem = oem
-            instance.uploader = request.user
+            instance.oem, instance.uploader = oem, request.user
             instance.save()
             return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
         return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
 
 
 class OEMStandardFileDeleteView(RepositoryAccessMixin, View):
-    """删除主机厂标准文件"""
     permission_required = 'app_repository.change_oem'
-
     def post(self, request, pk):
         file_obj = get_object_or_404(OEMStandardFile, pk=pk)
         oem_pk = file_obj.oem.pk

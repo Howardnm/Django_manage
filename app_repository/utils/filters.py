@@ -2,53 +2,44 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
+from app_user.models import Department
 from ..models import Customer, OEM, ProjectRepository
 from common_utils.filters import TablerFilterMixin
 
 User = get_user_model()
 
+# ==========================================
 # 1. 项目档案列表过滤器
+# ==========================================
 class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
     customer = django_filters.ModelChoiceFilter(
         queryset=Customer.objects.all(),
-        label='客户',
+        label='直接客户',
         empty_label="所有客户",
-        widget=forms.Select(attrs={
-            'class': 'form-select remote-search',
-            'data-model': 'customer',
-            'style': 'width: 250px;'
-        })
+        widget=forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'})
     )
 
-    # 【重要修正】：业务员现在筛选 User 模型 (is_staff=True)
+    # 业务员筛选：精准匹配 SALES 角色
     salesperson = django_filters.ModelChoiceFilter(
-        queryset=User.objects.filter(is_staff=True),
-        label='业务员',
-        empty_label="所有业务员",
+        queryset=User.objects.filter(user_type=User.UserType.SALES),
+        label='负责业务员',
+        empty_label="所有人员",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
-    group = django_filters.ModelChoiceFilter(
-        queryset=Group.objects.all(),
-        field_name='project__manager__groups',
-        label='所属组',
-        empty_label="所有组",
+    # 部门筛选：对应 app_user.Department
+    dept = django_filters.ModelChoiceFilter(
+        queryset=Department.objects.all(),
+        field_name='project__manager__department',
+        label='研发部门',
+        empty_label="所有部门",
         widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     start_date = django_filters.DateFilter(
-        field_name='project__created_at',
-        lookup_expr='gte',
-        label='开始日期',
-        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
-    )
-    end_date = django_filters.DateFilter(
-        field_name='project__created_at',
-        lookup_expr='lte',
-        label='结束日期',
+        field_name='project__created_at', lookup_expr='gte', label='创建于',
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'})
     )
 
@@ -57,34 +48,33 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
             ('project__name', 'project'),
             ('updated_at', 'updated_at'),
             ('customer__company_name', 'customer'),
-            ('material__grade_name', 'material'),
-            ('project__created_at', 'project_created_at'),
+            ('project__created_at', 'created'),
         ),
         widget=forms.HiddenInput
     )
 
     class Meta:
         model = ProjectRepository
-        fields = ['q', 'customer', 'salesperson', 'group', 'start_date', 'end_date']
+        fields = ['q', 'customer', 'salesperson', 'dept', 'start_date']
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
             Q(project__name__icontains=value) |
             Q(customer__company_name__icontains=value) |
             Q(oem__name__icontains=value) |
-            Q(material__grade_name__icontains=value) |
             Q(product_name__icontains=value)
         )
 
 
-# 2. 客户过滤器
+# ==========================================
+# 2. 客户公司过滤器
+# ==========================================
 class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
     sort = django_filters.OrderingFilter(
         fields=(
             ('company_name', 'company_name'),
-            ('contact_name', 'contact_name'),
             ('id', 'id'),
         ),
         widget=forms.HiddenInput
@@ -95,14 +85,20 @@ class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
         fields = ['q']
 
     def filter_search(self, queryset, name, value):
+        """
+        增强搜索：支持搜索公司名，以及关联的系统账号姓名。
+        """
         return queryset.filter(
             Q(company_name__icontains=value) |
-            Q(contact_name__icontains=value) |
-            Q(email__icontains=value)
-        )
+            Q(short_name__icontains=value) |
+            Q(members__first_name__icontains=value) | # 搜索关联人的姓名
+            Q(members__username__icontains=value)    # 搜索关联人的账号
+        ).distinct()
 
 
-# 4. 主机厂过滤器
+# ==========================================
+# 3. 主机厂过滤器
+# ==========================================
 class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
@@ -110,7 +106,6 @@ class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
         fields=(
             ('name', 'name'),
             ('short_name', 'short_name'),
-            ('id', 'id'),
         ),
         widget=forms.HiddenInput
     )
@@ -122,5 +117,6 @@ class OEMFilter(TablerFilterMixin, django_filters.FilterSet):
     def filter_search(self, queryset, name, value):
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(short_name__icontains=value)
-        )
+            Q(short_name__icontains=value) |
+            Q(members__first_name__icontains=value)
+        ).distinct()

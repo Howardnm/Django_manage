@@ -1,154 +1,158 @@
 {% extends 'base.html' %}
 {% load project_extras %}
 
-{% block page_title %}{{ page_title }}{% endblock %}
-
 {% block content %}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <h2 class="page-title">{{ customer.short_name|default:customer.company_name }}</h2>
-            <div class="text-muted mt-1">{{ customer.company_name }}</div>
-        </div>
-        <div class="col-auto ms-auto">
-            <a href="{% url 'repo_customer_list' %}" class="btn btn-outline-secondary">
-                <i class="ti ti-arrow-left"></i> 返回列表
-            </a>
-            <a href="{% url 'repo_customer_edit' customer.pk %}" class="btn btn-primary">
-                <i class="ti ti-edit"></i> 编辑
-            </a>
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'repo_customer_list' %}">客户名录</a></li>
+                        <li class="breadcrumb-item active">{{ customer.company_name }}</li>
+                    </ol>
+                </nav>
+                <h2 class="page-title">{{ customer.short_name|default:customer.company_name }}</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <div class="btn-list">
+                    <a href="{% url 'repo_customer_edit' customer.pk %}" class="btn btn-primary">
+                        <i class="ti ti-edit me-1"></i> 编辑档案
+                    </a>
+                </div>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="page-body">
-    <div class="row g-4">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">基础信息</h3>
-                </div>
-                <div class="card-body">
-                    <div class="datagrid">
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">公司全称</div>
-                            <div class="datagrid-content">{{ customer.company_name }}</div>
+    <div class="container-xl">
+        <div class="row row-cards">
+
+            <!-- 1. 基础信息卡片 -->
+            <div class="col-lg-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <div class="subheader mb-3">公司档案</div>
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">公司全称</div>
+                                <div class="datagrid-content fw-bold">{{ customer.company_name }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">办公地址</div>
+                                <div class="datagrid-content small">{{ customer.address|default:"-" }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">社会信用代码</div>
+                                <div class="datagrid-content"><code>{{ customer.business_license_code|default:"-" }}</code></div>
+                            </div>
                         </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">公司简称</div>
-                            <div class="datagrid-content">{{ customer.short_name|default:"--" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">公司地址</div>
-                            <div class="datagrid-content">{{ customer.address|default:"--" }}</div>
+                        <div class="mt-4">
+                            <div class="subheader mb-2">客户简介</div>
+                            <p class="text-secondary small">{{ customer.description|default:"暂无描述" }}</p>
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">联系人信息</h3>
-                </div>
-                <div class="card-body">
-                    <div class="datagrid">
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">商务联系人</div>
-                            <div class="datagrid-content">{{ customer.contact_name|default:"--" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">手机</div>
-                            <div class="datagrid-content">{{ customer.phone|default:"--" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">邮箱</div>
-                            <div class="datagrid-content">{{ customer.email|default:"--" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">技术/质量对接人</div>
-                            <div class="datagrid-content">{{ customer.tech_contact|default:"--" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">技术联系电话</div>
-                            <div class="datagrid-content">{{ customer.tech_phone|default:"--" }}</div>
-                        </div>
+            <!-- 2. 关联系统账号 (核心重构：联系人展示) -->
+            <div class="col-lg-8">
+                <div class="card h-100">
+                    <div class="card-header"><h3 class="card-title">系统关联账号 ({{ contacts.count }})</h3></div>
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter">
+                            <thead>
+                                <tr>
+                                    <th>姓名/姓名</th>
+                                    <th>账号名</th>
+                                    <th>联系电话</th>
+                                    <th>邮箱</th>
+                                    <th>状态</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for contact in contacts %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <span class="avatar avatar-sm bg-blue-lt me-2">{{ contact.get_full_name|default:contact.username|slice:":1" }}</span>
+                                            <div class="font-weight-medium">{{ contact.get_full_name|default:contact.username }}</div>
+                                        </div>
+                                    </td>
+                                    <td class="text-muted small">{{ contact.username }}</td>
+                                    <td class="text-muted">{{ contact.phone|default:"-" }}</td>
+                                    <td class="text-muted small">{{ contact.email|default:"-" }}</td>
+                                    <td>
+                                        {% if contact.is_active %}
+                                            <span class="badge bg-green-lt">有效</span>
+                                        {% else %}
+                                            <span class="badge bg-red-lt">已禁用</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center py-4 text-muted">该公司暂未关联系统账号</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-footer text-muted small">
+                        * 可以在“用户管理”模块为客户创建账号并指派归属。
                     </div>
                 </div>
             </div>
-        </div>
 
-        <div class="col-12">
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title">关联项目 ({{ paginator.count }})</h3>
-                </div>
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter text-nowrap">
-                        <thead>
-                            <tr>
-                                <th>项目名称</th>
-                                <th style="width: 25%;">项目进度</th>
-                                <th>终端 (OEM)</th>
-                                <th>业务员</th>
-                                <th>创建时间</th>
-                                <th>进度更新时间</th>
-                                <th></th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for repo in page_obj %}
-                            <tr>
-                                <td><a href="{% url 'project_detail' repo.project.id %}">{{ repo.project.name }}</a></td>
-                                <td>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <div class="text-truncate" style="max-width: 120px;">
-                                            {% if repo.project.is_terminated %}
-                                                <span class="badge bg-red-lt">已终止</span>
-                                            {% elif repo.project.progress_percent == 100 %}
-                                                <span class="badge bg-green-lt">已完成</span>
-                                            {% else %}
-                                                <span class="text-blue small fw-bold">{{ repo.project.get_current_stage_display }}</span>
-                                            {% endif %}
+            <!-- 3. 关联项目展示 (保持原功能) -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">配套项目执行看板</h3></div>
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter text-nowrap">
+                            <thead>
+                                <tr>
+                                    <th>项目名称</th>
+                                    <th style="width: 25%;">进度轨迹</th>
+                                    <th>终端 (OEM)</th>
+                                    <th>业务负责人</th>
+                                    <th>进度更新</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for repo in page_obj %}
+                                <tr>
+                                    <td><a href="{% url 'project_detail' repo.project.id %}" class="fw-bold">{{ repo.project.name }}</a></td>
+                                    <td>
+                                        <div class="d-flex justify-content-between align-items-center mb-1">
+                                            <div class="text-truncate" style="max-width: 120px;">
+                                                {% if repo.project.is_terminated %}
+                                                    <span class="badge bg-red-lt">已终止</span>
+                                                {% elif repo.project.progress_percent == 100 %}
+                                                    <span class="badge bg-green-lt">已完成</span>
+                                                {% else %}
+                                                    <span class="text-blue small fw-bold">{{ repo.project.get_current_stage_display }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-muted small">{{ repo.project.progress_percent }}%</div>
                                         </div>
-                                        <div class="text-muted small">{{ repo.project.progress_percent }}%</div>
-                                    </div>
-                                    <div class="progress progress-sm">
-                                        <div class="progress-bar {% if repo.project.is_terminated %}bg-danger{% elif repo.project.progress_percent == 100 %}bg-success{% else %}bg-primary{% endif %}"
-                                             style="width: {{ repo.project.progress_percent }}%" role="progressbar" aria-valuenow="{{ repo.project.progress_percent }}" aria-valuemin="0" aria-valuemax="100">
+                                        <div class="progress progress-sm">
+                                            <div class="progress-bar bg-primary" style="width: {{ repo.project.progress_percent }}%"></div>
                                         </div>
-                                    </div>
-                                </td>
-                                <td>{{ repo.oem.short_name|default:"--" }}</td>
-                                <td>{{ repo.salesperson.name|default:"--" }}</td>
-                                <td>{{ repo.project.created_at|date:"Y-m-d" }}</td>
-                                <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"--" }}</td>
-                                <td class="text-end">
-                                    <a href="{% url 'repo_project_edit' repo.project.id %}" class="btn btn-sm btn-ghost-primary">档案</a>
-                                </td>
-                            </tr>
-                            {% empty %}
-                            <tr>
-                                <td colspan="7" class="text-center py-5">
-                                    <div class="empty">
-                                        <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
-                                        <p class="empty-title">暂无关联项目</p>
-                                        <p class="empty-subtitle text-muted">
-                                            可以在 <a href="{% url 'repo_list' %}">项目档案库</a> 中关联此客户。
-                                        </p>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                                    </td>
+                                    <td>{{ repo.oem.short_name|default:"-" }}</td>
+                                    <td>{{ repo.salesperson.get_full_name|default:repo.salesperson.username }}</td>
+                                    <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"-" }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr><td colspan="5" class="text-center py-5">暂无关联项目数据</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% if is_paginated %}
+                    <div class="card-footer">{% include 'apps/list_modules/paginator.html' %}</div>
+                    {% endif %}
                 </div>
-                {% if is_paginated %}
-                <div>
-                    {% include 'apps/list_modules/paginator.html' %}
-                </div>
-                {% endif %}
             </div>
         </div>
     </div>

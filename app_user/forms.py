@@ -11,7 +11,6 @@ class UserLoginForm(AuthenticationForm):
     remember_me = forms.BooleanField(label="在此设备上保持登录", required=False, widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}))
 
     def __init__(self, request=None, *args, **kwargs):
-        # 接收 request 参数，以便在 clean 方法中访问 session
         self.request = request
         super().__init__(request, *args, **kwargs)
         for field in self.fields.values():
@@ -19,19 +18,13 @@ class UserLoginForm(AuthenticationForm):
                 field.widget.attrs.update({'class': 'form-control'})
 
     def clean(self):
-        # 1. 先校验验证码
         if self.request:
             captcha = self.request.POST.get('captcha', '')
             session_captcha = self.request.session.get('captcha_code', '')
-            
             if not captcha:
                 raise forms.ValidationError("请输入图形验证码")
-            
             if not session_captcha or session_captcha.lower() != captcha.lower():
                 raise forms.ValidationError("图形验证码错误")
-
-        # 2. 再调用父类的 clean 方法校验用户名和密码
-        # 如果验证码错误，上面的 raise 会中断执行，从而跳过账号密码校验
         return super().clean()
 
 
@@ -41,7 +34,7 @@ class UserRegisterForm(UserCreationForm):
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = UserCreationForm.Meta.fields + ('email',)  # 注册时多填个邮箱
+        fields = UserCreationForm.Meta.fields + ('email',)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,19 +49,25 @@ class UserRegisterForm(UserCreationForm):
         return code
 
 
-# 3. 个人资料修改表单 (合并了原 User 和 Profile 逻辑)
+# 3. 个人资料修改表单
 class UserUpdateForm(forms.ModelForm):
     class Meta:
         model = User
         fields = [
             'first_name', 'last_name', 'email', 
-            'phone', 'company', 'job_title', 'address', 'description'
+            'phone', 'job_title', 'address', 'description',
+            'associated_customer', 'associated_oem' # 增加公司归属关联
         ]
+        widgets = {
+            'associated_customer': forms.Select(attrs={'class': 'form-select'}),
+            'associated_oem': forms.Select(attrs={'class': 'form-select'}),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})
+            if not field.widget.attrs.get('class'):
+                field.widget.attrs.update({'class': 'form-control'})
 
 
 # 4. 密码重置表单
@@ -86,7 +85,6 @@ class PasswordResetForm(forms.Form):
         cleaned_data = super().clean()
         new_password = cleaned_data.get("new_password")
         confirm_password = cleaned_data.get("confirm_password")
-
         if new_password and confirm_password and new_password != confirm_password:
             raise forms.ValidationError("两次输入的密码不一致")
         return cleaned_data

@@ -1,10 +1,32 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse
+from django.contrib.auth import get_user_model
 from .models import (
-    OEM, 
-    Customer, ProjectRepository, ProjectFile, OEMStandardFile, ExternalMemberActivity
+    OEM, Customer, ProjectRepository, ProjectFile, OEMStandardFile, ExternalMemberActivity
 )
+
+User = get_user_model()
+
+# ==========================================
+# 0. 关联账号内联 (核心重构：在公司页管理账号)
+# ==========================================
+class UserContactInline(admin.TabularInline):
+    model = User
+    fields = ('username', 'first_name', 'phone', 'user_type', 'is_active')
+    extra = 0
+    show_change_link = True
+    
+    def get_queryset(self, request):
+        return super().get_queryset(request).select_related('department')
+
+class CustomerUserInline(UserContactInline):
+    fk_name = 'associated_customer'
+    verbose_name = "关联客户联系人"
+
+class OEMUserInline(UserContactInline):
+    fk_name = 'associated_oem'
+    verbose_name = "关联主机厂对接人"
 
 
 # ==========================================
@@ -12,35 +34,42 @@ from .models import (
 # ==========================================
 @admin.register(ExternalMemberActivity)
 class ExternalMemberActivityAdmin(admin.ModelAdmin):
-    list_display = ('member_info', 'action', 'target_name', 'timestamp')
+    list_display = ('member_identity', 'action_label', 'target_name', 'timestamp')
     list_filter = ('action', 'timestamp')
     search_fields = ('member_token', 'target_name')
     readonly_fields = ('member_token', 'action', 'target_name', 'timestamp')
 
-    def member_info(self, obj):
-        customer = Customer.objects.filter(member_token=obj.member_token).first()
-        if customer: return format_html('<span class="badge bg-blue-lt">客户: {}</span>', customer.company_name)
-        oem = OEM.objects.filter(member_token=obj.member_token).first()
-        if oem: return format_html('<span class="badge bg-azure-lt">主机厂: {}</span>', oem.name)
-        if obj.member_token and obj.member_token.startswith('staff_'): return format_html('<span class="badge bg-green-lt">内部员工</span>')
+    def member_identity(self, obj):
+        # 现在的 member_token 对应 User 模型的 UUID
+        user = User.objects.filter(member_token=obj.member_token).select_related('associated_customer', 'associated_oem').first()
+        if user:
+            if user.associated_customer:
+                return format_html('<span class="badge bg-blue-lt">客户: {} ({})</span>', user.associated_customer.company_name, user.get_full_name() or user.username)
+            if user.associated_oem:
+                return format_html('<span class="badge bg-azure-lt">主机厂: {} ({})</span>', user.associated_oem.name, user.get_full_name() or user.username)
+            return format_html('<span class="badge bg-green-lt">内部员工: {}</span>', user.username)
         return f"未知令牌: {obj.member_token[:8]}"
     
-    member_info.short_description = '身份来源'
+    def action_label(self, obj):
+        color = 'red' if 'DOWNLOAD' in obj.action else 'azure'
+        return format_html('<span class="badge bg-{}-lt">{}</span>', color, obj.action)
+
+    member_identity.short_description = '访问者身份'
+    action_label.short_description = '行为'
 
 
 # ==========================================
-# 2. OEM管理 (用户画像)
+# 2. OEM管理 (公司级)
 # ==========================================
 @admin.register(OEM)
 class OEMAdmin(admin.ModelAdmin):
-    list_display = ('name', 'short_name', 'user', 'is_active', 'view_activity_link')
+    list_display = ('name', 'short_name', 'website', 'contact_count', 'created_at')
     search_fields = ('name', 'short_name')
-    autocomplete_fields = ['user']
+    inlines = [OEMUserInline] # 直接管理对接人
     
-    def view_activity_link(self, obj):
-        url = reverse('admin:app_repository_externalmemberactivity_changelist') + f"?q={obj.member_token}"
-        return format_html('<a href="{}">查看手册行为</a>', url)
-    view_activity_link.short_description = '手册活跃度'
+    def contact_count(self, obj):
+        return obj.members.count()
+    contact_count.short_description = '关联账号数'
 
 
 @admin.register(OEMStandardFile)
@@ -51,65 +80,39 @@ class OEMStandardFileAdmin(admin.ModelAdmin):
 
 
 # ==========================================
-# 3. 客户库管理 (用户画像)
+# 3. 客户公司管理
 # ==========================================
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('company_name', 'short_name', 'user', 'is_active', 'view_activity_link')
-    search_fields = ('company_name', 'short_name', 'contact_name')
-    autocomplete_fields = ['user']
-    actions = ['reset_password']
+    list_display = ('company_name', 'short_name', 'contact_count', 'created_at')
+    search_fields = ('company_name', 'short_name')
+    inlines = [CustomerUserInline] # 直接管理联系人
 
-    def view_activity_link(self, obj):
-        url = reverse('admin:app_repository_externalmemberactivity_changelist') + f"?q={obj.member_token}"
-        return format_html('<a href="{}">查看手册行为</a>', url)
-    view_activity_link.short_description = '手册活跃度'
-
-    @admin.action(description="重置选中客户的密码 (Sunwill@123)")
-    def reset_password(self, request, queryset):
-        for obj in queryset:
-            if obj.user:
-                obj.user.set_password('Sunwill@123')
-                obj.user.save()
-        self.message_user(request, "选中的客户密码已重置为: Sunwill@123")
+    def contact_count(self, obj):
+        return obj.members.count()
+    contact_count.short_description = '关联账号数'
 
 
 # ==========================================
-# 4. 项目档案管理 (直接基于 User 进行权限隔离)
+# 4. 项目商务档案管理
 # ==========================================
 class ProjectFileInline(admin.TabularInline):
     model = ProjectFile
     fields = ('file', 'name', 'file_type', 'version', 'description')
     extra = 1
 
-
 @admin.register(ProjectRepository)
 class ProjectRepositoryAdmin(admin.ModelAdmin):
     list_display = ('project', 'customer', 'oem', 'salesperson', 'material', 'updated_at')
     search_fields = ('project__name', 'customer__company_name', 'oem__name', 'product_name')
     list_filter = ('salesperson', 'updated_at')
-    autocomplete_fields = ['project', 'customer', 'oem', 'material', 'salesperson'] # salesperson 也是 autocomplete 了
+    autocomplete_fields = ['project', 'customer', 'oem', 'material', 'salesperson']
     inlines = [ProjectFileInline]
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        # 如果不是超级管理员，则判断当前用户是否被指定为负责业务员
+        if request.user.is_superuser: return qs
         return qs.filter(salesperson=request.user)
-
-    def formfield_for_foreignkey(self, db_field, request, **kwargs):
-        if not request.user.is_superuser:
-            if db_field.name == "customer":
-                customer_ids = ProjectRepository.objects.filter(salesperson=request.user).values_list('customer_id', flat=True).distinct()
-                kwargs["queryset"] = Customer.objects.filter(id__in=customer_ids)
-            elif db_field.name == "oem":
-                oem_ids = ProjectRepository.objects.filter(salesperson=request.user).values_list('oem_id', flat=True).distinct()
-                kwargs["queryset"] = OEM.objects.filter(id__in=oem_ids)
-            elif db_field.name == "salesperson":
-                from django.contrib.auth.models import User
-                kwargs["queryset"] = User.objects.filter(pk=request.user.pk)
-        return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
 @admin.register(ProjectFile)
@@ -118,9 +121,3 @@ class ProjectFileAdmin(admin.ModelAdmin):
     list_filter = ('file_type', 'uploaded_at')
     search_fields = ('repository__project__name', 'name', 'description')
     autocomplete_fields = ['repository']
-    
-    def get_queryset(self, request):
-        qs = super().get_queryset(request)
-        if request.user.is_superuser:
-            return qs
-        return qs.filter(repository__salesperson=request.user)

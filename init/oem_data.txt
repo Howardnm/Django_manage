@@ -1,69 +1,69 @@
-Tesla Motors;;特斯拉;;全球新能源汽车领导者，对轻量化、阻燃材料要求极高。;;Elon Musk;;13800000001;;tesla@example.com;;Palo Alto, CA
-Volkswagen Group;;大众;;大众集团，包括大众、奥迪、保时捷等，标准体系严谨 (VW 50180等)。;;Herbert Diess;;13800000002;;vw@example.com;;Wolfsburg, Germany
-General Motors;;通用;;通用汽车，包括别克、雪佛兰、凯迪拉克，GMW标准体系。;;Mary Barra;;13800000003;;gm@example.com;;Detroit, MI
-Ford Motor Company;;福特;;福特汽车，WSS标准体系。;;Jim Farley;;13800000004;;ford@example.com;;Dearborn, MI
-BMW Group;;宝马;;宝马集团，对内饰气味、环保材料有高标准。;;Oliver Zipse;;13800000005;;bmw@example.com;;Munich, Germany
-Mercedes-Benz Group;;奔驰;;梅赛德斯-奔驰，豪华车标杆，对表面处理和质感要求高。;;Ola Källenius;;13800000006;;mercedes@example.com;;Stuttgart, Germany
-Stellantis N.V.;;斯特兰蒂斯;;包括标致、雪铁龙、Jeep、菲亚特等。;;Carlos Tavares;;13800000007;;stellantis@example.com;;Amsterdam, Netherlands
-Toyota Motor Corporation;;丰田;;丰田汽车，TSM标准，强调成本与性能平衡，供应链稳定。;;Akio Toyoda;;13800000008;;toyota@example.com;;Toyota City, Japan
-Honda Motor Co., Ltd.;;本田;;本田汽车，HES标准。;;Toshihiro Mibe;;13800000009;;honda@example.com;;Tokyo, Japan
-Nissan Motor Co., Ltd.;;日产;;日产汽车，NES标准。;;Makoto Uchida;;13800000010;;nissan@example.com;;Yokohama, Japan
-Hyundai Motor Group;;现代起亚;;现代起亚集团，MS标准。;;Euisun Chung;;13800000011;;hyundai@example.com;;Seoul, South Korea
-BYD Auto;;比亚迪;;新能源龙头，垂直整合能力强，电池包材料需求大。;;王传福;;13800000012;;byd@example.com;;深圳，中国
-Geely Auto Group;;吉利;;吉利汽车，包括吉利、领克、极氪，沃尔沃技术协同。;;李书福;;13800000013;;geely@example.com;;杭州，中国
-Great Wall Motor;;长城;;长城汽车，哈弗、坦克、欧拉，SUV市场为主。;;魏建军;;13800000014;;gwm@example.com;;保定，中国
-Changan Automobile;;长安;;长安汽车，研发实力强。;;朱华荣;;13800000015;;changan@example.com;;重庆，中国
-Chery Automobile;;奇瑞;;奇瑞汽车，出口量大。;;尹同跃;;13800000016;;chery@example.com;;芜湖，中国
-SAIC Motor;;上汽;;上汽集团，包括荣威、名爵、智己。;;陈虹;;13800000017;;saic@example.com;;上海，中国
-GAC Group;;广汽;;广汽集团，传祺、埃安。;;曾庆洪;;13800000018;;gac@example.com;;广州，中国
-NIO Inc.;;蔚来;;高端纯电，对免喷涂、环保材料有创新需求。;;李斌;;13800000019;;nio@example.com;;上海，中国
-Li Auto;;理想;;增程/纯电，家庭用车定位。;;李想;;13800000020;;lixiang@example.com;;北京，中国
-XPeng Motors;;小鹏;;智能化标签。;;何小鹏;;13800000021;;xpeng@example.com;;广州，中国
-Xiaomi Auto;;小米;;生态链整合，对消费电子级外观要求高。;;雷军;;13800000022;;xiaomi@example.com;;北京，中国
-Leapmotor;;零跑;;全域自研，性价比高。;;朱江明;;13800000023;;leapmotor@example.com;;杭州，中国
-Seres;;赛力斯;;华为智选车合作伙伴 (问界)。;;张兴海;;13800000024;;seres@example.com;;重庆，中国
-Apple Inc.;;苹果;;消费电子风向标，对外观、环保(无卤)、再生材料要求极严。;;Tim Cook;;13800000025;;apple@example.com;;Cupertino, CA
-Huawei Technologies;;华为;;通讯基站、手机、智选车，对5G材料、散热材料需求大。;;任正非;;13800000026;;huawei@example.com;;深圳，中国
-Samsung Electronics;;三星;;手机、家电、半导体。;;Lee Jae-yong;;13800000027;;samsung@example.com;;Suwon, South Korea
-Dell Technologies;;戴尔;;PC/服务器，大量使用PCR回收材料。;;Michael Dell;;13800000028;;dell@example.com;;Round Rock, TX
-HP Inc.;;惠普;;打印机/PC，环保材料先行者。;;Enrique Lores;;13800000029;;hp@example.com;;Palo Alto, CA
-Lenovo Group;;联想;;PC全球第一。;;杨元庆;;13800000030;;lenovo@example.com;;北京，中国
-Sony Group;;索尼;;游戏机、视听设备，阻燃材料需求大。;;Kenichiro Yoshida;;13800000031;;sony@example.com;;Tokyo, Japan
-ZTE Corporation;;中兴;;通讯设备。;;李自学;;13800000032;;zte@example.com;;深圳，中国
-Foxconn (Hon Hai);;富士康;;全球最大代工厂，连接器/结构件用量巨大。;;刘扬伟;;13800000033;;foxconn@example.com;;Taipei, Taiwan
-Luxshare Precision;;立讯精密;;连接器龙头，Apple核心供应商。;;王来春;;13800000034;;luxshare@example.com;;东莞，中国
-Amphenol Corporation;;安费诺;;全球连接器巨头。;;Adam Norwitt;;13800000035;;amphenol@example.com;;Wallingford, CT
-TE Connectivity;;泰科;;连接器/传感器，汽车/工业应用为主。;;Terrence Curtin;;13800000036;;te@example.com;;Schaffhausen, Switzerland
-Molex;;莫仕;;连接器巨头。;;Joe Nelligan;;13800000037;;molex@example.com;;Lisle, IL
-DJI;;大疆;;无人机全球霸主，对轻量化、高强度材料有特殊需求。;;汪滔;;13800000038;;dji@example.com;;深圳，中国
-Midea Group;;美的;;白电、小家电，对PP、ABS、AS用量极大。;;方洪波;;13800000039;;midea@example.com;;佛山，中国
-Haier Group;;海尔;;海尔智家，冰洗空，全球化布局。;;张瑞敏;;13800000040;;haier@example.com;;青岛，中国
-Gree Electric;;格力;;格力电器，空调为主，自建模具/注塑能力强。;;董明珠;;13800000041;;gree@example.com;;珠海，中国
-Hisense Group;;海信;;电视、白电。;;周厚健;;13800000042;;hisense@example.com;;青岛，中国
-TCL Technology;;TCL;;电视、面板。;;李东生;;13800000043;;tcl@example.com;;惠州，中国
-Dyson;;戴森;;吸尘器/吹风机，对高光泽、耐摔、耐热材料有特殊要求。;;James Dyson;;13800000044;;dyson@example.com;;Malmesbury, UK
-Panasonic;;松下;;综合家电。;;Yuki Kusumi;;13800000045;;panasonic@example.com;;Osaka, Japan
-Whirlpool;;惠而浦;;欧美白电巨头。;;Marc Bitzer;;13800000046;;whirlpool@example.com;;Benton Harbor, MI
-Ecovacs Robotics;;科沃斯;;扫地机器人，对耐磨、防静电材料有需求。;;钱东奇;;13800000047;;ecovacs@example.com;;苏州，中国
-Roborock;;石头科技;;扫地机器人。;;昌敬;;13800000048;;roborock@example.com;;北京，中国
-Joyoung;;九阳;;小家电，豆浆机/破壁机，食品接触级材料。;;王旭宁;;13800000049;;joyoung@example.com;;杭州，中国
-Supor;;苏泊尔;;炊具/小家电，SEB集团旗下。;;苏显泽;;13800000050;;supor@example.com;;杭州，中国
-CATL;;宁德时代;;动力电池全球第一，电池包支架/端板/绝缘件。;;曾毓群;;13800000051;;catl@example.com;;宁德，中国
-Sungrow Power;;阳光电源;;光伏逆变器，耐候/阻燃材料。;;曹仁贤;;13800000052;;sungrow@example.com;;合肥，中国
-Enphase Energy;;Enphase;;微型逆变器。;;Badri Kothandaraman;;13800000053;;enphase@example.com;;Fremont, CA
-Ginlong (Solis);;锦浪;;逆变器。;;王一鸣;;13800000054;;ginlong@example.com;;宁波，中国
-GoodWe;;固德威;;逆变器。;;黄敏;;13800000055;;goodwe@example.com;;苏州，中国
-Pylontech;;派能;;户用储能。;;谈文;;13800000056;;pylontech@example.com;;上海，中国
-Trina Solar;;天合光能;;光伏组件，接线盒材料。;;高纪凡;;13800000057;;trina@example.com;;常州，中国
-Longi Green Energy;;隆基;;光伏组件。;;李振国;;13800000058;;longi@example.com;;西安，中国
-TTI Group;;创科实业;;Milwaukee, Ryobi，全球电动工具巨头，对尼龙增强材料需求大。;;Horst Julius Pudwill;;13800000059;;tti@example.com;;Hong Kong, China
-Stanley Black & Decker;;史丹利百得;;DeWalt，电动工具。;;Donald Allan Jr.;;13800000060;;stanley@example.com;;New Britain, CT
-Bosch Power Tools;;博世;;博世电动工具。;;Stefan Hartung;;13800000061;;bosch@example.com;;Gerlingen, Germany
-Makita;;牧田;;牧田电动工具。;;Munetoshi Goto;;13800000062;;makita@example.com;;Anjo, Japan
-Chervon;;泉峰;;EGO，高端园林工具。;;潘龙泉;;13800000063;;chervon@example.com;;南京，中国
-Globe Tools;;格力博;;Greenworks，园林工具。;;陈寅;;13800000064;;globetools@example.com;;常州，中国
-Mindray;;迈瑞;;监护仪/超声，对耐化学品(消毒液)材料要求高。;;李西廷;;13800000065;;mindray@example.com;;深圳，中国
-Philips Healthcare;;飞利浦医疗;;医疗设备。;;Roy Jakobs;;13800000066;;philips@example.com;;Amsterdam, Netherlands
-GE Healthcare;;GE医疗;;医疗设备。;;Peter Arduini;;13800000067;;ge@example.com;;Chicago, IL
-Siemens Healthineers;;西门子医疗;;医疗设备。;;Bernd Montag;;13800000068;;siemens@example.com;;Erlangen, Germany
-Yuwell;;鱼跃;;家用医疗器械。;;吴光明;;13800000069;;yuwell@example.com;;丹阳，中国
+Tesla Motors;;特斯拉;;全球新能源汽车领导者，对轻量化、阻燃材料要求极高。
+Volkswagen Group;;大众;;大众集团，包括大众、奥迪、保时捷等，标准体系严谨 (VW 50180等)。
+General Motors;;通用;;通用汽车，包括别克、雪佛兰、凯迪拉克，GMW标准体系。
+Ford Motor Company;;福特;;福特汽车，WSS标准体系。
+BMW Group;;宝马;;宝马集团，对内饰气味、环保材料有高标准。
+Mercedes-Benz Group;;奔驰;;梅赛德斯-奔驰，豪华车标杆，对表面处理和质感要求高。
+Stellantis N.V.;;斯特兰蒂斯;;包括标致、雪铁龙、Jeep、菲亚特等。
+Toyota Motor Corporation;;丰田;;丰田汽车，TSM标准，强调成本与性能平衡，供应链稳定。
+Honda Motor Co., Ltd.;;本田;;本田汽车，HES标准。
+Nissan Motor Co., Ltd.;;日产;;日产汽车，NES标准。
+Hyundai Motor Group;;现代起亚;;现代起亚集团，MS标准。
+BYD Auto;;比亚迪;;新能源龙头，垂直整合能力强，电池包材料需求大。
+Geely Auto Group;;吉利;;吉利汽车，包括吉利、领克、极氪，沃尔沃技术协同。
+Great Wall Motor;;长城;;长城汽车，哈弗、坦克、欧拉，SUV市场为主。
+Changan Automobile;;长安;;长安汽车，研发实力强。
+Chery Automobile;;奇瑞;;奇瑞汽车，出口量大。
+SAIC Motor;;上汽;;上汽集团，包括荣威、名爵、智己。
+GAC Group;;广汽;;广汽集团，传祺、埃安。
+NIO Inc.;;蔚来;;高端纯电，对免喷涂、环保材料有创新需求。
+Li Auto;;理想;;增程/纯电，家庭用车定位。
+XPeng Motors;;小鹏;;智能化标签。
+Xiaomi Auto;;小米;;生态链整合，对消费电子级外观要求高。
+Leapmotor;;零跑;;全域自研，性价比高。
+Seres;;赛力斯;;华为智选车合作伙伴 (问界)。
+Apple Inc.;;苹果;;消费电子风向标，对外观、环保(无卤)、再生材料要求极严。
+Huawei Technologies;;华为;;通讯基站、手机、智选车，对5G材料、散热材料需求大。
+Samsung Electronics;;三星;;手机、家电、半导体。
+Dell Technologies;;戴尔;;PC/服务器，大量使用PCR回收材料。
+HP Inc.;;惠普;;打印机/PC，环保材料先行者。
+Lenovo Group;;联想;;PC全球第一。
+Sony Group;;索尼;;游戏机、视听设备，阻燃材料需求大。
+ZTE Corporation;;中兴;;通讯设备。
+Foxconn (Hon Hai);;富士康;;全球最大代工厂，连接器/结构件用量巨大。
+Luxshare Precision;;立讯精密;;连接器龙头，Apple核心供应商。
+Amphenol Corporation;;安费诺;;全球连接器巨头。
+TE Connectivity;;泰科;;连接器/传感器，汽车/工业应用为主。
+Molex;;莫仕;;连接器巨头。
+DJI;;大疆;;无人机全球霸主，对轻量化、高强度材料有特殊需求。
+Midea Group;;美的;;白电、小家电，对PP、ABS、AS用量极大。
+Haier Group;;海尔;;海尔智家，冰洗空，全球化布局。
+Gree Electric;;格力;;格力电器，空调为主，自建模具/注塑能力强。
+Hisense Group;;海信;;电视、白电。
+TCL Technology;;TCL;;电视、面板。
+Dyson;;戴森;;吸尘器/吹风机，对高光泽、耐摔、耐热材料有特殊要求。
+Panasonic;;松下;;综合家电。
+Whirlpool;;惠而浦;;欧美白电巨头。
+Ecovacs Robotics;;科沃斯;;扫地机器人，对耐磨、防静电材料有需求。
+Roborock;;石头科技;;扫地机器人。
+Joyoung;;九阳;;小家电，豆浆机/破壁机，食品接触级材料。
+Supor;;苏泊尔;;炊具/小家电，SEB集团旗下。
+CATL;;宁德时代;;动力电池全球第一，电池包支架/端板/绝缘件。
+Sungrow Power;;阳光电源;;光伏逆变器，耐候/阻燃材料。
+Enphase Energy;;Enphase;;微型逆变器。
+Ginlong (Solis);;锦浪;;逆变器。
+GoodWe;;固德威;;逆变器。
+Pylontech;;派能;;户用储能。
+Trina Solar;;天合光能;;光伏组件，接线盒材料。
+Longi Green Energy;;隆基;;光伏组件。
+TTI Group;;创科实业;;Milwaukee, Ryobi，全球电动工具巨头，对尼龙增强材料需求大。
+Stanley Black & Decker;;史丹利百得;;DeWalt，电动工具。
+Bosch Power Tools;;博世;;博世电动工具。
+Makita;;牧田;;牧田电动工具。
+Chervon;;泉峰;;EGO，高端园林工具。
+Globe Tools;;格力博;;Greenworks，园林工具。
+Mindray;;迈瑞;;监护仪/超声，对耐化学品(消毒液)材料要求高。
+Philips Healthcare;;飞利浦医疗;;医疗设备。
+GE Healthcare;;GE医疗;;医疗设备。
+Siemens Healthineers;;西门子医疗;;医疗设备。
+Yuwell;;鱼跃;;家用医疗器械。

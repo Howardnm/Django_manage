@@ -8,30 +8,30 @@ from common_utils.validators import validate_file_size
 
 
 # ==========================================
-# 1. 主机厂 (OEM) - 用户画像
+# 1. 主机厂 (OEM) - 顶级业务实体
 # ==========================================
 class OEM(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
-                                related_name='oem_profile', verbose_name="关联系统账号")
-    member_token = models.UUIDField("成员唯一令牌", default=uuid.uuid4, editable=False, unique=True)
-    is_active = models.BooleanField("账号启用状态", default=True)
-
-    name = models.CharField("主机厂名称", max_length=100, unique=True)
-    short_name = models.CharField("简称", max_length=20, blank=True)
-    description = models.TextField("描述/备注", blank=True)
+    """
+    主机厂公司档案 (如：吉利汽车、长城汽车)
+    """
+    name = models.CharField("主机厂全称", max_length=100, unique=True)
+    short_name = models.CharField("品牌简称", max_length=20, blank=True)
+    logo = models.ImageField("品牌Logo", upload_to='oem/logos/', blank=True, null=True)
+    description = models.TextField("公司简介/备注", blank=True)
     website = models.URLField("官方网站", blank=True)
-    contact_name = models.CharField("主要联系人", max_length=50, blank=True)
-    contact_phone = models.CharField("联系电话", max_length=50, blank=True)
-    contact_email = models.EmailField("电子邮箱", blank=True)
-    address = models.CharField("公司地址", max_length=200, blank=True)
     
+    # 统计信息
+    view_count = models.PositiveIntegerField("查阅次数", default=0)
+    created_at = models.DateTimeField("录入时间", auto_now_add=True)
+
     def __str__(self): return self.short_name or self.name
     class Meta:
         verbose_name = "主机厂"
-        verbose_name_plural = "主机厂库"
+        verbose_name_plural = "1. 主机厂名录"
 
 
 class OEMStandardFile(models.Model):
+    """主机厂标准文件 (如：Q/JL 材质规范)"""
     oem = models.ForeignKey(OEM, on_delete=models.CASCADE, related_name='standard_files', verbose_name="所属主机厂")
     name = models.CharField("文件名称", max_length=100, blank=True)
     file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
@@ -42,65 +42,52 @@ class OEMStandardFile(models.Model):
     version = models.PositiveIntegerField("版本号", default=1)
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        super().save(*args, **kwargs)
-        if is_new and self.file:
+        if not self.name and self.file:
             self.name = os.path.basename(self.file.name)
-            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
+        super().save(*args, **kwargs)
 
-    def __str__(self): return f"{self.name} (V{self.version})"
+    def __str__(self): return self.name
     class Meta:
-        verbose_name = "主机厂标准文件"
-        verbose_name_plural = "主机厂标准文件库"
+        verbose_name = "主机厂标准"
         ordering = ['-uploaded_at']
 
 
 # ==========================================
-# 2. 客户库 - 用户画像
+# 2. 客户公司 (Tier 1/2) - 业务实体
 # ==========================================
 class Customer(models.Model):
-    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
-                                related_name='customer_profile', verbose_name="关联系统账号")
-    member_token = models.UUIDField("成员唯一令牌", default=uuid.uuid4, editable=False, unique=True)
-    is_active = models.BooleanField("账号启用状态", default=True)
-
+    """
+    直接客户公司档案 (如：延锋、马瑞利、华阳)
+    """
     company_name = models.CharField("公司全称", max_length=100, unique=True)
-    short_name = models.CharField("简称", max_length=20, blank=True)
-    address = models.CharField("地址", max_length=200, blank=True)
-    contact_name = models.CharField("商务联系人", max_length=50, blank=True)
-    phone = models.CharField("手机", max_length=20, blank=True)
-    email = models.EmailField("邮箱", blank=True)
+    short_name = models.CharField("公司简称", max_length=20, blank=True)
+    logo = models.ImageField("公司Logo", upload_to='customer/logos/', blank=True, null=True)
+    
+    address = models.CharField("公司办公地址", max_length=200, blank=True)
+    business_license_code = models.CharField("统一社会信用代码", max_length=50, blank=True)
+    description = models.TextField("客户简介", blank=True)
+    
+    created_at = models.DateTimeField("录入时间", auto_now_add=True)
     
     def __str__(self): return self.short_name or self.company_name
     class Meta:
-        verbose_name = "客户"
-        verbose_name_plural = "客户库"
+        verbose_name = "客户公司"
+        verbose_name_plural = "2. 客户名录"
 
 
 # ==========================================
-# 3. 外部会员行为回流记录
-# ==========================================
-class ExternalMemberActivity(models.Model):
-    member_token = models.CharField("会员令牌", max_length=100, db_index=True)
-    action = models.CharField("操作类型", max_length=50)
-    target_name = models.CharField("目标牌号", max_length=100)
-    timestamp = models.DateTimeField("发生时间")
-    def __str__(self): return f"{self.member_token} - {self.action} - {self.target_name}"
-    class Meta:
-        verbose_name = "外部行为日志"
-        verbose_name_plural = "外部行为审计"
-        ordering = ['-timestamp']
-
-
-# ==========================================
-# 4. 项目档案 - 核心业务模型
+# 3. 项目商务档案 - 核心关联
 # ==========================================
 class ProjectRepository(models.Model):
+    """
+    项目档案：在此处关联具体的 项目、客户公司、主机厂。
+    """
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='repository', verbose_name="关联项目")
-    customer = models.ForeignKey('Customer', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户 (Tier1)")
+    
+    # 商业三要素：在此处产生交集
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户 (Tier1)")
     oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="终端主机厂 (OEM)")
     
-    # 【核心调整】：salesperson 现在直接指向 User 模型 (即内部系统用户)
     salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
                                     related_name='managed_project_repos', verbose_name="负责业务员")
     
@@ -108,7 +95,6 @@ class ProjectRepository(models.Model):
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
     material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用材料")
 
-    # 【加回缺失字段】
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
 
@@ -117,7 +103,7 @@ class ProjectRepository(models.Model):
     def __str__(self): return f"{self.project.name} 档案"
     class Meta:
         verbose_name = "项目档案"
-        verbose_name_plural = "项目档案"
+        verbose_name_plural = "3. 项目商务档案"
         ordering = ['-updated_at']
 
 
@@ -132,14 +118,22 @@ class ProjectFile(models.Model):
     version = models.PositiveIntegerField("版本号", default=1)
 
     def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        super().save(*args, **kwargs)
-        if is_new and self.file:
+        if not self.name and self.file:
             self.name = os.path.basename(self.file.name)
-            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
+        super().save(*args, **kwargs)
 
     def __str__(self): return f"{self.name} (V{self.version})"
     class Meta:
         verbose_name = "项目文件"
         verbose_name_plural = "项目文件库"
         ordering = ['-uploaded_at']
+
+# 外部行为回流记录
+class ExternalMemberActivity(models.Model):
+    member_token = models.CharField("会员令牌", max_length=100, db_index=True)
+    action = models.CharField("操作类型", max_length=50)
+    target_name = models.CharField("目标牌号", max_length=100)
+    timestamp = models.DateTimeField("发生时间")
+    class Meta:
+        verbose_name = "外部行为日志"
+        ordering = ['-timestamp']
