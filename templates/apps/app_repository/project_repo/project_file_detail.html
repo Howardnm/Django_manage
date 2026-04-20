@@ -53,7 +53,7 @@
                                         <tr>
                                             <td>
                                                 <a href="{% url 'secure_download' 'app_repository' 'ProjectFile' file.id 'file' %}" target="_blank">
-                                                    {{ file.name|default:file.filename }}
+                                                    {{ file.name|default:file.file.name }}
                                                 </a>
                                             </td>
                                             <td class="text-secondary">{{ file.get_file_type_display }}</td>
@@ -118,7 +118,7 @@
                                                         <tr>
                                                             <td>
                                                                 <a href="{% url 'secure_download' 'app_repository' 'ProjectFile' file.id 'file' %}" target="_blank">
-                                                                    {{ file.name|default:file.filename }}
+                                                                    {{ file.name|default:file.file.name }}
                                                                 </a>
                                                             </td>
                                                             <td>{{ file.get_file_type_display }}</td>

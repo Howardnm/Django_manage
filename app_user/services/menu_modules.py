@@ -19,7 +19,7 @@ class MenuModule:
     @staticmethod
     def get_project():
         return {
-            "name": "项目管理系统",
+            "name": "项目管理中心",
             "icon": "ti-subtask",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
             "url_name": "project_list",
@@ -31,13 +31,13 @@ class MenuModule:
     @staticmethod
     def get_repository():
         return {
-            "name": "项目档案中心",
+            "name": "客户档案中心",
             "icon": "ti-archive",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
             "url_name": "repo_list",
             "sub_items": [
-                {"name": "项目商务档案", "url_name": "repo_list"},
-                {"name": "客户名录库", "url_name": "repo_customer_list"},
+                {"name": "项目档案库", "url_name": "repo_list"},
+                {"name": "客户资料库", "url_name": "repo_customer_list"},
                 {"name": "主机厂(OEM)库", "url_name": "repo_oem_list"},
             ]
         }
@@ -45,7 +45,7 @@ class MenuModule:
     @staticmethod
     def get_basic_research():
         return {
-            "name": "基础预研系统",
+            "name": "基础预研中心",
             "icon": "ti-flask",
             "visible_to": IdentityConfig.RND_ONLY,
             "url_name": "basic_research_list",
@@ -63,8 +63,9 @@ class MenuModule:
             "url_name": "material_list",
             "sub_items": [
                 {"name": "成品材料列表", "url_name": "material_list"},
-                {"name": "材料分类管理", "url_name": "type_list"},
-                {"name": "应用场景管理", "url_name": "scenario_list"},
+                {"name": "材料类型分类", "url_name": "type_list"},
+                {"name": "材料特性分类", "url_name": "characteristic_list"},
+                {"name": "应用场景分类", "url_name": "scenario_list"},
                 {"name": "测试标准配置", "url_name": "test_config_list"},
             ]
         }
@@ -84,7 +85,7 @@ class MenuModule:
     @staticmethod
     def get_process():
         return {
-            "name": "生产工艺系统",
+            "name": "生产工艺库",
             "icon": "ti-settings-automation",
             "visible_to": IdentityConfig.TECH_CORE,
             "url_name": "process_profile_list",
@@ -98,14 +99,14 @@ class MenuModule:
     @staticmethod
     def get_raw_material():
         return {
-            "name": "原材料数据库",
+            "name": "原材料/供应商",
             "icon": "ti-packages",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
             "url_name": "raw_material_list",
             "sub_items": [
                 {"name": "原材料列表", "url_name": "raw_material_list"},
-                {"name": "原材料类型管理", "url_name": "raw_type_list"},
-                {"name": "供应商档案", "url_name": "raw_supplier_list"},
+                {"name": "原材料类型分类", "url_name": "raw_type_list"},
+                {"name": "供应商资料库", "url_name": "raw_supplier_list"},
             ]
         }
 
@@ -117,7 +118,7 @@ class MenuModule:
             "visible_to": [IdentityConfig.R_ADMIN],
             "url_name": "project_score_rule_list",
             "sub_items": [
-                {"name": "绩效评分规则", "url_name": "project_score_rule_list"},
+                {"name": "项目绩效评分规则", "url_name": "project_score_rule_list"},
                 {"name": "进入底层管理", "url_name": "admin:index"},
             ]
         }
