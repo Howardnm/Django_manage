@@ -1,25 +1,62 @@
-{% extends "base.html" %}
 {% load static %}
-
-{% block title %}无权限访问{% endblock %}
-
-{% block content %}
-<div class="page page-center">
-    <div class="container-tight py-4">
-        <div class="empty">
-            <div class="empty-header">403</div>
-            <p class="empty-title">您没有权限访问此页面</p>
-            <p class="empty-subtitle text-muted">
-                很抱歉，您没有足够的权限来查看您请求的资源。
-                请联系管理员获取更多权限，或返回首页。
-            </p>
-            <div class="empty-action">
-                <a href="{% url 'panel_home' %}" class="btn btn-primary">
-                    <i class="ti ti-arrow-left me-2"></i>
-                    返回首页
-                </a>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 【修复】添加 Viewport Meta 标签以适配移动端 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>无权限访问</title>
+    <!-- 引入 CSS (Tabler & Icons) -->
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+    <!-- 1. 引入 Tom Select 专用 CSS (适配 Bootstrap 5) -->
+    <link rel="stylesheet" href="{% static 'tom-select/core-2.2.2/dist/css/tom-select.bootstrap5.min.css' %}">
+    <!-- Tabler Icons Webfont -->
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
+    <!-- 引入 HTMX, 建议放在 <head> 中 -->
+    <script src="{% static 'htmx.org/core-2.0.8/dist/htmx.min.js' %}"></script>
+    {% block extra_css %}{% endblock %}
+</head>
+<div class="page">
+    <div class="page-wrapper">
+        <div class="page-body">
+            <div class="container-xl">
+                <div class="page page-center">
+                    <div class="container-tight py-4">
+                        <div class="empty">
+                            <div class="empty-header">403</div>
+                            <p class="empty-title">您没有权限访问此页面</p>
+                            <p class="empty-subtitle text-muted">
+                                很抱歉，您没有足够的权限来查看您请求的资源。
+                                请联系管理员获取更多权限，或返回首页。
+                            </p>
+                            <div class="empty-action">
+                                <a href="{% url 'panel_home' %}" class="btn btn-primary">
+                                    <i class="ti ti-arrow-left me-2"></i>
+                                    返回首页
+                                </a>
+                                {% if request.user.is_authenticated %}
+                                <form action="{% url 'logout' %}" method="post" class="d-inline ms-3">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-outline-danger">
+                                        <i class="ti ti-logout me-2"></i>
+                                        退出登录
+                                    </button>
+                                </form>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
-{% endblock %}
+<!-- 引入 JS -->
+<!-- 2. 配置 Django CSRF (放在 body 标签最底部) -->
+<script>
+    document.body.addEventListener('htmx:configRequest', (event) => {
+        event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+    });
+</script>
+<script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+<script src="{% static 'tom-select/core-2.2.2/dist/js/tom-select.complete.min.js' %}"></script>

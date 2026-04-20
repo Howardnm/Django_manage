@@ -1,5 +1,7 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
+from django.shortcuts import redirect
+from django.conf import settings
 from .models import User
 
 class IdentityConfig:
@@ -15,10 +17,10 @@ class IdentityConfig:
 
     # 技术核心：涉及研发、工艺、配方的全员
     TECH_CORE = [R_ENGINEER, R_PROCESS, R_ADMIN]
-    
+
     # 纯技术研发
     RND_ONLY = [R_ENGINEER, R_ADMIN]
-    
+
     # 纯工艺工程
     PROCESS_ONLY = [R_PROCESS, R_ADMIN]
 
@@ -33,12 +35,15 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     """
     统一权限架构控制 Mixin (4D-Security-Logic)。
     """
+    # 允许不定义原生权限码，此时仅要求登录
+    permission_required = []
+
     # 维度1：负责人关联字段名列表
     user_link_fields = ['manager', 'creator', 'user', 'owner', 'uploader', 'salesperson']
     
     # 维度2：最低用户等级要求
     min_level_required = 1
-    
+
     # 维度3：部门隔离开关
     enforce_dept_isolation = True
 
@@ -55,7 +60,12 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         # Django 原生权限 (Dim: Perms)
         if not super().has_permission(): return False
 
-        # 用户等级 (Dim: Level)
+        # 1. Django 原生权限 (仅在定义了非空权限码时执行)
+        perms = self.get_permission_required()
+        if perms: # 只有当 permission_required 不为空时才执行原生权限检查
+            if not super().has_permission(): return False
+        
+        # 2. 用户等级
         if user.user_level < self.min_level_required: return False
 
         # 角色判定 (Dim: Type)
@@ -64,10 +74,26 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
 
         return True
 
+    def handle_no_permission(self):
+        """
+        权限不足时的智能处理逻辑：
+        1. 未登录 -> 跳转登录页
+        2. 已登录但无权 -> 跳转到 403 友好提示页
+        """
+        if not self.request.user.is_authenticated:
+            return super().handle_no_permission()
+        
+        # 如果已登录但无权，跳转到 settings 中定义的无权提示地址
+        # 如果没定义，默认跳回首页并带上错误提示
+        perm_denied_url = getattr(settings, 'LOGIN_URL', 'panel_home')
+        from django.contrib import messages
+        messages.error(self.request, "您的账号权限不足，无法访问该页面。")
+        return redirect(perm_denied_url)
+
     def get_queryset(self):
         """数据范围过滤引擎"""
         user = self.request.user
-        
+
         # 1. 自动获取 QuerySet (容错处理)
         if hasattr(self, 'queryset') and self.queryset is not None:
             qs = self.queryset.all()

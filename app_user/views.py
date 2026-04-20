@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
 from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, PasswordResetForm
+from .mixins import IdentityConfig
 from .utils import generate_captcha, send_verification_email, send_register_success_email
 
 User = get_user_model()
@@ -36,6 +37,16 @@ class CustomLoginView(LoginView):
         return context
 
     def form_valid(self, form):
+        # --- 核心拦截：只允许内部成员用户登录此管理系统 ---
+        user = form.get_user()
+        # 外部角色 (CUSTOMER, OEM) 禁止登录此后台管理系统
+        # 他们应该前往电子手册系统 (app_catalog)
+        allowed_roles = IdentityConfig.INTERNAL_STAFF
+        
+        if not user.is_superuser and user.user_type not in allowed_roles:
+            messages.error(self.request, "您的账号身份不属于内部成员，无法访问管理系统。")
+            return self.form_invalid(form)
+
         # 处理 "保持登录" 逻辑
         remember_me = form.cleaned_data.get('remember_me')
         if not remember_me:
@@ -48,9 +59,7 @@ class CustomLoginView(LoginView):
         return super().form_valid(form)
 
     def form_invalid(self, form):
-        # 检查是否被 axes 锁定
-        response = super().form_invalid(form)
-        return response
+        return super().form_invalid(form)
 
 
 # 生成图形验证码视图
@@ -98,7 +107,7 @@ def verify_browser(request):
         y_coords = {point['y'] for point in trajectory}
         if len(y_coords) < 3: # 至少有3个不同的Y坐标，允许轻微的直线抖动
             return JsonResponse({'status': 'fail', 'message': '验证异常，请刷新页面重试'}, status=400)
-            
+
         # 5. X轴非线性验证 (简易版)
         # 检查x坐标是否是单调递增的，防止来回拖动
         x_coords = [point['x'] for point in trajectory]
@@ -111,7 +120,7 @@ def verify_browser(request):
         # 关键步骤：立即销毁令牌，防止重放
         if 'shield_nonce' in request.session:
             del request.session['shield_nonce']
-            
+
         request.session['access_granted'] = True
         return JsonResponse({'status': 'success'})
 
@@ -126,7 +135,7 @@ def send_email_code(request):
     # 我们可以通过 request.GET.get('type') 来区分是注册还是重置
 
     action_type = request.GET.get('type', 'register')
-    
+
     if action_type == 'register':
         if not getattr(settings, 'REGISTER_INVITE_CODE', None):
             return JsonResponse({'status': 'error', 'msg': '系统暂未开放注册'})
@@ -137,7 +146,7 @@ def send_email_code(request):
     # 1. 校验图形验证码
     if not captcha:
         return JsonResponse({'status': 'error', 'msg': '请输入图形验证码'})
-    
+
     if request.session.get('captcha_code', '').lower() != captcha.lower():
         return JsonResponse({'status': 'error', 'msg': '图形验证码错误'})
 
@@ -150,7 +159,7 @@ def send_email_code(request):
     client_ip = get_client_ip(request)
     cache_key_ip = f"email_code_limit_ip_{client_ip}"
     cache_key_email = f"email_code_limit_email_{email}"
-    
+
     if cache.get(cache_key_ip) or cache.get(cache_key_email):
         return JsonResponse({'status': 'error', 'msg': '发送过于频繁，请稍后再试'})
 
@@ -167,14 +176,14 @@ def send_email_code(request):
 
     # 4. 发送验证码
     code, success, error_msg = send_verification_email(email)
-    
+
     if not success:
         return JsonResponse({'status': 'error', 'msg': f'邮件发送失败: {error_msg}'})
-    
+
     # 设置缓存，限制频率 (60秒)
     cache.set(cache_key_ip, True, 60)
     cache.set(cache_key_email, True, 60)
-    
+
     # 使用不同的 session key 区分注册和重置
     if action_type == 'register':
         request.session['register_email_code'] = code
@@ -182,7 +191,7 @@ def send_email_code(request):
     else:
         request.session['reset_email_code'] = code
         request.session['reset_email'] = email
-        
+
     return JsonResponse({'status': 'success', 'msg': '验证码已发送'})
 
 
@@ -278,12 +287,12 @@ class PasswordResetView(FormView):
             user.set_password(new_password)
             user.save()
             messages.success(self.request, "密码重置成功，请使用新密码登录")
-            
+
             if 'reset_email_code' in self.request.session:
                 del self.request.session['reset_email_code']
             if 'reset_email' in self.request.session:
                 del self.request.session['reset_email']
-            
+
         except User.DoesNotExist:
             form.add_error('email', "该邮箱未注册用户")
             return self.form_invalid(form)
