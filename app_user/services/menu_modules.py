@@ -12,7 +12,8 @@ class MenuModule:
             "url_name": "panel_home",
             "sub_items": [
                 {"name": "项目全景看板", "url_name": "project_overview"},
-                {"name": "业务业绩榜单", "url_name": "project_performance_list"},
+                {"name": "客户行为分析", "url_name": "customer_activity_overview"}, # 【新增】
+                {"name": "成员绩效榜单", "url_name": "user_performance_list"},
             ]
         }
 

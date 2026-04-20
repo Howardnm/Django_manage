@@ -1,29 +1,30 @@
 from django.views import View
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.http import Http404, StreamingHttpResponse
 from ..models import CatalogProduct, VisitorLog
 from ..services.material_api import client
-from ..api.views import push_member_activity_feedback
+from ..services.feedback_service import FeedbackService
 
 class MaterialDownloadView(View):
     """
     中转下载视图：作为代理向主系统请求文件流。
-    满足后期独立部署需求，不暴露主系统物理文件地址。
+    采用对象模块化 Service 进行通信和行为回传。
     """
     def get(self, request, pk, file_type):
         # 1. 查找产品，确保已发布
         product = get_object_or_404(CatalogProduct, pk=pk, is_published=True)
-        member_token = self.request.session.get('member_token')
+        member_token = request.session.get('member_token')
         
-        # 2. 身份校验逻辑 (如果是独立运行系统，此处需根据 CatalogMember 逻辑检查)
-        # 此处假设只有登录会员或在特定 session 下才能下载
-        # if not member_token:
-        #     raise PermissionDenied("请先登录后下载技术文档")
+        # 2. 核心准入：必须是已登录会员
+        if not member_token:
+            # 记录尝试下载但未登录的行为 (可选)
+            login_url = redirect('app_catalog:login').url
+            return redirect(f"{login_url}?next={request.path}")
 
-        # 3. 记录日志 (本地)
+        # 3. 行为审计 (本地与主系统)
         VisitorLog.objects.create(
             product=product,
-            visitor_ip=self.request.META.get('REMOTE_ADDR'),
+            visitor_ip=request.META.get('REMOTE_ADDR'),
             member_token=member_token,
             action='DOWNLOAD'
         )
@@ -31,25 +32,23 @@ class MaterialDownloadView(View):
         product.download_count += 1
         product.save(update_fields=['download_count'])
         
-        # 4. 回传反馈给主系统
-        if member_token:
-            action_desc = f"DOWNLOAD_{file_type.upper()}"
-            push_member_activity_feedback(member_token, action_desc, product.display_name)
+        # 使用模块化 Service 回传下载行为
+        FeedbackService.push_activity(member_token, f"DOWNLOAD_{file_type.upper()}", product.display_name)
         
-        # 5. 从主系统获取流
-        # 注意：这里调用的是我们刚刚在 client 增加的方法
-        response = client.stream_file_download(product.remote_material_id, file_type)
+        # 4. 获取远程流
+        # 调用低代码语义化方法
+        response = client.request_file_stream(product.remote_material_id, file_type)
         
-        if not response:
-            raise Http404(f"主系统未提供或无权访问该 {file_type.upper()} 文件")
+        if not response or response.status_code != 200:
+            raise Http404(f"主系统当前无法提供 {file_type.upper()} 文件，请稍后再试。")
 
-        # 6. 流式中转给最终用户
+        # 5. 安全中转传输 (Streaming)
         proxy_response = StreamingHttpResponse(
             response.iter_content(chunk_size=8192),
-            content_type=response.headers.get('Content-Type')
+            content_type=response.headers.get('Content-Type', 'application/pdf')
         )
         
-        # 提取原文件名称或构建新名称
+        # 保持文件名一致性
         content_disposition = response.headers.get('Content-Disposition')
         if content_disposition:
             proxy_response['Content-Disposition'] = content_disposition

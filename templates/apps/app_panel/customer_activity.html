@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-users me-2"></i>外部客户行为全览
+                </h2>
+                <div class="text-muted mt-1">实时掌握电子手册 (App Catalog) 用户的访问与下载偏好</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-deck row-cards">
+
+            <!-- 1. 核心指标卡片 -->
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="subheader">累计浏览量</div>
+                        </div>
+                        <div class="h1 mb-3">{{ role_distribution.VIEW }}</div>
+                        <div class="d-flex mb-2">
+                            <div>浏览趋势 (30天)</div>
+                        </div>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar bg-primary" style="width: 70%" role="progressbar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card">
+                    <div class="card-body">
+                        <div class="d-flex align-items-center">
+                            <div class="subheader">累计下载量</div>
+                        </div>
+                        <div class="h1 mb-3 text-red">{{ role_distribution.DOWNLOAD }}</div>
+                        <div class="d-flex mb-2">
+                            <div>下载转化率</div>
+                        </div>
+                        <div class="progress progress-sm">
+                            <div class="progress-bar bg-red" style="width: 45%" role="progressbar"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. 热门排行：受关注牌号 -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">最受关注牌号 TOP 10</h3>
+                    </div>
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                            <tr>
+                                <th>牌号名称</th>
+                                <th colspan="2">浏览热度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in hot_materials %}
+                            <tr>
+                                <td>{{ item.target_name }}</td>
+                                <td>{{ item.total_count }}</td>
+                                <td class="w-50">
+                                    <div class="progress progress-xs">
+                                        <div class="progress-bar bg-primary" style="width: {{ item.total_count }}%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">暂无行为数据</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 3. 热门排行：高频下载 -->
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">热门下载文档排行</h3>
+                    </div>
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                            <tr>
+                                <th>牌号名称</th>
+                                <th colspan="2">下载次数</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in hot_downloads %}
+                            <tr>
+                                <td>{{ item.target_name }}</td>
+                                <td>{{ item.download_count }}</td>
+                                <td class="w-50">
+                                    <div class="progress progress-xs">
+                                        <div class="progress-bar bg-red" style="width: {{ item.download_count }}%"></div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" class="text-center text-muted">暂无下载记录</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 4. 实时活动流 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">实时客户活动流 (最新50条)</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-vcenter card-table">
+                            <thead>
+                                <tr>
+                                    <th>发生时间</th>
+                                    <th>会员令牌</th>
+                                    <th>操作类型</th>
+                                    <th>目标对象</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for activity in activities %}
+                                <tr>
+                                    <td class="text-secondary">{{ activity.timestamp|date:"Y-m-d H:i:s" }}</td>
+                                    <td>
+                                        <code class="text-blue">{{ activity.member_token|truncatechars:12 }}</code>
+                                    </td>
+                                    <td>
+                                        {% if 'DOWNLOAD' in activity.action %}
+                                            <span class="badge bg-red-lt">文件下载</span>
+                                        {% else %}
+                                            <span class="badge bg-azure-lt">页面浏览</span>
+                                        {% endif %}
+                                        <small class="ms-1 text-muted">{{ activity.action }}</small>
+                                    </td>
+                                    <td class="fw-bold">{{ activity.target_name }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -6,70 +6,83 @@ from functools import lru_cache
 logger = logging.getLogger(__name__)
 
 class MaterialApiClient:
+    """
+    电子手册 API 客户端服务：
+    负责与主系统进行安全、可靠的远程数据通信。
+    采用“低代码方法名”设计，视图层只需关心业务动作。
+    """
+    
     def __init__(self):
+        # 1. 自动从系统配置中提取锚点
         self.base_url = getattr(settings, 'REMOTE_API_BASE_URL', 'http://127.0.0.1:8000/api/material/')
-        self.timeout = getattr(settings, 'REMOTE_API_TIMEOUT', 10)
+        self.timeout = getattr(settings, 'REMOTE_API_TIMEOUT', 15) # 稍微延长超时时间
         self.api_token = getattr(settings, 'INTERNAL_API_TOKEN', '')
+        
+        # 2. 注入标准安全请求头
         self.headers = {
             'Accept': 'application/json',
-            'X-Internal-Client': 'Catalog-App',
+            'X-Internal-Client': 'Catalog-Portal-v2',
             'X-Internal-Api-Token': self.api_token
         }
 
-    def _post(self, endpoint, data=None):
-        url = f"{self.base_url}{endpoint.strip('/')}/"
-        try:
-            return requests.post(url, json=data, headers=self.headers, timeout=self.timeout)
-        except Exception as e:
-            logger.error(f"API POST 失败 [{url}]: {str(e)}")
-            return None
+    # --- 底层通信引擎 (模块化) ---
 
-    def _get(self, endpoint, params=None):
+    def _execute_request(self, method, endpoint, **kwargs):
+        """通用请求执行器：含异常处理与日志"""
+        # 构建完整 URL (支持分页链接穿透)
         if endpoint.startswith('http'):
             url = endpoint
-        elif '?' in endpoint:
-            url = f"{self.base_url}{endpoint.lstrip('/')}"
         else:
             url = f"{self.base_url}{endpoint.strip('/')}/"
 
         try:
-            response = requests.get(url, params=params, headers=self.headers, timeout=self.timeout)
+            # 自动注入 headers，除非 kwargs 另有定义
+            if 'headers' not in kwargs:
+                kwargs['headers'] = self.headers
+            
+            # 设置默认超时
+            kwargs.setdefault('timeout', self.timeout)
+
+            response = requests.request(method, url, **kwargs)
+            
+            # 特殊处理流式响应
+            if kwargs.get('stream'):
+                return response
+            
             response.raise_for_status()
             return response.json()
-        except Exception as e:
-            logger.error(f"API GET 失败 [{url}]: {str(e)}")
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Remote API [{method}] failed on {url}: {e}")
             return None
 
-    def get_material_list(self, **kwargs): return self._get('materials/', params=kwargs)
-    def get_material_detail(self, material_id): return self._get(f'materials/{material_id}/')
-    @lru_cache(maxsize=128)
-    def get_scenarios(self): return self._get('scenarios/')
-    
-    def verify_member_credentials(self, username, password):
+    # --- 业务语义化方法 (低代码调用点) ---
+
+    def get_paged_materials(self, **filters):
+        """获取物料列表 (支持分页和筛选参数)"""
+        return self._execute_request('GET', 'materials/', params=filters)
+
+    def fetch_material_details(self, material_id):
+        """抓取单个物料的完整画像"""
+        return self._execute_request('GET', f'materials/{material_id}/')
+
+    @lru_cache(maxsize=1) # 静态维度数据，极高缓存价值
+    def get_all_scenarios(self):
+        """获取所有应用场景配置"""
+        return self._execute_request('GET', 'scenarios/')
+
+    def verify_credentials(self, username, password):
+        """会员身份远程鉴权"""
         payload = {'username': username, 'password': password}
-        response = self._post('auth/verify/', data=payload)
-        if response and response.status_code == 200: return response.json()
-        elif response:
-            try: return response.json()
-            except: return {'status': 'error', 'message': f'Server error {response.status_code}'}
-        return {'status': 'error', 'message': 'Connection failed'}
+        # 此处不直接返回 None，而是返回包含错误信息的 dict，便于前端反馈
+        response = self._execute_request('POST', 'auth/verify/', json=payload)
+        return response or {'status': 'error', 'message': '与主系统通信失败，请检查网络'}
 
-    def stream_file_download(self, material_id, file_type):
-        """
-        向主系统申请文件流，用于中转下载。
-        file_type: 'tds', 'msds', 'rohs'
-        """
-        url = f"{self.base_url}materials/{material_id}/download/{file_type}/"
-        try:
-            # 使用 stream=True 进行流式下载
-            response = requests.get(url, headers=self.headers, timeout=30, stream=True)
-            if response.status_code == 200:
-                return response
-            else:
-                logger.error(f"文件下载 API 失败 [{url}]: {response.status_code}")
-                return None
-        except Exception as e:
-            logger.error(f"文件下载连接失败 [{url}]: {str(e)}")
-            return None
+    def request_file_stream(self, material_id, file_type):
+        """向主系统申请加密文件流"""
+        endpoint = f"materials/{material_id}/download/{file_type.lower()}/"
+        # 使用流式传输
+        return self._execute_request('GET', endpoint, stream=True)
 
+# 导出单例，全局复用长连接
 client = MaterialApiClient()

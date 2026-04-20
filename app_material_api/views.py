@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django_filters.rest_framework import DjangoFilterBackend
-from django.http import FileResponse, Http404
+from django.http import FileResponse
+from django.shortcuts import get_object_or_404
 
 from app_material.models.material import (MaterialType, ApplicationScenario, MetricCategory, 
                                           TestConfig, MaterialLibrary, MaterialDataPoint, MaterialFile)
@@ -13,7 +14,7 @@ from app_repository.models import ExternalMemberActivity, OEM, Customer
 
 from .serializers import (MaterialTypeSerializer, ApplicationScenarioSerializer, MetricCategorySerializer,
                          TestConfigSerializer, MaterialLibrarySerializer, MaterialDataPointSerializer, 
-                         MaterialFileSerializer, MaterialCharacteristicSerializer)
+                         MaterialFileSerializer)
 from .filters import MaterialLibraryFilter
 
 logger = logging.getLogger(__name__)
@@ -24,63 +25,104 @@ class InternalApiTokenPermission(permissions.BasePermission):
         token = request.headers.get('X-Internal-Api-Token')
         return token == settings.INTERNAL_API_TOKEN
 
-# --- 外部会员验证接口 ---
+# ==========================================
+# 1. 外部会员鉴权引擎 (适配 4D 架构)
+# ==========================================
 class MemberAuthVerifyView(APIView):
+    """
+    提供给子系统的会员验证接口。
+    返回精简的 4D 身份画像，仅包含鉴权和角色判断所需信息。
+    """
     permission_classes = [InternalApiTokenPermission]
+
     def post(self, request):
         username = request.data.get('username')
         password = request.data.get('password')
-        if not username or not password: return Response({'status': 'error', 'message': '请输入用户名和密码'}, status=400)
+        
+        if not username or not password:
+            return Response({'status': 'error', 'message': '请输入用户名和密码'}, status=400)
+            
         user = authenticate(request=request, username=username, password=password)
+        
         if user is not None:
-            if not user.is_active: return Response({'status': 'error', 'message': '该账号已被禁用'}, status=403)
-            role = 'GUEST'; token = None; display_name = user.get_full_name() or user.username
-            if user.is_staff: role = 'STAFF'; token = f"staff_{user.id}"
-            elif hasattr(user, 'oem_profile'): role = 'OEM'; token = str(user.oem_profile.member_token); display_name = user.oem_profile.name
-            elif hasattr(user, 'customer_profile'): role = 'CUSTOMER'; token = str(user.customer_profile.member_token); display_name = user.customer_profile.company_name
-            if not token: return Response({'status': 'error', 'message': '账号未关联会员资料'}, status=403)
-            return Response({'status': 'success', 'user': {'username': user.username, 'role': role, 'token': token, 'display_name': display_name}})
+            if not user.is_active:
+                return Response({'status': 'error', 'message': '该账号已被禁用'}, status=403)
+
+            # --- 构建精简的 4D 身份画像数据包 ---
+            profile_data = {
+                'display_name': user.get_full_name() or user.username, # 用于前端显示
+                'user_type': user.user_type,
+                'user_level': user.user_level,
+                'dept_code': user.department.code if user.department else "NONE", # 部门编码，非敏感
+            }
+
+            # --- 确定唯一令牌 (Token) ---
+            token = None
+            role = 'GUEST' # 默认角色
+            
+            if user.is_staff:
+                role = 'STAFF'
+                token = f"staff_{user.id}"
+            elif hasattr(user, 'oem_profile'):
+                role = 'OEM'
+                token = str(user.oem_profile.member_token)
+                profile_data['display_name'] = user.oem_profile.name # 优先显示主机厂名
+            elif hasattr(user, 'customer_profile'):
+                role = 'CUSTOMER'
+                token = str(user.customer_profile.member_token)
+                profile_data['display_name'] = user.customer_profile.company_name # 优先显示客户名
+            
+            if not token:
+                return Response({'status': 'error', 'message': '账号未关联业务身份，无法登录手册'}, status=403)
+
+            profile_data['role'] = role
+            profile_data['token'] = token
+
+            return Response({
+                'status': 'success',
+                'user': profile_data
+            })
+            
         return Response({'status': 'error', 'message': '用户名或密码错误'}, status=401)
 
-# --- 行为日志回流接收接口 ---
+# ==========================================
+# 2. 行为日志回流
+# ==========================================
 class MemberActivityFeedbackView(APIView):
     permission_classes = [InternalApiTokenPermission]
     def post(self, request):
         logs = request.data.get('logs', [])
-        if not isinstance(logs, list): return Response({'status': 'error', 'message': 'Invalid format'}, status=400)
         created_count = 0
         for item in logs:
             if item.get('member_token'):
-                ExternalMemberActivity.objects.create(member_token=item['member_token'], action=item['action'], target_name=item['target_name'], timestamp=item['timestamp'])
+                ExternalMemberActivity.objects.create(
+                    member_token=item['member_token'], 
+                    action=item['action'], 
+                    target_name=item['target_name'], 
+                    timestamp=item['timestamp']
+                )
                 created_count += 1
         return Response({'status': 'success', 'received': created_count})
 
-# --- 文件流输出接口 (专供中转下载) ---
+# ==========================================
+# 3. 受限下载流接口
+# ==========================================
 class MaterialInternalDownloadView(APIView):
-    """
-    提供受限的文件流下载接口。
-    """
     permission_classes = [InternalApiTokenPermission]
 
     def get(self, request, pk, file_type):
         material = get_object_or_404(MaterialLibrary, pk=pk)
-        
-        # 校验字段是否存在
         field_name = f"file_{file_type.lower()}"
-        if not hasattr(material, field_name):
-            return Response({'error': 'Invalid file type'}, status=400)
-            
-        file_field = getattr(material, field_name)
+        file_field = getattr(material, field_name, None)
+        
         if not file_field:
             return Response({'error': 'File not found'}, status=404)
 
-        try:
-            return FileResponse(file_field.open('rb'), as_attachment=True)
-        except FileNotFoundError:
-            return Response({'error': 'Physical file missing'}, status=404)
+        return FileResponse(file_field.open('rb'), as_attachment=True)
 
-from django.shortcuts import get_object_or_404 # 确保导入了
-
+# ==========================================
+# 4. 只读资源接口 (供同步抓取)
+# ==========================================
 class MaterialTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = MaterialType.objects.all(); serializer_class = MaterialTypeSerializer; permission_classes = [InternalApiTokenPermission]
 class ApplicationScenarioViewSet(viewsets.ReadOnlyModelViewSet):
