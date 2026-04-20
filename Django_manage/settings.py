@@ -43,20 +43,17 @@ INSTALLED_APPS = [
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
     'app_material.apps.AppMaterialConfig',
-
-    # 【新增】：注册材料库集成服务模块
     'app_material_api.apps.AppMaterialApiConfig',
-
     'app_notification.apps.AppNotificationConfig',
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
     'app_formula.apps.AppFormulaConfig',
     'app_basic_research.apps.AppBasicResearchConfig',
     'app_catalog.apps.AppCatalogConfig',
-    'common_utils.apps.CommonUtilsConfig', # 注册 common_utils 为 App
-    # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
+    'common_utils.apps.CommonUtilsConfig',
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
+    # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
     # 'app_dify_sync.apps.AppDifySyncConfig',           # Dify 数据同步
 ]
 
@@ -71,8 +68,7 @@ MIDDLEWARE = [
     "debug_toolbar.middleware.DebugToolbarMiddleware", # 这是debug_toolbar的配置
     'axes.middleware.AxesMiddleware', # django-axes 登录失败次数中间件
     'app_user.middleware.SecurityShieldMiddleware', # 访问盾中间件
-    # 关键修复：添加我们自己的中间件
-    'app_notification.middleware.CurrentUserMiddleware',
+    'app_notification.middleware.CurrentUserMiddleware', # 通知中间件
 ]
 
 ROOT_URLCONF = 'Django_manage.urls'
