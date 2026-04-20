@@ -74,11 +74,16 @@ class MaterialLibrarySerializer(serializers.ModelSerializer):
 
     def get_grouped_properties(self, obj):
         grouped = defaultdict(list)
-        points = obj.properties.all().order_by('test_config__category__order', 'test_config__order')
+        # 修正：使用 select_related 优化 N+1
+        points = obj.properties.select_related('test_config', 'test_config__category').order_by(
+            'test_config__category__order', 'test_config__order'
+        )
         for point in points:
             cat_name = point.test_config.category.name
             grouped[cat_name].append(MaterialDataPointSerializer(point, context=self.context).data)
+        
         result = []
+        # 保持原始排序顺序显示分类
         seen_cats = []
         for point in points:
             cat_name = point.test_config.category.name

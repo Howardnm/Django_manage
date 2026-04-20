@@ -10,7 +10,8 @@ from django.shortcuts import get_object_or_404
 
 from app_material.models.material import (MaterialType, ApplicationScenario, MetricCategory, 
                                           TestConfig, MaterialLibrary, MaterialDataPoint, MaterialFile)
-from app_repository.models import ExternalMemberActivity, OEM, Customer
+from app_repository.models import ExternalMemberActivity, OEM, Customer # 导入 Customer 和 OEM
+from app_user.models import User as CustomUser # 导入自定义 User 模型，避免命名冲突
 
 from .serializers import (MaterialTypeSerializer, ApplicationScenarioSerializer, MetricCategorySerializer,
                          TestConfigSerializer, MaterialLibrarySerializer, MaterialDataPointSerializer, 
@@ -57,23 +58,22 @@ class MemberAuthVerifyView(APIView):
             }
 
             # --- 确定唯一令牌 (Token) ---
-            token = None
+            token = str(user.member_token) # 直接从 User 模型获取 member_token
+
+            # --- 确定角色和显示名称 ---
             role = 'GUEST' # 默认角色
-            
             if user.is_staff:
                 role = 'STAFF'
-                token = f"staff_{user.id}"
-            elif hasattr(user, 'oem_profile'):
+            elif user.associated_oem:
                 role = 'OEM'
-                token = str(user.oem_profile.member_token)
-                profile_data['display_name'] = user.oem_profile.name # 优先显示主机厂名
-            elif hasattr(user, 'customer_profile'):
+                profile_data['display_name'] = user.associated_oem.name # 优先显示主机厂名
+            elif user.associated_customer:
                 role = 'CUSTOMER'
-                token = str(user.customer_profile.member_token)
-                profile_data['display_name'] = user.customer_profile.company_name # 优先显示客户名
+                profile_data['display_name'] = user.associated_customer.company_name # 优先显示客户公司名
             
-            if not token:
-                return Response({'status': 'error', 'message': '账号未关联业务身份，无法登录手册'}, status=403)
+            # 确保 token 存在 (User 模型现在自带 member_token)
+            if not token: # 理论上不会发生，因为 User 模型有 default=uuid.uuid4
+                return Response({'status': 'error', 'message': '账号未生成唯一令牌，请联系管理员'}, status=500)
 
             profile_data['role'] = role
             profile_data['token'] = token
