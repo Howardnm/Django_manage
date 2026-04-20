@@ -12,7 +12,7 @@ class MenuModule:
             "url_name": "panel_home",
             "sub_items": [
                 {"name": "项目全景看板", "url_name": "project_overview"},
-                {"name": "成员绩效榜单", "url_name": "user_performance_list"},
+                {"name": "业务业绩榜单", "url_name": "project_performance_list"},
             ]
         }
 
@@ -25,7 +25,6 @@ class MenuModule:
             "url_name": "project_list",
             "sub_items": [
                 {"name": "项目列表", "url_name": "project_list"},
-                {"name": "业务业绩榜单", "url_name": "project_performance_list"},
             ]
         }
 
@@ -79,7 +78,6 @@ class MenuModule:
             "url_name": "formula_list",
             "sub_items": [
                 {"name": "实验配方列表", "url_name": "formula_list"},
-                {"name": "录入新配方", "url_name": "formula_create"},
             ]
         }
 
