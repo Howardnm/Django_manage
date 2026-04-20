@@ -99,7 +99,8 @@
 
             {% if is_paginated %}
             <div class="mt-5 d-flex justify-content-center">
-                {% include "apps/list_modules/paginator.html" %}
+                {# 【已解耦】使用 app_catalog 内部的分页模板 #}
+                {% include "apps/app_catalog/includes/paginator_catalog.html" %}
             </div>
             {% endif %}
         </div>

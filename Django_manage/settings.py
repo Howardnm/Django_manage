@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'app_formula.apps.AppFormulaConfig',
     'app_basic_research.apps.AppBasicResearchConfig',
     'app_catalog.apps.AppCatalogConfig',
+    'common_utils.apps.CommonUtilsConfig', # 注册 common_utils 为 App
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
@@ -218,9 +219,12 @@ REST_FRAMEWORK = {
 }
 
 # --- 内部集成安全性与同步配置 ---
+# 通信安全 Token (必须与主系统 INTERNAL_API_TOKEN 保持一致)
 INTERNAL_API_TOKEN = 'catalog-portal-secure-token-2024'
+# Webhook 校验密钥 (必须与主系统 WEBHOOK_SECRET_KEY 保持一致)
 WEBHOOK_SECRET_KEY = 'your-secure-webhook-secret-key'
-CATALOG_WEBHOOK_URL = 'http://127.0.0.1:8000/catalog/api/webhook/material/'
+CATALOG_WEBHOOK_URL = 'http://127.0.0.1:8001/catalog/api/webhook/material/'
+# 主系统 API 的基础地址 (结尾需带斜杠)
 REMOTE_API_BASE_URL = 'http://127.0.0.1:8000/api/material/'
 
 # --- 日志配置 ---

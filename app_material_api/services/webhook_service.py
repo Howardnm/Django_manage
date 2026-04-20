@@ -62,9 +62,19 @@ class WebhookService:
         secret = getattr(settings, 'WEBHOOK_SECRET_KEY', None)
 
         if not target_url:
+            error_msg = "Target URL (CATALOG_WEBHOOK_URL) not configured in settings."
             task.status = 'FAILED'
-            task.last_error = "Target URL missing in settings."
+            task.last_error = error_msg
             task.save()
+            logger.error(f"Webhook dispatch failed for task {task.id}: {error_msg}")
+            return False
+
+        if not secret:
+            error_msg = "Webhook Secret Key (WEBHOOK_SECRET_KEY) not configured in settings."
+            task.status = 'FAILED'
+            task.last_error = error_msg
+            task.save()
+            logger.error(f"Webhook dispatch failed for task {task.id}: {error_msg}")
             return False
 
         headers = {
@@ -74,14 +84,30 @@ class WebhookService:
 
         try:
             response = requests.post(target_url, data=task.payload, headers=headers, timeout=10)
-            response.raise_for_status()
+            response.raise_for_status()  # 检查 HTTP 状态码，非 2xx 抛出异常
             task.status = 'SUCCESS'
             task.save()
+            logger.info(f"Webhook task {task.id} dispatched successfully to {target_url}")
             return True
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
+            error_msg = f"Network or HTTP error: {e}"
+            if hasattr(e, 'response') and e.response is not None:
+                error_msg += f" | Response status: {e.response.status_code}"
+                error_msg += f" | Response body: {e.response.text}"
+            
             task.retry_count += 1
-            task.last_error = str(e)
+            task.last_error = error_msg
             if task.retry_count >= task.max_retries:
                 task.status = 'FAILED'
             task.save()
+            logger.error(f"Webhook dispatch failed for task {task.id} to {target_url}: {error_msg}")
+            return False
+        except Exception as e:
+            error_msg = f"Unexpected error during webhook dispatch: {e}"
+            task.retry_count += 1
+            task.last_error = error_msg
+            if task.retry_count >= task.max_retries:
+                task.status = 'FAILED'
+            task.save()
+            logger.error(f"Webhook dispatch failed for task {task.id} to {target_url}: {error_msg}")
             return False
