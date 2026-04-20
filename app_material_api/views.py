@@ -5,6 +5,7 @@ from rest_framework.response import Response
 from django.conf import settings
 from django.contrib.auth import authenticate
 from django_filters.rest_framework import DjangoFilterBackend
+from django.http import FileResponse, Http404
 
 from app_material.models.material import (MaterialType, ApplicationScenario, MetricCategory, 
                                           TestConfig, MaterialLibrary, MaterialDataPoint, MaterialFile)
@@ -53,6 +54,32 @@ class MemberActivityFeedbackView(APIView):
                 ExternalMemberActivity.objects.create(member_token=item['member_token'], action=item['action'], target_name=item['target_name'], timestamp=item['timestamp'])
                 created_count += 1
         return Response({'status': 'success', 'received': created_count})
+
+# --- 文件流输出接口 (专供中转下载) ---
+class MaterialInternalDownloadView(APIView):
+    """
+    提供受限的文件流下载接口。
+    """
+    permission_classes = [InternalApiTokenPermission]
+
+    def get(self, request, pk, file_type):
+        material = get_object_or_404(MaterialLibrary, pk=pk)
+        
+        # 校验字段是否存在
+        field_name = f"file_{file_type.lower()}"
+        if not hasattr(material, field_name):
+            return Response({'error': 'Invalid file type'}, status=400)
+            
+        file_field = getattr(material, field_name)
+        if not file_field:
+            return Response({'error': 'File not found'}, status=404)
+
+        try:
+            return FileResponse(file_field.open('rb'), as_attachment=True)
+        except FileNotFoundError:
+            return Response({'error': 'Physical file missing'}, status=404)
+
+from django.shortcuts import get_object_or_404 # 确保导入了
 
 class MaterialTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = MaterialType.objects.all(); serializer_class = MaterialTypeSerializer; permission_classes = [InternalApiTokenPermission]

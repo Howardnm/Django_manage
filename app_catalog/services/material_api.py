@@ -25,7 +25,6 @@ class MaterialApiClient:
             return None
 
     def _get(self, endpoint, params=None):
-        # 核心修正：如果 endpoint 已经包含 query 参数（如 materials/?page=2），不要补斜杠
         if endpoint.startswith('http'):
             url = endpoint
         elif '?' in endpoint:
@@ -45,6 +44,7 @@ class MaterialApiClient:
     def get_material_detail(self, material_id): return self._get(f'materials/{material_id}/')
     @lru_cache(maxsize=128)
     def get_scenarios(self): return self._get('scenarios/')
+    
     def verify_member_credentials(self, username, password):
         payload = {'username': username, 'password': password}
         response = self._post('auth/verify/', data=payload)
@@ -53,5 +53,23 @@ class MaterialApiClient:
             try: return response.json()
             except: return {'status': 'error', 'message': f'Server error {response.status_code}'}
         return {'status': 'error', 'message': 'Connection failed'}
+
+    def stream_file_download(self, material_id, file_type):
+        """
+        向主系统申请文件流，用于中转下载。
+        file_type: 'tds', 'msds', 'rohs'
+        """
+        url = f"{self.base_url}materials/{material_id}/download/{file_type}/"
+        try:
+            # 使用 stream=True 进行流式下载
+            response = requests.get(url, headers=self.headers, timeout=30, stream=True)
+            if response.status_code == 200:
+                return response
+            else:
+                logger.error(f"文件下载 API 失败 [{url}]: {response.status_code}")
+                return None
+        except Exception as e:
+            logger.error(f"文件下载连接失败 [{url}]: {str(e)}")
+            return None
 
 client = MaterialApiClient()
