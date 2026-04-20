@@ -48,7 +48,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     def has_permission(self):
         """核心判定引擎"""
         user = self.request.user
-        
+
         if not user.is_authenticated: return False
         if user.is_superuser: return True
 
@@ -67,15 +67,20 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     def get_queryset(self):
         """数据范围过滤引擎"""
         user = self.request.user
-        if self.queryset is not None:
+        
+        # 1. 自动获取 QuerySet (容错处理)
+        if hasattr(self, 'queryset') and self.queryset is not None:
             qs = self.queryset.all()
-        elif self.model is not None:
+        elif hasattr(self, 'model') and self.model is not None:
             qs = self.model.objects.all()
         else:
-            return super().get_queryset()
+            # 【修复】对于没有定义 model/queryset 的原生 View，返回 None 是危险的
+            # 此处应返回对应的 model.objects.all() 或抛出配置异常提醒开发者
+            return None
 
         if user.is_superuser: return qs
 
+        # 2. 执行部门隔离
         if self.enforce_dept_isolation:
             user_field = self._detect_user_link_field(qs.model)
             if user_field:
@@ -85,6 +90,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         return qs
 
     def _detect_user_link_field(self, model):
+        """探测模型实际存在的关联字段"""
         model_fields = [f.name for f in model._meta.get_fields()]
         for field in self.user_link_fields:
             if field in model_fields: return field

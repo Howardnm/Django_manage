@@ -4,7 +4,6 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 from django.http import HttpResponse
-from django.db.models import Q
 
 from app_basic_research.forms import ResearchProjectForm, ResearchProjectNodeUpdateForm, ResearchProjectFileForm
 from app_basic_research.models import ResearchProject, ResearchStage, ResearchProjectNode, ResearchProjectFile
@@ -18,6 +17,7 @@ from app_basic_research.mixins import BasicResearchAccessMixin
 class ResearchProjectListView(BasicResearchAccessMixin, View):
     """预研列表：仅限研发及管理员，严格部门隔离"""
     permission_required = 'app_basic_research.view_researchproject'
+    model = ResearchProject # 必须显式声明模型，供 Mixin 自动执行 get_queryset
 
     def get(self, request):
         # 自动探测 'manager' 并执行过滤
@@ -148,6 +148,7 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
 class BasicResearchObjectView(BasicResearchAccessMixin, View):
     """内部通用视图：用于检查 project 权限"""
     permission_required = 'app_basic_research.change_researchproject'
+    model = ResearchProject # 补全模型声明
 
     def get_project_and_check(self, project_id):
         project = get_object_or_404(ResearchProject, pk=project_id)

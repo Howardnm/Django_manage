@@ -115,7 +115,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
-        self.check_object_level_permission(obj)
+        self.check_object_permission(obj)
         return obj
 
     def get_context_data(self, **kwargs):

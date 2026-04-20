@@ -24,8 +24,8 @@ class MenuModule:
             "visible_to": IdentityConfig.INTERNAL_STAFF,
             "url_name": "project_list",
             "sub_items": [
-                {"name": "选型项目库", "url_name": "project_list"},
-                {"name": "新建选型项目", "url_name": "project_create"},
+                {"name": "项目列表", "url_name": "project_list"},
+                {"name": "业务业绩榜单", "url_name": "project_performance_list"},
             ]
         }
 
@@ -35,12 +35,11 @@ class MenuModule:
             "name": "项目档案中心",
             "icon": "ti-archive",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
-            "url_name": "repo_list", # 核心修复：更正为正确的 URL 名称
+            "url_name": "repo_list",
             "sub_items": [
-                {"name": "项目商务档案", "url_name": "repo_list"}, # 核心修复：更正为正确的 URL 名称
+                {"name": "项目商务档案", "url_name": "repo_list"},
                 {"name": "客户名录库", "url_name": "repo_customer_list"},
                 {"name": "主机厂(OEM)库", "url_name": "repo_oem_list"},
-                # 业务业绩榜单 (暂时隐藏或指向 correct URL)
             ]
         }
 
@@ -53,7 +52,6 @@ class MenuModule:
             "url_name": "basic_research_list",
             "sub_items": [
                 {"name": "预研项目管理", "url_name": "basic_research_list"},
-                {"name": "新建预研项目", "url_name": "basic_research_create"},
             ]
         }
 
@@ -63,10 +61,11 @@ class MenuModule:
             "name": "材料成品库",
             "icon": "ti-database",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
-            "url_name": "material_library_list",
+            "url_name": "material_list",
             "sub_items": [
-                {"name": "成品材料列表", "url_name": "material_library_list"},
-                {"name": "材料分类管理", "url_name": "material_type_list"},
+                {"name": "成品材料列表", "url_name": "material_list"},
+                {"name": "材料分类管理", "url_name": "type_list"},
+                {"name": "应用场景管理", "url_name": "scenario_list"},
                 {"name": "测试标准配置", "url_name": "test_config_list"},
             ]
         }
