@@ -26,6 +26,7 @@ class MenuModule:
             "url_name": "project_list",
             "sub_items": [
                 {"name": "项目列表", "url_name": "project_list"},
+                {"name": "成员绩效看板", "url_name": "project_performance_list"},
             ]
         }
 
