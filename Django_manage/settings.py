@@ -23,6 +23,11 @@ CSRF_TRUSTED_ORIGINS = [
     'http://你的服务器公网IP',  # 若用IP访问，也需添加
 ]
 
+# Secure settings for HTTPS
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+
 # Application definition
 
 INSTALLED_APPS = [
