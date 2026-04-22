@@ -5,51 +5,67 @@ from app_user.mixins import UnifiedAccessMixin, IdentityConfig
 class RepositoryAccessMixin(UnifiedAccessMixin):
     """
     档案中心权限管控 (双重负责制适配)。
-    
-    特点：
-    1. 负责人识别：salesperson (业务) 和 project__manager (研发)。
-    2. 穿透可见：内部全员 (INTERNAL_STAFF) 准入，但仅限本部门相关档案。
     """
     
     user_link_fields = ['salesperson', 'project__manager']
-    
-    # 使用对象化分组：支持研发、工艺、销售
     identity_required = IdentityConfig.INTERNAL_STAFF
     
+    # 默认开启隔离，但在具体视图中（如客户名录）可手动关闭
     enforce_dept_isolation = True
 
     def get_queryset(self):
-        """实现“业务部”与“研发部”的双重部门隔离并集"""
+        """
+        实现“业务部”与“研发部”的双重部门隔离并集。
+        自动探测模型是否支持该过滤逻辑。
+        """
         user = self.request.user
-        qs = super().get_queryset()
+        
+        # 1. 获取模型
+        if hasattr(self, 'model') and self.model:
+            model = self.model
+        elif hasattr(self, 'queryset') and self.queryset is not None:
+            model = self.queryset.model
+        else:
+            return super().get_queryset()
+
+        # 2. 核心探测：如果模型不包含 salesperson 字段，则跳过自定义的复杂隔离逻辑
+        # 转而使用基类的默认逻辑或直接返回全集
+        fields = [f.name for f in model._meta.get_fields()]
+        if 'salesperson' not in fields:
+            # 这种情况通常是 Customer 或 OEM 公司名录，属于公共资源
+            return model.objects.all()
 
         if user.is_superuser:
-            return qs
+            return model.objects.all()
 
+        # 3. 执行 ProjectRepository 专属的“双重负责”隔离
         if self.enforce_dept_isolation:
             if user.department:
-                return qs.model.objects.filter(
+                return model.objects.filter(
                     Q(salesperson__department=user.department) | 
                     Q(project__manager__department=user.department)
                 ).distinct()
             else:
-                return qs.model.objects.filter(
+                return model.objects.filter(
                     Q(salesperson=user) | 
                     Q(project__manager=user)
                 ).distinct()
         
-        return qs
+        return model.objects.all()
 
     def check_object_permission(self, obj):
+        """对象级细分控制：同样增加字段探测逻辑"""
         user = self.request.user
-        if user.is_superuser:
+        if user.is_superuser: return True
+
+        # 如果是 Customer 或 OEM 对象，不进行“负责人”校验（因为公司级对象没有单一负责人）
+        if not hasattr(obj, 'salesperson'):
             return True
 
-        # 1. 业务端检查
+        # 针对 ProjectRepository 的校验
         is_sales_dept = user.department and getattr(obj.salesperson, 'department', None) == user.department
         is_sales_owner = (obj.salesperson == user)
 
-        # 2. 研发端检查
         project = getattr(obj, 'project', None)
         if project:
             is_rnd_dept = user.department and getattr(project.manager, 'department', None) == user.department

@@ -23,7 +23,6 @@ class ProjectListView(ProjectAccessMixin, View):
     permission_required = 'app_project.view_project'
 
     def get(self, request):
-        # 这里的 super().get_queryset() 已被 ProjectAccessMixin 过滤
         projects_qs = Project.objects.select_related(
             'manager',
             'repository',
@@ -76,8 +75,6 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
     """
     项目编辑：
     - 准入：需有 change_project 权限。
-    - 细分：默认继承 min_level_required=1。
-    - 若需限制特定项目 11 级，只需在子类中重写属性。
     """
     permission_required = 'app_project.change_project'
     model = Project
@@ -86,7 +83,8 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
-        self.check_object_level_permission(obj)
+        # 核心修复：更正方法名
+        self.check_object_permission(obj)
         return obj
 
     def get_success_url(self):
@@ -115,6 +113,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 
     def get_object(self, queryset=None):
         obj = super().get_object(queryset)
+        # 核心修复：保持方法名一致
         self.check_object_permission(obj)
         return obj
 
