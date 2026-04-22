@@ -4,7 +4,7 @@ from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
 from .views.ProjectMember import *
 from .views.PerformanceRule import * # 【新增】
-from app_panel.views.PerformanceView import UserPerformanceListView
+from app_panel.views.PerformanceView import UserPerformanceListView, UserPerformanceDetailView
 
 urlpatterns = [
     path('list/', ProjectListView.as_view(), name='project_list'),
@@ -14,6 +14,7 @@ urlpatterns = [
     
     # 绩效相关
     path('performance/', UserPerformanceListView.as_view(), name='project_performance_list'),
+    path('performance/user/<int:user_id>/', UserPerformanceDetailView.as_view(), name='project_performance_user_detail'), # 【新增】
     path('performance/rules/', NodeScoreRuleListView.as_view(), name='project_score_rule_list'),
     path('performance/rules/create/', NodeScoreRuleCreateView.as_view(), name='project_score_rule_create'),
     path('performance/rules/<int:pk>/edit/', NodeScoreRuleUpdateView.as_view(), name='project_score_rule_edit'),

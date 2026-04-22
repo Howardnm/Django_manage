@@ -1,10 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.views import View
 from django.contrib.auth import get_user_model
 from django.db.models import Sum, F, DecimalField, ExpressionWrapper
 from django.db.models.functions import Coalesce
 from app_panel.mixins import PanelAccessMixin
 from decimal import Decimal
+from app_project.models import ProjectMember
 
 User = get_user_model()
 
@@ -67,3 +68,44 @@ class UserPerformanceListView(PanelAccessMixin, View):
             'page_title': '成员协同绩效看板'
         }
         return render(request, 'apps/app_project/performance_list.html', context)
+
+
+class UserPerformanceDetailView(PanelAccessMixin, View):
+    """
+    成员绩效明细页面：
+    列出该成员参与的所有项目及其明细得分
+    """
+    def get(self, request, user_id):
+        target_user = get_object_or_404(User, pk=user_id)
+        
+        # 获取该成员的所有项目参与记录，并预加载相关数据
+        memberships = ProjectMember.objects.filter(user=target_user).select_related(
+            'project', 
+            'project__grade', 
+            'project__repository__customer'
+        ).annotate(
+            # 单项有效贡献得分
+            effective_score=ExpressionWrapper(
+                (F('project__quality_score') * F('workload_share') / 100.0) * 
+                Coalesce(F('project__grade__factor'), 1.0, output_field=DecimalField()),
+                output_field=DecimalField()
+            ),
+            # 单项基础工作量得分
+            workload_score=ExpressionWrapper(
+                F('project__quality_score') * F('workload_share') / 100.0,
+                output_field=DecimalField()
+            )
+        ).order_by('-project__created_at')
+
+        # 计算总分（冗余校验或展示）
+        total_effective = sum(m.effective_score for m in memberships)
+        total_workload = sum(m.workload_score for m in memberships)
+
+        context = {
+            'target_user': target_user,
+            'memberships': memberships,
+            'total_effective': total_effective,
+            'total_workload': total_workload,
+            'page_title': f'绩效明细: {target_user.username}'
+        }
+        return render(request, 'apps/app_project/performance_detail.html', context)

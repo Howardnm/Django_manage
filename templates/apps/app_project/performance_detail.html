@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'project_performance_list' %}">绩效看板</a></li>
+                        <li class="breadcrumb-item active">{{ target_user.username }} 的明细</li>
+                    </ol>
+                </nav>
+                <h2 class="page-title">{{ target_user.username }} - 协同项目绩效明细</h2>
+            </div>
+            <div class="col-auto ms-auto">
+                <a href="{% url 'project_performance_list' %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>返回排行榜
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <!-- 顶部总分汇总 -->
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-primary text-white avatar"><i class="ti ti-chart-bar"></i></span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">有效贡献总分</div>
+                        <div class="text-muted small">等级加权后</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="h2 mb-0 text-primary fw-bold">{{ total_effective|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-secondary text-white avatar"><i class="ti ti-manual-gearbox"></i></span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">基础工作量总分</div>
+                        <div class="text-muted small">原始产出统计</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="h2 mb-0 text-secondary fw-bold">{{ total_workload|floatformat:2 }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-blue text-white avatar"><i class="ti ti-subtask"></i></span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">参与项目数</div>
+                        <div class="text-muted small">历史累计</div>
+                    </div>
+                    <div class="col-auto">
+                        <div class="h2 mb-0">{{ memberships.count }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 项目明细列表 -->
+    <div class="col-12">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-hover">
+                    <thead>
+                        <tr>
+                            <th>项目名称 / 客户</th>
+                            <th>我的角色</th>
+                            <th class="text-center">项目等级</th>
+                            <th class="text-center">质量分 / 占比</th>
+                            <th class="text-end">有效贡献分</th>
+                            <th class="text-end text-muted small">基础工作量分</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in memberships %}
+                        <tr>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    <div class="flex-fill">
+                                        <div class="font-weight-medium">
+                                            <a href="{% url 'project_detail' m.project.id %}">{{ m.project.name }}</a>
+                                        </div>
+                                        <div class="text-muted small">
+                                            {{ m.project.repository.customer.company_name|default:"内部项目" }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="badge bg-blue-lt">{{ m.get_role_display }}</span>
+                            </td>
+                            <td class="text-center">
+                                {% if m.project.grade %}
+                                    <span class="badge bg-purple-lt" title="加权因子: {{ m.project.grade.factor }}">
+                                        {{ m.project.grade.name }} (x{{ m.project.grade.factor }})
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <div><span class="text-azure fw-bold">{{ m.project.quality_score }}</span> / <span class="text-orange">{{ m.workload_share }}</span></div>
+                                <div class="progress progress-xs mt-1">
+                                    <div class="progress-bar bg-azure" style="width: {{ m.project.progress_percent }}%"></div>
+                                </div>
+                            </td>
+                            <td class="text-end">
+                                <span class="text-primary fw-bold">{{ m.effective_score|floatformat:2 }}</span>
+                            </td>
+                            <td class="text-end text-muted small">
+                                {{ m.workload_score|floatformat:2 }}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">该成员暂未参与任何项目</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
