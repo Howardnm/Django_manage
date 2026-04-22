@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">项目等级因子设置</h2>
+                <div class="text-muted small mt-1">配置不同等级项目的加权因子，影响客户质量评分计算</div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'repo_grade_factor_create' %}" class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="ti ti-plus me-1"></i>新增等级
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <div class="col-12">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-hover">
+                    <thead>
+                        <tr>
+                            <th>等级名称</th>
+                            <th class="text-center">加权因子</th>
+                            <th>标准说明</th>
+                            <th class="w-1">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for factor in factors %}
+                        <tr>
+                            <td>
+                                <div class="font-weight-medium text-purple">{{ factor.name }}</div>
+                            </td>
+                            <td class="text-center">
+                                <span class="h3 m-0 text-primary fw-bold">{{ factor.factor }}</span>
+                            </td>
+                            <td>
+                                <div class="text-muted small">{{ factor.description|default:"暂无描述" }}</div>
+                            </td>
+                            <td>
+                                <div class="btn-list flex-nowrap">
+                                    <a href="{% url 'repo_grade_factor_edit' factor.pk %}" class="btn btn-white btn-sm">编辑</a>
+                                    <button class="btn btn-ghost-danger btn-sm"
+                                            onclick="if(confirm('确定要删除此等级配置吗？')) { document.getElementById('delete-form-{{ factor.pk }}').submit(); }">
+                                        删除
+                                    </button>
+                                    <form id="delete-form-{{ factor.pk }}" action="{% url 'repo_grade_factor_delete' factor.pk %}" method="post" style="display:none;">
+                                        {% csrf_token %}
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center py-5 text-muted">
+                                尚未配置任何等级因子，点击“新增等级”开始。
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

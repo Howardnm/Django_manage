@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% load repo_tags %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    客户合作质量排行榜
+                </h2>
+                <div class="text-muted mt-1">基于项目等级因子与进度的加权评分体系</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-cards">
+            <!-- 排行榜卡片 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="table table-vcenter table-mobile-md card-table">
+                            <thead>
+                                <tr>
+                                    <th class="w-1">排名</th>
+                                    <th>客户公司</th>
+                                    <th>关联项目数</th>
+                                    <th>质量贡献总分</th>
+                                    <th class="w-1"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for ranking in rankings %}
+                                <tr>
+                                    <td>
+                                        <span class="avatar avatar-sm rounded {{ forloop.counter|ranking_medal_color }}">
+                                            {% if forloop.counter <= 3 %}
+                                                <i class="ti ti-trophy fs-2"></i>
+                                            {% else %}
+                                                {{ forloop.counter }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td data-label="客户公司">
+                                        <div class="d-flex py-1 align-items-center">
+                                            <span class="avatar me-2" {% if ranking.logo %}style="background-image: url({{ ranking.logo.url }})"{% endif %}>
+                                                {% if not ranking.logo %}{{ ranking.company_name|slice:":1" }}{% endif %}
+                                            </span>
+                                            <div class="flex-fill">
+                                                <div class="font-weight-medium">{{ ranking.company_name }}</div>
+                                                <div class="text-muted"><a href="{% url 'repo_customer_detail' ranking.pk %}" class="text-reset">查看详情</a></div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td data-label="关联项目数">
+                                        <div>{{ ranking.project_count }} 个项目</div>
+                                    </td>
+                                    <td data-label="质量贡献总分">
+                                        <div class="text-primary fw-bold fs-2">
+                                            {{ ranking.total_weighted_score|default:"0.00"|floatformat:2 }}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="btn-list flex-nowrap">
+                                            <a href="{% url 'repo_customer_detail' ranking.pk %}" class="btn btn-white btn-sm">
+                                                项目清单
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center py-4 text-muted">
+                                        暂无有效评分数据
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 算法说明卡片 -->
+            <div class="col-12 mt-4">
+                <div class="card bg-primary-lt">
+                    <div class="card-body">
+                        <h3 class="card-title text-primary"><i class="ti ti-info-circle me-2"></i>客户评分算法说明</h3>
+                        <div class="row">
+                            <div class="col-md-7">
+                                <div class="p-3 bg-white rounded border">
+                                    <div class="subheader mb-2">核心加权公式</div>
+                                    <div class="h2 mb-0 fw-bold text-center py-3">
+                                        Score = <span class="text-blue">Σ (Factor<sub>i</sub> × Completion<sub>i</sub>)</span> / <span class="text-secondary">Σ Factor<sub>i</sub></span>
+                                    </div>
+                                    <div class="text-muted small mt-2">
+                                        * 其中 <code>Factor<sub>i</sub></code> 为第 i 个项目的等级因子，<code>Completion<sub>i</sub></code> 为项目的得分完成度（0-1.0）。
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-5">
+                                <ul class="list-unstyled space-y-2 text-secondary small pt-2">
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>等级因子：</strong> 由项目等级（如 A级、B级）决定，代表该客户项目的战略重要性或复杂度。</li>
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>得分完成度：</strong> 项目当前累计的工作量绩效得分（0-100分）映射到 0.0-1.0 的区间。</li>
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>加权逻辑：</strong> 采用加权平均法，旨在体现客户合作的“平均质量水平”，防止仅靠项目数量堆叠而产生的评分偏见。</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

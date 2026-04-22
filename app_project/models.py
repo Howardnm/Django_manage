@@ -27,6 +27,9 @@ class Project(models.Model):
     description = models.TextField("项目描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     
+    # 【新增】项目等级关联
+    grade = models.ForeignKey('app_repository.GradeFactor', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="项目等级")
+
     # 进度冗余字段
     current_stage = models.CharField("当前阶段", max_length=20, choices=ProjectStage.choices, default=ProjectStage.INIT)
     progress_percent = models.PositiveIntegerField("进度百分比", default=0)

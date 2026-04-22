@@ -1,11 +1,22 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Customer, ProjectRepository, ProjectFile, OEM, OEMStandardFile
+from .models import Customer, ProjectRepository, ProjectFile, OEM, OEMStandardFile, GradeFactor
 from app_material.models.material import MaterialLibrary
 from common_utils.filters import TablerFormMixin
 from app_project.models import ProjectNode
 
 User = get_user_model()
+
+# ==========================================
+# 0. 等级因子表单
+# ==========================================
+class GradeFactorForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = GradeFactor
+        fields = ['name', 'factor', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '请输入等级说明...'}),
+        }
 
 # ==========================================
 # 1. 客户公司表单 (公司实体级)

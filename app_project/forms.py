@@ -9,9 +9,10 @@ User = get_user_model()
 class ProjectForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'description']
+        fields = ['name', 'grade', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称'}),
+            'grade': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),
         }
 

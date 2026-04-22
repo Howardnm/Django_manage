@@ -61,6 +61,16 @@
                     {% endif %}
                 </div>
 
+                <!-- 项目等级 -->
+                <div class="mb-3">
+                    <label class="form-label">项目等级</label>
+                    {{ form.grade }}
+                    <small class="form-hint">项目等级决定了客户贡献度排行榜中的加权系数。</small>
+                    {% if form.grade.errors %}
+                        <div class="invalid-feedback d-block">{{ form.grade.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
                 <!-- 项目描述 -->
                 <div class="mb-3">
                     <label class="form-label">项目描述</label>

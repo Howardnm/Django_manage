@@ -64,8 +64,7 @@
                         <table class="table card-table table-vcenter">
                             <thead>
                                 <tr>
-                                    <th>姓名/姓名</th>
-                                    <th>账号名</th>
+                                    <th>姓名/账号</th>
                                     <th>联系电话</th>
                                     <th>邮箱</th>
                                     <th>状态</th>
@@ -77,10 +76,12 @@
                                     <td>
                                         <div class="d-flex align-items-center">
                                             <span class="avatar avatar-sm bg-blue-lt me-2">{{ contact.get_full_name|default:contact.username|slice:":1" }}</span>
-                                            <div class="font-weight-medium">{{ contact.get_full_name|default:contact.username }}</div>
+                                            <div>
+                                                <div class="font-weight-medium">{{ contact.get_full_name|default:contact.username }}</div>
+                                                <div class="text-muted small">{{ contact.username }}</div>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td class="text-muted small">{{ contact.username }}</td>
                                     <td class="text-muted">{{ contact.phone|default:"-" }}</td>
                                     <td class="text-muted small">{{ contact.email|default:"-" }}</td>
                                     <td>
@@ -92,7 +93,7 @@
                                     </td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="5" class="text-center py-4 text-muted">该公司暂未关联系统账号</td></tr>
+                                <tr><td colspan="4" class="text-center py-4 text-muted">该公司暂未关联系统账号</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -103,7 +104,7 @@
                 </div>
             </div>
 
-            <!-- 3. 关联项目展示 (保持原功能) -->
+            <!-- 3. 关联项目展示 (增加等级与加权分) -->
             <div class="col-12">
                 <div class="card">
                     <div class="card-header"><h3 class="card-title">配套项目执行看板</h3></div>
@@ -112,7 +113,8 @@
                             <thead>
                                 <tr>
                                     <th>项目名称</th>
-                                    <th style="width: 25%;">进度轨迹</th>
+                                    <th>等级</th>
+                                    <th style="width: 20%;">进度轨迹</th>
                                     <th>终端 (OEM)</th>
                                     <th>业务负责人</th>
                                     <th>进度更新</th>
@@ -122,6 +124,15 @@
                                 {% for repo in page_obj %}
                                 <tr>
                                     <td><a href="{% url 'project_detail' repo.project.id %}" class="fw-bold">{{ repo.project.name }}</a></td>
+                                    <td>
+                                        {% if repo.project.grade %}
+                                            <span class="badge bg-purple-lt" title="加权因子: {{ repo.project.grade.factor }}">
+                                                {{ repo.project.grade.name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="text-muted small">未定级</span>
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         <div class="d-flex justify-content-between align-items-center mb-1">
                                             <div class="text-truncate" style="max-width: 120px;">
@@ -144,7 +155,7 @@
                                     <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"-" }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="5" class="text-center py-5">暂无关联项目数据</td></tr>
+                                <tr><td colspan="6" class="text-center py-5">暂无关联项目数据</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

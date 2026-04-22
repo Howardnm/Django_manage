@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    {% if form.instance.pk %}编辑等级因子{% else %}新增等级因子{% endif %}
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-6">
+        <div class="card">
+            <form method="post">
+                {% csrf_token %}
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label required">等级名称</label>
+                        {{ form.name }}
+                        <div class="form-hint">例如：“A级”、“S级重点项目”</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label required">加权因子</label>
+                        {{ form.factor }}
+                        <div class="form-hint">支持两位小数。因子越大，该等级项目在排行榜中的贡献权重越高。</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">等级说明/标准</label>
+                        {{ form.description }}
+                    </div>
+                </div>
+                <div class="card-footer text-end">
+                    <div class="d-flex">
+                        <a href="{% url 'repo_grade_factor_list' %}" class="btn btn-link">取消返回</a>
+                        <button type="submit" class="btn btn-primary ms-auto">保存等级设置</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -2,6 +2,7 @@ from django.urls import path
 from .views.ProjectRepository import *
 from .views.Customer import *
 from .views.OEM import *
+from .views.GradeFactor import * # 【新增】
 
 urlpatterns = [
     # --- 基础数据管理主页 ---
@@ -14,6 +15,7 @@ urlpatterns = [
     path('customers/add/', CustomerCreateView.as_view(), name='repo_customer_add'),
     path('customers/<int:pk>/', CustomerDetailView.as_view(), name='repo_customer_detail'),
     path('customers/<int:pk>/edit/', CustomerUpdateView.as_view(), name='repo_customer_edit'),
+    path('customers/ranking/', CustomerRankingView.as_view(), name='repo_customer_ranking'),
 
     # 项目档案 (核心业务)
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
@@ -30,4 +32,10 @@ urlpatterns = [
     path('oems/<int:pk>/file/form/', OEMStandardFileFormView.as_view(), name='repo_oem_file_form'),
     path('oems/<int:pk>/file/upload/', OEMStandardFileUploadView.as_view(), name='repo_oem_file_upload'),
     path('oems/file/<int:pk>/delete/', OEMStandardFileDeleteView.as_view(), name='repo_oem_file_delete'),
+
+    # 等级因子管理 (绩效规则扩展) 【新增】
+    path('performance/grade-factors/', GradeFactorListView.as_view(), name='repo_grade_factor_list'),
+    path('performance/grade-factors/create/', GradeFactorCreateView.as_view(), name='repo_grade_factor_create'),
+    path('performance/grade-factors/<int:pk>/edit/', GradeFactorUpdateView.as_view(), name='repo_grade_factor_edit'),
+    path('performance/grade-factors/<int:pk>/delete/', GradeFactorDeleteView.as_view(), name='repo_grade_factor_delete'),
 ]

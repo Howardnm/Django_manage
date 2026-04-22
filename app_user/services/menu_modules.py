@@ -40,6 +40,7 @@ class MenuModule:
             "sub_items": [
                 {"name": "项目档案库", "url_name": "repo_list"},
                 {"name": "客户资料库", "url_name": "repo_customer_list"},
+                {"name": "客户评分排行", "url_name": "repo_customer_ranking"}, # 【新增】
                 {"name": "主机厂(OEM)库", "url_name": "repo_oem_list"},
             ]
         }
@@ -121,6 +122,7 @@ class MenuModule:
             "url_name": "project_score_rule_list",
             "sub_items": [
                 {"name": "项目绩效评分规则", "url_name": "project_score_rule_list"},
+                {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"}, # 【新增】
                 {"name": "进入底层管理", "url_name": "admin:index"},
             ]
         }

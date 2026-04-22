@@ -3,10 +3,20 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from .models import (
-    OEM, Customer, ProjectRepository, ProjectFile, OEMStandardFile, ExternalMemberActivity
+    OEM, Customer, ProjectRepository, ProjectFile, OEMStandardFile, ExternalMemberActivity, GradeFactor
 )
 
 User = get_user_model()
+
+# ==========================================
+# 0. 等级因子配置
+# ==========================================
+@admin.register(GradeFactor)
+class GradeFactorAdmin(admin.ModelAdmin):
+    list_display = ('name', 'factor', 'description')
+    search_fields = ('name',)
+    list_editable = ('factor',)
+
 
 # ==========================================
 # 0. 关联账号内联 (核心重构：在公司页管理账号)

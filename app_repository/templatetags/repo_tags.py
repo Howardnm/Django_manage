@@ -18,3 +18,11 @@ def get_category_color(category_name):
     if '阻燃' in name or '电气' in name: return 'yellow'
 
     return 'secondary'
+
+@register.filter
+def ranking_medal_color(rank):
+    """返回排名奖牌颜色"""
+    if rank == 1: return "text-yellow"
+    if rank == 2: return "text-secondary"
+    if rank == 3: return "text-orange"
+    return "text-muted"

@@ -8,6 +8,25 @@ from common_utils.validators import validate_file_size
 
 
 # ==========================================
+# 0. 基础配置 - 等级因子
+# ==========================================
+class GradeFactor(models.Model):
+    """
+    项目等级因子配置 (如：A级-1.5, B级-1.2)
+    """
+    name = models.CharField("等级名称", max_length=20, unique=True)
+    factor = models.DecimalField("等级因子", max_digits=5, decimal_places=2, default=1.00)
+    description = models.TextField("等级说明/标准", blank=True)
+
+    def __str__(self):
+        return f"{self.name} (因子: {self.factor})"
+
+    class Meta:
+        verbose_name = "等级因子"
+        verbose_name_plural = "0. 等级因子配置"
+
+
+# ==========================================
 # 1. 主机厂 (OEM) - 顶级业务实体
 # ==========================================
 class OEM(models.Model):
