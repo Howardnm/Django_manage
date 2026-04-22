@@ -85,7 +85,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         
         # 如果已登录但无权，跳转到 settings 中定义的无权提示地址
         # 如果没定义，默认跳回首页并带上错误提示
-        perm_denied_url = getattr(settings, 'LOGIN_URL', 'panel_home')
+        perm_denied_url = getattr(settings, 'PERM_DENIED_URL', 'panel_home')
         from django.contrib import messages
         messages.error(self.request, "您的账号权限不足，无法访问该页面。")
         return redirect(perm_denied_url)
