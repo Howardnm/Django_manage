@@ -6,9 +6,9 @@
         <div class="row g-2 align-items-center">
             <div class="col">
                 <h2 class="page-title">成员协同绩效看板</h2>
-                <div class="text-muted small mt-1">基于项目阶段权重与成员工作量占比的加权得分统计</div>
+                <div class="text-muted small mt-1">基于项目等级因子、工作量占比及节点得分的综合加权统计</div>
             </div>
-            <!-- 【新增】管理入口按钮 -->
+            <!-- 管理入口按钮 -->
             <div class="col-auto ms-auto">
                 <a href="{% url 'project_score_rule_list' %}" class="btn btn-outline-primary">
                     <i class="ti ti-settings me-1"></i>配置评分规则
@@ -29,7 +29,14 @@
                             <th>成员</th>
                             <th>参与项目</th>
                             <th>角色分布</th>
-                            <th class="text-end">累计绩效得分 (S_member)</th>
+                            <th class="text-end">
+                                有效贡献得分
+                                <i class="ti ti-help-alt text-muted" title="考虑项目等级加权后的总分"></i>
+                            </th>
+                            <th class="text-end">
+                                基础工作量得分
+                                <i class="ti ti-help-alt text-muted" title="不考虑等级加权，仅反映产出与投入的原始得分"></i>
+                            </th>
                             <th class="w-1">操作</th>
                         </tr>
                     </thead>
@@ -58,8 +65,11 @@
                                     <span class="badge bg-secondary-lt">其他: {{ item.roles.OTHER }}</span>
                                 </div>
                             </td>
-                            <td class="text-end" data-label="得分">
-                                <div class="h2 m-0 text-primary font-weight-bold">{{ item.total_score|floatformat:1 }}</div>
+                            <td class="text-end" data-label="有效贡献得分">
+                                <div class="h3 m-0 text-primary fw-bold">{{ item.effective_score|floatformat:2 }}</div>
+                            </td>
+                            <td class="text-end" data-label="基础工作量得分">
+                                <div class="h3 m-0 text-secondary font-weight-bold">{{ item.workload_score|floatformat:2 }}</div>
                             </td>
                             <td>
                                 <div class="btn-list flex-nowrap">
@@ -71,7 +81,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">暂无绩效数据</td>
+                            <td colspan="6" class="text-center py-5 text-muted">暂无绩效数据</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -80,17 +90,46 @@
         </div>
     </div>
 
-    <!-- 2. 说明卡片 -->
-    <div class="col-md-6">
-        <div class="card bg-primary-lt">
+    <!-- 2. 算法说明卡片 -->
+    <div class="col-12">
+        <div class="card bg-primary-lt border-primary-subtle">
             <div class="card-body">
-                <h3 class="card-title text-primary"><i class="ti ti-info-circle me-1"></i>评分说明</h3>
-                <ul class="list-unstyled small text-secondary" style="line-height: 1.8;">
-                    <li>1. <strong>项目总分 (S_project)</strong>：取项目已完成节点中最高的业务分值。</li>
-                    <li>2. <strong>个人得分 (S_member)</strong>：项目总分 × 成员在该项目中的工作量占比。</li>
-                    <li>3. <strong>自动更新</strong>：系统会在节点状态更新后自动重算，无需人工干预。</li>
-                    <li>4. <strong>数据范围</strong>：仅统计当前系统中已分配成员的项目数据。</li>
-                </ul>
+                <h3 class="card-title text-primary"><i class="ti ti-calculator me-2"></i>成员绩效双分制算法说明</h3>
+                <div class="row g-4">
+                    <div class="col-md-7">
+                        <div class="space-y-3">
+                            <!-- 公式1 -->
+                            <div class="p-3 bg-white rounded-3 border shadow-sm">
+                                <div class="subheader mb-1 text-primary">1. 有效贡献得分 (含等级加权)</div>
+                                <div class="h3 mb-0 fw-bold">
+                                    Σ [ (质量分 × 占比 / 100) <span class="text-danger">× 等级因子</span> ]
+                                </div>
+                                <div class="text-muted small mt-1">反映成员在攻坚重点项目、高价值项目上的贡献度。</div>
+                            </div>
+                            <!-- 公式2 -->
+                            <div class="p-3 bg-white rounded-3 border shadow-sm">
+                                <div class="subheader mb-1 text-secondary">2. 基础工作量得分 (原始产出)</div>
+                                <div class="h3 mb-0 fw-bold text-secondary">
+                                    Σ [ (质量分 × 占比 / 100) ]
+                                </div>
+                                <div class="text-muted small mt-1">反映成员的通用产出效率，不随项目难度波动。</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-5">
+                        <div class="subheader mb-2 text-primary">核心逻辑</div>
+                        <ul class="list-unstyled space-y-2">
+                            <li class="d-flex align-items-start small">
+                                <i class="ti ti-star-filled text-warning mt-1 me-2"></i>
+                                <span><strong>双维评价：</strong> 既看“做了多少”（工作量），也看“做了多难”（贡献度）。</span>
+                            </li>
+                            <li class="d-flex align-items-start small">
+                                <i class="ti ti-refresh text-blue mt-1 me-2"></i>
+                                <span><strong>实时统计：</strong> 得分随项目节点状态实时流转，系统自动加权。</span>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
