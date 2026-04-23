@@ -2,8 +2,7 @@ import django_filters
 from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
-from django.db.models import Subquery, OuterRef
-from app_project.models import Project, ProjectNode # 导入 ProjectNode
+from app_project.models import Project, ProjectNode
 from common_utils.filters import DateRangeFilterMixin
 
 User = get_user_model()
@@ -31,15 +30,11 @@ class ProjectStatisticsFilter(django_filters.FilterSet):
     项目统计专用过滤器
     """
     start_date = django_filters.DateFilter(
-        field_name='nodes__updated_at', # 这里的 field_name 只是一个占位符，实际过滤逻辑在 method 中
-        lookup_expr='gte',
         label='立项开始日期',
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         method='filter_init_time'
     )
     end_date = django_filters.DateFilter(
-        field_name='nodes__updated_at', # 这里的 field_name 只是一个占位符，实际过滤逻辑在 method 中
-        lookup_expr='lte',
         label='立项结束日期',
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         method='filter_init_time'
@@ -64,25 +59,20 @@ class ProjectStatisticsFilter(django_filters.FilterSet):
         fields = ['start_date', 'end_date', 'group', 'manager']
 
     def filter_init_time(self, queryset, name, value):
+        """
+        核心逻辑：精准定位 order=1 且 stage='INIT' 的节点，使用其 updated_at 进行筛选
+        """
         if not value:
             return queryset
         
-        # 子查询：获取每个项目的第一个 INIT 节点的 updated_at
-        # 假设 INIT 节点总是 order=1
-        init_node_updated_at_subquery = ProjectNode.objects.filter(
-            project=OuterRef('pk'),
+        lookup = 'gte' if name == 'start_date' else 'lte'
+        
+        # 1. 直接在 ProjectNode 表中查找符合条件的第一个节点的项目 ID
+        target_project_ids = ProjectNode.objects.filter(
             stage='INIT',
-            order=1
-        ).values('updated_at')[:1]
-
-        # 为 queryset 标注一个 init_date 字段，然后基于此进行过滤
-        queryset = queryset.annotate(
-            init_date=Subquery(init_node_updated_at_subquery)
-        )
-
-        if name == 'start_date':
-            return queryset.filter(init_date__date__gte=value).distinct()
-        if name == 'end_date':
-            return queryset.filter(init_date__date__lte=value).distinct()
-
-        return queryset
+            order=1,
+            **{f'updated_at__date__{lookup}': value}
+        ).values_list('project_id', flat=True)
+        
+        # 2. 将结果限制在这些 ID 中
+        return queryset.filter(id__in=target_project_ids)

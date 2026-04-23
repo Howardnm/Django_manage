@@ -1,12 +1,13 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="page-header d-print-none mb-3">
     <div class="container-xl">
         <div class="row g-2 align-items-center">
             <div class="col">
-                <h2 class="page-title">项目统计看板</h2>
-                <div class="text-muted small mt-1">从立项时间维度分析项目分布与交付效率</div>
+                <h2 class="page-title">项目数据统计中心</h2>
+                <div class="text-muted small mt-1">立项维度全局效率分析</div>
             </div>
         </div>
     </div>
@@ -14,10 +15,10 @@
 
 <div class="page-body">
     <div class="container-xl">
-        <!-- 筛选栏 -->
+        <!-- 1. 筛选栏 -->
         <div class="card mb-3">
             <div class="card-body">
-                <form method="get" class="row g-3">
+                <form id="stats-filter-form" class="row g-3">
                     <div class="col-md-3">
                         <label class="form-label">立项开始日期</label>
                         {{ filter.form.start_date }}
@@ -35,245 +36,210 @@
                         {{ filter.form.manager }}
                     </div>
                     <div class="col-md-2 d-flex align-items-end">
-                        <button type="submit" class="btn btn-primary w-100">
-                            <i class="ti ti-search me-1"></i>筛选
-                        </button>
+                        <button type="submit" class="btn btn-primary w-100 me-2">筛选</button>
+                        <a href="{% url 'project_statistics' %}" class="btn btn-ghost-secondary w-100">重置</a>
                     </div>
                 </form>
             </div>
         </div>
 
-        <!-- 第一部分：项目数量统计 -->
-        <div class="row row-cards mb-4">
-            <div class="col-12">
-                <div class="subheader mb-2">① 项目执行状态分布 (总计: {{ total_projects }} 个项目)</div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-blue text-white avatar"><i class="ti ti-code"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">开发中</div>
-                                <div class="text-muted small">研发首轮进行中</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.in_development }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-azure text-white avatar"><i class="ti ti-package"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">一次送样</div>
-                                <div class="text-muted small">客户小试首轮</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.first_sample_delivery }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-orange text-white avatar"><i class="ti ti-refresh"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">不合格再开发</div>
-                                <div class="text-muted small">研发多轮迭代</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0 text-orange">{{ stats.re_development }}</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-yellow text-white avatar"><i class="ti ti-truck-delivery"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">多次送样</div>
-                                <div class="text-muted small">客户小试多轮</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0 text-yellow">{{ stats.multiple_sample_deliveries }}</div>
-                            </div>
+        <div id="stats-container" class="opacity-0 transition-opacity">
+            <!-- 2. 项目执行分布 (柱状图) -->
+            <div class="row mb-4">
+                <div class="col-12">
+                    <div class="subheader mb-2">① 项目执行分布 (总计 <span id="total-projects-count">0</span>)</div>
+                    <div class="card">
+                        <div class="card-body">
+                            <div id="distribution-column-chart" style="height: 350px; width: 100%;"></div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-indigo text-white avatar"><i class="ti ti-checkbox"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">合格待产</div>
-                                <div class="text-muted small">小试通过/待量产</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.qualified_awaiting_production }}</div>
-                            </div>
+            <!-- 3. 核心交付指标 (独立 5 个 Gauge) -->
+            <div class="row row-cards">
+                <div class="col-12"><div class="subheader mb-3">② 核心交付指标分析 (质量与转化)</div></div>
+
+                <div class="col">
+                    <div class="card h-100 border-bottom border-success border-2">
+                        <div class="card-body p-2 text-center">
+                            <div id="gauge-pass-rate" style="height: 250px;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-teal text-white avatar"><i class="ti ti-flask"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">已中试</div>
-                                <div class="text-muted small">已完成客户中试</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.mid_test_completed }}</div>
-                            </div>
+                <div class="col">
+                    <div class="card h-100 border-bottom border-info border-2">
+                        <div class="card-body p-2 text-center">
+                            <div id="gauge-mass-prod-rate" style="height: 250px;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-green text-white avatar"><i class="ti ti-award"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">已量产</div>
-                                <div class="text-muted small">项目圆满交付</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0 text-green">{{ stats.mass_production_completed }}</div>
-                            </div>
+                <div class="col">
+                    <div class="card h-100 border-bottom border-info border-2">
+                        <div class="card-body p-2 text-center">
+                            <div id="gauge-feedback-rate" style="height: 250px;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body border-start border-warning border-3">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-warning text-white avatar"><i class="ti ti-player-pause"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">暂停</div>
-                                <div class="text-muted small">待命状态项目</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.paused }}</div>
-                            </div>
+                <div class="col">
+                    <div class="card h-100 border-bottom border-warning border-2">
+                        <div class="card-body p-2 text-center">
+                            <div id="gauge-pause-rate" style="height: 250px;"></div>
                         </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-sm-6 col-lg-3">
-                <div class="card card-sm">
-                    <div class="card-body border-start border-danger border-3">
-                        <div class="row align-items-center">
-                            <div class="col-auto">
-                                <span class="bg-danger text-white avatar"><i class="ti ti-circle-x"></i></span>
-                            </div>
-                            <div class="col">
-                                <div class="font-weight-medium">已终止</div>
-                                <div class="text-muted small">由于各种原因中止</div>
-                            </div>
-                            <div class="col-auto">
-                                <div class="h2 mb-0">{{ stats.terminated }}</div>
-                            </div>
+                <div class="col">
+                    <div class="card h-100 border-bottom border-danger border-2">
+                        <div class="card-body p-2 text-center">
+                            <div id="gauge-termination-rate" style="height: 250px;"></div>
                         </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- 第二部分：项目数据分析 -->
-        <div class="row row-cards">
-            <div class="col-12">
-                <div class="subheader mb-2">② 核心交付指标分析 (剔除终止项目后的质量表现)</div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="subheader">项目合格率 (中试及以上)</div>
-                        <div class="h1 mb-3">{{ analysis.pass_rate|floatformat:1 }}%</div>
-                        <div class="progress progress-sm">
-                            <div class="progress-bar bg-green" style="width: {{ analysis.pass_rate }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="subheader">项目量产转化率</div>
-                        <div class="h1 mb-3">{{ analysis.mass_prod_rate|floatformat:1 }}%</div>
-                        <div class="progress progress-sm">
-                            <div class="progress-bar bg-primary" style="width: {{ analysis.mass_prod_rate }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="subheader">客户意见反馈率</div>
-                        <div class="h1 mb-3">{{ analysis.feedback_rate|floatformat:1 }}%</div>
-                        <div class="progress progress-sm">
-                            <div class="progress-bar bg-info" style="width: {{ analysis.feedback_rate }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body">
-                        <div class="subheader">项目暂停率</div>
-                        <div class="h1 mb-3">{{ analysis.pause_rate|floatformat:1 }}%</div>
-                        <div class="progress progress-sm">
-                            <div class="progress-bar bg-warning" style="width: {{ analysis.pause_rate }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-6 col-lg-4">
-                <div class="card">
-                    <div class="card-body border-bottom border-danger border-3">
-                        <div class="subheader">项目整体终止率</div>
-                        <div class="h1 mb-3">{{ analysis.termination_rate|floatformat:1 }}%</div>
-                        <div class="progress progress-sm">
-                            <div class="progress-bar bg-danger" style="width: {{ analysis.termination_rate }}%"></div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        <!-- 加载动画 -->
+        <div id="stats-loader" class="text-center py-5">
+            <div class="spinner-border text-primary" role="status"></div>
+            <div class="mt-2 text-muted">正在载入统计数据...</div>
         </div>
     </div>
 </div>
+
+<!-- 脚本资源 -->
+<script src="{% static 'highcharts/core-12.5.0/highcharts.js' %}"></script>
+<script src="{% static 'highcharts/core-12.5.0/highcharts-more.js' %}"></script>
+<script src="{% static 'highcharts/core-12.5.0/modules/solid-gauge.js' %}"></script>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const form = document.getElementById('stats-filter-form');
+        const container = document.getElementById('stats-container');
+        const loader = document.getElementById('stats-loader');
+
+        // 通用仪表盘配置模版
+        const getGaugeOptions = (containerId, value, color, titleText) => ({
+            chart: {
+                type: 'solidgauge',
+                backgroundColor: 'transparent',
+                height: 250 // Increased height for full circle
+            },
+            title: {
+                text: titleText, // Display title above the gauge
+                verticalAlign: 'top',
+                y: 20, // Adjust position
+                style: {
+                    fontSize: '20px',
+                    color: '#555'
+                }
+            },
+            pane: {
+                center: ['50%', '50%'], // Center for full circle
+                size: '80%', // Adjust size to fit in container
+                startAngle: 0, // Full circle
+                endAngle: 360, // Full circle
+                background: [{ // Track background
+                    outerRadius: '100%',
+                    innerRadius: '76%', // 24% thick track
+                    backgroundColor: Highcharts.color(color).setOpacity(0.2).get(), // Lighter track color
+                    borderWidth: 0
+                }]
+            },
+            tooltip: {
+                enabled: false // Percentage in center is enough
+            },
+            yAxis: {
+                min: 0,
+                max: 100,
+                lineWidth: 0,
+                tickPositions: [],
+                labels: { enabled: false } // Disable yAxis labels
+            },
+            plotOptions: {
+                solidgauge: {
+                    dataLabels: {
+                        enabled: true, // Enable data labels
+                        y: -35, // Center vertically
+                        borderWidth: 0,
+                        useHTML: true,
+                        format: '<div style="text-align:center"><span style="font-size:2.5rem;font-weight:bold;color:'+color+'">{y}%</span></div>'
+                    },
+                    linecap: 'round',
+                    stickyTracking: false,
+                    rounded: true,
+                    innerRadius: '76%', // Series fill this area
+                    radius: '100%'
+                }
+            },
+            series: [{
+                name: titleText,
+                data: [{
+                    color: color,
+                    y: parseFloat(value)
+                }]
+            }],
+            credits: { enabled: false }
+        });
+
+        const loadData = () => {
+            container.classList.add('opacity-0');
+            loader.classList.remove('d-none');
+
+            const params = new URLSearchParams(new FormData(form)).toString();
+            fetch(`?${params}&format=json`)
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-projects-count').textContent = data.total_projects;
+
+                    // 1. 渲染柱状图
+                    renderColumnChart(data.stats);
+
+                    // 2. 渲染 5 个独立仪表盘
+                    Highcharts.chart('gauge-pass-rate', getGaugeOptions('gauge-pass-rate', data.analysis.pass_rate, '#2fb344', '项目合格率'));
+                    Highcharts.chart('gauge-mass-prod-rate', getGaugeOptions('gauge-mass-prod-rate', data.analysis.mass_prod_rate, '#206bc4', '量产转化率'));
+                    Highcharts.chart('gauge-feedback-rate', getGaugeOptions('gauge-feedback-rate', data.analysis.feedback_rate, '#4299e1', '客户意见反馈率'));
+                    Highcharts.chart('gauge-pause-rate', getGaugeOptions('gauge-pause-rate', data.analysis.pause_rate, '#f59f00', '项目暂停率'));
+                    Highcharts.chart('gauge-termination-rate', getGaugeOptions('gauge-termination-rate', data.analysis.termination_rate, '#d63939', '项目整体终止率'));
+
+                    loader.classList.add('d-none');
+                    container.classList.remove('opacity-0');
+                });
+        };
+
+        const renderColumnChart = (stats) => {
+            Highcharts.chart('distribution-column-chart', {
+                chart: { type: 'column', backgroundColor: 'transparent' },
+                title: null,
+                xAxis: {
+                    categories: ['开发中', '不合格再开发', '已开发未送样', '一次送样', '多次送样', '合格待产', '已中试', '已量产', '暂停', '终止'],
+                    crosshair: true
+                },
+                yAxis: { min: 0, title: { text: '项目数量 (个)' } },
+                tooltip: { headerFormat: '<b>{point.key}</b><br>', pointFormat: '数量: {point.y} 个' },
+                plotOptions: {
+                    column: {
+                        pointPadding: 0.2, borderWidth: 0, borderRadius: 4,
+                        dataLabels: { enabled: true }
+                    }
+                },
+                series: [{
+                    name: '当前状态项目数',
+                    colorByPoint: true,
+                    colors: ['#206bc4', '#f59f00', '#6772e5', '#4299e1', '#f1c40f', '#00b894', '#1abc9c', '#2fb344', '#666', '#d63939'],
+                    data: [
+                        stats.in_development, stats.re_development, stats.developed_not_sampled,
+                        stats.first_sample_delivery, stats.multiple_sample_deliveries,
+                        stats.qualified_awaiting_production, stats.mid_test_completed,
+                        stats.mass_production_completed, stats.paused, stats.terminated
+                    ]
+                }],
+                legend: { enabled: false },
+                credits: { enabled: false }
+            });
+        };
+
+        form.addEventListener('submit', (e) => { e.preventDefault(); loadData(); });
+        loadData();
+    });
+</script>
 {% endblock %}
