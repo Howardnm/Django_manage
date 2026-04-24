@@ -49,7 +49,7 @@
                                 {% endif %}
                             </td>
                             <td>
-                                <span class="badge bg-green-lt">{{ rule.get_trigger_status_display }}</span>
+                                <span class="badge {{ rule.status_css_class }}">{{ rule.get_trigger_status_display }}</span>
                             </td>
                             <td>
                                 {% if rule.is_multiple_rounds %}

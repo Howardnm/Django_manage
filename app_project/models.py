@@ -257,3 +257,17 @@ class NodeScoreRule(models.Model):
 
     class Meta:
         verbose_name = "绩效评分规则"
+
+    @property
+    def status_css_class(self):
+        """返回触发状态对应的彩色胶囊样式"""
+        mapping = {
+            'DONE': 'bg-green-lt',
+            'FAILED': 'bg-red-lt',
+            'TERMINATED': 'bg-dark-lt',
+            'PENDING': 'bg-secondary-lt',
+            'DOING': 'bg-blue-lt',
+            'PAUSED': 'bg-warning-lt',
+            'FEEDBACK': 'bg-yellow-lt',
+        }
+        return mapping.get(self.trigger_status, 'bg-secondary-lt')
