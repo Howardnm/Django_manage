@@ -1,0 +1,60 @@
+<!-- 成员绩效核算体系说明卡片 -->
+<div class="card bg-primary-lt border-primary-subtle shadow-sm">
+    <div class="card-body">
+        <h3 class="card-title text-primary"><i class="ti ti-calculator me-2"></i>成员绩效核算体系说明</h3>
+        <div class="row g-4">
+            <!-- A. 公式展示区 -->
+            <div class="col-md-7">
+                <div class="space-y-3">
+                    <div class="p-3 bg-white rounded-3 border">
+                        <div class="subheader mb-1 text-primary">1. 有效贡献得分 (Effective Score)</div>
+                        <div class="h3 mb-1 fw-bold text-dark">
+                            Σ [ (项目质量分 × 占比 / 100) <span class="text-danger">× 项目等级因子</span> ]
+                        </div>
+                        <div class="text-muted small">反映成员在 **高难度、高价值、重点攻坚项目** 中的贡献表现。等级越高，分值放大效应越明显。</div>
+                    </div>
+                    <div class="p-3 bg-white rounded-3 border">
+                        <div class="subheader mb-1 text-secondary">2. 基础工作量得分 (Workload Score)</div>
+                        <div class="h3 mb-1 fw-bold text-dark">
+                            Σ [ (项目质量分 × 占比 / 100) ]
+                        </div>
+                        <div class="text-muted small">反映成员的 **通用产出效率与基础投入**，无论项目等级如何，只看项目推进质量与个人分工占比。</div>
+                    </div>
+                    <div class="p-3 bg-white rounded-3 border">
+                        <div class="subheader mb-1 text-success">3. 阶段性得分增量 (Increment)</div>
+                        <div class="h3 mb-1 fw-bold text-dark">
+                            Score(截止日期快照) - Score(开始日期快照)
+                        </div>
+                        <div class="text-muted small">通过对两个时间点项目状态进行“切片对比”，得出成员在该周期内通过推进节点获得的 **净绩效增长**。</div>
+                    </div>
+                </div>
+            </div>
+            <!-- B. 指标定义说明 -->
+            <div class="col-md-5">
+                <div class="subheader mb-2 text-primary">关键指标定义</div>
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">项目质量分 (S_project)</div>
+                        <div class="datagrid-content small text-secondary">由项目当前已完成的最高权重节点决定 (0-100)。</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">成员占比 (Share)</div>
+                        <div class="datagrid-content small text-secondary">成员在项目成员名单中所占的工作量权重 (0.0 - 1.0)。</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">项目等级因子 (Factor)</div>
+                        <div class="datagrid-content small text-secondary">A级/B级等不同难度的加权系数 (如 1.5, 1.2)，体现项目价值。</div>
+                    </div>
+                </div>
+                <div class="mt-4 pt-2 border-top">
+                    <div class="subheader mb-2 text-warning">考核导向</div>
+                    <ul class="list-unstyled space-y-1 text-secondary small">
+                        <li><i class="ti ti-target me-1"></i>鼓励参与重点、难点项目攻坚</li>
+                        <li><i class="ti ti-rocket me-1"></i>认可日常基础研发的持续投入</li>
+                        <li><i class="ti ti-calendar-event me-1"></i>实时追踪周/月度任务完成质量</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

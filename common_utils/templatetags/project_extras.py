@@ -18,10 +18,15 @@ def url_replace(context, **kwargs):
 @register.filter
 def sort_toggle(field_name, current_sort):
     """
-    (旧版单选逻辑，保留兼容)
+    Toggles sorting order for a given field.
+    If current_sort is 'field_name', returns '-field_name'.
+    If current_sort is '-field_name', returns 'field_name'.
+    Otherwise, returns 'field_name'.
     """
     if current_sort == field_name:
         return f"-{field_name}"
+    elif current_sort == f"-{field_name}": # 修复：正确判断是否为降序
+        return field_name
     else:
         return field_name
 
