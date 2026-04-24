@@ -89,7 +89,7 @@
                             <th>项目名称 / 客户</th>
                             <th>我的角色</th>
                             <th class="text-center">项目等级</th>
-                            <th class="text-center">质量分 / 占比</th>
+                            <th class="text-center">质量分 / 占比 / 进度</th>
                             <th class="text-end">有效贡献分</th>
                             <th class="text-end text-muted small">基础工作量分</th>
                         </tr>
@@ -122,9 +122,14 @@
                                 {% endif %}
                             </td>
                             <td class="text-center">
-                                <div><span class="text-azure fw-bold">{{ m.project.quality_score }}</span> / <span class="text-orange">{{ m.workload_share }}</span></div>
-                                <div class="progress progress-xs mt-1">
-                                    <div class="progress-bar bg-azure" style="width: {{ m.project.progress_percent }}%"></div>
+                                <div class="mb-1">
+                                    <span class="text-azure fw-bold" title="项目质量得分">{{ m.project.quality_score }}</span>
+                                    <span class="text-muted mx-1">/</span>
+                                    <span class="text-orange" title="工作量占比">{{ m.workload_share }}</span>
+                                    <span class="text-muted small ms-2">({{ m.project.progress_percent }}%)</span>
+                                </div>
+                                <div class="progress progress-xs">
+                                    <div class="progress-bar {{ m.project.progress_bar_css_class }}" style="width: {{ m.project.progress_percent }}%"></div>
                                 </div>
                             </td>
                             <td class="text-end">

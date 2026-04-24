@@ -99,10 +99,13 @@ def _update_project_current_stage(project):
     # --- C. 计算是否终止 ---
     new_is_terminated = terminated_node is not None
 
-    # --- D. 【核心修复】项目质量分逻辑调整 ---
-    # 不再取全局 Max，而是取“最近一个已有结果节点”的得分
-    # 逻辑：在所有状态为 DONE, FAILED, TERMINATED 的节点中，取 order 最大的那个
-    last_terminal_node = all_nodes.filter(status__in=['DONE', 'FAILED', 'TERMINATED']).last()
+    # --- D. 【核心优化】项目质量分逻辑调整 ---
+    # 不再取全局 Max，而是取“最近一个已有结果且非反馈阶段的节点”的得分
+    # 逻辑：在所有状态为 DONE, FAILED, TERMINATED 的非 FEEDBACK 节点中，取 order 最大的那个
+    last_terminal_node = all_nodes.filter(
+        status__in=['DONE', 'FAILED', 'TERMINATED']
+    ).exclude(stage=ProjectStage.FEEDBACK).last()
+
     current_quality_score = last_terminal_node.final_score if last_terminal_node else 0
 
     # --- E. 批量更新 ---
