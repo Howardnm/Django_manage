@@ -14,38 +14,6 @@ from app_repository.mixins import RepositoryAccessMixin
 
 User = get_user_model()
 
-# ==========================================
-# 3. 项目档案视图 (Project Repository)
-# ==========================================
-
-class ProjectRepositoryListView(RepositoryAccessMixin, ListView):
-    """
-    项目档案列表：
-    - 准入：需有 app_repository.view_projectrepository。
-    - 隔离：智能识别 salesperson 字段并进行部门隔离。
-    """
-    permission_required = 'app_repository.view_projectrepository'
-    model = ProjectRepository
-    template_name = 'apps/app_repository/project_repo/repo_list.html'
-    context_object_name = 'repos'
-    paginate_by = 10
-
-    def get_queryset(self):
-        # 1. 调用 Mixin 自动执行“负责人+部门”双重过滤逻辑
-        base_qs = super().get_queryset().select_related(
-            'project', 'project__manager', 'customer', 'oem', 'material', 'salesperson'
-        ).prefetch_related('files').order_by('-updated_at')
-        
-        # 2. 应用过滤器
-        self.filterset = ProjectRepositoryFilter(self.request.GET, queryset=base_qs)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        context['current_sort'] = self.request.GET.get('sort', '')
-        return context
-
 
 class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
     """档案更新：需有 change_projectrepository 权限，且仅限本部门。"""

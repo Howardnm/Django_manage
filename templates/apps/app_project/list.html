@@ -11,10 +11,12 @@
                 <thead>
                 <tr>
                     <th>项目名称</th>
-                    <th>客户 / 产品</th>
+                    <th>客户 / OEM</th>
+                    <th>产品名称</th>
+                    <th>负责人 / 业务员</th>
+                    <th class="text-center">等级 / 得分</th>
                     <th>进度概览</th>
-                    <th style="width: 30%;">最新进展</th>
-                    <th>创建时间</th>
+                    <th style="width: 25%;">最新进展</th>
                     <th>操作</th>
                 </tr>
                 </thead>
@@ -22,34 +24,80 @@
                 {% for project in page_obj %}
                     <tr>
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ project.name }}">
+                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 180px;" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
-                            <div class="text-purple small d-flex align-items-center mt-1">
-                                <i class="ti ti-user-circle me-1"></i>
-                                <span>{{ project.manager.username }}</span>
+                            <div class="text-muted small mt-1">
+                                <i class="ti ti-calendar-event me-1"></i>{{ project.created_at|date:"Y-m-d" }}
                             </div>
                         </td>
                         
                         <td>
                             {% if project.repository.customer %}
-                                <div class="d-flex align-items-center">
-                                    <span class="avatar avatar-xs bg-blue-lt rounded me-2">{{ project.repository.customer.company_name|slice:":1" }}</span>
-                                    <span class="text-reset text-truncate" style="max-width: 150px;" title="{{ project.repository.customer.company_name }}">
+                                <div class="d-flex align-items-center mb-1">
+                                    <span class="badge bg-blue-lt me-2" style="min-width: 40px;">客户</span>
+                                    <span class="text-reset text-truncate" style="max-width: 120px;" title="{{ project.repository.customer.company_name }}">
                                         {{ project.repository.customer.short_name|default:project.repository.customer.company_name }}
                                     </span>
                                 </div>
-                            {% else %}
-                                <span class="text-muted">-</span>
                             {% endif %}
-                            
-                            {# 关键修改：在下方显示产品名称和代码 #}
-                            {% if project.repository.product_name or project.repository.product_code %}
-                                <div class="text-blue small text-truncate mt-1" style="max-width: 150px;" title="{{ project.repository.product_name }} | {{ project.repository.product_code }}">
-                                    <i class="ti ti-package me-1 opacity-50"></i>
-                                    <span>{{ project.repository.product_name|default_if_none:"" }} {{ project.repository.product_code|default_if_none:"" }}</span>
+                            {% if project.repository.oem %}
+                                <div class="d-flex align-items-center">
+                                    <span class="badge bg-indigo-lt me-2" style="min-width: 40px;">OEM</span>
+                                    <span class="text-reset text-truncate" style="max-width: 120px;" title="{{ project.repository.oem.name }}">
+                                        {{ project.repository.oem.short_name|default:project.repository.oem.name }}
+                                    </span>
                                 </div>
                             {% endif %}
+                            {% if not project.repository.customer and not project.repository.oem %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if project.repository.product_name %}
+                                <div class="font-weight-medium text-truncate" style="max-width: 150px;" title="{{ project.repository.product_name }}">
+                                    {{ project.repository.product_name }}
+                                </div>
+                                {% if project.repository.product_code %}
+                                    <div class="text-muted small text-truncate" style="max-width: 150px;" title="{{ project.repository.product_code }}">
+                                        {{ project.repository.product_code }}
+                                    </div>
+                                {% endif %}
+                            {% else %}
+                                <span class="text-muted small">-</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="d-flex align-items-center mb-1" title="项目负责人">
+                                <span class="avatar avatar-xs bg-purple-lt rounded me-2">研</span>
+                                <span class="text-reset">{{ project.manager.username }}</span>
+                            </div>
+                            {% if project.repository.salesperson %}
+                                <div class="d-flex align-items-center" title="负责业务员">
+                                    <span class="avatar avatar-xs bg-azure-lt rounded me-2">商</span>
+                                    <span class="text-reset">{{ project.repository.salesperson.username }}</span>
+                                </div>
+                            {% else %}
+                                <div class="text-muted small ps-4">未指定业务</div>
+                            {% endif %}
+                        </td>
+
+                        {# 等级与得分合并列 #}
+                        <td class="text-center">
+                            <div class="d-flex flex-column align-items-center gap-1">
+                                {% if project.grade %}
+                                    <span class="badge bg-purple text-purple-fg" title="加权因子: {{ project.grade.factor }}" style="min-width: 35px;">
+                                        {{ project.grade.name }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary-lt" style="min-width: 35px;">-级</span>
+                                {% endif %}
+                                <span class="badge bg-yellow text-yellow-fg fw-bold px-2" title="当前质量得分" style="min-width: 35px;">
+                                    {{ project.quality_score|floatformat:0 }}
+                                </span>
+                            </div>
                         </td>
                         
                         <td>
@@ -85,10 +133,6 @@
                             {% endif %}
                         </td>
                         
-                        <td class="text-muted">
-                            {{ project.created_at|date:"Y-m-d" }}
-                        </td>
-                        
                         <td>
                             <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="管理项目">
                                 <i class="ti ti-settings"></i>
@@ -97,7 +141,7 @@
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-5">
+                        <td colspan="11" class="text-center py-5">
                             <div class="empty">
                                 <div class="empty-icon"><i class="ti ti-folder-off fs-1 opacity-25"></i></div>
                                 <p class="empty-title">没有找到项目</p>

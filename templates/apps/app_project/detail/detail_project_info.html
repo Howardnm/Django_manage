@@ -1,12 +1,24 @@
 <div class="card mb-3 shadow-sm border-0 overflow-hidden">
     <!-- 1. 顶部：负责人信息 + 项目质量分展示 -->
     <div class="card-header bg-primary-lt border-0 d-flex align-items-center py-3">
-        <!-- 勋章式项目得分展示 (左侧) -->
+        <!-- 【新增】项目等级展示 (左侧) -->
+        {% if project.grade %}
+        <div class="me-2">
+            <div class="badge bg-purple text-purple-fg shadow-sm d-flex flex-column align-items-center justify-content-center"
+                 style="width: 54px; height: 54px; border-radius: 12px;"
+                 title="项目等级因子: {{ project.grade.factor }}">
+                <span style="font-size: 0.7rem; font-weight: bold; opacity: 0.9;">等级</span>
+                <span style="font-size: 1.1rem; font-weight: 800;">{{ project.grade.name }}</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 勋章式项目得分展示 -->
         <div class="me-3">
             <div class="badge bg-yellow text-yellow-fg shadow-sm d-flex flex-column align-items-center justify-content-center"
                  style="width: 54px; height: 54px; border-radius: 12px;"
                  title="当前项目经营质量得分">
-                <span style="font-size: 0.7rem; font-weight: bold; opacity: 0.9;">质量分</span>
+                <span style="font-size: 0.7rem; font-weight: bold; opacity: 0.9;">得分</span>
                 <span style="font-size: 1.2rem; font-weight: 800;">{{ project.quality_score|floatformat:0 }}</span>
             </div>
         </div>

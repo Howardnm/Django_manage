@@ -38,9 +38,8 @@ class MenuModule:
             "name": "客户档案中心",
             "icon": "ti-archive",
             "visible_to": IdentityConfig.INTERNAL_STAFF,
-            "url_name": "repo_list",
+            "url_name": "repo_customer_list",
             "sub_items": [
-                {"name": "项目档案库", "url_name": "repo_list"},
                 {"name": "客户资料库", "url_name": "repo_customer_list"},
                 {"name": "客户评分排行", "url_name": "repo_customer_ranking"},
                 {"name": "主机厂(OEM)库", "url_name": "repo_oem_list"},
