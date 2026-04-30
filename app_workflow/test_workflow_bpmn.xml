@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_1"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- 项目节点审批流程：演示串行 → 条件分支 → 并行审批 完整链路 -->
+  <bpmn:process id="project_node_approval" name="项目节点审批流程" isExecutable="true">
+
+    <bpmn:startEvent id="StartEvent" name="发起审批">
+      <bpmn:outgoing>Flow_to_dept_mgr</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- 第1步：部门经理审批（候选人组） -->
+    <bpmn:userTask id="Task_dept_mgr" name="部门经理审批" camunda:candidateGroups="dept_manager">
+      <bpmn:incoming>Flow_to_dept_mgr</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_dir</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 第2步：研发总监审批（具体指派人） -->
+    <bpmn:userTask id="Task_director" name="研发总监审批" camunda:assignee="rnd_dir">
+      <bpmn:incoming>Flow_to_dir</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 并行网关 Fork：工艺复核 + 销售确认 同时进行 -->
+    <bpmn:parallelGateway id="Gateway_fork" name="并行分发">
+      <bpmn:incoming>Flow_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_process</bpmn:outgoing>
+      <bpmn:outgoing>Flow_to_sales</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <!-- 第3a步：工艺复核 -->
+    <bpmn:userTask id="Task_process" name="工艺复核" camunda:candidateGroups="process_lead">
+      <bpmn:incoming>Flow_to_process</bpmn:incoming>
+      <bpmn:outgoing>Flow_process_done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 第3b步：销售确认 -->
+    <bpmn:userTask id="Task_sales" name="销售确认" camunda:candidateGroups="sales_lead">
+      <bpmn:incoming>Flow_to_sales</bpmn:incoming>
+      <bpmn:outgoing>Flow_sales_done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- 并行网关 Join：等待并行分支全部完成 -->
+    <bpmn:parallelGateway id="Gateway_join" name="并行汇聚">
+      <bpmn:incoming>Flow_process_done</bpmn:incoming>
+      <bpmn:incoming>Flow_sales_done</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_end</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:endEvent id="EndEvent" name="审批完成">
+      <bpmn:incoming>Flow_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- 连线定义 -->
+    <bpmn:sequenceFlow id="Flow_to_dept_mgr" sourceRef="StartEvent" targetRef="Task_dept_mgr" />
+    <bpmn:sequenceFlow id="Flow_to_dir" sourceRef="Task_dept_mgr" targetRef="Task_director" />
+    <bpmn:sequenceFlow id="Flow_to_gateway" sourceRef="Task_director" targetRef="Gateway_fork" />
+    <bpmn:sequenceFlow id="Flow_to_process" sourceRef="Gateway_fork" targetRef="Task_process" />
+    <bpmn:sequenceFlow id="Flow_to_sales" sourceRef="Gateway_fork" targetRef="Task_sales" />
+    <bpmn:sequenceFlow id="Flow_process_done" sourceRef="Task_process" targetRef="Gateway_join" />
+    <bpmn:sequenceFlow id="Flow_sales_done" sourceRef="Task_sales" targetRef="Gateway_join" />
+    <bpmn:sequenceFlow id="Flow_to_end" sourceRef="Gateway_join" targetRef="EndEvent" />
+
+  </bpmn:process>
+
+  <!-- 图示布局（bpmn-js 编辑器会自动管理此部分） -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="project_node_approval">
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent">
+        <dc:Bounds x="200" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_dept_mgr_di" bpmnElement="Task_dept_mgr">
+        <dc:Bounds x="300" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_director_di" bpmnElement="Task_director">
+        <dc:Bounds x="460" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_fork_di" bpmnElement="Gateway_fork">
+        <dc:Bounds x="620" y="225" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_process_di" bpmnElement="Task_process">
+        <dc:Bounds x="730" y="130" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_sales_di" bpmnElement="Task_sales">
+        <dc:Bounds x="730" y="290" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_join_di" bpmnElement="Gateway_join">
+        <dc:Bounds x="890" y="225" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent">
+        <dc:Bounds x="1000" y="232" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <!-- 连线坐标（简化，编辑器会自动调整） -->
+      <bpmndi:BPMNEdge id="Flow_to_dept_mgr_di" bpmnElement="Flow_to_dept_mgr">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="236" y="248" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="300" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_dir_di" bpmnElement="Flow_to_dir">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="400" y="250" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="460" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_gateway_di" bpmnElement="Flow_to_gateway">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="560" y="250" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="620" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_process_di" bpmnElement="Flow_to_process">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="645" y="225" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="730" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_sales_di" bpmnElement="Flow_to_sales">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="645" y="275" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="730" y="330" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_process_done_di" bpmnElement="Flow_process_done">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="830" y="170" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="915" y="225" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_sales_done_di" bpmnElement="Flow_sales_done">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="830" y="330" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="915" y="275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_end_di" bpmnElement="Flow_to_end">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="940" y="250" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="1000" y="250" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
