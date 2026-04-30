@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    我的待办任务
+                </h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="card">
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap datatable">
+                    <thead>
+                        <tr>
+                            <th>任务名称</th>
+                            <th>所属流程</th>
+                            <th>业务对象</th>
+                            <th>指派给</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in tasks %}
+                        <tr>
+                            <td>{{ task.task_name }}</td>
+                            <td>
+                                <a href="{% url 'workflow_instance_detail' pk=task.instance.pk %}">
+                                    {{ task.instance.definition.name }}
+                                </a>
+                            </td>
+                            <td class="text-muted">
+                                {% if task.instance.content_object %}
+                                    {% if task.related_model_name == 'projectnode' %}
+                                        项目: {{ task.instance.content_object.project.name }} - 阶段: {{ task.instance.content_object.get_stage_display }}
+                                    {% else %}
+                                        {{ task.instance.content_object }}
+                                    {% endif %}
+                                {% else %}
+                                    --
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if task.assigned_to %}
+                                    <span class="badge bg-blue-lt">{{ task.assigned_to.username }} (已指派)</span>
+                                {% elif task.candidate_users.all or task.candidate_groups %} {# 修改这里 #}
+                                    <span class="badge bg-yellow-lt">待签收</span>
+                                    {% if task.candidate_users.all %} {# 修改这里 #}
+                                        <small class="text-muted d-block">候选人: {% for user in task.candidate_users.all %}{{ user.username }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+                                    {% endif %}
+                                    {% if task.candidate_groups %}
+                                        <small class="text-muted d-block">候选组: {% for group in task.candidate_groups %}{{ group }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary-lt">未指派</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ task.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                {% if task.can_process %}
+                                    <a href="{% url 'workflow_instance_detail' pk=task.instance.pk %}" class="btn btn-sm btn-primary">处理</a>
+                                {% elif task.can_claim %}
+                                    <button class="btn btn-sm btn-success claim-btn" data-pk="{{ task.pk }}">签收</button>
+                                {% else %}
+                                    <a href="{% url 'workflow_instance_detail' pk=task.instance.pk %}" class="btn btn-sm btn-outline-secondary">查看</a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-4">目前没有待处理的任务。</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.claim-btn').forEach(btn => {
+        btn.addEventListener('click', async function() {
+            const pk = this.getAttribute('data-pk');
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            if (!confirm('确定要签收此任务吗？签收后，任务将指派给您。')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/workflow/task/${pk}/claim/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json' // 明确指定 Content-Type
+                    },
+                    body: JSON.stringify({}) // POST 请求通常需要 body，即使为空
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    alert(result.message || '任务签收成功！');
+                    window.location.reload();
+                } else {
+                    alert('签收失败：' + result.message);
+                }
+            } catch (err) {
+                console.error('签收请求错误:', err);
+                alert('签收任务时发生错误。');
+            }
+        });
+    });
+</script>
+{% endblock %}

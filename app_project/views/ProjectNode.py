@@ -1,10 +1,13 @@
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
+from django.db import transaction
+from django.contrib import messages
 
 from app_project.forms import ProjectNodeUpdateForm
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import ProjectNode
+from app_workflow.utils import WorkflowEngine
 
 
 # ==========================================
@@ -18,15 +21,17 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
     def get_node_and_check_perm(self, pk):
         """辅助方法：获取节点并检查项目级权限"""
         node = get_object_or_404(ProjectNode, pk=pk)
-        # 统一检查“能否动这个项目”
+        # 统一检查“能否动这个项目” (负责人/同部门/协同成员)
         self.check_object_permission(node.project)
         return node
 
     def get(self, request, pk):
         node = self.get_node_and_check_perm(pk)
+        form = ProjectNodeUpdateForm(instance=node)
+
         return render(request, self.template_name, {
             'node': node,
-            'status_choices': ProjectNode.STATUS_CHOICES
+            'form': form,
         })
 
     def post(self, request, pk):
@@ -34,13 +39,62 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
         form = ProjectNodeUpdateForm(request.POST, instance=node)
 
         if form.is_valid():
-            form.save()
+            with transaction.atomic():
+                new_status = form.cleaned_data.get('status')
+
+                # --- 优化权限逻辑：提交审批 (状态设为 DONE) 必须由项目负责人执行 ---
+                if new_status == 'DONE' and node.project.approval_workflow:
+                    # 检查是否为项目负责人或超级管理员
+                    if not (request.user == node.project.manager or request.user.is_superuser):
+                        # 如果不是负责人，不允许提交审批，返回错误提示
+                        form.add_error('status', "只有项目负责人有权提交审批。")
+                        return render(request, self.template_name, {
+                            'node': node,
+                            'form': form,
+                        })
+
+                    # --- 增强上下文数据，供流程图使用 ---
+                    user = request.user
+                    # 查找部门经理（假设 User 模型有 department 且关联了 manager）
+                    dept_manager = user.department.manager.username if hasattr(user, 'department') and user.department and user.department.manager else user.username
+
+                    context_data = {
+                        'project_name': node.project.name,
+                        'node_stage': node.get_stage_display(),
+                        'applicant_username': user.username,
+                        'department_name': user.department.name if user.department else "未知部门",
+                        'dept_manager': dept_manager,  # 预设部门经理变量
+                    }
+
+                    # 启动审批流程
+                    callback_config = {
+                        'handler': 'app_project.workflow_handlers.handle_project_node_workflow_callback',
+                        'args': {
+                            'node_pk': node.pk,
+                        }
+                    }
+
+                    instance = WorkflowEngine.start_instance(
+                        definition=node.project.approval_workflow,
+                        started_by=request.user,
+                        related_object=node,
+                        context_data=context_data,
+                        callback_config=callback_config
+                    )
+                    # 将节点状态设为待审批，并关联流程实例
+                    node.status = 'AWAITING_APPROVAL'
+                    node.workflow_instance = instance
+                    node.remark = form.cleaned_data.get('remark')
+                    node.save()
+                    return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+
+                # 常规保存 (协同成员可以更新 DOING, PAUSED 等状态，但不能提交 DONE)
+                form.save()
             return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 
         return render(request, self.template_name, {
             'node': node,
-            'status_choices': ProjectNode.STATUS_CHOICES,
-            'form': form
+            'form': form,
         })
 
 
@@ -62,7 +116,6 @@ class NodeFailedView(ProjectAccessMixin, View):
         self.check_object_permission(node.project)
 
         remark = request.POST.get('remark', '测试不通过，需返工')
-        # 业务逻辑已下沉到 Model
         node.perform_failure_logic(remark)
 
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
@@ -85,7 +138,6 @@ class InsertFeedbackView(ProjectAccessMixin, View):
         current_node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(current_node.project)
 
-        # 核心逻辑：直接调用 Model 方法
         current_node.project.handle_customer_feedback(
             current_node=current_node,
             feedback_type=request.POST.get('feedback_type'),

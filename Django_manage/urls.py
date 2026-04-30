@@ -20,6 +20,7 @@ urlpatterns = [
     path('', include('app_panel.urls')),
     path('catalog/', include('app_catalog.urls')), 
     path('project/', include('app_project.urls')),
+    path('workflow/', include('app_workflow.urls')), # 【新增】工作流中心
     path('research/', include('app_basic_research.urls')),
     path('user/', include('app_user.urls')),
     path('repository/', include('app_repository.urls')),

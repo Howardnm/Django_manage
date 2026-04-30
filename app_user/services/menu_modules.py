@@ -13,7 +13,7 @@ class MenuModule:
             "sub_items": [
                 {"name": "系统资源看板", "url_name": "panel_home"},
                 {"name": "项目全景看板", "url_name": "project_overview"},
-                {"name": "项目统计看板", "url_name": "project_statistics"}, # 【新增】
+                {"name": "项目统计看板", "url_name": "project_statistics"},
                 {"name": "客户行为分析", "url_name": "customer_activity_overview"},
                 {"name": "成员绩效榜单", "url_name": "user_performance_list"},
             ]
@@ -29,6 +29,21 @@ class MenuModule:
             "sub_items": [
                 {"name": "项目列表", "url_name": "project_list"},
                 {"name": "成员绩效看板", "url_name": "project_performance_list"},
+            ]
+        }
+
+    @staticmethod
+    def get_workflow():
+        """【新增】工作流审批中心"""
+        return {
+            "name": "流程审批中心",
+            "icon": "ti-git-pull-request",
+            "visible_to": IdentityConfig.INTERNAL_STAFF,
+            "url_name": "workflow_my_tasks",
+            "sub_items": [
+                {"name": "我的待办任务", "url_name": "workflow_my_tasks"},
+                {"name": "我的已办任务", "url_name": "workflow_completed_tasks"}, # 新增
+                {"name": "流程定义管理", "url_name": "workflow_definition_list"},
             ]
         }
 

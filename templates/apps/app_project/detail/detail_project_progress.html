@@ -30,6 +30,13 @@
                                         <i class="ti ti-star-filled me-1"></i>得分: {{ node.final_score|floatformat:0 }}
                                     </span>
                                 {% endif %}
+
+                                <!-- 【联动工作流】显示审批链接 -->
+                                {% if node.workflow_instance %}
+                                    <a href="{% url 'workflow_instance_detail' pk=node.workflow_instance.pk %}" class="badge bg-purple-lt ms-2" title="点击查看审批详情">
+                                        <i class="ti ti-git-pull-request me-1"></i>审批记录
+                                    </a>
+                                {% endif %}
                             </span>
 
                         <!-- 【优化】直接调用 Model 属性获取样式类 -->
@@ -66,6 +73,13 @@
 
                     <!-- 按钮组：使用 d-flex 配合 ms-auto 将上传按钮推向右侧 -->
                     <div class="mt-2 btn-list d-flex">
+                        {% if node.status == 'AWAITING_APPROVAL' %}
+                            <div class="alert alert-info py-1 px-2 mb-0 d-flex align-items-center">
+                                <i class="ti ti-loader-2 ti-spin me-2"></i>
+                                <span class="small">审批流程运行中，请等待审批结果...</span>
+                            </div>
+                        {% endif %}
+
                         {% if node.can_update_status %}
                             <button class="btn btn-sm btn-outline-secondary"
                                     data-bs-toggle="modal"

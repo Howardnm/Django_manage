@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% load static %}
+{% load i18n %} {# 引入 i18n 用于翻译，如果需要的话 #}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">
+                    Workflow Instance
+                </div>
+                <h2 class="page-title">
+                    流程实例详情：{{ instance.definition.name }}
+                </h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <span class="badge {% if instance.status == 'COMPLETED' %}bg-success{% elif instance.status == 'REJECTED' %}bg-danger{% elif instance.status == 'RUNNING' %}bg-primary{% else %}bg-secondary{% endif %} text-white">
+                        {{ instance.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="row row-cards">
+            <!-- 基本信息 -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-info-circle me-2"></i>基本信息
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">流程定义</div>
+                                <div class="datagrid-content">{{ instance.definition.name }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">发起人</div>
+                                <div class="datagrid-content">{{ instance.started_by.username }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">发起时间</div>
+                                <div class="datagrid-content">{{ instance.started_at|date:"Y-m-d H:i" }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">结束时间</div>
+                                <div class="datagrid-content">{{ instance.completed_at|date:"Y-m-d H:i"|default:"--" }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">关联业务</div>
+                                <div class="datagrid-content">
+                                    {% if instance.content_object %}
+                                        {{ instance.content_object }} (ID: {{ instance.object_id }})
+                                    {% else %}
+                                        --
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 关联业务对象详情 (ProjectNode) -->
+                {% if is_project_node and related_object %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-folder-open me-2"></i>项目节点详情
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">所属项目</div>
+                                <div class="datagrid-content">
+                                    <a href="{% url 'project_detail' pk=related_object.project.pk %}">{{ related_object.project.name }}</a>
+                                </div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">节点阶段</div>
+                                <div class="datagrid-content">{{ related_object.get_stage_display }} (第{{ related_object.round }}轮)</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">节点状态</div>
+                                <div class="datagrid-content">
+                                    <span class="badge {{ related_object.status_css_class }}">{{ related_object.get_status_display }}</span>
+                                </div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">最新备注</div>
+                                <div class="datagrid-content">{{ related_object.remark|default:"无" }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">更新时间</div>
+                                <div class="datagrid-content">{{ related_object.updated_at|date:"Y-m-d H:i" }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 流程上下文数据 -->
+                {% if instance.context_data %}
+                <div class="card mt-3">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-database me-2"></i>流程上下文数据
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            {% for key, value in instance.context_data.items %}
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">{{ key }}</div>
+                                <div class="datagrid-content">{{ value }}</div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- 审批操作 & 审批历史时间轴 -->
+            <div class="col-md-8">
+                <!-- 审批操作表单 -->
+                {% if current_task %}
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-checks me-2"></i>待处理任务: {{ current_task.task_name }}
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" action="{% url 'workflow_instance_detail' pk=instance.pk %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label">审批意见</label>
+                                <textarea name="remark" class="form-control" rows="4" placeholder="请输入审批意见..."></textarea>
+                            </div>
+                            <div class="btn-list">
+                                <button type="submit" name="action" value="APPROVE" class="btn btn-success">
+                                    <i class="ti ti-check me-2"></i>通过
+                                </button>
+                                <button type="submit" name="action" value="REJECT" class="btn btn-danger">
+                                    <i class="ti ti-x me-2"></i>驳回
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 审批历史时间轴 -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-history me-2"></i>审批轨迹
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <ul class="steps steps-vertical">
+                            {% for record in history %}
+                            <li class="step-item {% if record.action == 'START' %}active{% endif %}">
+                                <div class="h4 m-0">
+                                    {{ record.get_action_display }}
+                                    <small class="text-muted ms-2">{{ record.timestamp|date:"Y-m-d H:i" }}</small>
+                                </div>
+                                <div class="text-muted">
+                                    操作人: <strong>{{ record.approver.username }}</strong>
+                                    {% if record.task %}
+                                        <span class="ms-2">任务: {{ record.task.task_name }}</span>
+                                    {% endif %}
+                                </div>
+                                {% if record.remark %}
+                                <div class="mt-2 text-primary">
+                                    <i class="ti ti-message-dots icon icon-inline"></i>
+                                    审批意见: {{ record.remark }}
+                                </div>
+                                {% endif %}
+                            </li>
+                            {% endfor %}
+
+                            {% if instance.status == 'RUNNING' %}
+                            <li class="step-item active">
+                                <div class="h4 m-0">等待后续处理...</div>
+                                <div class="text-muted">当前处于流程运行中</div>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- 这里可以添加任何页面特有的JS，目前不需要 -->
+{% endblock %}

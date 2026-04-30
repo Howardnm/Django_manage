@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'app_basic_research.apps.AppBasicResearchConfig',
     'app_catalog.apps.AppCatalogConfig',
     'common_utils.apps.CommonUtilsConfig',
+    'app_workflow.apps.AppWorkflowConfig',             # 工作流模块
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库

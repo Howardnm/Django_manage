@@ -9,12 +9,19 @@ User = get_user_model()
 class ProjectForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'grade', 'description']
+        fields = ['name', 'grade', 'approval_workflow', 'description'] # 添加 approval_workflow
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
+            'approval_workflow': forms.Select(attrs={'class': 'form-select'}), # 下拉选择审批流
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 仅显示启用的流程定义
+        from app_workflow.models import WorkflowDefinition
+        self.fields['approval_workflow'].queryset = WorkflowDefinition.objects.filter(is_active=True).order_by('name')
 
 
 # 确保 ProjectNodeUpdateForm 也继承 TablerFormMixin
@@ -27,6 +34,11 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
             'status': forms.Select(),
             'remark': forms.Textarea(attrs={'rows': 12, 'placeholder': '填写备注信息...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 【优化】使用模型类方法获取用户可选的状态选项
+        self.fields['status'].choices = ProjectNode.get_user_selectable_choices()
 
 
 # 【新增】项目成员管理表单

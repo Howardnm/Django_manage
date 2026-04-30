@@ -10,21 +10,21 @@
     <div class="modal-body">
         <div class="mb-3">
             <label class="form-label">状态</label>
-            <select name="status" class="form-select">
-                <!-- 循环 View 传过来的 choices -->
-                {% for code, label in status_choices %}
-                    <!-- 过滤掉特殊状态 -->
-                    {% if code != 'FAILED' and code != 'TERMINATED' and code != 'FEEDBACK' %}
-                        <option value="{{ code }}" {% if node.status == code %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endif %}
+            {{ form.status }}
+            {% if form.status.errors %}
+                {% for error in form.status.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
                 {% endfor %}
-            </select>
+            {% endif %}
         </div>
         <div class="mb-3">
             <label class="form-label">备注</label>
-            <textarea name="remark" class="form-control" rows="3">{{ node.remark|default:'' }}</textarea>
+            {{ form.remark }}
+            {% if form.remark.errors %}
+                {% for error in form.remark.errors %}
+                    <div class="invalid-feedback d-block">{{ error }}</div>
+                {% endfor %}
+            {% endif %}
         </div>
     </div>
     <div class="modal-footer">

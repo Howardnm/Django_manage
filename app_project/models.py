@@ -39,6 +39,9 @@ class Project(models.Model):
     # 【核心优化】新增：项目质量分冗余字段 (用于绩效统计性能优化)
     quality_score = models.DecimalField("项目质量得分", max_digits=5, decimal_places=2, default=0.00)
 
+    # 【联动工作流】默认审批流程
+    approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="默认审批流程")
+
     class Meta:
         verbose_name = "项目"
         indexes = [
@@ -59,7 +62,7 @@ class Project(models.Model):
     @cached_property
     def current_active_node(self):
         for node in self.cached_nodes:
-            if node.status in ['DOING', 'PENDING', 'PAUSED']:
+            if node.status in ['DOING', 'PENDING', 'PAUSED', 'AWAITING_APPROVAL']:
                 return node
         return None
 
@@ -124,6 +127,7 @@ class ProjectNode(models.Model):
         ('PENDING', '未开始'),
         ('DOING', '进行中'),
         ('PAUSED', '暂停'),
+        ('AWAITING_APPROVAL', '待审批'),
         ('DONE', '已完成'),
         ('FEEDBACK', '客户意见'),
         ('FAILED', '异常/节点迭代'),
@@ -134,12 +138,15 @@ class ProjectNode(models.Model):
     stage = models.CharField("阶段", max_length=20, choices=ProjectStage.choices)
     round = models.PositiveIntegerField("轮次", default=1)
     order = models.IntegerField("排序权重", default=0)
-    status = models.CharField("状态", max_length=10, choices=STATUS_CHOICES, default='PENDING')
+    status = models.CharField("状态", max_length=20, choices=STATUS_CHOICES, default='PENDING')
     updated_at = models.DateTimeField("更新时间", auto_now=True)
     remark = models.TextField("备注/批注", blank=True, null=True)
     
     # 绩效得分
     final_score = models.DecimalField("节点绩效得分", max_digits=5, decimal_places=2, default=0.00)
+
+    # 【联动工作流】关联审批实例
+    workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联审批流程")
 
     class Meta:
         verbose_name = "项目进度节点"
@@ -148,19 +155,26 @@ class ProjectNode(models.Model):
     def __str__(self):
         return f"{self.project.name}-{self.get_stage_display()}"
 
+    @classmethod
+    def get_user_selectable_choices(cls):
+        """【优化】返回用户在界面上可选的状态子集"""
+        # 仅保留：未开始、进行中、暂停、已完成
+        allowed = ['PENDING', 'DOING', 'PAUSED', 'DONE']
+        return [(v, l) for v, l in cls.STATUS_CHOICES if v in allowed]
+
     @property
     def is_active(self):
         return self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
 
     @property
     def is_active_status(self):
-        return self.status in ['DONE', 'DOING', 'PAUSED']
+        return self.status in ['DONE', 'DOING', 'PAUSED', 'AWAITING_APPROVAL']
 
     @property
     def can_update_status(self):
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-        return is_current_node and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
+        return is_current_node and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK', 'AWAITING_APPROVAL']
 
     @property
     def can_report_failure(self):
@@ -173,7 +187,7 @@ class ProjectNode(models.Model):
     def can_add_feedback(self):
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-        return is_current_node and (self.status not in ['TERMINATED', 'DONE', 'FAILED']) and (self.stage != ProjectStage.FEEDBACK)
+        return is_current_node and (self.status not in ['TERMINATED', 'DONE', 'FAILED', 'AWAITING_APPROVAL']) and (self.stage != ProjectStage.FEEDBACK)
 
     @property
     def status_css_class(self):
@@ -181,6 +195,7 @@ class ProjectNode(models.Model):
             'PENDING': 'bg-secondary-lt',
             'DOING': 'bg-blue-lt',
             'PAUSED': 'bg-warning-lt',
+            'AWAITING_APPROVAL': 'bg-purple-lt',
             'DONE': 'bg-green-lt',
             'FEEDBACK': 'bg-yellow text-white',
             'FAILED': 'bg-red-lt',
@@ -194,6 +209,7 @@ class ProjectNode(models.Model):
             'PENDING': 'text-secondary',
             'DOING': 'text-primary',
             'PAUSED': 'text-warning',
+            'AWAITING_APPROVAL': 'text-purple',
             'DONE': 'text-primary',
             'FEEDBACK': 'badge bg-yellow text-white',
             'FAILED': 'text-primary',
@@ -269,5 +285,6 @@ class NodeScoreRule(models.Model):
             'DOING': 'bg-blue-lt',
             'PAUSED': 'bg-warning-lt',
             'FEEDBACK': 'bg-yellow-lt',
+            'AWAITING_APPROVAL': 'bg-purple-lt',
         }
         return mapping.get(self.trigger_status, 'bg-secondary-lt')

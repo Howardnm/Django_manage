@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
+<link rel="stylesheet" href="{% static 'bpmn-js/properties-panel-3.41.2/assets/properties-panel.css' %}">
+<style>
+    .bpmn-editor-container {
+        height: calc(100vh - 64px);
+        margin: -1.25rem;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+    .editor-header {
+        background: #fff;
+        border-bottom: 1px solid #e6e8e9;
+        padding: 0.75rem 1.25rem;
+        z-index: 100;
+    }
+    .editor-main { flex: 1; display: flex; overflow: hidden; }
+    #canvas { flex: 1; background-color: #fcfcfc; }
+    #properties-panel { width: 380px; border-left: 1px solid #e6e8e9; background: #fff; overflow-y: auto; }
+    .bjs-powered-by { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bpmn-editor-container">
+    <div class="editor-header">
+        <div class="row align-items-center g-3">
+            <div class="col-auto">
+                <a href="{% url 'workflow_definition_list' %}" class="btn btn-ghost-secondary btn-icon" title="返回列表">
+                    <i class="ti ti-arrow-left"></i>
+                </a>
+            </div>
+            <div class="col-md-3">
+                <div class="input-icon">
+                    <span class="input-icon-addon"><i class="ti ti-signature"></i></span>
+                    <input type="text" id="workflow-name" class="form-control" value="{{ definition.name|default:'未命名流程' }}">
+                </div>
+            </div>
+            <div class="col">
+                <div class="input-icon">
+                    <span class="input-icon-addon"><i class="ti ti-align-left"></i></span>
+                    <input type="text" id="workflow-description" class="form-control" value="{{ definition.description|default:'' }}" placeholder="输入描述...">
+                </div>
+            </div>
+            <div class="col-auto">
+                <button class="btn btn-primary px-4" id="btn-save">
+                    <i class="ti ti-device-floppy me-2"></i><strong>保存流程</strong>
+                </button>
+            </div>
+        </div>
+    </div>
+    <div class="editor-main">
+        <div id="canvas"></div>
+        <div id="properties-panel"></div>
+    </div>
+</div>
+
+<!-- 使用 script type="text/plain" 存放原始 XML，这是最安全的隔离方式 -->
+<script id="bpmn-xml-data" type="text/plain">{{ xml_content|safe }}</script>
+
+<input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-modeler.development.js' %}"></script>
+<script src="{% static 'bpmn-js/bpmn-js-properties-panel-5.54.0/dist/bpmn-js-properties-panel.umd.js' %}"></script>
+<script src="{% static 'bpmn-js/bpmn_chinese.js' %}"></script>
+
+<script>
+    function customTranslate(template, replacements) {
+        replacements = replacements || {};
+        const translations = window.bpmnChineseTranslations || {};
+        let translated = translations[template] || translations[template.trim()] || template;
+        return translated.replace(/{([^}]+)}/g, function(_, key) {
+            return translations[replacements[key]] || replacements[key] || '{' + key + '}';
+        });
+    }
+
+    async function initEditor() {
+        // 加载 camunda 描述符
+        let camundaModdleDescriptor = {};
+        try {
+            const response = await fetch("{% static 'bpmn-js/camunda-bpmn-moddle-7.0.1/resources/camunda.json' %}");
+            camundaModdleDescriptor = await response.json();
+        } catch (e) { console.error(e); }
+
+        const adapter = window.BpmnJSPropertiesPanel;
+        const additionalModules = [{ translate: ['value', customTranslate] }];
+
+        if (adapter) {
+            if (adapter.BpmnPropertiesPanelModule) additionalModules.push(adapter.BpmnPropertiesPanelModule);
+            if (adapter.BpmnPropertiesProviderModule) additionalModules.push(adapter.BpmnPropertiesProviderModule);
+            if (adapter.CamundaPlatformPropertiesProviderModule) additionalModules.push(adapter.CamundaPlatformPropertiesProviderModule);
+        }
+
+        const bpmnModeler = new BpmnJS({
+            container: '#canvas',
+            propertiesPanel: { parent: '#properties-panel' },
+            additionalModules: additionalModules,
+            moddleExtensions: { camunda: camundaModdleDescriptor }
+        });
+
+        // 从 script 标签中读取原始字符串，不经过 JS 的模板解析
+        const initialXml = document.getElementById('bpmn-xml-data').innerHTML;
+
+        if (initialXml && initialXml.trim().length > 10) { // 增加长度判断，避免空 XML 报错
+            bpmnModeler.importXML(initialXml).then(() => {
+                bpmnModeler.get('canvas').zoom('fit-viewport');
+            }).catch(err => {
+                console.error('BPMN 导入失败:', err);
+                alert('流程图加载失败，请检查XML格式是否正确。');
+            });
+        } else {
+            // 如果没有初始 XML，加载一个默认的空图
+            bpmnModeler.importXML(`<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Process_1">
+      <bpmndi:BPMNShape id="_BPMNShape_StartEvent_2" bpmnElement="StartEvent_1">
+        <dc:Bounds x="173" y="102" width="36" height="36" />
+      </bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>`).catch(err => console.error('Failed to load default XML', err));
+        }
+
+        document.getElementById('btn-save').addEventListener('click', async () => {
+            const btn = document.getElementById('btn-save');
+            btn.disabled = true;
+            try {
+                const { xml } = await bpmnModeler.saveXML({ format: true });
+                const response = await fetch("{% url 'workflow_save' %}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                    body: JSON.stringify({
+                        pk: "{{ definition.pk|default:'' }}" || null,
+                        name: document.getElementById('workflow-name').value,
+                        description: document.getElementById('workflow-description').value,
+                        xml: xml
+                    })
+                });
+                const result = await response.json();
+                if (result.status === 'success') {
+                    if (!"{{ definition.pk }}") window.location.href = "{% url 'workflow_editor_edit' 0 %}".replace('0', result.pk);
+                    else alert('流程已保存！');
+                }
+            } catch (err) { console.error(err); } finally { btn.disabled = false; }
+        });
+    }
+
+    window.addEventListener('load', initEditor);
+</script>
+{% endblock %}
