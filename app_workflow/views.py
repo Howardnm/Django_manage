@@ -1,13 +1,13 @@
 from django.shortcuts import render, get_object_or_404, redirect
 from django.views import View
 from django.http import JsonResponse
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
 from .utils import WorkflowEngine
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
+from .mixins import WorkflowAccessMixin
 from lxml import etree
 import json
 from SpiffWorkflow.exceptions import WorkflowException
@@ -70,7 +70,7 @@ def _resolve_task_names_from_bpmn(tasks):
 # 1. 流程定义管理
 # ==========================================
 
-class WorkflowDefinitionListView(LoginRequiredMixin, View):
+class WorkflowDefinitionListView(WorkflowAccessMixin, View):
     def get(self, request):
         qs = WorkflowDefinition.objects.all().select_related('created_by').order_by('-created_at')
         filter_set = WorkflowDefinitionFilter(request.GET, queryset=qs)
@@ -80,7 +80,7 @@ class WorkflowDefinitionListView(LoginRequiredMixin, View):
         })
 
 
-class WorkflowEditorView(LoginRequiredMixin, View):
+class WorkflowEditorView(WorkflowAccessMixin, View):
     def get(self, request, pk=None):
         definition = None
         if pk:
@@ -92,8 +92,11 @@ class WorkflowEditorView(LoginRequiredMixin, View):
         })
 
 
-class WorkflowSaveView(LoginRequiredMixin, View):
+class WorkflowSaveView(WorkflowAccessMixin, View):
     def post(self, request):
+        if not request.user.is_superuser:
+            return JsonResponse({'status': 'error', 'message': '仅超级管理员可编辑流程定义。'}, status=403)
+
         data = json.loads(request.body)
         pk = data.get('pk')
         name = data.get('name')
@@ -117,8 +120,11 @@ class WorkflowSaveView(LoginRequiredMixin, View):
         return JsonResponse({'status': 'success', 'pk': definition.pk})
 
 
-class WorkflowDefinitionDeleteView(LoginRequiredMixin, View):
+class WorkflowDefinitionDeleteView(WorkflowAccessMixin, View):
     def post(self, request, pk):
+        if not request.user.is_superuser:
+            return JsonResponse({'status': 'error', 'message': '仅超级管理员可删除流程定义。'}, status=403)
+
         definition = get_object_or_404(WorkflowDefinition, pk=pk)
         if definition.instances.filter(status='RUNNING').exists():
             return JsonResponse({'status': 'error', 'message': '该流程尚有运行中的实例，无法删除。'})
@@ -127,8 +133,11 @@ class WorkflowDefinitionDeleteView(LoginRequiredMixin, View):
         return JsonResponse({'status': 'success'})
 
 
-class WorkflowToggleActiveView(LoginRequiredMixin, View):
+class WorkflowToggleActiveView(WorkflowAccessMixin, View):
     def post(self, request, pk):
+        if not request.user.is_superuser:
+            return JsonResponse({'status': 'error', 'message': '仅超级管理员可切换流程启用状态。'}, status=403)
+
         definition = get_object_or_404(WorkflowDefinition, pk=pk)
         definition.is_active = not definition.is_active
         definition.save()
@@ -139,7 +148,7 @@ class WorkflowToggleActiveView(LoginRequiredMixin, View):
 # 2. 任务与审批处理
 # ==========================================
 
-class MyTaskListView(LoginRequiredMixin, View):
+class MyTaskListView(WorkflowAccessMixin, View):
     def get(self, request):
         user = request.user
         user_groups = set(user.groups.all().values_list('name', flat=True))
@@ -198,7 +207,7 @@ class MyTaskListView(LoginRequiredMixin, View):
         })
 
 
-class CompletedTaskListView(LoginRequiredMixin, View):
+class CompletedTaskListView(WorkflowAccessMixin, View):
     def get(self, request):
         base_qs = WorkflowTask.objects.filter(
             assigned_to=request.user,
@@ -228,7 +237,7 @@ class CompletedTaskListView(LoginRequiredMixin, View):
         })
 
 
-class InitiatedInstanceListView(LoginRequiredMixin, View):
+class InitiatedInstanceListView(WorkflowAccessMixin, View):
     """我发起的流程：跟踪自己发起的流程实例状态"""
     def get(self, request):
         base_qs = WorkflowInstance.objects.filter(
@@ -271,7 +280,7 @@ class InitiatedInstanceListView(LoginRequiredMixin, View):
         })
 
 
-class TaskClaimView(LoginRequiredMixin, View):
+class TaskClaimView(WorkflowAccessMixin, View):
     def post(self, request, pk):
         task = get_object_or_404(WorkflowTask, pk=pk)
         user = request.user
@@ -292,7 +301,7 @@ class TaskClaimView(LoginRequiredMixin, View):
         return JsonResponse({'status': 'success'})
 
 
-class WorkflowInstanceDetailView(LoginRequiredMixin, View):
+class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
 
     def _build_process_timeline(self, instance):
         """解析 BPMN XML，按流程序列提取所有 UserTask 节点，匹配数据库状态"""

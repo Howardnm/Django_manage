@@ -12,10 +12,12 @@
             </div>
             <div class="col-auto ms-auto d-print-none">
                 <div class="btn-list">
+                    {% if request.user.is_superuser %}
                     <a href="{% url 'workflow_editor_create' %}" class="btn btn-primary d-none d-sm-inline-block">
                         <i class="ti ti-plus icon"></i>
                         新建流程定义
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -63,6 +65,7 @@
                                 {% endif %}
                             </td>
                             <td>
+                                {% if request.user.is_superuser %}
                                 <label class="form-check form-switch m-0">
                                     <input class="form-check-input toggle-active" type="checkbox" data-pk="{{ definition.pk }}" {% if definition.is_active %}checked{% endif %}>
                                     <span class="form-check-label badge-status-text">
@@ -73,10 +76,17 @@
                                         {% endif %}
                                     </span>
                                 </label>
+                                {% else %}
+                                    {% if definition.is_active %}
+                                    <span class="badge bg-success text-white">启用中</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary text-white">已禁用</span>
+                                    {% endif %}
+                                {% endif %}
                             </td>
                             <td>
                                 <div class="d-flex py-1 align-items-center">
-                                    <span class="avatar avatar-xs me-2" style="background-image: url(https://api.dicebear.com/7.x/initials/svg?seed={{ definition.created_by.username }})"></span>
+                                    <span class="avatar avatar-xs me-2">{{ definition.created_by.username|first|upper }}</span>
                                     <div class="flex-fill">
                                         <div class="font-weight-medium">{{ definition.created_by.username }}</div>
                                     </div>
@@ -86,6 +96,7 @@
                                 {{ definition.updated_at|date:"Y-m-d H:i" }}
                             </td>
                             <td>
+                                {% if request.user.is_superuser %}
                                 <div class="btn-list flex-nowrap">
                                     <a href="{% url 'workflow_editor_edit' pk=definition.pk %}" class="btn btn-white btn-sm" title="编辑流程图">
                                         编辑
@@ -94,6 +105,11 @@
                                         删除
                                     </button>
                                 </div>
+                                {% else %}
+                                <a href="{% url 'workflow_editor_edit' pk=definition.pk %}" class="btn btn-white btn-sm" title="查看流程图">
+                                    查看
+                                </a>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}

@@ -181,7 +181,7 @@ class ProjectNode(models.Model):
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
         allowed_stages = [ProjectStage.RND, ProjectStage.PILOT, ProjectStage.MID_TEST]
-        return is_current_node and self.is_active and (self.stage in allowed_stages)
+        return is_current_node and self.is_active and (self.stage in allowed_stages) and self.status != 'AWAITING_APPROVAL'
 
     @property
     def can_add_feedback(self):

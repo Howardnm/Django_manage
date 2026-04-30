@@ -142,16 +142,16 @@ class WorkflowEngine:
             instance.spiff_workflow_data = json.loads(serializer.serialize_json(workflow))
             
             workflow_completed_status = None
-            if workflow.is_completed():
-                instance.status = 'COMPLETED'
-                instance.completed_at = timezone.now()
-                cls._callback_related_object(instance, 'DONE')
-                workflow_completed_status = 'COMPLETED'
-            elif action == 'REJECT':
+            if action == 'REJECT':
                 instance.status = 'REJECTED'
                 instance.completed_at = timezone.now()
                 cls._callback_related_object(instance, 'ROLLBACK')
                 workflow_completed_status = 'REJECTED'
+            elif workflow.is_completed():
+                instance.status = 'COMPLETED'
+                instance.completed_at = timezone.now()
+                cls._callback_related_object(instance, 'DONE')
+                workflow_completed_status = 'COMPLETED'
             
             instance.save()
 
