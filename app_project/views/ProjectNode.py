@@ -53,17 +53,14 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
                             'form': form,
                         })
 
-                    # --- 增强上下文数据，供流程图使用 ---
+                    # --- 上下文数据，供流程图条件表达式使用 ---
                     user = request.user
-                    # 查找部门经理（假设 User 模型有 department 且关联了 manager）
-                    dept_manager = user.department.manager.username if hasattr(user, 'department') and user.department and user.department.manager else user.username
 
                     context_data = {
                         'project_name': node.project.name,
                         'node_stage': node.get_stage_display(),
                         'applicant_username': user.username,
                         'department_name': user.department.name if user.department else "未知部门",
-                        'dept_manager': dept_manager,  # 预设部门经理变量
                     }
 
                     # 启动审批流程

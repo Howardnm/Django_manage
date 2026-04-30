@@ -17,6 +17,7 @@
 <div class="page-body">
     <div class="container-xl">
         <div class="card">
+            {% include 'apps/list_modules/tools_search_filter.html' %}
             <div class="table-responsive">
                 <table class="table card-table table-vcenter text-nowrap datatable">
                     <thead>
@@ -39,12 +40,8 @@
                                 </a>
                             </td>
                             <td class="text-muted">
-                                {% if task.instance.content_object %}
-                                    {% if task.related_model_name == 'projectnode' %}
-                                        项目: {{ task.instance.content_object.project.name }} - 阶段: {{ task.instance.content_object.get_stage_display }}
-                                    {% else %}
-                                        {{ task.instance.content_object }}
-                                    {% endif %}
+                                {% if task.related_object %}
+                                    <span class="text-muted-lt">[{{ task.related_model_name }}]</span> {{ task.related_object }}
                                 {% else %}
                                     --
                                 {% endif %}

@@ -89,6 +89,18 @@ class WorkflowInstance(models.Model):
     def __str__(self):
         return f"{self.definition.name} - {self.get_status_display()} ({self.started_at.strftime('%Y-%m-%d %H:%M')})"
 
+    def get_related_object_display(self):
+        """返回关联业务对象的展示文本（通用，不依赖具体模型）"""
+        obj = self.content_object
+        if obj is None:
+            return "—"
+        model_name = self.content_type.model if self.content_type else "unknown"
+        return f"[{model_name}] {obj}"
+
+    def get_related_object_url(self):
+        """返回关联业务对象的详情URL（子类可覆盖或通过注册表扩展）"""
+        return None
+
 
 class WorkflowTask(models.Model):
     """流程任务：分配给具体用户的待办事项"""

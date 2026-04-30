@@ -34,7 +34,7 @@ class MenuModule:
 
     @staticmethod
     def get_workflow():
-        """【新增】工作流审批中心"""
+        """工作流审批中心"""
         return {
             "name": "流程审批中心",
             "icon": "ti-git-pull-request",
@@ -42,7 +42,8 @@ class MenuModule:
             "url_name": "workflow_my_tasks",
             "sub_items": [
                 {"name": "我的待办任务", "url_name": "workflow_my_tasks"},
-                {"name": "我的已办任务", "url_name": "workflow_completed_tasks"}, # 新增
+                {"name": "我的已办任务", "url_name": "workflow_completed_tasks"},
+                {"name": "我发起的流程", "url_name": "workflow_initiated_list"},
                 {"name": "流程定义管理", "url_name": "workflow_definition_list"},
             ]
         }

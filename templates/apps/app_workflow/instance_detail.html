@@ -2,6 +2,35 @@
 {% load static %}
 {% load i18n %} {# 引入 i18n 用于翻译，如果需要的话 #}
 
+{% block extra_css %}
+<style>
+    @keyframes workflow-pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+    /* Tabler steps 状态增强 */
+    .steps .step-item.step-completed::before {
+        background: var(--tblr-success, #2fb344);
+        color: #fff;
+    }
+    .steps .step-item.step-rejected::before {
+        background: var(--tblr-danger, #d63939);
+        color: #fff;
+    }
+    .steps .step-item.step-current::before {
+        animation: workflow-pulse 2s infinite;
+    }
+    .steps .step-item.step-gateway::before {
+        background: #fff;
+        border: 2px solid var(--tblr-border-color, #b0b3b8);
+        color: transparent;
+    }
+    .steps .step-item.step-pending {
+        opacity: 0.5;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="page-header d-print-none">
     <div class="container-xl">
@@ -77,40 +106,30 @@
                     </div>
                 </div>
 
-                <!-- 关联业务对象详情 (ProjectNode) -->
-                {% if is_project_node and related_object %}
+                <!-- 关联业务对象详情 -->
+                {% if related_object and content_type_model %}
                 <div class="card mt-3">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="ti ti-folder-open me-2"></i>项目节点详情
+                            <i class="ti ti-folder-open me-2"></i>关联业务对象
                         </h3>
                     </div>
                     <div class="card-body">
                         <div class="datagrid">
                             <div class="datagrid-item">
-                                <div class="datagrid-title">所属项目</div>
-                                <div class="datagrid-content">
-                                    <a href="{% url 'project_detail' pk=related_object.project.pk %}">{{ related_object.project.name }}</a>
-                                </div>
+                                <div class="datagrid-title">对象类型</div>
+                                <div class="datagrid-content">{{ content_type_model }}</div>
                             </div>
                             <div class="datagrid-item">
-                                <div class="datagrid-title">节点阶段</div>
-                                <div class="datagrid-content">{{ related_object.get_stage_display }} (第{{ related_object.round }}轮)</div>
+                                <div class="datagrid-title">对象展示</div>
+                                <div class="datagrid-content">{{ related_object }}</div>
                             </div>
+                            {% if instance.object_id %}
                             <div class="datagrid-item">
-                                <div class="datagrid-title">节点状态</div>
-                                <div class="datagrid-content">
-                                    <span class="badge {{ related_object.status_css_class }}">{{ related_object.get_status_display }}</span>
-                                </div>
+                                <div class="datagrid-title">对象ID</div>
+                                <div class="datagrid-content">{{ instance.object_id }}</div>
                             </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">最新备注</div>
-                                <div class="datagrid-content">{{ related_object.remark|default:"无" }}</div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">更新时间</div>
-                                <div class="datagrid-content">{{ related_object.updated_at|date:"Y-m-d H:i" }}</div>
-                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -138,7 +157,7 @@
                 {% endif %}
             </div>
 
-            <!-- 审批操作 & 审批历史时间轴 -->
+            <!-- 审批流程进度 & 操作 -->
             <div class="col-md-8">
                 <!-- 审批操作表单 -->
                 {% if current_task %}
@@ -168,40 +187,129 @@
                 </div>
                 {% endif %}
 
-                <!-- 审批历史时间轴 -->
+                <!-- 流程进度时间轴 -->
                 <div class="card">
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="ti ti-history me-2"></i>审批轨迹
+                            <i class="ti ti-timeline me-2"></i>流程进度
                         </h3>
+                        <div class="card-actions">
+                            <span class="badge {% if instance.status == 'COMPLETED' %}bg-success{% elif instance.status == 'REJECTED' %}bg-danger{% elif instance.status == 'RUNNING' %}bg-primary{% endif %} text-white">
+                                {{ instance.get_status_display }}
+                            </span>
+                        </div>
                     </div>
                     <div class="card-body">
                         <ul class="steps steps-vertical">
-                            {% for record in history %}
-                            <li class="step-item {% if record.action == 'START' %}active{% endif %}">
-                                <div class="h4 m-0">
-                                    {{ record.get_action_display }}
-                                    <small class="text-muted ms-2">{{ record.timestamp|date:"Y-m-d H:i" }}</small>
+                            <!-- 发起步骤 -->
+                            <li class="step-item step-completed">
+                                <div class="h4 m-0">流程发起</div>
+                                <div class="text-muted">{{ instance.started_by.username }} &middot; {{ instance.started_at|date:"Y-m-d H:i" }}</div>
+                            </li>
+
+                            {% for item in process_timeline %}
+
+                            {% if item.is_gateway %}
+                            <li class="step-item step-gateway">
+                                <div class="text-muted small fw-bold text-uppercase">{{ item.name }}</div>
+                            </li>
+
+                            {% elif item.status == 'completed' %}
+                            <li class="step-item step-completed">
+                                <div class="fw-bold">{{ item.name }}</div>
+                                {% if item.approver %}
+                                <div class="text-muted small">
+                                    <span class="badge bg-green-lt">{{ item.approver.username }}</span>
                                 </div>
-                                <div class="text-muted">
-                                    操作人: <strong>{{ record.approver.username }}</strong>
-                                    {% if record.task %}
-                                        <span class="ms-2">任务: {{ record.task.task_name }}</span>
-                                    {% endif %}
-                                </div>
-                                {% if record.remark %}
-                                <div class="mt-2 text-primary">
-                                    <i class="ti ti-message-dots icon icon-inline"></i>
-                                    审批意见: {{ record.remark }}
+                                {% endif %}
+                                {% if item.completed_at %}
+                                <div class="text-muted xsmall">{{ item.completed_at|date:"Y-m-d H:i" }}</div>
+                                {% endif %}
+                                {% if item.remark %}
+                                <div class="mt-2">
+                                    <div class="card card-sm border-0 bg-muted-lt">
+                                        <div class="card-body p-2">
+                                            <div class="d-flex align-items-start">
+                                                <div class="me-2 text-secondary">
+                                                    <i class="ti ti-note"></i>
+                                                </div>
+                                                <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ item.remark }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 {% endif %}
                             </li>
+
+                            {% elif item.status == 'rejected' %}
+                            <li class="step-item step-rejected">
+                                <div class="fw-bold">{{ item.name }}</div>
+                                {% if item.approver %}
+                                <div class="text-muted small"><span class="badge bg-red-lt">{{ item.approver.username }}</span> 驳回</div>
+                                {% endif %}
+                                {% if item.remark %}
+                                <div class="mt-2">
+                                    <div class="card card-sm border-0 bg-muted-lt">
+                                        <div class="card-body p-2">
+                                            <div class="d-flex align-items-start">
+                                                <div class="me-2 text-secondary">
+                                                    <i class="ti ti-note"></i>
+                                                </div>
+                                                <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ item.remark }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </li>
+
+                            {% elif item.status == 'pending' and item.task %}
+                            <li class="step-item step-current active">
+                                <div class="fw-bold text-primary">{{ item.name }}</div>
+                                {% if item.assigned_to %}
+                                <div class="text-muted small">负责人: <span class="badge bg-blue-lt">{{ item.assigned_to.username }}</span></div>
+                                {% else %}
+                                <div class="text-muted small fw-bold mb-1">待签收</div>
+                                {% if item.candidate_usernames %}
+                                <div class="mb-1">
+                                    <span class="text-muted xsmall me-1">候选人:</span>
+                                    {% for username in item.candidate_usernames %}
+                                    <span class="badge bg-azure-lt">{{ username }}</span>
+                                    {% endfor %}
+                                </div>
+                                {% endif %}
+                                {% for group_name, members in item.candidate_group_members.items %}
+                                <div class="mb-1">
+                                    <span class="text-muted xsmall me-1">{{ group_name }}:</span>
+                                    {% for member in members %}
+                                    <span class="badge bg-purple-lt">{{ member }}</span>
+                                    {% endfor %}
+                                    {% if not members %}
+                                    <span class="badge bg-secondary-lt">无成员</span>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                {% endif %}
+                            </li>
+
+                            {% else %}
+                            <li class="step-item step-pending">
+                                <div class="text-muted">{{ item.name }}</div>
+                                <div class="text-muted xsmall">{{ item.assignee_label }}</div>
+                            </li>
+                            {% endif %}
+
                             {% endfor %}
 
-                            {% if instance.status == 'RUNNING' %}
-                            <li class="step-item active">
-                                <div class="h4 m-0">等待后续处理...</div>
-                                <div class="text-muted">当前处于流程运行中</div>
+                            {% if instance.status == 'COMPLETED' %}
+                            <li class="step-item step-completed">
+                                <div class="h4 m-0">流程完成</div>
+                                <div class="text-muted small">{{ instance.completed_at|date:"Y-m-d H:i" }}</div>
+                            </li>
+                            {% elif instance.status == 'REJECTED' %}
+                            <li class="step-item step-rejected">
+                                <div class="h4 m-0">流程已驳回</div>
+                                <div class="text-muted small">{{ instance.completed_at|date:"Y-m-d H:i" }}</div>
                             </li>
                             {% endif %}
                         </ul>

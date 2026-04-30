@@ -74,9 +74,9 @@
                     <!-- 按钮组：使用 d-flex 配合 ms-auto 将上传按钮推向右侧 -->
                     <div class="mt-2 btn-list d-flex">
                         {% if node.status == 'AWAITING_APPROVAL' %}
-                            <div class="alert alert-info py-1 px-2 mb-0 d-flex align-items-center">
-                                <i class="ti ti-loader-2 ti-spin me-2"></i>
-                                <span class="small">审批流程运行中，请等待审批结果...</span>
+                            <div class="d-flex align-items-center gap-2 mt-1 bg-blue-lt rounded-2 px-2 py-1 border">
+                                <span class="status-dot status-dot-animated bg-blue d-block"></span>
+                                <span class="text-secondary small">审批流程运行中，请等待审批结果...</span>
                             </div>
                         {% endif %}
 

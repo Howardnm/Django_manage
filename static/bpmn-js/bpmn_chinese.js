@@ -214,7 +214,7 @@ window.bpmnChineseTranslations = {
     'Follow up date':'跟进日期',
     'Priority':'优先级',
     'The follow up date as an EL expression (e.g. ${someDate}) or an ISO date (e.g. 2015-06-26T09:54:00).':'跟进日期可为EL表达式 (例如 ${someDate}) 或ISO日期 (例如 2015-06-26T09:54:00)',
-    'The due date as an EL expression (e.g. ${someDate}) or an ISO date (e.g. 2015-06-26T09:54:00)':'到期日期可为EL表达式 (例如 ${someDate}) 或ISO日期 (例如 2015-06-26T09:54:00)',
+    'The due date as an EL expression (e.g. ${someDate}) or an ISO date (e.g. 2015-06-26T09:54:00).':'到期日期可为EL表达式 (例如 ${someDate}) 或ISO日期 (例如 2015-06-26T09:54:00)',
     'Variables':'变量',
     'Candidate starter configuration':'候选启动器配置',
     'Task listeners':'任务监听器',

@@ -1,12 +1,13 @@
 from django.urls import path
 from .views import (
-    WorkflowDefinitionListView, 
-    WorkflowEditorView, 
+    WorkflowDefinitionListView,
+    WorkflowEditorView,
     WorkflowSaveView,
     WorkflowDefinitionDeleteView,
     WorkflowToggleActiveView,
     MyTaskListView,
-    CompletedTaskListView, # 新增
+    CompletedTaskListView,
+    InitiatedInstanceListView,
     WorkflowInstanceDetailView,
     TaskClaimView
 )
@@ -22,7 +23,8 @@ urlpatterns = [
     
     # 任务与实例
     path('tasks/', MyTaskListView.as_view(), name='workflow_my_tasks'),
-    path('tasks/completed/', CompletedTaskListView.as_view(), name='workflow_completed_tasks'), # 新增
+    path('tasks/completed/', CompletedTaskListView.as_view(), name='workflow_completed_tasks'),
+    path('initiated/', InitiatedInstanceListView.as_view(), name='workflow_initiated_list'),
     path('task/<int:pk>/claim/', TaskClaimView.as_view(), name='workflow_task_claim'),
     path('instance/<int:pk>/', WorkflowInstanceDetailView.as_view(), name='workflow_instance_detail'),
 ]

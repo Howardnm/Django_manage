@@ -5,6 +5,9 @@
 <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
 <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
 <link rel="stylesheet" href="{% static 'bpmn-js/properties-panel-3.41.2/assets/properties-panel.css' %}">
+<link rel="stylesheet" href="{% static 'codemirror-5.65.21/lib/codemirror.css' %}">
+<link rel="stylesheet" href="{% static 'codemirror-5.65.21/theme/dracula.css' %}">
+<link rel="stylesheet" href="{% static 'codemirror-5.65.21/addon/fold/foldgutter.css' %}">
 <style>
     .bpmn-editor-container {
         height: calc(100vh - 64px);
@@ -23,6 +26,50 @@
     #canvas { flex: 1; background-color: #fcfcfc; }
     #properties-panel { width: 380px; border-left: 1px solid #e6e8e9; background: #fff; overflow-y: auto; }
     .bjs-powered-by { display: none; }
+
+    .xml-editor-wrapper {
+        display: none;
+        flex: 1;
+        width: 0;
+        min-width: 0;
+        height: 100%;
+        overflow: hidden;
+    }
+    .xml-editor-wrapper .CodeMirror {
+        height: 100% !important;
+        width: 100% !important;
+        max-width: 100%;
+        font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+    .xml-editor-wrapper .CodeMirror pre.CodeMirror-line,
+    .xml-editor-wrapper .CodeMirror pre.CodeMirror-line-like {
+        background: transparent;
+    }
+    /* 亮色滚动条 */
+    .xml-editor-wrapper .CodeMirror-vscrollbar::-webkit-scrollbar,
+    .xml-editor-wrapper .CodeMirror-hscrollbar::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    .xml-editor-wrapper .CodeMirror-vscrollbar::-webkit-scrollbar-track,
+    .xml-editor-wrapper .CodeMirror-hscrollbar::-webkit-scrollbar-track {
+        background: #282a36;
+    }
+    .xml-editor-wrapper .CodeMirror-vscrollbar::-webkit-scrollbar-thumb,
+    .xml-editor-wrapper .CodeMirror-hscrollbar::-webkit-scrollbar-thumb {
+        background: #555;
+        border-radius: 5px;
+    }
+    .xml-editor-wrapper .CodeMirror-vscrollbar::-webkit-scrollbar-thumb:hover,
+    .xml-editor-wrapper .CodeMirror-hscrollbar::-webkit-scrollbar-thumb:hover {
+        background: #777;
+    }
+    .xml-editor-wrapper .CodeMirror-scroll {
+        margin-right: 0;
+        padding-right: 0;
+    }
 </style>
 {% endblock %}
 
@@ -48,6 +95,16 @@
                 </div>
             </div>
             <div class="col-auto">
+                <div class="btn-group" id="view-toggle">
+                    <button class="btn btn-outline-secondary active" data-view="graphic">
+                        <i class="ti ti-chart-bubble me-1"></i>图形
+                    </button>
+                    <button class="btn btn-outline-secondary" data-view="xml">
+                        <i class="ti ti-code me-1"></i>XML 源码
+                    </button>
+                </div>
+            </div>
+            <div class="col-auto">
                 <button class="btn btn-primary px-4" id="btn-save">
                     <i class="ti ti-device-floppy me-2"></i><strong>保存流程</strong>
                 </button>
@@ -57,6 +114,9 @@
     <div class="editor-main">
         <div id="canvas"></div>
         <div id="properties-panel"></div>
+        <div class="xml-editor-wrapper" id="xml-editor-wrapper">
+            <textarea id="xml-editor"></textarea>
+        </div>
     </div>
 </div>
 
@@ -70,6 +130,13 @@
 <script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-modeler.development.js' %}"></script>
 <script src="{% static 'bpmn-js/bpmn-js-properties-panel-5.54.0/dist/bpmn-js-properties-panel.umd.js' %}"></script>
 <script src="{% static 'bpmn-js/bpmn_chinese.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/lib/codemirror.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/mode/xml/xml.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/addon/fold/foldcode.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/addon/fold/foldgutter.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/addon/fold/xml-fold.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/addon/edit/matchbrackets.js' %}"></script>
+<script src="{% static 'codemirror-5.65.21/addon/edit/closetag.js' %}"></script>
 
 <script>
     function customTranslate(template, replacements) {
@@ -105,21 +172,46 @@
             moddleExtensions: { camunda: camundaModdleDescriptor }
         });
 
-        // 从 script 标签中读取原始字符串，不经过 JS 的模板解析
-        const initialXml = document.getElementById('bpmn-xml-data').innerHTML;
+        // 初始化 CodeMirror
+        const xmlTextarea = document.getElementById('xml-editor');
+        const cm = CodeMirror.fromTextArea(xmlTextarea, {
+            lineNumbers: true,
+            mode: 'xml',
+            theme: 'dracula',
+            matchBrackets: true,
+            autoCloseTags: true,
+            foldGutter: true,
+            gutters: ['CodeMirror-linenumbers', 'CodeMirror-foldgutter'],
+            tabSize: 2,
+            indentUnit: 2,
+            lineWrapping: true
+        });
 
-        if (initialXml && initialXml.trim().length > 10) { // 增加长度判断，避免空 XML 报错
-            bpmnModeler.importXML(initialXml).then(() => {
-                bpmnModeler.get('canvas').zoom('fit-viewport');
-            }).catch(err => {
+        // 从 script 标签中读取原始 XML
+        const initialXml = document.getElementById('bpmn-xml-data').innerHTML.trim();
+        let cachedXml = initialXml || '';
+
+        function loadDiagram(xml) {
+            return bpmnModeler.importXML(xml).then(() => {
+                cachedXml = xml;
+                try {
+                    bpmnModeler.get('canvas').zoom('fit-viewport');
+                } catch (e) {
+                    // zoom 可能因 diagram 尺寸未就绪而失败，不影响导入
+                }
+            });
+        }
+
+        if (initialXml && initialXml.length > 10) {
+            cm.setValue(initialXml);
+            loadDiagram(initialXml).catch(err => {
                 console.error('BPMN 导入失败:', err);
                 alert('流程图加载失败，请检查XML格式是否正确。');
             });
         } else {
-            // 如果没有初始 XML，加载一个默认的空图
-            bpmnModeler.importXML(`<?xml version="1.0" encoding="UTF-8"?>
+            const defaultXml = `<?xml version="1.0" encoding="UTF-8"?>
 <bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" id="Definitions_1" targetNamespace="http://bpmn.io/schema/bpmn">
-  <bpmn:process id="Process_1" isExecutable="false">
+  <bpmn:process id="Process_1" isExecutable="true">
     <bpmn:startEvent id="StartEvent_1" />
   </bpmn:process>
   <bpmndi:BPMNDiagram id="BPMNDiagram_1">
@@ -129,13 +221,19 @@
       </bpmndi:BPMNShape>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>
-</bpmn:definitions>`).catch(err => console.error('Failed to load default XML', err));
+</bpmn:definitions>`;
+            cachedXml = defaultXml;
+            cm.setValue(defaultXml);
+            loadDiagram(defaultXml).catch(err => console.error('Failed to load default XML', err));
         }
 
         document.getElementById('btn-save').addEventListener('click', async () => {
             const btn = document.getElementById('btn-save');
             btn.disabled = true;
             try {
+                if (document.getElementById('xml-editor-wrapper').style.display !== 'none') {
+                    await switchToGraphic();
+                }
                 const { xml } = await bpmnModeler.saveXML({ format: true });
                 const response = await fetch("{% url 'workflow_save' %}", {
                     method: 'POST',
@@ -149,10 +247,63 @@
                 });
                 const result = await response.json();
                 if (result.status === 'success') {
-                    if (!"{{ definition.pk }}") window.location.href = "{% url 'workflow_editor_edit' 0 %}".replace('0', result.pk);
+                    if (!"{{ definition.pk }}") window.location.href = "{% url 'workflow_editor_create' %}" + result.pk + '/';
                     else alert('流程已保存！');
                 }
             } catch (err) { console.error(err); } finally { btn.disabled = false; }
+        });
+
+        // --- 图形 / XML 视图切换 ---
+        const wrapper = document.getElementById('xml-editor-wrapper');
+        const canvas = document.getElementById('canvas');
+        const panel = document.getElementById('properties-panel');
+
+        async function switchToGraphic() {
+            const xml = cm.getValue().trim();
+            if (!xml) { alert('XML 为空，无法渲染流程图。'); throw new Error('empty xml'); }
+            if (xml === cachedXml) {
+                canvas.style.display = '';
+                panel.style.display = '';
+                wrapper.style.display = 'none';
+                return;
+            }
+            try {
+                await loadDiagram(xml);
+                canvas.style.display = '';
+                panel.style.display = '';
+                wrapper.style.display = 'none';
+            } catch (e) {
+                console.error(e);
+                alert('XML 解析失败，请检查格式。\n' + e.message);
+                throw e;
+            }
+        }
+
+        async function switchToXml() {
+            try {
+                const result = await bpmnModeler.saveXML({ format: true });
+                if (result && result.xml) cachedXml = result.xml;
+            } catch (e) {
+                // 获取失败则使用缓存
+            }
+            cm.setValue(cachedXml);
+            canvas.style.display = 'none';
+            panel.style.display = 'none';
+            wrapper.style.display = 'flex';
+            cm.refresh();
+        }
+
+        document.querySelectorAll('#view-toggle button').forEach(btn => {
+            btn.addEventListener('click', async function() {
+                const view = this.getAttribute('data-view');
+                document.querySelectorAll('#view-toggle button').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                if (view === 'xml') {
+                    await switchToXml();
+                } else {
+                    try { await switchToGraphic(); } catch(e) { /* error already alerted */ }
+                }
+            });
         });
     }
 
