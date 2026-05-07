@@ -25,6 +25,7 @@
                         <tr>
                             <th>关联模块</th>
                             <th>关联实体</th>
+                            <th>负责人/提交人</th>
                             <th>流程名称</th>
                             <th>当前状态</th>
                             <th>当前审批节点</th>
@@ -41,9 +42,16 @@
                             </td>
                             <td>
                                 {% if item.related_object_url %}
-                                    <a href="{{ item.related_object_url }}" class="text-reset"><strong>{{ item.related_object }}</strong></a>
+                                    <a href="{{ item.related_object_url }}" class="text-reset"><strong>{{ item.related_display_name|default:"—" }}</strong></a>
                                 {% else %}
-                                    <strong>{{ item.related_object|default:"—" }}</strong>
+                                    <strong>{{ item.related_display_name|default:"—" }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.related_person %}
+                                    <span class="badge bg-blue-lt">{{ item.related_person.username }}</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -92,13 +100,15 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="8" class="text-center text-muted py-4">你还没有发起过任何流程。</td>
+                            <td colspan="9" class="text-center text-muted py-4">你还没有发起过任何流程。</td>
                         </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+        <br>
+        {% include 'apps/list_modules/paginator.html' %}
     </div>
 </div>
 {% endblock %}

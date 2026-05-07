@@ -22,6 +22,11 @@
         .remark-label { font-size: 12px; color: #909399; margin-bottom: 6px; }
         .remark-text { font-size: 14px; color: #606266; white-space: pre-wrap; }
         .empty-state { text-align: center; padding: 60px 0; color: #909399; }
+        .related-card { padding: 16px 24px; display: flex; align-items: center; gap: 24px; }
+        .related-field { display: flex; align-items: center; gap: 8px; }
+        .related-field-label { font-size: 13px; color: #909399; }
+        .related-field-badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #e8f4fd; color: #409eff; }
+        .related-field-link { font-weight: 600; color: #303133; text-decoration: none; }
     </style>
 </head>
 <body>
@@ -40,6 +45,23 @@
         </div>
         <button onclick="history.back()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
     </div>
+
+    {% if related_module and related_entity %}
+    <div class="card related-card">
+        <div class="related-field">
+            <span class="related-field-label">关联模块</span>
+            <span class="related-field-badge">{{ related_module }}</span>
+        </div>
+        <div class="related-field">
+            <span class="related-field-label">关联实体</span>
+            {% if related_entity_url %}
+            <a href="{{ related_entity_url }}" class="related-field-link">{{ related_entity }}</a>
+            {% else %}
+            <strong class="related-field-link">{{ related_entity }}</strong>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
 
     <div id="submission-detail-app">
         <div v-if="rule.length === 0" class="card">

@@ -32,16 +32,16 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for task in tasks %}
+                        {% for task in page_obj %}
                         <tr>
                             <td>
                                 <span class="badge bg-azure-lt">{{ task.related_model_name|default:"—" }}</span>
                             </td>
                             <td>
                                 {% if task.related_object_url %}
-                                    <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_object }}</strong></a>
+                                    <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_display_name|default:"—" }}</strong></a>
                                 {% else %}
-                                    <strong>{{ task.related_object|default:"—" }}</strong>
+                                    <strong>{{ task.related_display_name|default:"—" }}</strong>
                                 {% endif %}
                             </td>
                             <td>{{ task.task_name }}</td>
@@ -73,6 +73,8 @@
                 </table>
             </div>
         </div>
+        <br>
+        {% include 'apps/list_modules/paginator.html' %}
     </div>
 </div>
 {% endblock %}

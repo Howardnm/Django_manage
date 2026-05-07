@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.http import Http404
 from django.contrib.contenttypes.models import ContentType
+from django.core.paginator import Paginator
 
 from .models import FormTemplate, FormSubmission
 from app_workflow.models import WorkflowDefinition
@@ -25,9 +26,11 @@ class FormTemplateListView(FormManagementAccessMixin, View):
     def get(self, request):
         qs = FormTemplate.objects.all().select_related('created_by', 'workflow')
         filter_set = FormTemplateFilter(request.GET, queryset=qs)
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
         workflows = WorkflowDefinition.objects.filter(is_active=True)
         return render(request, 'apps/app_form_management/template_list.html', {
-            'templates': filter_set.qs,
+            'page_obj': page_obj,
             'filter': filter_set,
             'workflows': workflows,
         })
@@ -187,6 +190,10 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     'target_alias': target_alias,
                     'obj_pk': obj_pk,
                 })
+        else:
+            existing = FormSubmission.objects.filter(
+                template=template, submitted_by=request.user, status='DRAFT'
+            ).first()
 
         return render(request, 'apps/app_form_management/submission_fill.html', {
             'template': template,
@@ -265,11 +272,28 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         )
         template = submission.template
 
+        # 解析关联业务对象
+        target = submission.target_object
+        related_module = None
+        related_entity = None
+        related_entity_url = None
+        if target:
+            from .registry import get_alias_for_model, _TARGET_REGISTRY
+            from app_workflow.utils import related_object_router
+            alias = get_alias_for_model(type(target))
+            cfg = _TARGET_REGISTRY.get(alias) if alias else None
+            related_module = cfg.label if cfg else target._meta.verbose_name
+            related_entity = cfg.display(target) if cfg else str(target)
+            related_entity_url = related_object_router.resolve(target)
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),
+            'related_module': related_module,
+            'related_entity': related_entity,
+            'related_entity_url': related_entity_url,
         })
 
 
@@ -316,17 +340,29 @@ class MyDraftsView(FormManagementAccessMixin, View):
         ).select_related('template', 'content_type').order_by('-updated_at')
 
         filter_set = MyDraftsFilter(request.GET, queryset=qs)
-        drafts = filter_set.qs
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
 
-        from .registry import get_alias_for_model
+        from .registry import get_alias_for_model, _TARGET_REGISTRY
+        from app_workflow.utils import related_object_router
 
-        for d in drafts:
+        for d in page_obj.object_list:
             if d.content_type_id:
                 model_class = d.content_type.model_class()
-                d.target_alias = get_alias_for_model(model_class)
+                alias = get_alias_for_model(model_class)
+                d.target_alias = alias
+                cfg = _TARGET_REGISTRY.get(alias)
+                d.target_module = cfg.label if cfg else str(d.content_type)
+                target_obj = d.target_object
+                d.target_display = cfg.display(target_obj) if cfg and target_obj else str(target_obj) if target_obj else '—'
+                d.target_url = related_object_router.resolve(target_obj)
+            else:
+                d.target_module = '—'
+                d.target_display = '—'
+                d.target_url = None
 
         return render(request, 'apps/app_form_management/my_drafts.html', {
-            'drafts': drafts,
+            'page_obj': page_obj,
             'filter': filter_set,
         })
 
@@ -339,11 +375,14 @@ class MySubmissionsView(FormManagementAccessMixin, View):
         ).select_related('template', 'content_type', 'workflow_instance').order_by('-created_at')
 
         filter_set = MySubmissionsFilter(request.GET, queryset=qs)
-        submissions = filter_set.qs
 
         from .registry import get_alias_for_model, _TARGET_REGISTRY
+        from app_workflow.utils import related_object_router
 
-        for sub in submissions:
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+
+        for sub in page_obj.object_list:
             if sub.content_type_id:
                 model_class = sub.content_type.model_class()
                 alias = get_alias_for_model(model_class)
@@ -351,14 +390,27 @@ class MySubmissionsView(FormManagementAccessMixin, View):
                 sub.target_module = cfg.label if cfg else str(sub.content_type)
                 target_obj = sub.target_object
                 sub.target_display = cfg.display(target_obj) if cfg and target_obj else str(target_obj) if target_obj else '—'
+                sub.target_url = related_object_router.resolve(target_obj)
             else:
                 sub.target_module = '—'
                 sub.target_display = '—'
+                sub.target_url = None
 
         return render(request, 'apps/app_form_management/my_submissions.html', {
-            'submissions': submissions,
+            'page_obj': page_obj,
             'filter': filter_set,
         })
+
+
+class FormSubmissionDeleteView(FormManagementAccessMixin, View):
+    def post(self, request, pk):
+        submission = get_object_or_404(FormSubmission, pk=pk)
+        if submission.submitted_by != request.user:
+            return JsonResponse({'status': 'error', 'message': '您没有权限删除此记录。'}, status=403)
+        if submission.status != 'DRAFT':
+            return JsonResponse({'status': 'error', 'message': '只能删除草稿记录。'}, status=400)
+        submission.delete()
+        return JsonResponse({'status': 'success'})
 
 
 # ==========================================

@@ -4,6 +4,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
+from django.core.paginator import Paginator
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
 from .utils import WorkflowEngine, related_object_router
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
@@ -74,8 +75,10 @@ class WorkflowDefinitionListView(WorkflowAccessMixin, View):
     def get(self, request):
         qs = WorkflowDefinition.objects.all().select_related('created_by').order_by('-created_at')
         filter_set = WorkflowDefinitionFilter(request.GET, queryset=qs)
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
         return render(request, 'apps/app_workflow/definition_list.html', {
-            'definitions': filter_set.qs,
+            'page_obj': page_obj,
             'filter': filter_set,
         })
 
@@ -182,19 +185,21 @@ class MyTaskListView(WorkflowAccessMixin, View):
         ).order_by('-created_at').distinct()
 
         filter_set = WorkflowTaskFilter(request.GET, queryset=base_qs)
-        all_tasks = filter_set.qs
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        tasks = page_obj.object_list
 
-        # --- C. 通用批量解析 content_object ---
-        instances = [t.instance for t in all_tasks if t.instance.content_type_id]
+        # --- C. 为当前页解析 content_object ---
+        instances = [t.instance for t in tasks if t.instance.content_type_id]
         _batch_resolve_content_objects(instances)
 
         # --- D. 组装展示数据 ---
-        _resolve_task_names_from_bpmn(all_tasks)
+        _resolve_task_names_from_bpmn(tasks)
 
-        for task in all_tasks:
+        for task in tasks:
             obj = getattr(task.instance, '_content_object', None)
             task.related_model_name = obj._meta.verbose_name if obj else None
-            task.related_object = obj
+            task.related_display_name = related_object_router.get_display_name(obj)
             task.related_object_url = related_object_router.resolve(obj)
 
             task.can_claim = (task.assigned_to is None and
@@ -203,7 +208,7 @@ class MyTaskListView(WorkflowAccessMixin, View):
             task.can_process = (task.assigned_to == user)
 
         return render(request, 'apps/app_workflow/task_list.html', {
-            'tasks': all_tasks,
+            'page_obj': page_obj,
             'filter': filter_set,
         })
 
@@ -220,7 +225,9 @@ class CompletedTaskListView(WorkflowAccessMixin, View):
         ).order_by('-completed_at')
 
         filter_set = WorkflowTaskFilter(request.GET, queryset=base_qs)
-        tasks = filter_set.qs
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        tasks = page_obj.object_list
 
         instances = [t.instance for t in tasks if t.instance.content_type_id]
         _batch_resolve_content_objects(instances)
@@ -230,11 +237,11 @@ class CompletedTaskListView(WorkflowAccessMixin, View):
         for task in tasks:
             obj = getattr(task.instance, '_content_object', None)
             task.related_model_name = obj._meta.verbose_name if obj else None
-            task.related_object = obj
+            task.related_display_name = related_object_router.get_display_name(obj)
             task.related_object_url = related_object_router.resolve(obj)
 
         return render(request, 'apps/app_workflow/completed_task_list.html', {
-            'tasks': tasks,
+            'page_obj': page_obj,
             'filter': filter_set,
         })
 
@@ -249,11 +256,13 @@ class InitiatedInstanceListView(WorkflowAccessMixin, View):
         ).order_by('-started_at')
 
         filter_set = WorkflowInstanceFilter(request.GET, queryset=base_qs)
-        instances = list(filter_set.qs)
+        paginator = Paginator(filter_set.qs, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        instances = list(page_obj.object_list)
 
         _batch_resolve_content_objects(instances)
 
-        # 批量获取每个实例的当前待处理任务
+        # 批量获取当前页实例的待处理任务
         instance_ids = [i.pk for i in instances]
         current_tasks = WorkflowTask.objects.filter(
             instance_id__in=instance_ids, status='PENDING'
@@ -272,12 +281,15 @@ class InitiatedInstanceListView(WorkflowAccessMixin, View):
             results.append({
                 'instance': inst,
                 'related_model_name': obj._meta.verbose_name if obj else None,
+                'related_display_name': related_object_router.get_display_name(obj),
+                'related_person': related_object_router.get_person(obj),
                 'related_object': obj,
                 'related_object_url': related_object_router.resolve(obj),
                 'pending_tasks': tasks,
             })
 
         return render(request, 'apps/app_workflow/initiated_list.html', {
+            'page_obj': page_obj,
             'items': results,
             'filter': filter_set,
         })
@@ -447,6 +459,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         related_object = getattr(instance, '_content_object', instance.content_object)
         content_type_model = instance.content_type.model if instance.content_type else None
         related_model_name = related_object._meta.verbose_name if related_object else None
+        related_display_name = related_object_router.get_display_name(related_object)
         related_object_url = related_object_router.resolve(related_object)
 
         process_timeline = self._build_process_timeline(instance)
@@ -456,6 +469,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             'history': history,
             'current_task': current_task,
             'related_object': related_object,
+            'related_display_name': related_display_name,
             'related_model_name': related_model_name,
             'related_object_url': related_object_url,
             'content_type_model': content_type_model,

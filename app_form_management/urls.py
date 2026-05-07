@@ -26,4 +26,5 @@ urlpatterns = [
 
     # 提交记录
     path('submission/<int:pk>/', views.FormSubmissionDetailView.as_view(), name='form_submission_detail'),
+    path('submission/<int:pk>/delete/', views.FormSubmissionDeleteView.as_view(), name='form_submission_delete'),
 ]

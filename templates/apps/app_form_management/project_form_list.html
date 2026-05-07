@@ -75,8 +75,14 @@
                                             </td>
                                             <td class="text-secondary">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
                                             <td>
-                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}"
-                                                   class="btn btn-sm btn-white">查看详情</a>
+                                                <div class="btn-list flex-nowrap">
+                                                    <a href="{% url 'form_submission_detail' pk=sub.pk %}"
+                                                       class="btn btn-sm btn-white">查看详情</a>
+                                                    {% if sub.workflow_instance_id %}
+                                                    <a href="{% url 'workflow_instance_detail' pk=sub.workflow_instance_id %}"
+                                                       class="btn btn-sm btn-outline-primary">查看流程</a>
+                                                    {% endif %}
+                                                </div>
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -153,8 +159,14 @@
                                                             </td>
                                                             <td class="text-secondary">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
                                                             <td>
-                                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}"
-                                                                   class="btn btn-sm btn-white">查看详情</a>
+                                                                <div class="btn-list flex-nowrap">
+                                                                    <a href="{% url 'form_submission_detail' pk=sub.pk %}"
+                                                                       class="btn btn-sm btn-white">查看详情</a>
+                                                                    {% if sub.workflow_instance_id %}
+                                                                    <a href="{% url 'workflow_instance_detail' pk=sub.workflow_instance_id %}"
+                                                                       class="btn btn-sm btn-outline-primary">查看流程</a>
+                                                                    {% endif %}
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     {% endfor %}

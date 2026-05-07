@@ -43,7 +43,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for tpl in templates %}
+                        {% for tpl in page_obj %}
                         <tr>
                             <td><span class="text-muted">{{ tpl.pk }}</span></td>
                             <td>
@@ -110,6 +110,8 @@
                 </table>
             </div>
         </div>
+        <br>
+        {% include 'apps/list_modules/paginator.html' %}
     </div>
 </div>
 

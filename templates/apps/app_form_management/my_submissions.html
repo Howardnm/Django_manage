@@ -29,12 +29,20 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for sub in submissions %}
+                        {% for sub in page_obj %}
                         <tr>
                             <td><span class="text-muted">{{ sub.pk }}</span></td>
                             <td><strong>{{ sub.template.name }}</strong></td>
-                            <td>{{ sub.target_module }}</td>
-                            <td>{{ sub.target_display }}</td>
+                            <td>
+                                <span class="badge bg-azure-lt">{{ sub.target_module }}</span>
+                            </td>
+                            <td>
+                                {% if sub.target_url %}
+                                <a href="{{ sub.target_url }}" class="text-reset"><strong>{{ sub.target_display }}</strong></a>
+                                {% else %}
+                                <strong>{{ sub.target_display }}</strong>
+                                {% endif %}
+                            </td>
                             <td>
                                 {% if sub.workflow_instance_id %}
                                     {% with status=sub.workflow_instance.status %}
@@ -77,6 +85,8 @@
                 </table>
             </div>
         </div>
+        <br>
+        {% include 'apps/list_modules/paginator.html' %}
     </div>
 </div>
 {% endblock %}

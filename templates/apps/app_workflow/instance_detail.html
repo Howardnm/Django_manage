@@ -112,9 +112,9 @@
                                 <div class="datagrid-title">关联实体</div>
                                 <div class="datagrid-content">
                                     {% if related_object_url %}
-                                        <a href="{{ related_object_url }}" class="text-reset"><strong>{{ related_object }}</strong></a>
+                                        <a href="{{ related_object_url }}" class="text-reset"><strong>{{ related_display_name|default:"—" }}</strong></a>
                                     {% else %}
-                                        <strong>{{ related_object }}</strong>
+                                        <strong>{{ related_display_name|default:"—" }}</strong>
                                     {% endif %}
                                 </div>
                             </div>

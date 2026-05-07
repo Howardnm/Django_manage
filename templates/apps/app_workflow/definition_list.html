@@ -42,7 +42,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for definition in definitions %}
+                        {% for definition in page_obj %}
                         <tr>
                             <td><span class="text-muted">{{ definition.pk }}</span></td>
                             <td>
@@ -138,6 +138,8 @@
             </div>
         </div>
     </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
 </div>
 
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">

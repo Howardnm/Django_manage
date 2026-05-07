@@ -13,4 +13,9 @@ class AppFormManagementConfig(AppConfig):
         from app_workflow.utils import related_object_router
         from .models import FormSubmission
 
-        related_object_router.register(FormSubmission, lambda obj: reverse('form_submission_detail', kwargs={'pk': obj.pk}))
+        related_object_router.register(
+            FormSubmission,
+            url_resolver=lambda obj: reverse('form_submission_detail', kwargs={'pk': obj.pk}),
+            display_name_resolver=lambda obj: obj.template.name,
+            person_resolver=lambda obj: obj.submitted_by,
+        )

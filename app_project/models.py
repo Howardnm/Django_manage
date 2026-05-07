@@ -153,7 +153,7 @@ class ProjectNode(models.Model):
         ordering = ['order']
 
     def __str__(self):
-        return f"{self.project.name}-{self.get_stage_display()}"
+        return f"{self.project.name} — {self.get_stage_display()}"
 
     @classmethod
     def get_user_selectable_choices(cls):
