@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ template.name }} - 表单填写</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; }
+        .page { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .header h2 { font-size: 20px; font-weight: 600; }
+        .header .meta { font-size: 13px; color: #909399; margin-top: 4px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 16px; }
+        .card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .card-desc { font-size: 13px; color: #909399; margin-bottom: 20px; }
+        .empty-state { text-align: center; padding: 60px 0; color: #909399; }
+        .remark-label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; color: #303133; }
+        .remark-input { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; resize: vertical; font-family: inherit; }
+        .remark-input:focus { outline: none; border-color: #409eff; }
+        .btn-row { display: flex; justify-content: space-between; margin-top: 16px; }
+    </style>
+</head>
+<body>
+
+<div class="page" id="form-fill-app">
+    <div class="header">
+        <div>
+            <h2>{{ template.name }}</h2>
+            {% if target_display %}
+            <div class="meta">{{ target_display }}</div>
+            {% endif %}
+        </div>
+        <button onclick="goBack()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
+    </div>
+
+    <div v-if="rule.length === 0" class="card">
+        <div class="empty-state">
+            <p>该表单模板未配置字段</p>
+            <p style="font-size:13px;margin-top:8px;">请先在表单设计器中添加字段</p>
+        </div>
+    </div>
+
+    <div v-else>
+        <div class="card">
+            <div class="card-title">表单填写</div>
+            {% if template.description %}
+            <div class="card-desc">{{ template.description }}</div>
+            {% endif %}
+            <form-create v-model:api="fApi" :rule="rule" :option="formOption" :value="formData" />
+        </div>
+
+        <div class="card">
+            <label class="remark-label">备注</label>
+            <textarea class="remark-input" id="remark-input" rows="3" placeholder="备注...">{{ existing.remark|default:'' }}</textarea>
+            <div class="btn-row">
+                <el-button @click="saveDraft" :loading="saving">保存草稿</el-button>
+                <el-button type="primary" @click="submitForm" :loading="saving">提交</el-button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
+<script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
+<script id="existing-data" type="application/json">{{ existing_data_json|safe }}</script>
+
+<script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
+<script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
+<script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>
+<script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
+
+<script>
+    const { createApp } = Vue;
+
+    const app = createApp({
+        data() {
+            const configEl = document.getElementById('form-config-data');
+            const optionEl = document.getElementById('form-option-data');
+            const dataEl = document.getElementById('existing-data');
+            let rule = [];
+            let option = {};
+            let formData = {};
+            try { rule = JSON.parse(configEl.textContent.trim()); } catch(e) {}
+            try { option = JSON.parse(optionEl.textContent.trim()); } catch(e) {}
+            try { formData = JSON.parse(dataEl.textContent.trim()); } catch(e) {}
+
+            const formOption = Object.assign({
+                form: { labelWidth: '120px' }
+            }, option, {
+                submitBtn: false,
+                resetBtn: false,
+                form: Object.assign({ labelWidth: '120px' }, option.form || {})
+            });
+
+            return {
+                rule: rule,
+                formData: formData,
+                fApi: null,
+                saving: false,
+                formOption: formOption
+            };
+        },
+
+        mounted() {
+            if (this.fApi && this.formData && Object.keys(this.formData).length > 0) {
+                this.fApi.setValue(this.formData);
+            }
+        },
+
+        watch: {
+            fApi(api) {
+                if (api && this.formData && Object.keys(this.formData).length > 0) {
+                    api.setValue(this.formData);
+                }
+            }
+        },
+
+        methods: {
+            async sendData(formData, status) {
+                const remark = document.getElementById('remark-input').value.trim();
+                const url = '{{ submit_url|escapejs }}';
+
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': '{{ csrf_token }}'
+                    },
+                    body: JSON.stringify({
+                        form_data: formData,
+                        status: status,
+                        remark: remark
+                    })
+                });
+                const result = await resp.json();
+                if (result.status !== 'success') {
+                    ElementPlus.ElMessage.error(result.message || '操作失败');
+                }
+                return result;
+            },
+
+            async saveDraft() {
+                if (!this.fApi) return;
+                this.saving = true;
+                try {
+                    const data = this.fApi.form;
+                    const result = await this.sendData(data, 'DRAFT');
+                    if (result && result.status === 'success') {
+                        ElementPlus.ElMessage.success('草稿已保存');
+                    }
+                } catch(err) {
+                    ElementPlus.ElMessage.error('请求失败: ' + err.message);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            async submitForm() {
+                if (!this.fApi) return;
+                this.saving = true;
+                try {
+                    await this.fApi.validate();
+                    const data = this.fApi.form;
+                    if (data && Object.keys(data).length > 0) {
+                        const result = await this.sendData(data, 'SUBMITTED');
+                        if (result && result.status === 'success') {
+                            window.location.href = '{% url "my_submissions" %}';
+                        }
+                    } else {
+                        ElementPlus.ElMessage.warning('请检查表单填写内容');
+                    }
+                } catch(err) {
+                    ElementPlus.ElMessage.warning('请检查表单填写内容');
+                } finally {
+                    this.saving = false;
+                }
+            }
+        }
+    });
+
+    app.use(ElementPlus);
+    app.use(FcDesigner.formCreate);
+    app.mount('#form-fill-app');
+
+    function goBack() {
+        window.history.back();
+    }
+</script>
+
+</body>
+</html>

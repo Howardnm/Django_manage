@@ -5,7 +5,7 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
-from .utils import WorkflowEngine
+from .utils import WorkflowEngine, related_object_router
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
 from lxml import etree
@@ -193,8 +193,9 @@ class MyTaskListView(WorkflowAccessMixin, View):
 
         for task in all_tasks:
             obj = getattr(task.instance, '_content_object', None)
-            task.related_model_name = obj._meta.model_name if obj else None
+            task.related_model_name = obj._meta.verbose_name if obj else None
             task.related_object = obj
+            task.related_object_url = related_object_router.resolve(obj)
 
             task.can_claim = (task.assigned_to is None and
                               (user in task.candidate_users.all() or
@@ -228,8 +229,9 @@ class CompletedTaskListView(WorkflowAccessMixin, View):
 
         for task in tasks:
             obj = getattr(task.instance, '_content_object', None)
-            task.related_model_name = obj._meta.model_name if obj else None
+            task.related_model_name = obj._meta.verbose_name if obj else None
             task.related_object = obj
+            task.related_object_url = related_object_router.resolve(obj)
 
         return render(request, 'apps/app_workflow/completed_task_list.html', {
             'tasks': tasks,
@@ -269,8 +271,9 @@ class InitiatedInstanceListView(WorkflowAccessMixin, View):
             tasks = pending_map.get(inst.pk, [])
             results.append({
                 'instance': inst,
-                'related_model_name': obj._meta.model_name if obj else None,
+                'related_model_name': obj._meta.verbose_name if obj else None,
                 'related_object': obj,
+                'related_object_url': related_object_router.resolve(obj),
                 'pending_tasks': tasks,
             })
 
@@ -443,6 +446,8 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
 
         related_object = getattr(instance, '_content_object', instance.content_object)
         content_type_model = instance.content_type.model if instance.content_type else None
+        related_model_name = related_object._meta.verbose_name if related_object else None
+        related_object_url = related_object_router.resolve(related_object)
 
         process_timeline = self._build_process_timeline(instance)
 
@@ -451,6 +456,8 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             'history': history,
             'current_task': current_task,
             'related_object': related_object,
+            'related_model_name': related_model_name,
+            'related_object_url': related_object_url,
             'content_type_model': content_type_model,
             'process_timeline': process_timeline,
         }

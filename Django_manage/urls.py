@@ -28,6 +28,7 @@ urlpatterns = [
     path('raw-material/', include('app_raw_material.urls')),
     path('process/', include('app_process.urls')),
     path('formula/', include('app_formula.urls')),
+    path('forms/', include('app_form_management.urls')),
     path('notifications/', include('app_notification.urls')),
     
     # 核心 API 重构：由 app_material_api 管控

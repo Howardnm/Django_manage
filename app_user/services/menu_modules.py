@@ -33,6 +33,22 @@ class MenuModule:
         }
 
     @staticmethod
+    def get_form_management():
+        """表单管理中心"""
+        return {
+            "name": "表单管理中心",
+            "icon": "ti-forms",
+            "visible_to": IdentityConfig.INTERNAL_STAFF,
+            "url_name": "form_template_list",
+            "sub_items": [
+                {"name": "创建表单", "url_name": "form_create_wizard"},
+                {"name": "我的草稿", "url_name": "my_drafts"},
+                {"name": "我的提交记录", "url_name": "my_submissions"},
+                {"name": "表单模板管理", "url_name": "form_template_list"},
+            ]
+        }
+
+    @staticmethod
     def get_workflow():
         """工作流审批中心"""
         return {
@@ -138,6 +154,7 @@ class MenuModule:
             "visible_to": [IdentityConfig.R_ADMIN],
             "url_name": "project_score_rule_list",
             "sub_items": [
+                {"name": "项目全局配置", "url_name": "project_config"},
                 {"name": "项目绩效评分规则", "url_name": "project_score_rule_list"},
                 {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"},
                 {"name": "进入底层管理", "url_name": "admin:index"},

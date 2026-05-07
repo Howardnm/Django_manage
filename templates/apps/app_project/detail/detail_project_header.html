@@ -8,8 +8,15 @@
         <div class="col-auto ms-auto">
             <!-- 顶部操作区 -->
             <div class="btn-list">
+                    <!-- 项目级表单入口 -->
+                    <a href="{% url 'form_create_wizard' %}?module=project&entity={{ project.pk }}"
+                       class="btn btn-outline-info">
+                        <i class="ti ti-forms me-1"></i>创建表单
+                        {% if project_form_count %}
+                        <span class="badge bg-info-lt ms-1">{{ project_form_count }}</span>
+                        {% endif %}
+                    </a>
                     <span class="d-none d-sm-inline">
-                        <!-- 【修改】指向导出路由 -->
                         <a href="{% url 'project_export_report' project.pk %}" class="btn btn-white">
                             <i class="ti ti-file-download me-2"></i>
                             导出报告

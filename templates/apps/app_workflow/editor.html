@@ -249,8 +249,12 @@
                 if (result.status === 'success') {
                     if (!"{{ definition.pk }}") window.location.href = "{% url 'workflow_editor_create' %}" + result.pk + '/';
                     else alert('流程已保存！');
+                } else {
+                    alert('保存失败：' + (result.message || '未知错误'));
                 }
-            } catch (err) { console.error(err); } finally { btn.disabled = false; }
+            } catch (err) {
+                alert('保存请求失败：' + err.message);
+            } finally { btn.disabled = false; }
         });
 
         // --- 图形 / XML 视图切换 ---

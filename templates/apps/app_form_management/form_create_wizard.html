@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">Form Management</div>
+            <h2 class="page-title">创建表单</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="javascript:history.back()" class="btn btn-ghost-secondary">
+                <i class="ti ti-arrow-left me-1"></i> 返回
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-status-top bg-blue"></div>
+
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-pencil me-2 text-blue"></i> 选择表单与关联对象
+                </h3>
+            </div>
+
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label required">选择表单模板</label>
+                    <select id="template-select" class="form-select">
+                        <option value="">-- 请选择 --</option>
+                        {% for tpl in templates %}
+                        <option value="{{ tpl.pk }}">{{ tpl.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-hint">选择要填写的表单模板，模板定义了需要填写的字段结构。</small>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">关联模块</label>
+                    <select id="module-select" class="form-select">
+                        <option value="">-- 独立表单（不关联任何模块） --</option>
+                        {% for alias, label in modules %}
+                        <option value="{{ alias }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-hint">将表单关联到项目、项目节点等模块，便于后续追溯和统计。</small>
+                </div>
+
+                <div class="mb-3" id="entity-group" style="display:none">
+                    <label class="form-label required">关联实体</label>
+                    <select id="entity-select" class="form-select" placeholder="输入关键词搜索...">
+                        <option value=""></option>
+                    </select>
+                    <small class="form-hint">输入关键词搜索目标实体，选中后表单将关联到该实体。</small>
+                </div>
+            </div>
+
+            <div class="card-footer text-end">
+                <a href="{% url 'form_template_list' %}" class="btn btn-link link-secondary">取消</a>
+                <button type="button" class="btn btn-primary ms-auto" id="btn-start" disabled>
+                    <i class="ti ti-pencil me-2"></i> 开始填写
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentModule = '';
+    const initialModule = '{{ initial_module|escapejs }}';
+    const initialEntityPk = '{{ initial_entity_pk|escapejs }}';
+    let preselectedEntityText = '';
+
+    function checkReady() {
+        const tpl = document.getElementById('template-select').value;
+        const mod = document.getElementById('module-select').value;
+        const entityGroup = document.getElementById('entity-group');
+        const entityVal = entityGroup.style.display !== 'none'
+            ? document.getElementById('entity-select').value
+            : '__NONE__';
+
+        const ready = tpl && (mod === '' || entityVal);
+        document.getElementById('btn-start').disabled = !ready;
+    }
+
+    function initEntitySelect(alias, preselectPk) {
+        const entityGroup = document.getElementById('entity-group');
+        entityGroup.style.display = '';
+        const entitySelect = document.getElementById('entity-select');
+
+        if (entitySelect.tomselect) {
+            entitySelect.tomselect.destroy();
+        }
+        entitySelect.innerHTML = '<option value=""></option>';
+
+        new TomSelect(entitySelect, {
+            valueField: 'id',
+            labelField: 'text',
+            searchField: ['text'],
+            placeholder: '输入关键词搜索...',
+            load: function(query, callback) {
+                const params = 'alias=' + encodeURIComponent(alias) + '&search=' + encodeURIComponent(query);
+                fetch('{% url "form_entity_search" %}?' + params)
+                    .then(resp => resp.json())
+                    .then(data => { callback(data.results); })
+                    .catch(() => { callback(); });
+            },
+            render: {
+                no_results: function() { return '<div class="no-results p-2 text-muted small">无匹配结果</div>'; }
+            },
+            onChange: function() { checkReady(); },
+            onInitialize: function() {
+                if (preselectPk) {
+                    const params = 'alias=' + encodeURIComponent(alias) + '&pk=' + encodeURIComponent(preselectPk);
+                    fetch('{% url "form_entity_search" %}?' + params)
+                        .then(resp => resp.json())
+                        .then(data => {
+                            if (data.results.length > 0) {
+                                const item = data.results[0];
+                                this.addOption({id: item.id, text: item.text});
+                                this.setValue(item.id);
+                            }
+                        });
+                }
+            }
+        });
+    }
+
+    document.getElementById('template-select').addEventListener('change', checkReady);
+
+    document.getElementById('module-select').addEventListener('change', function() {
+        const alias = this.value;
+        currentModule = alias;
+        if (!alias) {
+            document.getElementById('entity-group').style.display = 'none';
+            checkReady();
+            return;
+        }
+        initEntitySelect(alias, null);
+        checkReady();
+    });
+
+    document.getElementById('btn-start').addEventListener('click', function() {
+        const tplPk = document.getElementById('template-select').value;
+        const mod = document.getElementById('module-select').value;
+        const entityPk = document.getElementById('entity-select').value;
+
+        if (!tplPk) return;
+
+        const base = '{% url "form_template_list" %}';
+        const path = mod && entityPk
+            ? tplPk + '/fill/' + mod + '/' + entityPk + '/'
+            : tplPk + '/fill/';
+        window.location.href = base + path;
+    });
+
+    if (initialModule) {
+        document.getElementById('module-select').value = initialModule;
+        initEntitySelect(initialModule, initialEntityPk);
+        checkReady();
+    }
+</script>
+{% endblock %}

@@ -1,8 +1,14 @@
-<div class="card">
+﻿<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title">执行进度追踪</h3>
         <div class="btn-list">
-             <a href="{% url 'repo_project_file_detail' project.repository.id %}" class="btn btn-outline-purple btn-sm">
+             <a href="{% url 'project_form_list' project.id %}" class="btn btn-outline-info btn-sm">
+                <i class="ti ti-forms me-1"></i>查看全部表单
+                {% if total_form_count %}
+                <span class="badge bg-info-lt ms-1">{{ total_form_count }}</span>
+                {% endif %}
+            </a>
+            <a href="{% url 'repo_project_file_detail' project.repository.id %}" class="btn btn-outline-purple btn-sm">
                 <i class="ti ti-files me-1"></i>查看全部资料
                 <span class="badge bg-purple-lt ms-1">{{ project.repository.files.count }}</span>
             </a>
@@ -110,8 +116,16 @@
                             </button>
                         {% endif %}
 
-                        <!-- 【调整】上传资料按钮移至最后，并使用 ms-auto 置右 -->
-                        <button class="btn btn-sm btn-outline-purple ms-auto"
+                        <!-- 表单填写入口 -->
+                        <a href="{% url 'form_create_wizard' %}?module=project-node&entity={{ node.pk }}"
+                           class="btn btn-sm btn-outline-info ms-auto">
+                            <i class="ti ti-forms me-1"></i>创建表单
+                            {% if node.form_count %}
+                            <span class="badge bg-info-lt ms-1">{{ node.form_count }}</span>
+                            {% endif %}
+                        </a>
+
+                        <button class="btn btn-sm btn-outline-purple"
                                 data-bs-toggle="modal"
                                 data-bs-target="#modal-generic"
                                 hx-get="{% url 'repo_file_add' project.repository.id %}?node_id={{ node.id }}"

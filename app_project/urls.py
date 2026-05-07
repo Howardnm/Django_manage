@@ -1,14 +1,16 @@
 from django.urls import path
-from .views.Project import *
+from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView, ProjectDetailView, ProjectConfigView
 from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
 from .views.ProjectMember import *
-from .views.PerformanceRule import * # 【新增】
+from .views.PerformanceRule import *
 from app_panel.views.PerformanceView import UserPerformanceListView, UserPerformanceDetailView
+from app_form_management.views import ProjectFormListView
 
 urlpatterns = [
     path('list/', ProjectListView.as_view(), name='project_list'),
     path('create/', ProjectCreateView.as_view(), name='project_create'),
+    path('config/', ProjectConfigView.as_view(), name='project_config'),
     path('<int:pk>/', ProjectDetailView.as_view(), name='project_detail'),
     path('<int:pk>/edit/', ProjectUpdateView.as_view(), name='project_edit'),
     
@@ -25,6 +27,7 @@ urlpatterns = [
     path('node/<int:pk>/failed/', NodeFailedView.as_view(), name='node_failed'),
     path('node/<int:pk>/feedback/', InsertFeedbackView.as_view(), name='node_feedback'),
     
+    path('<int:pk>/forms/', ProjectFormListView.as_view(), name='project_form_list'),
     path('<int:pk>/export/', ProjectReportExportView.as_view(), name='project_export_report'),
 
     # 项目协同成员管理

@@ -23,8 +23,9 @@
                 <table class="table card-table table-vcenter text-nowrap datatable">
                     <thead>
                         <tr>
+                            <th>关联模块</th>
+                            <th>关联实体</th>
                             <th>流程名称</th>
-                            <th>关联业务</th>
                             <th>当前状态</th>
                             <th>当前审批节点</th>
                             <th>发起时间</th>
@@ -36,27 +37,33 @@
                         {% for item in items %}
                         <tr>
                             <td>
-                                <a href="{% url 'workflow_instance_detail' pk=item.instance.pk %}" class="text-reset">
-                                    <strong>{{ item.instance.definition.name }}</strong>
-                                </a>
+                                <span class="badge bg-azure-lt">{{ item.related_model_name|default:"—" }}</span>
                             </td>
-                            <td class="text-muted">
-                                {% if item.related_object %}
-                                    <span class="text-muted-lt">[{{ item.related_model_name }}]</span> {{ item.related_object }}
+                            <td>
+                                {% if item.related_object_url %}
+                                    <a href="{{ item.related_object_url }}" class="text-reset"><strong>{{ item.related_object }}</strong></a>
                                 {% else %}
-                                    --
+                                    <strong>{{ item.related_object|default:"—" }}</strong>
                                 {% endif %}
                             </td>
                             <td>
-                                {% if item.instance.status == 'RUNNING' %}
-                                    <span class="badge bg-primary-lt">运行中</span>
-                                {% elif item.instance.status == 'COMPLETED' %}
-                                    <span class="badge bg-success-lt">已完成</span>
-                                {% elif item.instance.status == 'REJECTED' %}
-                                    <span class="badge bg-danger-lt">已驳回</span>
-                                {% elif item.instance.status == 'CANCELED' %}
-                                    <span class="badge bg-secondary-lt">已取消</span>
+                                <a href="{% url 'workflow_instance_detail' pk=item.instance.pk %}" class="text-reset">
+                                    {{ item.instance.definition.name }}
+                                </a>
+                            </td>
+                            <td>
+                                {% with status=item.instance.status %}
+                                {% if status == 'RUNNING' %}
+                                    <span class="badge bg-primary-lt">
+                                {% elif status == 'COMPLETED' %}
+                                    <span class="badge bg-success-lt">
+                                {% elif status == 'REJECTED' %}
+                                    <span class="badge bg-danger-lt">
+                                {% elif status == 'CANCELED' %}
+                                    <span class="badge bg-secondary-lt">
                                 {% endif %}
+                                {{ item.instance.get_status_display }}</span>
+                                {% endwith %}
                             </td>
                             <td>
                                 {% if item.pending_tasks %}
@@ -85,7 +92,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center text-muted py-4">你还没有发起过任何流程。</td>
+                            <td colspan="8" class="text-center text-muted py-4">你还没有发起过任何流程。</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <div class="page-pretitle">表单管理</div>
+                <h2 class="page-title">{{ project.name }} - 项目表单记录</h2>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    <a href="{% url 'project_detail' project.id %}" class="btn btn-outline-secondary">
+                        <i class="ti ti-arrow-left me-1"></i>返回项目
+                    </a>
+                    <a href="{% url 'form_create_wizard' %}?module=project&entity={{ project.pk }}"
+                       class="btn btn-primary d-none d-sm-inline-block">
+                        <i class="ti ti-pencil me-1"></i>新建表单
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="row row-cards">
+            <!-- 项目级表单 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">项目级表单</h3>
+                        <span class="text-muted ms-2">直接关联到项目的表单记录</span>
+                    </div>
+                    {% if project_submissions %}
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table">
+                                <thead>
+                                    <tr>
+                                        <th>表单模板</th>
+                                        <th>提交人</th>
+                                        <th>审核状态</th>
+                                        <th>提交时间</th>
+                                        <th class="w-1">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for sub in project_submissions %}
+                                        <tr>
+                                            <td>
+                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}" class="text-reset">
+                                                    <strong>{{ sub.template.name }}</strong>
+                                                </a>
+                                            </td>
+                                            <td class="text-secondary">{{ sub.submitted_by.username|default:"—" }}</td>
+                                            <td>
+                                                {% if sub.workflow_instance %}
+                                                    {% with status=sub.workflow_instance.status %}
+                                                    {% if status == 'COMPLETED' %}
+                                                    <span class="badge bg-green text-white">已审核(通过)</span>
+                                                    {% elif status == 'REJECTED' %}
+                                                    <span class="badge bg-red text-white">已审核(拒绝)</span>
+                                                    {% elif status == 'RUNNING' %}
+                                                    <span class="badge bg-blue text-white">审核中</span>
+                                                    {% elif status == 'CANCELED' %}
+                                                    <span class="badge bg-secondary text-white">已取消</span>
+                                                    {% else %}
+                                                    <span class="badge bg-secondary text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                                    {% endif %}
+                                                    {% endwith %}
+                                                {% else %}
+                                                    <span class="badge bg-muted-lt text-muted">无需审核</span>
+                                                {% endif %}
+                                            </td>
+                                            <td class="text-secondary">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
+                                            <td>
+                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}"
+                                                   class="btn btn-sm btn-white">查看详情</a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="card-body py-4 text-center">
+                            <div class="text-secondary">暂无项目级表单记录</div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- 节点关联表单 -->
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">节点关联表单</h3>
+                        <span class="text-muted ms-2">按项目节点分组的表单记录</span>
+                    </div>
+                    <div class="card-body">
+                        {% if grouped_list %}
+                            <div class="space-y-3">
+                                {% for group in grouped_list %}
+                                    <div class="card card-sm">
+                                        <div class="card-header py-1 px-3 {{ group.node.status_css_class }} {% if group.node.status == 'TERMINATED' or group.node.status == 'FEEDBACK' %}text-white{% endif %}">
+                                            <div class="card-title" style="font-size: 0.875rem;">
+                                                {{ forloop.counter }}、{{ group.node.get_stage_display }}
+                                                {% if group.node.round > 1 %}
+                                                    <span class="badge bg-secondary-lt ms-1">第{{ group.node.round }}轮</span>
+                                                {% endif %}
+                                                <small class="ms-2 fw-normal opacity-75">[{{ group.node.get_status_display }}]</small>
+                                            </div>
+                                        </div>
+                                        <div class="table-responsive">
+                                            <table class="table table-vcenter card-table table-sm">
+                                                <thead>
+                                                    <tr>
+                                                        <th>表单模板</th>
+                                                        <th>提交人</th>
+                                                        <th>审核状态</th>
+                                                        <th>提交时间</th>
+                                                        <th class="w-1">操作</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for sub in group.submissions %}
+                                                        <tr>
+                                                            <td>
+                                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}" class="text-reset">
+                                                                    <strong>{{ sub.template.name }}</strong>
+                                                                </a>
+                                                            </td>
+                                                            <td class="text-secondary">{{ sub.submitted_by.username|default:"—" }}</td>
+                                                            <td>
+                                                                {% if sub.workflow_instance %}
+                                                                    {% with status=sub.workflow_instance.status %}
+                                                                    {% if status == 'COMPLETED' %}
+                                                                    <span class="badge bg-green text-white">已审核(通过)</span>
+                                                                    {% elif status == 'REJECTED' %}
+                                                                    <span class="badge bg-red text-white">已审核(拒绝)</span>
+                                                                    {% elif status == 'RUNNING' %}
+                                                                    <span class="badge bg-blue text-white">审核中</span>
+                                                                    {% elif status == 'CANCELED' %}
+                                                                    <span class="badge bg-secondary text-white">已取消</span>
+                                                                    {% else %}
+                                                                    <span class="badge bg-secondary text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                                                    {% endif %}
+                                                                    {% endwith %}
+                                                                {% else %}
+                                                                    <span class="badge bg-muted-lt text-muted">无需审核</span>
+                                                                {% endif %}
+                                                            </td>
+                                                            <td class="text-secondary">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
+                                                            <td>
+                                                                <a href="{% url 'form_submission_detail' pk=sub.pk %}"
+                                                                   class="btn btn-sm btn-white">查看详情</a>
+                                                            </td>
+                                                        </tr>
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-4 text-secondary">暂无节点关联表单记录</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

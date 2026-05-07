@@ -15,8 +15,8 @@ class ProjectStage(models.TextChoices):
     RND = 'RND', '⑤ 研发阶段'  # 可能多次
     PILOT = 'PILOT', '⑥ 客户小试'  # 可能多次
     MID_TEST = 'MID_TEST', '⑦ 客户中试'  # 可能多次
-    MASS_PROD = 'MASS_PROD', '⑧ 客户量产意向'
-    ORDER = 'ORDER', '⑨ 客户下单情况'
+    MASS_PROD = 'MASS_PROD', '⑧ 客户量产下单'
+    ORDER = 'ORDER', '⑨ 开发周期完成'
     FEEDBACK = 'FEEDBACK', '🎗️客户意见'
 
 
@@ -259,7 +259,25 @@ class ProjectMember(models.Model):
         unique_together = ('project', 'user')
 
 
-# 5. 评分规则配置模型
+# 5. 项目全局配置（单例）
+class ProjectConfig(models.Model):
+    """项目全局配置，仅允许超级管理员修改。"""
+    default_approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition',on_delete=models.SET_NULL,null=True, blank=True,verbose_name='默认审批流程')
+
+    class Meta:
+        verbose_name = "项目全局配置"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj
+
+
+# 6. 评分规则配置模型
 class NodeScoreRule(models.Model):
     name = models.CharField("规则名称", max_length=100)
     score_value = models.PositiveIntegerField("对应得分", default=0)

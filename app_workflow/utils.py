@@ -12,11 +12,90 @@ from .models import WorkflowInstance, WorkflowTask, ApprovalHistory, WorkflowDef
 from django.utils import timezone
 from django.db import transaction
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group # 导入 Group 模型
-from .signals import workflow_started, task_created, task_completed, workflow_completed # 导入信号
+from django.contrib.auth.models import Group
+from .signals import workflow_started, task_created, task_completed, workflow_completed
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+# ==========================================
+# 关联对象 URL 路由器（通用对接层）
+# ==========================================
+
+class RelatedObjectRouter:
+    """关联对象 URL 路由器。
+
+    供 app_workflow 内部使用，将审批流程的关联对象映射到其详情页 URL。
+    各业务模块在 apps.py 中调用 register() 完成注册，无需修改 app_workflow 代码。
+
+    使用示例::
+
+        from app_workflow.utils import related_object_router
+
+        # 在业务模块的 apps.py 中注册
+        related_object_router.register(
+            MyModel,
+            lambda obj: reverse('my_detail', kwargs={'pk': obj.pk}),
+        )
+
+        # 在视图/模板中使用
+        url = related_object_router.resolve(obj)
+    """
+
+    def __init__(self):
+        self._registry = {}
+
+    def register(self, model_class, resolver):
+        """注册模型对应的详情页 URL 解析器。
+
+        Parameters
+        ----------
+        model_class : Model class
+            Django 模型类（非代理模型），会按 MRO 向上查找匹配。
+        resolver : callable
+            签名为 ``(obj) -> str | None``，接收模型实例，返回详情页 URL 或 None。
+            推荐使用 lambda 配合 reverse() 构造。
+
+        Examples
+        --------
+        from app_workflow.utils import related_object_router
+        from app_project.models import Project
+        related_object_router.register(
+            Project,
+            lambda obj: reverse('project_detail', kwargs={'pk': obj.pk}),
+        )
+        """
+        self._registry[model_class] = resolver
+
+    def resolve(self, obj):
+        """解析关联对象的详情页 URL。
+
+        按 obj 的 MRO 顺序查找第一个匹配的注册项，适配代理模型场景。
+
+        Parameters
+        ----------
+        obj : Model instance or None
+            关联对象实例，为 None 时返回 None。
+
+        Returns
+        -------
+        str or None
+            对应的详情页 URL，未注册或 obj 为 None 时返回 None。
+        """
+        if obj is None:
+            return None
+        for cls in type(obj).__mro__:
+            resolver = self._registry.get(cls)
+            if resolver:
+                return resolver(obj)
+        return None
+
+
+# 模块级单例，供各业务模块注册和视图调用
+related_object_router = RelatedObjectRouter()
+
+
 
 class WorkflowEngine:
     """SpiffWorkflow 引擎封装类 (适配 3.1.2 版本)"""

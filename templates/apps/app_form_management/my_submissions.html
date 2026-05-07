@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title">我的提交记录</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="page-body">
+    <div class="container-xl">
+        <div class="card">
+            {% include 'apps/list_modules/tools_search_filter.html' %}
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap datatable">
+                    <thead>
+                        <tr>
+                            <th class="w-1">ID</th>
+                            <th>表单模板</th>
+                            <th>关联模块</th>
+                            <th>关联实体</th>
+                            <th>流程进度</th>
+                            <th>提交时间</th>
+                            <th class="w-1">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in submissions %}
+                        <tr>
+                            <td><span class="text-muted">{{ sub.pk }}</span></td>
+                            <td><strong>{{ sub.template.name }}</strong></td>
+                            <td>{{ sub.target_module }}</td>
+                            <td>{{ sub.target_display }}</td>
+                            <td>
+                                {% if sub.workflow_instance_id %}
+                                    {% with status=sub.workflow_instance.status %}
+                                    {% if status == 'RUNNING' %}
+                                    <span class="badge bg-blue text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                    {% elif status == 'COMPLETED' %}
+                                    <span class="badge bg-green text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                    {% elif status == 'REJECTED' %}
+                                    <span class="badge bg-red text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                    {% elif status == 'CANCELED' %}
+                                    <span class="badge bg-secondary text-white">{{ sub.workflow_instance.get_status_display }}</span>
+                                    {% else %}
+                                    <span class="text-muted">{{ sub.workflow_instance.get_status_display }}</span>
+                                    {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted">{{ sub.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <a href="{% url 'form_submission_detail' pk=sub.pk %}"
+                                   class="btn btn-sm btn-white">查看详情</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center text-muted py-4">
+                                <div class="empty">
+                                    <div class="empty-icon">
+                                        <i class="ti ti-mood-empty icon" style="font-size: 48px;"></i>
+                                    </div>
+                                    <p class="empty-title">暂无提交</p>
+                                    <p class="empty-subtitle text-muted">还没有提交过任何表单。</p>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

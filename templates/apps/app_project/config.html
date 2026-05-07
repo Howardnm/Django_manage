@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">System Configuration</div>
+            <h2 class="page-title">项目全局配置</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'project_list' %}" class="btn btn-ghost-secondary">
+                <i class="ti ti-arrow-left me-1"></i> 返回列表
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center mt-3">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-status-top bg-blue"></div>
+
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-settings me-2 text-blue"></i> 默认审批流程
+                </h3>
+            </div>
+
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">全局默认审批流程</label>
+                    <select id="workflow-select" class="form-select">
+                        <option value="">-- 不设置默认审批流程 --</option>
+                        {% for wf in workflows %}
+                        <option value="{{ wf.pk }}" {% if config.default_approval_workflow_id == wf.pk %}selected{% endif %}>
+                            {{ wf.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                    <small class="form-hint">
+                        新建项目时将自动关联此处选择的审批流程。项目节点提交完成时，将启动该审批流程。
+                        留空则表示项目不需要审批。
+                    </small>
+                </div>
+            </div>
+
+            <div class="card-footer text-end">
+                <button type="button" class="btn btn-primary" id="btn-save">
+                    <i class="ti ti-device-floppy me-2"></i> 保存配置
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('btn-save').addEventListener('click', async function() {
+        const btn = this;
+        btn.disabled = true;
+        try {
+            const resp = await fetch('{% url "project_config" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}'
+                },
+                body: JSON.stringify({
+                    workflow_id: document.getElementById('workflow-select').value || null
+                })
+            });
+            const result = await resp.json();
+            if (result.status === 'success') {
+                alert('配置已保存');
+            } else {
+                alert(result.message || '保存失败');
+            }
+        } catch(err) {
+            alert('请求失败: ' + err.message);
+        } finally {
+            btn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

@@ -61,29 +61,13 @@
                     {% endif %}
                 </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <!-- 项目等级 -->
-                        <div class="mb-3">
-                            <label class="form-label">项目等级</label>
-                            {{ form.grade }}
-                            <small class="form-hint">影响客户贡献度排行加权。</small>
-                            {% if form.grade.errors %}
-                                <div class="invalid-feedback d-block">{{ form.grade.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <!-- 默认审批流 -->
-                        <div class="mb-3">
-                            <label class="form-label">默认审批流程</label>
-                            {{ form.approval_workflow }}
-                            <small class="form-hint">配置后，项目阶段完成时需审批通过才生效。</small>
-                            {% if form.approval_workflow.errors %}
-                                <div class="invalid-feedback d-block">{{ form.approval_workflow.errors.0 }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label">项目等级</label>
+                    {{ form.grade }}
+                    <small class="form-hint">影响客户贡献度排行加权。</small>
+                    {% if form.grade.errors %}
+                        <div class="invalid-feedback d-block">{{ form.grade.errors.0 }}</div>
+                    {% endif %}
                 </div>
 
                 <!-- 项目描述 -->

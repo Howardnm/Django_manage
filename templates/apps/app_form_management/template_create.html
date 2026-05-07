@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% if template %}编辑表单{% else %}新建表单{% endif %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+        html, body { height: 100%; }
+        #app { height: 100%; display: flex; flex-direction: column; }
+        .toolbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 20px; border-bottom: 1px solid #e6e8e9; background: #fff;
+            flex-shrink: 0;
+        }
+        .toolbar h2 { font-size: 18px; font-weight: 600; margin: 0; }
+        .designer-wrap { flex: 1; min-height: 0; }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <div class="toolbar">
+        <h2>{% if template %}编辑表单模板{% else %}新建表单模板{% endif %}</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+            <select id="workflow-select" style="padding:6px 12px;border:1px solid #dcdfe6;border-radius:4px;font-size:14px;min-width:180px;">
+                <option value="">-- 不关联审批流程 --</option>
+                {% for wf in workflows %}
+                <option value="{{ wf.pk }}" {% if template and template.workflow_id == wf.pk %}selected{% endif %}>{{ wf.name }}</option>
+                {% endfor %}
+            </select>
+            <el-button @click="goBack">返回列表</el-button>
+            <el-button type="primary" @click="doSave" :loading="saving">保存表单</el-button>
+        </div>
+    </div>
+    <div class="designer-wrap">
+        <fc-designer ref="designerRef" height="100%" />
+    </div>
+</div>
+
+<script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
+<script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
+
+<script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
+<script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
+<script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>
+<script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
+
+<script>
+    const { createApp } = Vue;
+
+    const app = createApp({
+        data() {
+            const existingName = '{{ template.name|default:""|escapejs }}';
+            const existingDesc = '{{ template.description|default:""|escapejs }}';
+            return {
+                saving: false,
+                existingName: existingName,
+                existingDesc: existingDesc
+            };
+        },
+
+        mounted() {
+            const designer = this.$refs.designerRef;
+
+            const configEl = document.getElementById('form-config-data');
+            if (configEl) {
+                try {
+                    const rule = JSON.parse(configEl.textContent.trim());
+                    if (rule && rule.length > 0) {
+                        designer.setRule(rule);
+                    }
+                } catch(e) {}
+            }
+
+            const optionEl = document.getElementById('form-option-data');
+            if (optionEl) {
+                try {
+                    const option = JSON.parse(optionEl.textContent.trim());
+                    if (option && Object.keys(option).length > 0) {
+                        designer.setOption(option);
+                    }
+                } catch(e) {}
+            }
+        },
+
+        methods: {
+            async doSave() {
+                const designer = this.$refs.designerRef;
+                const rule = designer ? designer.getRule() : [];
+                if (!rule || rule.length === 0) {
+                    ElementPlus.ElMessage.warning('请在设计器中添加至少一个字段');
+                    return;
+                }
+
+                const option = designer ? designer.getOption() : {};
+
+                // 表单名称从设计器 option.formName 读取
+                let name = option.formName || this.existingName;
+
+                // 无名称时用原生 prompt 快速输入
+                if (!name) {
+                    name = prompt('请输入表单名称');
+                    if (!name || !name.trim()) {
+                        ElementPlus.ElMessage.warning('表单名称不能为空');
+                        return;
+                    }
+                }
+                name = name.trim();
+
+                const description = option.form?.description || option.description || this.existingDesc;
+
+                this.saving = true;
+                try {
+                    const resp = await fetch('{% if template %}{% url "form_template_edit" pk=template.pk %}{% else %}{% url "form_template_create" %}{% endif %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': '{{ csrf_token }}'
+                        },
+                        body: JSON.stringify({
+                            name: name,
+                            description: description.trim(),
+                            is_active: true,
+                            form_config: rule,
+                            form_option: option,
+                            workflow_id: document.getElementById('workflow-select').value || null
+                        })
+                    });
+                    const result = await resp.json();
+                    if (result.status === 'success') {
+                        ElementPlus.ElMessage.success('保存成功');
+                        window.location.href = '{% url "form_template_list" %}';
+                    } else {
+                        ElementPlus.ElMessage.error('保存失败: ' + (result.message || '未知错误'));
+                    }
+                } catch(e) {
+                    ElementPlus.ElMessage.error('请求失败: ' + e.message);
+                } finally {
+                    this.saving = false;
+                }
+            },
+
+            goBack() {
+                window.location.href = '{% url "form_template_list" %}';
+            }
+        }
+    });
+
+    app.use(ElementPlus);
+    app.use(FcDesigner);
+    app.use(FcDesigner.formCreate);
+    app.mount('#app');
+</script>
+
+</body>
+</html>

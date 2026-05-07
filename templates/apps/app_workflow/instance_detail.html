@@ -69,17 +69,13 @@
             <!-- 基本信息 -->
             <div class="col-md-4">
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header bg-azure-lt">
                         <h3 class="card-title">
                             <i class="ti ti-info-circle me-2"></i>基本信息
                         </h3>
                     </div>
                     <div class="card-body">
                         <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">流程定义</div>
-                                <div class="datagrid-content">{{ instance.definition.name }}</div>
-                            </div>
                             <div class="datagrid-item">
                                 <div class="datagrid-title">发起人</div>
                                 <div class="datagrid-content">{{ instance.started_by.username }}</div>
@@ -92,24 +88,14 @@
                                 <div class="datagrid-title">结束时间</div>
                                 <div class="datagrid-content">{{ instance.completed_at|date:"Y-m-d H:i"|default:"--" }}</div>
                             </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">关联业务</div>
-                                <div class="datagrid-content">
-                                    {% if instance.content_object %}
-                                        {{ instance.content_object }} (ID: {{ instance.object_id }})
-                                    {% else %}
-                                        --
-                                    {% endif %}
-                                </div>
-                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- 关联业务对象详情 -->
-                {% if related_object and content_type_model %}
+                {% if related_object %}
                 <div class="card mt-3">
-                    <div class="card-header">
+                    <div class="card-header bg-green-lt">
                         <h3 class="card-title">
                             <i class="ti ti-folder-open me-2"></i>关联业务对象
                         </h3>
@@ -117,19 +103,21 @@
                     <div class="card-body">
                         <div class="datagrid">
                             <div class="datagrid-item">
-                                <div class="datagrid-title">对象类型</div>
-                                <div class="datagrid-content">{{ content_type_model }}</div>
+                                <div class="datagrid-title">关联模块</div>
+                                <div class="datagrid-content">
+                                    <span class="badge bg-azure-lt">{{ related_model_name|default:"—" }}</span>
+                                </div>
                             </div>
                             <div class="datagrid-item">
-                                <div class="datagrid-title">对象展示</div>
-                                <div class="datagrid-content">{{ related_object }}</div>
+                                <div class="datagrid-title">关联实体</div>
+                                <div class="datagrid-content">
+                                    {% if related_object_url %}
+                                        <a href="{{ related_object_url }}" class="text-reset"><strong>{{ related_object }}</strong></a>
+                                    {% else %}
+                                        <strong>{{ related_object }}</strong>
+                                    {% endif %}
+                                </div>
                             </div>
-                            {% if instance.object_id %}
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">对象ID</div>
-                                <div class="datagrid-content">{{ instance.object_id }}</div>
-                            </div>
-                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -138,19 +126,25 @@
                 <!-- 流程上下文数据 -->
                 {% if instance.context_data %}
                 <div class="card mt-3">
-                    <div class="card-header">
+                    <div class="card-header bg-purple-lt" data-bs-toggle="collapse" data-bs-target="#collapse-context" role="button" style="cursor: pointer;">
                         <h3 class="card-title">
                             <i class="ti ti-database me-2"></i>流程上下文数据
                         </h3>
+                        <div class="card-actions">
+                            <span class="text-muted small">{{ instance.context_data|length }} 项</span>
+                            <i class="ti ti-chevron-down ms-2 collapse-icon"></i>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="datagrid">
-                            {% for key, value in instance.context_data.items %}
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">{{ key }}</div>
-                                <div class="datagrid-content">{{ value }}</div>
+                    <div class="collapse" id="collapse-context">
+                        <div class="card-body">
+                            <div class="datagrid">
+                                {% for key, value in instance.context_data.items %}
+                                <div class="datagrid-item">
+                                    <div class="datagrid-title">{{ key }}</div>
+                                    <div class="datagrid-content">{{ value }}</div>
+                                </div>
+                                {% endfor %}
                             </div>
-                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -162,7 +156,7 @@
                 <!-- 审批操作表单 -->
                 {% if current_task %}
                 <div class="card mb-3">
-                    <div class="card-header">
+                    <div class="card-header bg-yellow-lt">
                         <h3 class="card-title">
                             <i class="ti ti-checks me-2"></i>待处理任务: {{ current_task.task_name }}
                         </h3>
@@ -189,7 +183,7 @@
 
                 <!-- 流程进度时间轴 -->
                 <div class="card">
-                    <div class="card-header">
+                    <div class="card-header bg-blue-lt">
                         <h3 class="card-title">
                             <i class="ti ti-timeline me-2"></i>流程进度
                         </h3>
