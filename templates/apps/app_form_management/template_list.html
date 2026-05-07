@@ -126,10 +126,6 @@
             <div class="modal-body">
                 <input type="hidden" id="edit-pk">
                 <div class="mb-3">
-                    <label class="form-label required">表单名称</label>
-                    <input type="text" id="edit-name" class="form-control" placeholder="输入表单名称">
-                </div>
-                <div class="mb-3">
                     <label class="form-label">描述</label>
                     <textarea id="edit-desc" class="form-control" rows="3" placeholder="表单用途说明"></textarea>
                 </div>
@@ -167,7 +163,6 @@
         if (!btn) return;
 
         document.getElementById('edit-pk').value = btn.dataset.pk;
-        document.getElementById('edit-name').value = btn.dataset.name;
         document.getElementById('edit-desc').value = btn.dataset.desc;
         document.getElementById('edit-active').checked = btn.dataset.active === 'true';
         document.getElementById('edit-workflow').value = btn.dataset.workflow || '';
@@ -175,8 +170,6 @@
 
     document.getElementById('btn-save-info').addEventListener('click', async function() {
         const pk = document.getElementById('edit-pk').value;
-        const name = document.getElementById('edit-name').value.trim();
-        if (!name) { alert('请输入表单名称'); return; }
 
         const url = '{% url "form_template_update_info" pk=0 %}'.replace('0', pk);
         const btn = this;
@@ -186,7 +179,6 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
                 body: JSON.stringify({
-                    name: name,
                     description: document.getElementById('edit-desc').value.trim(),
                     is_active: document.getElementById('edit-active').checked,
                     workflow_id: document.getElementById('edit-workflow').value || null

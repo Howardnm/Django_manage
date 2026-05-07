@@ -122,10 +122,8 @@ class FormTemplateBasicInfoUpdateView(FormManagementAccessMixin, View):
             return JsonResponse({'status': 'error', 'message': '无效的JSON数据。'}, status=400)
 
         name = data.get('name', '').strip()
-        if not name:
-            return JsonResponse({'status': 'error', 'message': '表单名称不能为空。'}, status=400)
-
-        template.name = name
+        if name:
+            template.name = name
         template.description = data.get('description', '')
         template.is_active = data.get('is_active', True)
         template.workflow_id = data.get('workflow_id') or None
