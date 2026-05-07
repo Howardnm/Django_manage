@@ -19,7 +19,6 @@ class FormTemplate(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
     class Meta:
-        db_table = 'form_template'
         verbose_name = '表单模板'
         verbose_name_plural = verbose_name
         ordering = ['-created_at']
@@ -50,7 +49,6 @@ class FormSubmission(models.Model):
     updated_at = models.DateTimeField(auto_now=True, verbose_name='更新时间')
 
     class Meta:
-        db_table = 'form_submission'
         verbose_name = '表单提交'
         verbose_name_plural = verbose_name
         ordering = ['-created_at']
