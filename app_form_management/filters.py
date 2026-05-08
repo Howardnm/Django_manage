@@ -24,6 +24,9 @@ class TablerFilterMixin:
                 if 'form-control' not in existing_class:
                     attrs['class'] = f"{existing_class} form-control".strip()
                 attrs['type'] = 'date'
+            elif isinstance(widget, forms.TextInput):
+                if 'form-control' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-control".strip()
 
 
 # ==========================================
@@ -34,6 +37,12 @@ class FormTemplateFilter(TablerFilterMixin, django_filters.FilterSet):
         method='filter_search',
         label='搜索',
         widget=forms.TextInput(attrs={'placeholder': '搜索模板名称/描述...'})
+    )
+
+    group = django_filters.CharFilter(
+        method='filter_group',
+        label='分组',
+        widget=forms.TextInput(attrs={'placeholder': '输入分组名称...'})
     )
 
     is_active = django_filters.ChoiceFilter(
@@ -52,7 +61,7 @@ class FormTemplateFilter(TablerFilterMixin, django_filters.FilterSet):
 
     class Meta:
         model = FormTemplate
-        fields = ['q', 'is_active', 'workflow']
+        fields = ['q', 'group', 'is_active', 'workflow']
 
     def filter_search(self, queryset, name, value):
         if not value:
@@ -61,6 +70,11 @@ class FormTemplateFilter(TablerFilterMixin, django_filters.FilterSet):
             Q(name__icontains=value) |
             Q(description__icontains=value)
         )
+
+    def filter_group(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(group__icontains=value)
 
 
 # ==========================================

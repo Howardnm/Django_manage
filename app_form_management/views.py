@@ -124,6 +124,7 @@ class FormTemplateBasicInfoUpdateView(FormManagementAccessMixin, View):
         name = data.get('name', '').strip()
         if name:
             template.name = name
+        template.group = data.get('group', '')
         template.description = data.get('description', '')
         template.is_active = data.get('is_active', True)
         template.workflow_id = data.get('workflow_id') or None
@@ -301,7 +302,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
 
 class FormCreateWizardView(FormManagementAccessMixin, View):
     def get(self, request):
-        templates = FormTemplate.objects.filter(is_active=True)
+        templates = FormTemplate.objects.filter(is_active=True).order_by('group', 'name')
         initial_module = request.GET.get('module', '')
         initial_entity_pk = request.GET.get('entity', '')
 
@@ -309,8 +310,23 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
         if initial_module and get_target(initial_module) is None:
             initial_module = ''
 
+        # 按分组整理模板 — 有分组的在前，未分组的末尾
+        template_groups = []
+        seen = set()
+        ungrouped = []
+        for tpl in templates:
+            if tpl.group:
+                if tpl.group not in seen:
+                    seen.add(tpl.group)
+                    template_groups.append({'name': tpl.group, 'templates': [], 'muted': False})
+                template_groups[-1]['templates'].append(tpl)
+            else:
+                ungrouped.append(tpl)
+        if ungrouped:
+            template_groups.append({'name': '', 'templates': ungrouped, 'muted': True})
+
         return render(request, 'apps/app_form_management/form_create_wizard.html', {
-            'templates': templates,
+            'template_groups': template_groups,
             'modules': get_module_choices(),
             'initial_module': initial_module,
             'initial_entity_pk': initial_entity_pk,

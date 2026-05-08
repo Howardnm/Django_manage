@@ -9,6 +9,7 @@ User = get_user_model()
 class FormTemplate(models.Model):
     """表单模板 — form_config 存储 form-create-designer 生成的 JSON rule"""
     name = models.CharField(max_length=100, verbose_name='表单名称')
+    group = models.CharField(max_length=100, blank=True, default='', verbose_name='分组', help_text='用于在创建表单页面中将模板分组展示')
     description = models.TextField(blank=True, default='', verbose_name='描述')
     is_active = models.BooleanField(default=True, verbose_name='启用')
     form_config = models.JSONField(default=list, blank=True, verbose_name='表单字段配置JSON', help_text='form-create-designer 生成的 rule 数组')
