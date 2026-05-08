@@ -26,6 +26,7 @@
             <div class="card-body">
                 <form method="get" class="row g-3">
                     <input type="hidden" name="sort" value="{{ current_sort }}">
+                    <input type="hidden" name="tab" value="{{ current_tab }}">
 
                     <!-- A. 立项日期筛选 -->
                     <div class="col-md-3">
@@ -109,7 +110,7 @@
                                         </a>
                                     </th>
                                     <th class="text-end">
-                                        <a href="?{% url_replace sort='inc_work'|sort_toggle:current_sort %}" class="table-sort-header text-muted">
+                                        <a href="?{% url_replace sort='inc_work'|sort_toggle:current_sort %}" class="table-sort-header text-success">
                                             基础工作量(增量)
                                             {% if current_sort == 'inc_work' %}<i class="ti ti-arrow-up icon-sm"></i>
                                             {% elif current_sort == '-inc_work' %}<i class="ti ti-arrow-down icon-sm"></i>
