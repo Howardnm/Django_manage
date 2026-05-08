@@ -27,6 +27,7 @@
                     <thead>
                         <tr>
                             <th>规则名称</th>
+                            <th>类型</th>
                             <th>触发阶段</th>
                             <th>触发状态</th>
                             <th>条件</th>
@@ -40,6 +41,13 @@
                             <td>
                                 <div class="font-weight-medium">{{ rule.name }}</div>
                                 <div class="text-muted small">{{ rule.description|default:"暂无描述" }}</div>
+                            </td>
+                            <td>
+                                {% if rule.rule_type == 'SALES' %}
+                                    <span class="badge bg-green-lt">销售</span>
+                                {% else %}
+                                    <span class="badge bg-blue-lt">研发</span>
+                                {% endif %}
                             </td>
                             <td>
                                 {% if rule.trigger_stage %}
@@ -76,7 +84,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
+                            <td colspan="7" class="text-center py-5 text-muted">
                                 尚未配置任何评分规则，点击“新增规则”开始。
                             </td>
                         </tr>

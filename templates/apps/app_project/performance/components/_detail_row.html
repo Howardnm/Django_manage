@@ -1,0 +1,47 @@
+<tr>
+    <td>
+        <div class="font-weight-medium"><a href="{% url 'project_detail' m.project.id %}">{{ m.project.name }}</a></div>
+        <div class="text-muted small">{{ m.project.repository.customer.company_name|default:"内部项目" }}</div>
+    </td>
+    <td>
+        {% if is_sales %}
+            <span class="badge bg-green-lt me-1">商务跟进</span>
+        {% else %}
+            <span class="badge bg-blue-lt me-1">{{ m.get_role_display }}</span>
+        {% endif %}
+        {% if m.project.grade %}
+            <span class="badge bg-purple-lt" title="加权因子: {{ m.project.grade.factor }}">x{{ m.project.grade.factor }}</span>
+        {% endif %}
+    </td>
+    <td class="text-center">
+        <div class="mb-1">
+            <span class="text-azure fw-bold" title="项目质量得分">{% if is_sales %}{{ m.project.sales_quality_score }}{% else %}{{ m.project.quality_score }}{% endif %}</span>
+            <span class="text-muted mx-1">/</span>
+            <span class="text-orange" title="工作量占比">{{ m.workload_share }}</span>
+            <span class="text-muted small ms-2">({{ m.project.progress_percent }}%)</span>
+        </div>
+        <div class="progress progress-xs">
+            <div class="progress-bar {{ m.project.progress_bar_css_class }}" style="width: {{ m.project.progress_percent }}%"></div>
+        </div>
+    </td>
+    <td class="text-end">
+        <span class="h3 m-0 text-primary fw-bold">{{ m.cumulative_eff|floatformat:2 }}</span>
+    </td>
+    <td class="text-end">
+        <span class="h3 m-0 text-muted fw-bold">{{ m.cumulative_work|floatformat:2 }}</span>
+    </td>
+    <td class="text-end">
+        {% if m.inc_eff != 0 %}
+            <span class="h3 m-0 text-success fw-bold">{% if m.inc_eff > 0 %}+{% endif %}{{ m.inc_eff|floatformat:2 }}</span>
+        {% else %}-{% endif %}
+    </td>
+    <td class="text-end">
+        {% if m.inc_work > 0 %}
+            <span class="h3 m-0 text-success fw-bold">+{{ m.inc_work|floatformat:2 }}</span>
+        {% elif m.inc_work < 0 %}
+            <span class="h3 m-0 text-danger fw-bold">{{ m.inc_work|floatformat:2 }}</span>
+        {% else %}
+            <span class="text-muted">-</span>
+        {% endif %}
+    </td>
+</tr>

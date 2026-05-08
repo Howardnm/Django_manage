@@ -37,7 +37,10 @@ class Project(models.Model):
     latest_remark = models.CharField("最新进展", max_length=200, blank=True, help_text="自动同步当前活跃节点的备注")
     
     # 【核心优化】新增：项目质量分冗余字段 (用于绩效统计性能优化)
-    quality_score = models.DecimalField("项目质量得分", max_digits=5, decimal_places=2, default=0.00)
+    quality_score = models.DecimalField("项目研发质量得分", max_digits=5, decimal_places=2, default=0.00)
+
+    # 销售质量分（独立评定标准）
+    sales_quality_score = models.DecimalField("项目销售质量得分", max_digits=5, decimal_places=2, default=0.00)
 
     # 【联动工作流】默认审批流程
     approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="默认审批流程")
@@ -143,7 +146,8 @@ class ProjectNode(models.Model):
     remark = models.TextField("备注/批注", blank=True, null=True)
     
     # 绩效得分
-    final_score = models.DecimalField("节点绩效得分", max_digits=5, decimal_places=2, default=0.00)
+    final_score = models.DecimalField("节点研发绩效得分", max_digits=5, decimal_places=2, default=0.00)
+    sales_final_score = models.DecimalField("节点销售绩效得分", max_digits=5, decimal_places=2, default=0.00)
 
     # 【联动工作流】关联审批实例
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联审批流程")
@@ -259,6 +263,21 @@ class ProjectMember(models.Model):
         unique_together = ('project', 'user')
 
 
+# 4.1 项目销售成员模型（独立管理，独立工作量池）
+class ProjectSalesMember(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sales_members', verbose_name="关联项目")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="销售成员")
+    workload_share = models.DecimalField("销售工作量占比 (0-1.0)", max_digits=3, decimal_places=2, default=0.00)
+
+    class Meta:
+        verbose_name = "项目销售成员"
+        verbose_name_plural = verbose_name
+        unique_together = ('project', 'user')
+
+    def __str__(self):
+        return f"{self.project.name} - {self.user.username} (销售)"
+
+
 # 5. 项目全局配置（单例）
 class ProjectConfig(models.Model):
     """项目全局配置，仅允许超级管理员修改。"""
@@ -279,8 +298,11 @@ class ProjectConfig(models.Model):
 
 # 6. 评分规则配置模型
 class NodeScoreRule(models.Model):
+    RULE_TYPES = [('RD', '研发'), ('SALES', '销售')]
+
     name = models.CharField("规则名称", max_length=100)
     score_value = models.PositiveIntegerField("对应得分", default=0)
+    rule_type = models.CharField("规则类型", max_length=10, choices=RULE_TYPES, default='RD')
     trigger_stage = models.CharField("触发阶段", max_length=20, choices=ProjectStage.choices, blank=True, null=True)
     trigger_status = models.CharField("触发状态", max_length=20, choices=ProjectNode.STATUS_CHOICES)
     is_multiple_rounds = models.BooleanField("是否为多轮次 (返工)", default=False)

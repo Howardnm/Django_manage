@@ -5,9 +5,16 @@
     <div class="container-xl">
         <div class="row g-2 align-items-center">
             <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'project_score_rule_list' %}">评分规则配置</a></li>
+                        <li class="breadcrumb-item active">{% if form.instance.pk %}编辑规则{% else %}新增规则{% endif %}</li>
+                    </ol>
+                </nav>
                 <h2 class="page-title">
                     {% if form.instance.pk %}编辑评分规则{% else %}新增评分规则{% endif %}
                 </h2>
+                <div class="text-muted small mt-1">定义节点在不同阶段与状态下的自动化评分逻辑</div>
             </div>
         </div>
     </div>
@@ -15,32 +22,80 @@
 
 <div class="row justify-content-center">
     <div class="col-lg-8">
-        <div class="card">
-            <form method="post">
-                {% csrf_token %}
+        <form method="post">
+            {% csrf_token %}
+
+            <!-- 基本信息 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-id me-2 text-primary"></i>基本信息</h3>
+                </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-8">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label required">规则名称</label>
                                 {{ form.name }}
-                                <div class="form-hint">例如：“中试合格”、“不合格再开发”</div>
+                                <div class="form-hint">例如：中试合格、不合格再开发</div>
                             </div>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-6">
                             <div class="mb-3">
                                 <label class="form-label required">对应分值</label>
-                                {{ form.score_value }}
+                                <div class="input-group">
+                                    {{ form.score_value }}
+                                    <span class="input-group-text">分</span>
+                                </div>
                                 <div class="form-hint">0 - 100 之间的整数</div>
                             </div>
                         </div>
                     </div>
 
+                    <div class="mb-0">
+                        <label class="form-label required">规则类型</label>
+                        <div class="form-selectgroup form-selectgroup-boxes d-flex">
+                            <label class="form-selectgroup-item flex-fill">
+                                <input type="radio" name="{{ form.rule_type.name }}" value="RD" class="form-selectgroup-input"
+                                       {% if form.rule_type.value == 'RD' %}checked{% endif %}>
+                                <div class="form-selectgroup-label d-flex align-items-center justify-content-center py-3">
+                                    <span class="avatar avatar-xs rounded bg-blue-lt me-2"><i class="ti ti-flask text-blue"></i></span>
+                                    <div>
+                                        <div class="font-weight-medium">研发评分</div>
+                                        <div class="text-muted small">适用于研发/工艺成员绩效评定</div>
+                                    </div>
+                                </div>
+                            </label>
+                            <label class="form-selectgroup-item flex-fill ms-2">
+                                <input type="radio" name="{{ form.rule_type.name }}" value="SALES" class="form-selectgroup-input"
+                                       {% if form.rule_type.value == 'SALES' %}checked{% endif %}>
+                                <div class="form-selectgroup-label d-flex align-items-center justify-content-center py-3">
+                                    <span class="avatar avatar-xs rounded bg-green-lt me-2"><i class="ti ti-briefcase text-green"></i></span>
+                                    <div>
+                                        <div class="font-weight-medium">销售评分</div>
+                                        <div class="text-muted small">适用于销售成员绩效评定</div>
+                                    </div>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 触发条件 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-settings me-2 text-primary"></i>触发条件</h3>
+                    <div class="card-actions">
+                        <span class="badge bg-muted-lt text-muted">匹配任一条件即触发</span>
+                    </div>
+                </div>
+                <div class="card-body">
                     <div class="row">
                         <div class="col-md-6">
                             <div class="mb-3">
-                                <label class="form-label">适用阶段 (留空则为通用规则)</label>
+                                <label class="form-label">适用阶段</label>
                                 {{ form.trigger_stage }}
+                                <div class="form-hint">留空则为通用规则，匹配所有阶段</div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -51,27 +106,45 @@
                         </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-check form-switch mt-2">
-                            <input class="form-check-input" type="checkbox" name="{{ form.is_multiple_rounds.name }}"
-                                   {% if form.is_multiple_rounds.value %}checked{% endif %}>
-                            <span class="form-check-label">仅适用于多轮次 (返工/重开) 情况</span>
-                        </label>
+                    <div class="hr-text hr-text-left">
+                        <span class="text-muted small fw-bold text-uppercase">高级选项</span>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label">判定逻辑描述</label>
+                    <label class="form-check form-switch mb-0">
+                        <input class="form-check-input" type="checkbox" name="{{ form.is_multiple_rounds.name }}"
+                               {% if form.is_multiple_rounds.value %}checked{% endif %}>
+                        <span class="form-check-label">
+                            <strong>仅适用于多轮次</strong>
+                            <span class="text-muted d-block small mt-1">开启后，该规则仅在节点为返工/重开（round &gt; 1）时生效。例如：首轮不合格与多轮不合格可设定不同分值。</span>
+                        </span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- 规则描述 -->
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-notes me-2 text-primary"></i>规则描述</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-0">
+                        <label class="form-label">判定逻辑说明</label>
                         {{ form.description }}
+                        <div class="form-hint">可选，用于记录该规则的业务含义与适用场景</div>
                     </div>
                 </div>
-                <div class="card-footer text-end">
-                    <div class="d-flex">
-                        <a href="{% url 'project_score_rule_list' %}" class="btn btn-link">取消返回</a>
-                        <button type="submit" class="btn btn-primary ms-auto">保存规则</button>
-                    </div>
-                </div>
-            </form>
-        </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="d-flex">
+                <a href="{% url 'project_score_rule_list' %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>取消返回
+                </a>
+                <button type="submit" class="btn btn-primary ms-auto px-4">
+                    <i class="ti ti-device-floppy me-1"></i>保存规则
+                </button>
+            </div>
+        </form>
     </div>
 </div>
 {% endblock %}

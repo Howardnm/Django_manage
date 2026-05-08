@@ -3,6 +3,7 @@ from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView
 from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
 from .views.ProjectMember import *
+from .views.ProjectSalesMember import *
 from .views.PerformanceRule import *
 from app_panel.views.PerformanceView import UserPerformanceListView, UserPerformanceDetailView
 from app_form_management.views import ProjectFormListView
@@ -33,4 +34,8 @@ urlpatterns = [
     # 项目协同成员管理
     path('<int:pk>/member/manage/', ProjectMemberManageView.as_view(), name='project_member_manage'),
     path('member/<int:pk>/delete/', ProjectMemberDeleteView.as_view(), name='project_member_delete'),
+
+    # 项目销售成员管理
+    path('<int:pk>/sales-member/manage/', ProjectSalesMemberManageView.as_view(), name='project_sales_member_manage'),
+    path('sales-member/<int:pk>/delete/', ProjectSalesMemberDeleteView.as_view(), name='project_sales_member_delete'),
 ]

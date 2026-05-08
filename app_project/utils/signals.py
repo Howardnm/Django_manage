@@ -1,6 +1,6 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-from django.db.models import Max
+from django.db.models import Max, Q
 from app_project.models import Project, ProjectNode, ProjectStage, NodeScoreRule
 
 @receiver(post_save, sender=Project)
@@ -18,51 +18,62 @@ def create_project_nodes(sender, instance, created, **kwargs):
 
 @receiver([post_save, post_delete], sender=ProjectNode)
 def update_project_status_fields(sender, instance, **kwargs):
-    # 1. 计算节点分
     _calculate_node_final_score(instance)
-    # 2. 更新项目全局字段及冗余质量分
     _update_project_current_stage(instance.project)
 
 @receiver([post_save, post_delete], sender=NodeScoreRule)
 def trigger_global_score_recalculation(sender, instance, **kwargs):
     affected_nodes = ProjectNode.objects.filter(status__in=['DONE', 'FAILED', 'TERMINATED'])
-    
+
     affected_projects = set()
     for node in affected_nodes:
         _calculate_node_final_score(node)
         affected_projects.add(node.project)
-    
+
     for project in affected_projects:
         _update_project_current_stage(project)
 
 
 def _calculate_node_final_score(node):
-    """
-    自动评分引擎：判定单个节点的得分
-    """
     if node.status not in ['DONE', 'FAILED', 'TERMINATED']:
-        if node.final_score != 0:
-            ProjectNode.objects.filter(pk=node.pk).update(final_score=0)
+        kwargs = {'final_score': 0}
+        if node.sales_final_score != 0:
+            kwargs['sales_final_score'] = 0
+        if node.final_score != 0 or node.sales_final_score != 0:
+            ProjectNode.objects.filter(pk=node.pk).update(**kwargs)
         return
 
     is_multiple = node.round > 1
-    
-    rule = NodeScoreRule.objects.filter(
-        trigger_status=node.status, 
-        trigger_stage=node.stage, 
-        is_multiple_rounds=is_multiple
-    ).first()
-    
-    if not rule:
-        from django.db.models import Q
-        rule = NodeScoreRule.objects.filter(
-            Q(trigger_stage__isnull=True) | Q(trigger_stage=''),
-            trigger_status=node.status, 
-            is_multiple_rounds=is_multiple
-        ).first()
 
-    new_score = rule.score_value if rule else 0
-    ProjectNode.objects.filter(pk=node.pk).update(final_score=new_score)
+    # 研发评分
+    rd_rule = NodeScoreRule.objects.filter(
+        rule_type='RD', trigger_status=node.status,
+        trigger_stage=node.stage, is_multiple_rounds=is_multiple
+    ).first()
+    if not rd_rule:
+        rd_rule = NodeScoreRule.objects.filter(
+            Q(rule_type='RD'),
+            Q(trigger_stage__isnull=True) | Q(trigger_stage=''),
+            Q(trigger_status=node.status), Q(is_multiple_rounds=is_multiple)
+        ).first()
+    rd_score = rd_rule.score_value if rd_rule else 0
+
+    # 销售评分
+    sales_rule = NodeScoreRule.objects.filter(
+        rule_type='SALES', trigger_status=node.status,
+        trigger_stage=node.stage, is_multiple_rounds=is_multiple
+    ).first()
+    if not sales_rule:
+        sales_rule = NodeScoreRule.objects.filter(
+            Q(rule_type='SALES'),
+            Q(trigger_stage__isnull=True) | Q(trigger_stage=''),
+            Q(trigger_status=node.status), Q(is_multiple_rounds=is_multiple)
+        ).first()
+    sales_score = sales_rule.score_value if sales_rule else 0
+
+    ProjectNode.objects.filter(pk=node.pk).update(
+        final_score=rd_score, sales_final_score=sales_score
+    )
 
 
 def _update_project_current_stage(project):
@@ -70,7 +81,7 @@ def _update_project_current_stage(project):
     重新计算并更新 Project 的冗余字段。
     """
     all_nodes = project.nodes.all().order_by('order')
-    
+
     # --- A. 定位当前阶段 ---
     terminated_node = all_nodes.filter(status='TERMINATED').last()
     if terminated_node:
@@ -99,14 +110,14 @@ def _update_project_current_stage(project):
     # --- C. 计算是否终止 ---
     new_is_terminated = terminated_node is not None
 
-    # --- D. 【核心优化】项目质量分逻辑调整 ---
-    # 不再取全局 Max，而是取“最近一个已有结果且非反馈阶段的节点”的得分
-    # 逻辑：在所有状态为 DONE, FAILED, TERMINATED 的非 FEEDBACK 节点中，取 order 最大的那个
+    # --- D. 项目质量分逻辑 ---
+    # 取"最近一个已有结果且非反馈阶段的节点"的得分
     last_terminal_node = all_nodes.filter(
         status__in=['DONE', 'FAILED', 'TERMINATED']
     ).exclude(stage=ProjectStage.FEEDBACK).last()
 
     current_quality_score = last_terminal_node.final_score if last_terminal_node else 0
+    current_sales_quality_score = last_terminal_node.sales_final_score if last_terminal_node else 0
 
     # --- E. 批量更新 ---
     update_fields = []
@@ -122,6 +133,9 @@ def _update_project_current_stage(project):
     if project.quality_score != current_quality_score:
         project.quality_score = current_quality_score
         update_fields.append('quality_score')
+    if project.sales_quality_score != current_sales_quality_score:
+        project.sales_quality_score = current_sales_quality_score
+        update_fields.append('sales_quality_score')
 
     new_remark = new_remark[:190]
     if project.latest_remark != new_remark:

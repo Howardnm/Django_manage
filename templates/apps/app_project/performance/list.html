@@ -64,6 +64,20 @@
         <div class="row row-cards">
             <div class="col-12">
                 <div class="card">
+                    <div class="card-header">
+                        <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+                            <li class="nav-item">
+                                <a href="?{% url_replace tab='rd' %}" class="nav-link {% if current_tab == 'rd' %}active{% endif %}">
+                                    <i class="ti ti-flask me-1"></i>研发绩效榜
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a href="?{% url_replace tab='sales' %}" class="nav-link {% if current_tab == 'sales' %}active{% endif %}">
+                                    <i class="ti ti-briefcase me-1"></i>销售绩效榜
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
                     <div class="table-responsive">
                         <table class="table table-vcenter table-mobile-md card-table table-hover">
                             <thead>
@@ -106,57 +120,19 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for item in performance_data %}
-                                <tr>
-                                    <td data-label="成员">
-                                        <div class="d-flex align-items-center">
-                                            <span class="avatar avatar-sm rounded me-2">{{ item.user.username|slice:":1"|upper }}</span>
-                                            <div class="flex-fill">
-                                                <div class="font-weight-medium">{{ item.user.username }}</div>
-                                                <div class="text-muted small">{{ item.user.profile.department|default:"研发部" }}</div>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td data-label="参与项目">
-                                        <div>{{ item.project_count }} 个项目</div>
-                                    </td>
-                                    <td class="text-end" data-label="有效(累计)">
-                                        <div class="h3 m-0 text-primary fw-bold">{{ item.effective_score|floatformat:2 }}</div>
-                                    </td>
-                                    <td class="text-end" data-label="有效(增量)">
-                                        {% if item.eff_inc > 0 %}
-                                            <div class="h3 m-0 text-success fw-bold">+{{ item.eff_inc|floatformat:2 }}</div>
-                                        {% elif item.eff_inc < 0 %}
-                                            <div class="h3 m-0 text-danger fw-bold">{{ item.eff_inc|floatformat:2 }}</div>
-                                        {% else %}
-                                            <div class="text-muted">-</div>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end text-muted" data-label="基础(累计)">
-                                        <div class="h3 m-0 text-muted fw-bold">{{ item.workload_score|floatformat:2 }}</div>
-                                    </td>
-                                    <td class="text-end text-muted" data-label="基础(增量)">
-                                        {% if item.work_inc > 0 %}
-                                            <span class="h3 m-0 text-success fw-bold">+{{ item.work_inc|floatformat:2 }}</span>
-                                        {% elif item.work_inc < 0 %}
-                                            <span class="h3 m-0 text-danger fw-bold">{{ item.work_inc|floatformat:2 }}</span>
-                                        {% else %}
-                                            -
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <div class="btn-list flex-nowrap">
-                                            <a href="{% url 'project_performance_user_detail' item.user.id %}?{% url_replace %}" class="btn btn-ghost-primary btn-sm">
-                                                查看明细
-                                            </a>
-                                        </div>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr>
-                                    <td colspan="7" class="text-center py-5 text-muted">暂无符合条件的绩效数据</td>
-                                </tr>
-                                {% endfor %}
+                                {% if current_tab == 'rd' %}
+                                    {% for item in rd_data %}
+                                    {% include 'apps/app_project/performance/components/_performance_row.html' %}
+                                    {% empty %}
+                                    <tr><td colspan="7" class="text-center py-5 text-muted">暂无研发绩效数据</td></tr>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for item in sales_data %}
+                                    {% include 'apps/app_project/performance/components/_performance_row.html' %}
+                                    {% empty %}
+                                    <tr><td colspan="7" class="text-center py-5 text-muted">暂无销售绩效数据</td></tr>
+                                    {% endfor %}
+                                {% endif %}
                             </tbody>
                         </table>
                     </div>

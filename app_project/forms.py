@@ -1,5 +1,5 @@
 from django import forms
-from .models import Project, ProjectNode, ProjectMember, NodeScoreRule
+from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -76,11 +76,47 @@ class ProjectMemberForm(TablerFormMixin, forms.ModelForm):
         return workload
 
 
+# 【新增】销售成员表单
+class ProjectSalesMemberForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = ProjectSalesMember
+        fields = ['user', 'workload_share']
+        widgets = {
+            'user': forms.Select(attrs={'class': 'form-select-search'}),
+            'workload_share': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'max': '1.0'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.project = kwargs.pop('project', None)
+        super().__init__(*args, **kwargs)
+        self.fields['user'].queryset = User.objects.filter(is_active=True).order_by('username')
+        if not self.instance.pk:
+            self.initial['workload_share'] = 0.00
+
+    def clean_workload_share(self):
+        workload = self.cleaned_data.get('workload_share')
+
+        if self.project:
+            existing_total = ProjectSalesMember.objects.filter(project=self.project)
+            if self.instance.pk:
+                existing_total = existing_total.exclude(pk=self.instance.pk)
+
+            total_sum = existing_total.aggregate(Sum('workload_share'))['workload_share__sum'] or 0
+
+            if total_sum + workload > 1.0:
+                available = 1.0 - total_sum
+                raise forms.ValidationError(
+                    f"销售总工作量不能超过 100%。当前剩余可用配额仅剩: {available:.2f} ({(available*100):.0f}%)"
+                )
+
+        return workload
+
+
 # 【新增】绩效评分规则表单
 class NodeScoreRuleForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = NodeScoreRule
-        fields = ['name', 'score_value', 'trigger_stage', 'trigger_status', 'is_multiple_rounds', 'description']
+        fields = ['name', 'score_value', 'rule_type', 'trigger_stage', 'trigger_status', 'is_multiple_rounds', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }
