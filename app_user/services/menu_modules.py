@@ -29,6 +29,7 @@ class MenuModule:
             "sub_items": [
                 {"name": "项目列表", "url_name": "project_list"},
                 {"name": "成员绩效看板", "url_name": "project_performance_list"},
+                {"name": "项目评分规则", "url_name": "project_score_rule_list"},
             ]
         }
 
@@ -155,7 +156,6 @@ class MenuModule:
             "url_name": "project_score_rule_list",
             "sub_items": [
                 {"name": "项目全局配置", "url_name": "project_config"},
-                {"name": "项目绩效评分规则", "url_name": "project_score_rule_list"},
                 {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"},
                 {"name": "进入底层管理", "url_name": "admin:index"},
             ]
