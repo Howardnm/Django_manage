@@ -54,6 +54,8 @@ echo "  -> 正在导入测试配置库..."
 python manage.py import_configs
 echo "  -> 正在导入原材料..."
 python manage.py import_raw_materials
+echo "  -> 正在导入成员绩效得分规则..."
+python manage.py init_performance_rules
 print_success "基础数据导入完成。"
 
 

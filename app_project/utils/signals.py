@@ -1,7 +1,7 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.db.models import Max, Q
-from app_project.models import Project, ProjectNode, ProjectStage, NodeScoreRule
+from app_project.models import Project, ProjectNode, ProjectStage, NodeScoreRule, ProjectConfig
 
 @receiver(post_save, sender=Project)
 def create_project_nodes(sender, instance, created, **kwargs):
@@ -144,3 +144,11 @@ def _update_project_current_stage(project):
 
     if update_fields:
         project.save(update_fields=update_fields)
+
+
+# --- 全局配置变更 → 项目同步 ---
+
+@receiver(post_save, sender=ProjectConfig)
+def sync_default_workflow_to_projects(sender, instance, **kwargs):
+    """全局默认审批流程变更后，所有项目统一同步为新默认流程"""
+    Project.objects.update(approval_workflow=instance.default_approval_workflow)
