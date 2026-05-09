@@ -20,8 +20,8 @@ class Command(BaseCommand):
             ('研发阶段成功',               60,  'RD', ProjectStage.RND,         'DONE',       False),
             ('客户小试合格',               80,  'RD', ProjectStage.PILOT,       'DONE',       False),
             ('客户中试合格',               90,  'RD', ProjectStage.MID_TEST,    'DONE',       False),
-            ('量产意向达成',               95,  'RD', ProjectStage.MASS_PROD,   'DONE',       False),
-            ('项目最终下单/量产',          100, 'RD', ProjectStage.ORDER,       'DONE',       False),
+            ('量产下单达成',               95,  'RD', ProjectStage.MASS_PROD,   'DONE',       False),
+            ('开发周期完成',               100, 'RD', ProjectStage.ORDER,       'DONE',       False),
 
             # --- 2. 异常返工（首轮 FAILED）--- 节点异常触发迭代 ---
             ('研发不合格重开',             0,   'RD', ProjectStage.RND,         'FAILED',     False),
@@ -46,7 +46,7 @@ class Command(BaseCommand):
             ('小试阶段终止',               25,  'RD', ProjectStage.PILOT,       'TERMINATED', False),
             ('中试阶段终止',               35,  'RD', ProjectStage.MID_TEST,    'TERMINATED', False),
             ('量产意向阶段终止',           45,  'RD', ProjectStage.MASS_PROD,   'TERMINATED', False),
-            ('最终下单阶段终止',           50,  'RD', ProjectStage.ORDER,       'TERMINATED', False),
+            ('开发最终阶段终止',           50,  'RD', ProjectStage.ORDER,       'TERMINATED', False),
 
             # --- 6. 按阶段终止（多轮 TERMINATED）--- 返工中途终止，略低于首轮终止 ---
             ('返工后研发阶段终止',         10,  'RD', ProjectStage.RND,         'TERMINATED', True),
@@ -74,7 +74,7 @@ class Command(BaseCommand):
             ('中试完成（销售）',           40,  'SALES', ProjectStage.MID_TEST,    'DONE',       False),
 
             # --- 3. 商务冲刺（首轮 DONE）--- 销售价值在后端集中爆发 ---
-            ('量产意向达成（销售）',       80,  'SALES', ProjectStage.MASS_PROD,   'DONE',       False),
+            ('量产下单达成（销售）',       80,  'SALES', ProjectStage.MASS_PROD,   'DONE',       False),
             ('开发周期完成（销售）',       100, 'SALES', ProjectStage.ORDER,       'DONE',       False),
 
             # --- 4. 按阶段终止（首轮 TERMINATED）--- 根据商务推进程度给予阶梯分值 ---
@@ -86,7 +86,7 @@ class Command(BaseCommand):
             ('小试阶段终止（销售）',       10,  'SALES', ProjectStage.PILOT,       'TERMINATED', False),
             ('中试阶段终止（销售）',       20,  'SALES', ProjectStage.MID_TEST,    'TERMINATED', False),
             ('量产意向阶段终止（销售）',   40,  'SALES', ProjectStage.MASS_PROD,   'TERMINATED', False),
-            ('最终下单阶段终止（销售）',   50,  'SALES', ProjectStage.ORDER,       'TERMINATED', False),
+            ('开发最终阶段终止（销售）',   50,  'SALES', ProjectStage.ORDER,       'TERMINATED', False),
 
             # --- 5. 异常返工（首轮 FAILED）--- 销售在可迭代阶段的失败得分，反映协同损失 ---
             ('研发异常（销售）',           0,   'SALES', ProjectStage.RND,         'FAILED',     False),
