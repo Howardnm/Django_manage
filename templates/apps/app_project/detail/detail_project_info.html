@@ -88,131 +88,134 @@
         </div>
     </div>
 
-    <!-- 5. 协作团队管理 (优化列表展示) -->
-    <div class="card-header border-top d-flex justify-content-between align-items-center bg-light-lt py-2">
-        <h4 class="card-title text-muted" style="font-size: 0.8rem;">
-            <i class="ti ti-users me-1"></i>协同成员 ({{ project.members.count }})
-        </h4>
-        <button class="btn btn-ghost-primary btn-sm px-2 py-1"
-                data-bs-toggle="modal"
-                data-bs-target="#modal-generic"
-                hx-get="{% url 'project_member_manage' project.id %}"
-                hx-target="#modal-content-placeholder">
-            <i class="ti ti-plus me-1"></i>添加
-        </button>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-vcenter table-sm card-table table-hover" style="font-size: 12px;">
-            <tbody>
-                {% for member in project.members.all %}
-                <tr>
-                    <td class="ps-3">
-                        <div class="d-flex align-items-center">
-                            <span class="avatar avatar-xs rounded-circle bg-blue-lt me-2">{{ member.user.username|slice:":1"|upper }}</span>
-                            <div>
-                                <div class="font-weight-medium">{{ member.user.username }}</div>
-                                <div class="text-muted" style="font-size: 10px;">{{ member.get_role_display }}</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge bg-purple-lt" title="工作量权重">{{ member.workload_share }}</span>
-                    </td>
-                    <td class="text-end pe-3">
-                        <div class="btn-list flex-nowrap justify-content-end">
-                            <!-- 直接显示的编辑按钮 -->
-                            <a href="#" class="btn btn-icon btn-ghost-secondary btn-sm border-0"
-                               data-bs-toggle="modal"
-                               data-bs-target="#modal-generic"
-                               hx-get="{% url 'project_member_manage' project.id %}?member_id={{ member.id }}"
-                               hx-target="#modal-content-placeholder"
-                               title="编辑权重">
-                                <i class="ti ti-edit"></i>
-                            </a>
-                            <!-- 直接显示的删除按钮 -->
-                            <form action="{% url 'project_member_delete' member.id %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-icon btn-ghost-danger btn-sm border-0"
-                                        onclick="return confirm('移除该协同成员？');"
-                                        title="移除成员">
-                                    <i class="ti ti-trash"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="text-center py-4 text-muted opacity-50 small">
-                        <i class="ti ti- moods-empty d-block fs-1"></i>
-                        暂未组建协作团队
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    <!-- 5. 成员管理（协同 + 销售左右并排） -->
+    <div class="row g-0 border-top">
+        <!-- 协同成员 -->
+        <div class="col-6 border-end d-flex flex-column">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light-lt py-2 border-0">
+                <h4 class="card-title text-muted" style="font-size: 0.8rem;">
+                    <i class="ti ti-users me-1"></i>协同成员 ({{ project.members.count }})
+                </h4>
+                <button class="btn btn-ghost-primary btn-sm px-2 py-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-generic"
+                        hx-get="{% url 'project_member_manage' project.id %}"
+                        hx-target="#modal-content-placeholder">
+                    <i class="ti ti-plus me-1"></i>添加
+                </button>
+            </div>
+            <div class="flex-fill">
+                <table class="table table-vcenter table-sm card-table table-hover mb-0" style="font-size: 12px;">
+                    <tbody>
+                        {% for member in project.members.all %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar avatar-xs rounded-circle bg-blue-lt me-2">{{ member.user.username|slice:":1"|upper }}</span>
+                                    <div>
+                                        <div class="font-weight-medium">{{ member.user.username }}</div>
+                                        <div class="text-muted" style="font-size: 10px;">{{ member.get_role_display }}</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-purple-lt" title="工作量权重">{{ member.workload_share }}</span>
+                            </td>
+                            <td class="text-end pe-2">
+                                <div class="btn-list flex-nowrap justify-content-end">
+                                    <a href="#" class="btn btn-icon btn-ghost-secondary btn-sm border-0"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#modal-generic"
+                                       hx-get="{% url 'project_member_manage' project.id %}?member_id={{ member.id }}"
+                                       hx-target="#modal-content-placeholder"
+                                       title="编辑权重">
+                                        <i class="ti ti-edit"></i>
+                                    </a>
+                                    <form action="{% url 'project_member_delete' member.id %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-icon btn-ghost-danger btn-sm border-0"
+                                                onclick="return confirm('移除该协同成员？');"
+                                                title="移除成员">
+                                            <i class="ti ti-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center py-4 text-muted opacity-50 small">
+                                暂未组建协作团队
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
 
-    <!-- 6. 销售成员管理 -->
-    <div class="card-header border-top d-flex justify-content-between align-items-center bg-light-lt py-2">
-        <h4 class="card-title text-muted" style="font-size: 0.8rem;">
-            <i class="ti ti-briefcase me-1"></i>销售成员 ({{ project.sales_members.count }})
-        </h4>
-        <button class="btn btn-ghost-success btn-sm px-2 py-1"
-                data-bs-toggle="modal"
-                data-bs-target="#modal-generic"
-                hx-get="{% url 'project_sales_member_manage' project.id %}"
-                hx-target="#modal-content-placeholder">
-            <i class="ti ti-plus me-1"></i>添加
-        </button>
-    </div>
-    <div class="table-responsive">
-        <table class="table table-vcenter table-sm card-table table-hover" style="font-size: 12px;">
-            <tbody>
-                {% for member in project.sales_members.all %}
-                <tr>
-                    <td class="ps-3">
-                        <div class="d-flex align-items-center">
-                            <span class="avatar avatar-xs rounded-circle bg-green-lt me-2">{{ member.user.username|slice:":1"|upper }}</span>
-                            <div>
-                                <div class="font-weight-medium">{{ member.user.username }}</div>
-                                <div class="text-muted" style="font-size: 10px;">商务跟进</div>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="text-center">
-                        <span class="badge bg-green-lt" title="销售工作量权重">{{ member.workload_share }}</span>
-                    </td>
-                    <td class="text-end pe-3">
-                        <div class="btn-list flex-nowrap justify-content-end">
-                            <a href="#" class="btn btn-icon btn-ghost-secondary btn-sm border-0"
-                               data-bs-toggle="modal"
-                               data-bs-target="#modal-generic"
-                               hx-get="{% url 'project_sales_member_manage' project.id %}?member_id={{ member.id }}"
-                               hx-target="#modal-content-placeholder"
-                               title="编辑权重">
-                                <i class="ti ti-edit"></i>
-                            </a>
-                            <form action="{% url 'project_sales_member_delete' member.id %}" method="post" class="d-inline">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-icon btn-ghost-danger btn-sm border-0"
-                                        onclick="return confirm('移除该销售成员？');"
-                                        title="移除成员">
-                                    <i class="ti ti-trash"></i>
-                                </button>
-                            </form>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="3" class="text-center py-4 text-muted opacity-50 small">
-                        <i class="ti ti-mood-empty d-block fs-1"></i>
-                        暂未添加销售成员
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- 销售成员 -->
+        <div class="col-6 d-flex flex-column">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light-lt py-2 border-0">
+                <h4 class="card-title text-muted" style="font-size: 0.8rem;">
+                    <i class="ti ti-briefcase me-1"></i>销售成员 ({{ project.sales_members.count }})
+                </h4>
+                <button class="btn btn-ghost-success btn-sm px-2 py-1"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modal-generic"
+                        hx-get="{% url 'project_sales_member_manage' project.id %}"
+                        hx-target="#modal-content-placeholder">
+                    <i class="ti ti-plus me-1"></i>添加
+                </button>
+            </div>
+            <div class="flex-fill">
+                <table class="table table-vcenter table-sm card-table table-hover mb-0" style="font-size: 12px;">
+                    <tbody>
+                        {% for member in project.sales_members.all %}
+                        <tr>
+                            <td class="ps-3">
+                                <div class="d-flex align-items-center">
+                                    <span class="avatar avatar-xs rounded-circle bg-green-lt me-2">{{ member.user.username|slice:":1"|upper }}</span>
+                                    <div>
+                                        <div class="font-weight-medium">{{ member.user.username }}</div>
+                                        <div class="text-muted" style="font-size: 10px;">商务跟进</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-green-lt" title="销售工作量权重">{{ member.workload_share }}</span>
+                            </td>
+                            <td class="text-end pe-2">
+                                <div class="btn-list flex-nowrap justify-content-end">
+                                    <a href="#" class="btn btn-icon btn-ghost-secondary btn-sm border-0"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#modal-generic"
+                                       hx-get="{% url 'project_sales_member_manage' project.id %}?member_id={{ member.id }}"
+                                       hx-target="#modal-content-placeholder"
+                                       title="编辑权重">
+                                        <i class="ti ti-edit"></i>
+                                    </a>
+                                    <form action="{% url 'project_sales_member_delete' member.id %}" method="post" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-icon btn-ghost-danger btn-sm border-0"
+                                                onclick="return confirm('移除该销售成员？');"
+                                                title="移除成员">
+                                            <i class="ti ti-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center py-4 text-muted opacity-50 small">
+                                暂未添加销售成员
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
