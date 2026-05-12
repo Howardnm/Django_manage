@@ -125,9 +125,12 @@
 
             <!-- 3. BOM 区 -->
             <tr class="bg-orange-lt">
-                <td class="text-start fw-bold text-orange align-middle" colspan="{{ columns|length|add:3 }}">
+                <td class="text-start fw-bold text-orange align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #fef0e6;">
                     <i class="ti ti-list me-1"></i>BOM 结构对比
                 </td>
+                {% if columns|length > 1 %}
+                <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #fef0e6;">&nbsp;</td>
+                {% endif %}
             </tr>
             {% if bom_matrix %}
                 {% for row in bom_matrix %}
@@ -156,9 +159,12 @@
 
             <!-- 4. 性能区 -->
             <tr class="bg-purple-lt">
-                <td class="text-start fw-bold text-purple align-middle" colspan="{{ columns|length|add:3 }}">
+                <td class="text-start fw-bold text-purple align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #f1ebf8;">
                     <i class="ti ti-flask me-1"></i>性能指标对比
                 </td>
+                {% if columns|length > 1 %}
+                <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #f1ebf8;">&nbsp;</td>
+                {% endif %}
             </tr>
             {% if test_matrix %}
                 {% for row in test_matrix %}
@@ -190,9 +196,12 @@
 
             <!-- 5. 工艺 & 信息区 -->
             <tr class="bg-cyan-lt">
-                <td class="text-start fw-bold text-cyan align-middle" colspan="{{ columns|length|add:3 }}">
+                <td class="text-start fw-bold text-cyan align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #e6f4f7;">
                     <i class="ti ti-settings-cog me-1"></i>工艺 & 基础信息
                 </td>
+                {% if columns|length > 1 %}
+                <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #e6f4f7;">&nbsp;</td>
+                {% endif %}
             </tr>
             <tr>
                 <td class="text-start text-muted small">工艺方案</td>
@@ -253,10 +262,11 @@
             var isThead = row.parentElement.tagName === 'THEAD';
             for (var i = 0; i < Math.min(STICKY_COLS, cells.length); i++) {
                 var cell = cells[i];
-                if (cell.colSpan > 1) continue;
+                var isPreSticky = cell.classList.contains('sticky-col');
+                if (cell.colSpan > 1 && !isPreSticky) continue;
                 cell.classList.add('sticky-col');
-                cell.style.left = offsets[i] + 'px';
-                if (!/bg-/.test(cell.className)) {
+                cell.style.left = isPreSticky ? cell.style.left || offsets[0] + 'px' : offsets[i] + 'px';
+                if (!/bg-/.test(cell.className) && !cell.style.backgroundColor) {
                     cell.style.backgroundColor = isThead ? '#f8f9fa' : '#fff';
                 }
             }
