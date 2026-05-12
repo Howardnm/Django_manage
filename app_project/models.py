@@ -42,6 +42,9 @@ class Project(models.Model):
     # 销售质量分（独立评定标准）
     sales_quality_score = models.DecimalField("项目销售质量得分", max_digits=5, decimal_places=2, default=0.00)
 
+    # 选用成品材料
+    material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用成品材料", related_name='projects')
+
     # 【联动工作流】默认审批流程
     approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="默认审批流程")
 
@@ -77,9 +80,33 @@ class Project(models.Model):
     @property
     def progress_bar_css_class(self):
         if self.is_terminated: return "bg-danger"
-        if self.progress_percent == 100: return "bg-success"
+        if self.is_completed: return "bg-success"
         if self.is_paused: return "bg-warning"
         return "bg-primary"
+
+    @property
+    def is_completed(self):
+        return self.progress_percent == 100
+
+    @property
+    def status_css_class(self):
+        if self.is_terminated:
+            return 'badge bg-red-lt'
+        if self.is_completed:
+            return 'badge bg-green-lt'
+        if self.is_paused:
+            return 'badge bg-warning-lt'
+        return 'text-blue small fw-bold'
+
+    @property
+    def status_label(self):
+        if self.is_terminated:
+            return '已终止'
+        if self.is_completed:
+            return '已完成'
+        if self.is_paused:
+            return '暂停中'
+        return self.get_current_stage_display()
 
     # --- 业务逻辑封装 ---
     def add_iteration_node(self, stage_code, after_node_order):
@@ -157,7 +184,7 @@ class ProjectNode(models.Model):
         ordering = ['order']
 
     def __str__(self):
-        return f"{self.project.name} — {self.get_stage_display()}"
+        return f"{self.project.name} — {self.get_stage_display()}（第{self.round}轮）"
 
     @classmethod
     def get_user_selectable_choices(cls):
@@ -229,6 +256,32 @@ class ProjectNode(models.Model):
     @property
     def is_feedback_stage(self):
         return self.stage == ProjectStage.FEEDBACK
+
+    @property
+    def is_awaiting_approval(self):
+        return self.status == 'AWAITING_APPROVAL'
+
+    @property
+    def has_been_updated(self):
+        return self.status != 'PENDING'
+
+    FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+
+    @property
+    def can_add_formula(self):
+        return self.can_update_status and self.stage in self.FORMULA_STAGES
+
+    @property
+    def formula_button_label(self):
+        if self.stage == 'MASS_PROD':
+            return '新增成熟配方'
+        return '新增配方'
+
+    @property
+    def formula_name(self):
+        if self.stage == 'MASS_PROD':
+            return f'{self.project.name} — 量产成熟配方'
+        return f'{self.project.name} — {self.get_stage_display()} 第{self.round}轮'
 
     def perform_failure_logic(self, reason):
         with transaction.atomic():

@@ -32,8 +32,8 @@
                     {% endif %}
                 </div>
                 <div class="ms-auto">
-                    <a href="{% url 'material_edit' material.pk %}" class="btn btn-icon btn-danger" title="编辑">
-                        <i class="ti ti-edit"></i>
+                    <a href="{% url 'material_detail' material.pk %}" class="btn btn-icon btn-danger" title="查看材料详情">
+                        <i class="ti ti-arrow-right"></i>
                     </a>
                 </div>
             </div>
@@ -86,32 +86,21 @@
         <!-- 下半部分：全维物性指标 (Performance Matrix) -->
         <!-- ============================================================ -->
         <div class="card-body p-0">
+            {% load material_tags %}
             {% for group in material.get_grouped_properties %}
+                {% get_category_color group.category_name as theme_color %}
                 <div class="p-2 {% if not forloop.last %}border-bottom{% endif %}">
 
                     <!-- 分类标题 -->
                     <div class="mb-2">
-                        {% if "物理" in group.category_name %}
-                            <span class="badge bg-blue-lt w-100 py-1 justify-content-start rounded text-blue fs-5">
-                                <i class="ti ti-microscope me-2"></i> {{ group.category_name }}
-                            </span>
-                        {% elif "机械" in group.category_name %}
-                            <span class="badge bg-orange-lt w-100 py-1 justify-content-start rounded text-orange fs-5">
-                                <i class="ti ti-hammer me-2"></i> {{ group.category_name }}
-                            </span>
-                        {% elif "热学" in group.category_name %}
-                            <span class="badge bg-red-lt w-100 py-1 justify-content-start rounded text-red fs-5">
-                                <i class="ti ti-flame me-2"></i> {{ group.category_name }}
-                            </span>
-                        {% elif "阻燃" in group.category_name or "电气" in group.category_name %}
-                            <span class="badge bg-purple-lt w-100 py-1 justify-content-start rounded text-purple fs-5">
-                                <i class="ti ti-bolt me-2"></i> {{ group.category_name }}
-                            </span>
-                        {% else %}
-                            <span class="badge bg-secondary-lt w-100 py-1 justify-content-start rounded text-secondary fs-5">
-                                <i class="ti ti-list me-2"></i> {{ group.category_name }}
-                            </span>
-                        {% endif %}
+                        <span class="badge bg-{{ theme_color }}-lt w-100 py-1 justify-content-start rounded text-{{ theme_color }} fs-5">
+                            {% if theme_color == 'blue' %}<i class="ti ti-microscope me-2"></i>
+                            {% elif theme_color == 'orange' %}<i class="ti ti-hammer me-2"></i>
+                            {% elif theme_color == 'red' %}<i class="ti ti-flame me-2"></i>
+                            {% elif theme_color == 'yellow' %}<i class="ti ti-bolt me-2"></i>
+                            {% else %}<i class="ti ti-list me-2"></i>{% endif %}
+                            {{ group.category_name }}
+                        </span>
                     </div>
 
                     <!-- 指标列表 -->
@@ -123,11 +112,7 @@
                                         {{ item.name }}
                                     </div>
                                     <div class="text-end lh-1 ms-1">
-                                        <div class="fw-bolder fs-4 
-                                            {% if '物理' in group.category_name %}text-blue
-                                            {% elif '机械' in group.category_name %}text-orange
-                                            {% elif '热学' in group.category_name %}text-red
-                                            {% else %}text-purple{% endif %}">
+                                        <div class="fw-bolder fs-4 text-{{ theme_color }}">
                                             {% if item.data_type == 'NUMBER' %}
                                                 {% if "密度" in item.name or "比重" in item.name %}
                                                     {{ item.value|floatformat:3 }}

@@ -1,0 +1,342 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<style>
+    .formula-group-toggle:not(.collapsed) .ti-chevron-down {
+        transform: rotate(180deg);
+    }
+    .formula-group-toggle {
+        cursor: pointer;
+        transition: background-color .15s;
+    }
+    .formula-group-toggle:hover {
+        background-color: rgba(0,0,0,.03) !important;
+    }
+</style>
+<div class="page-header d-print-none mb-3">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">配方过程</div>
+            <h2 class="page-title">{{ project.name }}</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <div class="btn-list">
+                <a href="{% url 'project_detail' project.pk %}" class="btn btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i> 返回项目详情
+                </a>
+                {% if stage_round_items %}
+                    <a href="?compare=1" class="btn btn-outline-purple">
+                        <i class="ti ti-columns me-1"></i> 全局配方对比
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RND 轮次 tab bar -->
+<div class="card mb-3">
+    <div class="card-body p-0">
+        <ul class="nav nav-tabs nav-tabs-alt px-3 pt-2" role="tablist">
+            {% for item in stage_round_items %}
+                <li class="nav-item" role="presentation">
+                    <a class="nav-link {% if not global_compare and active_stage == item.stage and active_round == item.round %}active{% endif %}"
+                       href="?stage={{ item.stage }}&round={{ item.round }}{% if compare_mode %}&compare=1{% endif %}">
+                        <i class="ti ti-flask me-1"></i>
+                        {{ item.stage_display }} 第{{ item.round }}轮
+                        <span class="badge {% if not global_compare and active_stage == item.stage and active_round == item.round %}bg-white text-primary{% else %}bg-primary-lt{% endif %} ms-1">{{ item.formulas|length }}</span>
+                    </a>
+                </li>
+            {% endfor %}
+            {% if global_compare %}
+                <li class="nav-item" role="presentation">
+                    <span class="nav-link active">
+                        <i class="ti ti-columns me-1"></i>
+                        全部阶段对比
+                        <span class="badge bg-white text-primary ms-1">{{ total_formula_count }}</span>
+                    </span>
+                </li>
+            {% endif %}
+            {% if not stage_round_items %}
+                <li class="nav-item">
+                    <span class="nav-link disabled">
+                        <i class="ti ti-flask me-1"></i>暂无配方数据
+                    </span>
+                </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<div class="row row-cards">
+    {% if not compare_mode %}
+    <!-- 左侧：配方列表 + 对比按钮 -->
+    <div class="col-lg-3">
+        <div class="card">
+            <div class="card-header bg-primary-lt d-flex justify-content-between align-items-center py-2 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ti ti-list-check text-primary" style="font-size: 16px;"></i>
+                    <span class="fw-semibold text-primary" style="font-size: 14px;">配方列表</span>
+                    <span class="badge bg-primary text-white" style="font-size: 10px;">{{ active_formulas|length }}</span>
+                </div>
+                {% if active_formulas|length > 1 %}
+                    <a href="?stage={{ active_stage }}&round={{ active_round }}&compare=1"
+                       class="btn btn-sm btn-outline-secondary py-0" style="font-size: 12px;">
+                        <i class="ti ti-columns me-1"></i>对比
+                    </a>
+                {% endif %}
+            </div>
+            <div class="list-group list-group-flush" style="max-height: 70vh; overflow-y: auto;">
+                {% for group in formula_groups %}
+                    {% if group.formulas|length == 1 %}
+                        {% with f=group.formulas.0 %}
+                        <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ f.pk }}"
+                           class="list-group-item list-group-item-action py-2 px-3 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
+                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}</span>
+                                {% if f.cost_predicted %}
+                                    <span class="badge bg-green-lt text-green flex-shrink-0" style="font-size: 10px;">{{ f.cost_predicted }}</span>
+                                {% endif %}
+                                {% if f.is_mature %}
+                                    <i class="ti ti-star-filled text-yellow flex-shrink-0" style="font-size: 12px;" title="成熟配方"></i>
+                                {% endif %}
+                                {% if f.project_id == project.pk %}
+                                    <span class="badge bg-blue-lt text-blue flex-shrink-0" style="font-size: 10px;" title="本项目">本</span>
+                                {% else %}
+                                    <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;" title="来源: {{ f.project.name }}">史</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-muted mt-1" style="font-size: 11px;">
+                                <i class="ti ti-file-text me-1" style="font-size: 10px;"></i>{{ group.code }}
+                            </div>
+                        </a>
+                        {% endwith %}
+                    {% else %}
+                        <div class="border-bottom">
+                            <button class="formula-group-toggle accordion-button {% if group.is_collapsed %}collapsed{% endif %} py-2 px-3 w-100 border-0 bg-transparent d-flex align-items-center gap-2"
+                                    style="font-size: 13px; box-shadow: none;"
+                                    data-bs-toggle="collapse" data-bs-target="#collapse-{{ group.code|slugify }}">
+                                <i class="ti ti-file-text text-muted flex-shrink-0" style="font-size: 13px;"></i>
+                                <span class="text-muted flex-fill text-start fw-medium">{{ group.code }}</span>
+                                <span class="badge bg-primary-lt text-primary flex-shrink-0" style="font-size: 10px;">{{ group.formulas|length }}版本</span>
+                                <a href="{% url 'formula_edit' group.formulas.0.pk %}" class="btn btn-sm btn-ghost-secondary py-0 px-1 flex-shrink-0" style="font-size: 12px; line-height: 1;" title="批量编辑" onclick="event.stopPropagation();">
+                                    <i class="ti ti-edit"></i>
+                                </a>
+                                <i class="ti ti-chevron-down text-muted flex-shrink-0" style="font-size: 12px; transition: transform .2s;"></i>
+                            </button>
+                            <div id="collapse-{{ group.code|slugify }}" class="collapse {% if not group.is_collapsed %}show{% endif %}">
+                                        {% for f in group.formulas %}
+                                        <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ f.pk }}"
+                                           class="list-group-item list-group-item-action py-2 px-3 ps-5 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
+                                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}</span>
+                                                {% if f.cost_predicted %}
+                                                    <span class="badge bg-green-lt text-green flex-shrink-0" style="font-size: 10px;">{{ f.cost_predicted }}</span>
+                                                {% endif %}
+                                                {% if f.is_mature %}
+                                                    <i class="ti ti-star-filled text-yellow flex-shrink-0" style="font-size: 12px;" title="成熟配方"></i>
+                                                {% endif %}
+                                                {% if f.project_id == project.pk %}
+                                                    <span class="badge bg-blue-lt text-blue flex-shrink-0" style="font-size: 10px;" title="本项目">本</span>
+                                                {% else %}
+                                                    <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;" title="来源: {{ f.project.name }}">史</span>
+                                                {% endif %}
+                                            </div>
+                                        </a>
+                                        {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+                {% empty %}
+                    <div class="list-group-item text-center text-muted py-5">
+                        <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                        该轮次暂无配方数据
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 右侧：配方详情 / 对比视图 -->
+    <div class="{% if compare_mode %}col-lg-12{% else %}col-lg-9{% endif %}">
+        {% if compare_mode and columns %}
+            <!-- ============ 对比模式 ============ -->
+            {% include 'apps/app_project/detail/_formula_compare_panel.html' %}
+
+        {% elif selected_formula %}
+            <!-- ============ 单配方详情 ============ -->
+
+            <!-- 配方信息头 -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-fill">
+                            <h4 class="mb-1">{{ selected_formula.code }} {{ selected_formula.name }} <small class="text-muted">v{{ selected_formula.version }}</small></h4>
+                            <div class="text-muted small">
+                                <i class="ti ti-user me-1"></i>{{ selected_formula.creator.username }}
+                                <span class="mx-2">|</span>
+                                <i class="ti ti-calendar me-1"></i>{{ selected_formula.created_at|date:"Y-m-d" }}
+                                <span class="mx-2">|</span>
+                                <span class="badge bg-purple-lt">{{ selected_formula.material_type.name }}</span>
+                                {% if selected_formula.is_mature %}
+                                    <span class="badge bg-green-lt ms-1">成熟配方</span>
+                                {% endif %}
+                                {% if selected_formula.project_id != project.pk %}
+                                    <span class="badge bg-yellow-lt ms-1">
+                                        <i class="ti ti-building me-1"></i>来源: {{ selected_formula.project.name }}
+                                    </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="btn-list">
+                            <a href="{% url 'formula_detail' selected_formula.pk %}" class="btn btn-outline-primary btn-sm" target="_blank">
+                                <i class="ti ti-external-link me-1"></i> 打开详情
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BOM 表 -->
+            <div class="card mb-3">
+                <div class="card-header bg-orange-lt">
+                    <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>喂料口</th>
+                            <th>原材料类型</th>
+                            <th>原材料</th>
+                            <th>比例/份数</th>
+                            <th>共混信息</th>
+                            <th>分秤</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for item in selected_formula.bom_lines.all %}
+                            <tr>
+                                <td><span class="badge bg-secondary-lt">{{ item.get_feeding_port_display }}</span></td>
+                                <td><span class="badge bg-blue-lt">{{ item.raw_material.category.name }}</span></td>
+                                <td class="fw-bold">
+                                    <a href="{% url 'raw_material_detail' item.raw_material.pk %}" target="_blank" class="text-reset">
+                                        {{ item.raw_material.name }}
+                                    </a>
+                                    <span class="text-muted small">({{ item.raw_material.model_name }})</span>
+                                </td>
+                                <td class="fs-3">{{ item.percentage }}</td>
+                                <td>
+                                    {% if item.is_pre_mix %}
+                                        <span class="badge bg-purple-lt">{{ item.pre_mix_order }}. 共混({{ item.pre_mix_time }}s)</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if item.weighing_scale %}
+                                        <span class="badge bg-azure-lt">{{ item.get_weighing_scale_display }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if item.is_tail %}<span class="badge bg-orange-lt">尾料回掺</span>{% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="7" class="text-center text-muted py-3">暂无BOM数据</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 测试结果 -->
+            <div class="card mb-3">
+                <div class="card-header bg-purple-lt">
+                    <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                        <tr>
+                            <th>分类</th>
+                            <th>测试项目</th>
+                            <th>标准/条件</th>
+                            <th>数值 / 结果</th>
+                            <th>测试日期</th>
+                            <th>备注</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for res in sorted_test_results %}
+                            <tr>
+                                <td><span class="text-muted small">{{ res.test_config.category.name }}</span></td>
+                                <td class="fw-bold">{{ res.test_config.name }}</td>
+                                <td class="text-muted small">
+                                    {{ res.test_config.standard }}
+                                    {% if res.test_config.condition %}<br>({{ res.test_config.condition }}){% endif %}
+                                </td>
+                                <td class="fs-3 fw-bold text-dark">
+                                    {% if res.test_config.data_type == 'NUMBER' %}
+                                        {% if '密度' in res.test_config.name %}
+                                            {{ res.value|floatformat:3 }}
+                                        {% else %}
+                                            {{ res.value|floatformat:2 }}
+                                        {% endif %}
+                                    {% else %}
+                                        {{ res.value_text }}
+                                    {% endif %}
+                                    <span class="text-muted fs-5 fw-normal">{{ res.test_config.unit }}</span>
+                                </td>
+                                <td>{{ res.test_date|date:"Y-m-d"|default:"-" }}</td>
+                                <td class="text-muted">{{ res.remark }}</td>
+                            </tr>
+                        {% empty %}
+                            <tr><td colspan="6" class="text-center text-muted py-3">暂无测试数据</td></tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 工艺方案 -->
+            <div class="card mb-3">
+                <div class="card-header bg-cyan-lt">
+                    <h3 class="card-title text-cyan"><i class="ti ti-settings-cog me-2"></i>关联工艺方案</h3>
+                </div>
+                <div class="card-body">
+                    {% if selected_formula.process %}
+                        <a href="{% url 'process_profile_detail' selected_formula.process.pk %}"
+                           class="btn btn-outline-cyan" target="_blank">
+                            <i class="ti ti-external-link me-1"></i>
+                            {{ selected_formula.process.name }}
+                        </a>
+                        {% if selected_formula.process.machine %}
+                            <span class="ms-2 text-muted small">
+                                机台: {{ selected_formula.process.machine }}
+                            </span>
+                        {% endif %}
+                    {% else %}
+                        <span class="text-muted">未关联工艺方案</span>
+                    {% endif %}
+                </div>
+            </div>
+
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="ti ti-flask-off fs-1 d-block mb-3"></i>
+                    <p class="mb-0">暂无配方数据</p>
+                    <p class="text-muted small">请前往项目详情页面，通过研发阶段节点的「新增配方」按钮创建。</p>
+                    <a href="{% url 'project_detail' project.pk %}" class="btn btn-primary mt-3">
+                        <i class="ti ti-arrow-left me-1"></i> 返回项目详情
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

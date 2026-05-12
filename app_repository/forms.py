@@ -1,7 +1,6 @@
 from django import forms
 from django.contrib.auth import get_user_model
 from .models import Customer, ProjectRepository, ProjectFile, OEM, OEMStandardFile, GradeFactor
-from app_material.models.material import MaterialLibrary
 from common_utils.filters import TablerFormMixin
 from app_project.models import ProjectNode
 
@@ -55,7 +54,6 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             'customer': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'}),
             'oem': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'oem'}),
-            'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
             'salesperson': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'salesperson'}),
         }
 
@@ -63,11 +61,6 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         if not self.data:
             instance = kwargs.get('instance')
-            if instance and instance.material_id:
-                self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
-            else:
-                self.fields['material'].queryset = MaterialLibrary.objects.none()
-            
             if instance and instance.customer_id:
                 self.fields['customer'].queryset = Customer.objects.filter(pk=instance.customer_id)
             else:

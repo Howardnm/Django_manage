@@ -9,11 +9,11 @@
     <div class="flex-fill text-truncate">
         <!-- ... 标题 ... -->
         <div class="text-muted small mt-1 text-truncate">
-            {{ repo.material.manufacturer }}
+            {{ material.manufacturer }}
             <span class="mx-1">|</span>
 
             <!-- 【修改】循环显示场景 -->
-            {% for s in repo.material.scenarios.all %}
+            {% for s in material.scenarios.all %}
                 {{ s.name }}{% if not forloop.last %}、{% endif %}
             {% empty %}
                 通用

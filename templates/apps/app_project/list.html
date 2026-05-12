@@ -103,15 +103,7 @@
                         <td>
                             <div class="d-flex justify-content-between align-items-center mb-1">
                                 <div class="text-truncate" style="max-width: 120px;">
-                                    {% if project.is_terminated %}
-                                        <span class="badge bg-red-lt">已终止</span>
-                                    {% elif project.progress_percent == 100 %}
-                                        <span class="badge bg-green-lt">已完成</span>
-                                    {% elif project.is_paused %}
-                                        <span class="badge bg-warning-lt">暂停中</span>
-                                    {% else %}
-                                        <span class="text-blue small fw-bold">{{ project.get_current_stage_display }}</span>
-                                    {% endif %}
+                                    <span class="{{ project.status_css_class }}">{{ project.status_label }}</span>
                                 </div>
                                 <div class="text-muted small">{{ project.progress_percent }}%</div>
                             </div>

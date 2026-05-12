@@ -22,7 +22,7 @@ class ProjectReportExportView(ProjectAccessMixin, View):
             'repository',
             'repository__customer',
             'repository__oem',
-            'repository__material',
+            'material',
             'repository__salesperson'
         ).prefetch_related('nodes'), pk=pk)
         
@@ -145,11 +145,10 @@ class ProjectReportExportView(ProjectAccessMixin, View):
 
     def _add_chapter_material(self, document, project):
         self._add_heading(document, "3. 材料方案")
-        repo = getattr(project, 'repository', None)
-        if not repo or not repo.material:
+        if not project.material:
             self._add_paragraph(document, "暂未选定材料")
             return
-        mat = repo.material
+        mat = project.material
         self._add_paragraph(document, f"选定材料：{mat.grade_name} ({mat.manufacturer})", bold=True)
         self._add_paragraph(document, f"材料类型：{mat.category.name} | 阻燃等级：{mat.flammability}")
         self._add_heading(document, "核心性能指标", level=2)

@@ -4,7 +4,7 @@ from .views.MaterialType import *
 from .views.Scenario import *
 from .views.TestConfig import *
 from .views.Characteristic import *
-from .views.utils import MaterialAutocompleteView
+from common_utils.views import MaterialAutocompleteView
 
 urlpatterns = [
 

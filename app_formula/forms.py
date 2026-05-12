@@ -6,23 +6,34 @@ from app_process.models import ProcessProfile
 from app_material.models import TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_basic_research.models import ResearchProject
+from app_project.models import Project, ProjectNode
 
 # 1. 配方主表单
 class LabFormulaForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = LabFormula
-        exclude = ['creator', 'created_at', 'cost_predicted']
+        fields = ['code', 'name', 'material_type', 'process', 'project', 'project_node', 'research_projects', 'cost_actual', 'is_mature', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
             'material_type': forms.Select(attrs={'class': 'form-select'}),
             'process': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'process'}),
-            'related_materials': forms.SelectMultiple(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
+            'project': forms.Select(attrs={'class': 'form-select'}),
+            'project_node': forms.Select(attrs={'class': 'form-select'}),
             'research_projects': forms.SelectMultiple(attrs={'class': 'form-select remote-search', 'data-model': 'research_project'}),
+            'is_mature': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
+        # code 字段设为非必填(自动生成)
+        self.fields['code'].required = False
+
+        # 关联商业项目 & 阶段节点：锁定不可编辑，由项目进度流程控制
+        self.fields['project'].disabled = True
+        self.fields['project'].required = False
+        self.fields['project_node'].disabled = True
+        self.fields['project_node'].required = False
+
         if not self.data:
             instance = kwargs.get('instance')
             initial = kwargs.get('initial', {})
@@ -33,33 +44,68 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
             else:
                 self.fields['process'].queryset = ProcessProfile.objects.none()
 
-            # 2. 关联成品 (多对多)
-            # 【修复】同时考虑 instance 和 initial
-            qs_materials = MaterialLibrary.objects.none()
+            # 2. 关联商业项目
+            if instance and instance.project_id:
+                self.fields['project'].queryset = Project.objects.filter(pk=instance.project_id)
+            elif 'project' in initial and initial['project']:
+                self.fields['project'].queryset = Project.objects.filter(pk=initial['project'])
+            else:
+                self.fields['project'].queryset = Project.objects.none()
 
-            if instance and instance.pk:
-                qs_materials = instance.related_materials.all()
+            # 3. 关联项目节点 (按 project 过滤)
+            project_id = None
+            if instance and instance.project_id:
+                project_id = instance.project_id
+            elif 'project' in initial and initial['project']:
+                project_id = initial['project']
 
-            # 如果 initial 中有预设值 (例如从材料详情页跳转过来)
-            if 'related_materials' in initial:
-                ids = initial['related_materials']
-                if ids:
-                    qs_materials = qs_materials | MaterialLibrary.objects.filter(pk__in=ids)
+            if instance and instance.project_node_id:
+                self.fields['project_node'].queryset = ProjectNode.objects.filter(pk=instance.project_node_id).select_related('project')
+            elif project_id:
+                self.fields['project_node'].queryset = ProjectNode.objects.filter(
+                    project_id=project_id,
+                    stage__in=['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+                ).select_related('project')
+            else:
+                self.fields['project_node'].queryset = ProjectNode.objects.none()
 
-            self.fields['related_materials'].queryset = qs_materials
-
-            # 3. 关联预研项目 (多对多)
+            # 4. 关联预研项目 (多对多)
             qs_projects = ResearchProject.objects.none()
-            
+
             if instance and instance.pk:
                 qs_projects = instance.research_projects.all()
-                
+
             if 'research_projects' in initial:
                 ids = initial['research_projects']
                 if ids:
                     qs_projects = qs_projects | ResearchProject.objects.filter(pk__in=ids)
-                    
+
             self.fields['research_projects'].queryset = qs_projects
+
+            # 6. 非量产阶段禁用 is_mature
+            NON_MATURE_STAGES = ('RND', 'PILOT', 'MID_TEST')
+            node = None
+            if instance and instance.pk and instance.project_node_id:
+                node = instance.project_node
+            elif 'project_node' in initial:
+                node_id = initial['project_node']
+                if node_id:
+                    try:
+                        node = ProjectNode.objects.only('stage').get(pk=node_id)
+                    except ProjectNode.DoesNotExist:
+                        pass
+
+            if node and node.stage in NON_MATURE_STAGES:
+                self.fields['is_mature'].disabled = True
+                self.fields['is_mature'].help_text = '当前阶段节点不可标记为成熟配方'
+
+    def clean_is_mature(self):
+        is_mature = self.cleaned_data.get('is_mature')
+        project_node = self.cleaned_data.get('project_node')
+        NON_MATURE_STAGES = ('RND', 'PILOT', 'MID_TEST')
+        if is_mature and project_node and project_node.stage in NON_MATURE_STAGES:
+            raise forms.ValidationError('当前阶段节点不可标记为成熟配方，请先修改项目阶段节点为量产下单后再勾选。')
+        return is_mature
 
 
 # 2. BOM 明细表单

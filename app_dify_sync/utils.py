@@ -15,7 +15,7 @@ def _format_project(instance: Project):
     if repo:
         if repo.customer: info_lines.append(f"- **客户**: {repo.customer.company_name}")
         if repo.oem: info_lines.append(f"- **主机厂**: {repo.oem.name}")
-        if repo.material: info_lines.append(f"- **选用材料**: {repo.material.grade_name}")
+        if instance.material: info_lines.append(f"- **选用材料**: {instance.material.grade_name}")
 
     nodes_string = ""
     nodes = instance.nodes.order_by('order').all()
@@ -46,7 +46,7 @@ def _format_project(instance: Project):
 def _format_material_library(instance: MaterialLibrary):
     name = f"材料 - {instance.grade_name}"
     
-    formulas_string = "\n".join([f"- {f.code}: {f.name}" for f in instance.formulas.all()]) or "无"
+    formulas_string = "\n".join([f"- {f.code}: {f.name}" for f in LabFormula.objects.filter(project__material=instance)]) or "无"
     
     properties_string = ""
     grouped_props = instance.get_grouped_properties()

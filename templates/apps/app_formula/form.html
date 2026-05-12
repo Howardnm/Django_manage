@@ -1,8 +1,73 @@
 {% extends "base.html" %}
 
+{% block extra_css %}
+<style>
+    /* 配方表单表格紧凑样式 */
+    #bom-formset .form-control,
+    #bom-formset .form-select,
+    #test-formset .form-control,
+    #test-formset .form-select {
+        padding: 2px 6px;
+        font-size: 12px;
+        height: auto;
+        min-height: 28px;
+    }
+    #bom-formset .ts-wrapper .ts-control,
+    #test-formset .ts-wrapper .ts-control {
+        padding: 2px 6px;
+        font-size: 12px;
+        min-height: 28px;
+    }
+    #bom-formset td,
+    #test-formset td {
+        padding: 4px 4px;
+        vertical-align: middle;
+    }
+    #bom-formset th,
+    #test-formset th {
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+    #bom-formset .form-check,
+    #test-formset .form-check {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+    }
+    /* 变体列固定宽度，不被压缩 */
+    .bom-percentages .percentage-col {
+        flex: 0 0 70px !important;
+        min-width: 70px !important;
+    }
+    .test-values .value-col {
+        flex: 0 0 105px !important;
+        min-width: 105px !important;
+    }
+    .bom-percentages .percentage-col input,
+    .test-values .value-col input,
+    .test-values .value-col select {
+        padding: 2px 4px;
+        font-size: 12px;
+        min-height: 26px;
+    }
+    /* 确保表格容器支持横向滚动 */
+    .table-responsive {
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
     <form method="post">
         {% csrf_token %}
+        <input type="hidden" name="next" value="{{ next_url|default:'' }}">
+        <input type="hidden" name="num_columns" id="num_columns" value="{{ num_columns|default:1 }}">
+        {% if batch_edit_mode %}
+            {% for f in formula_columns %}
+            <input type="hidden" name="formula_ids" value="{{ f.pk }}">
+            {% endfor %}
+        {% endif %}
 
         <!-- Page Header -->
         <div class="page-header d-print-none mb-3">
@@ -10,22 +75,29 @@
                 <div class="row g-2 align-items-center">
                     <div class="col">
                         <h2 class="page-title">
-                            {% if form.instance.pk %}
+                            {% if page_title == '编辑实验配方' %}
                                 <i class="ti ti-edit me-2"></i>
-                                编辑实验配方
+                            {% elif page_title == '复制配方' %}
+                                <i class="ti ti-copy me-2"></i>
                             {% else %}
                                 <i class="ti ti-plus me-2"></i>
-                                新增实验配方
                             {% endif %}
+                            {{ page_title }}
                         </h2>
                     </div>
                     <!-- 顶部操作按钮 -->
                     <div class="col-auto ms-auto d-print-none">
                         <div class="btn-list">
-                            <a href="{% url 'formula_list' %}" class="btn btn-outline-secondary">
+                            <a href="javascript:history.back()" class="btn btn-outline-secondary">
                                 <i class="ti ti-arrow-left me-2"></i>
-                                返回列表
+                                返回上页
                             </a>
+                            {% if show_import_button %}
+                            <button type="button" class="btn btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modal-import-formula">
+                                <i class="ti ti-file-import me-1"></i>
+                                导入数据
+                            </button>
+                            {% endif %}
                             <button type="submit" class="btn btn-primary">
                                 <i class="ti ti-device-floppy me-2"></i>
                                 保存配方
@@ -58,10 +130,19 @@
                     </div>
                 {% endif %}
                 
-                <!-- 1. 基础信息 (上下布局) -->
+                <!-- 1. 基础信息 -->
                 <div class="card mb-3">
-                    <div class="card-header bg-blue-lt">
+                    <div class="card-header bg-blue-lt d-flex justify-content-between align-items-center">
                         <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基础信息</h3>
+                        <label class="form-check form-switch m-0">
+                            {{ form.is_mature }}
+                            <span class="form-check-label">
+                                成熟配方
+                                {% if project_node_stage == 'RND' or project_node_stage == 'PILOT' or project_node_stage == 'MID_TEST' %}
+                                    <i class="ti ti-info-circle text-muted" title="当前阶段节点不可标记为成熟配方，需在量产下单阶段才可勾选"></i>
+                                {% endif %}
+                            </span>
+                        </label>
                     </div>
                     <div class="card-body">
                         <div class="row">
@@ -94,23 +175,7 @@
                                     <div class="invalid-feedback d-block">{{ form.process.errors.0 }}</div>
                                 {% endif %}
                             </div>
-                            
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">关联成品材料</label>
-                                {{ form.related_materials }}
-                                {% if form.related_materials.errors %}
-                                    <div class="invalid-feedback d-block">{{ form.related_materials.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            <!-- 新增：关联预研项目 -->
-                            <div class="col-md-4 mb-3">
-                                <label class="form-label">关联预研项目</label>
-                                {{ form.research_projects }}
-                                {% if form.research_projects.errors %}
-                                    <div class="invalid-feedback d-block">{{ form.research_projects.errors.0 }}</div>
-                                {% endif %}
-                            </div>
-                            <div class="col-md-4 mb-3">
+                            <div class="col-md-3 mb-3">
                                 <label class="form-label">实际成本 (元/kg)</label>
                                 <div class="input-group">
                                     <span class="input-group-text">¥</span>
@@ -120,7 +185,7 @@
                                     <div class="invalid-feedback d-block">{{ form.cost_actual.errors.0 }}</div>
                                 {% endif %}
                             </div>
-                            <div class="col-md-12 mb-3">
+                            <div class="col-md-6 mb-3">
                                 <label class="form-label">实验描述</label>
                                 {{ form.description }}
                                 {% if form.description.errors %}
@@ -131,24 +196,69 @@
                     </div>
                 </div>
 
-                <!-- 2. BOM 明细 -->
+                <!-- 2. 关联信息 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-green-lt">
+                        <h3 class="card-title text-green"><i class="ti ti-link me-2"></i>关联信息</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">关联商业项目</label>
+                                <input type="text" class="form-control" value="{{ project_name|default:'-' }}" readonly disabled>
+                                <span class="d-none">{{ form.project }}</span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">项目阶段节点</label>
+                                <input type="text" class="form-control" value="{{ project_node_display|default:'-' }}" readonly disabled>
+                                <span class="d-none">{{ form.project_node }}</span>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">关联预研项目</label>
+                                {{ form.research_projects }}
+                                {% if form.research_projects.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.research_projects.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. BOM 明细 -->
                 <div class="card mb-3">
                     <div class="card-header bg-orange-lt">
                         <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-vcenter card-table text-nowrap">
+                        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
-                                <th class="w-10">喂料口</th>
-                                <th class="w-25">原材料</th>
-                                <th class="w-10">比例/份数</th>
-                                <th class="w-1">是否尾料</th>
-                                <th class="w-1">是否共混</th>
-                                <th class="w-10">共混顺序</th>
-                                <th class="w-10">共混时间</th>
-                                <th class="w-10">分秤(用于大机投料)</th>
-                                <th>删除</th>
+                                <th style="width: 120px;">喂料口</th>
+                                <th style="width: 200px;">原材料</th>
+                                <th style="width: auto;">
+                                    <div class="d-flex align-items-center justify-content-center">
+                                        <span>比例/份数</span>
+                                        {% if enable_multi_column|default:True and not batch_edit_mode %}
+                                        <button type="button" class="btn btn-sm btn-icon ms-1" id="add-pct-col" title="添加配方变体列"><i class="ti ti-plus"></i></button>
+                                        <button type="button" class="btn btn-sm btn-icon d-none" id="remove-pct-col" title="移除最后一个变体列"><i class="ti ti-minus"></i></button>
+                                        {% endif %}
+                                    </div>
+                                    {% if batch_edit_mode and formula_columns %}
+                                    <div class="d-flex gap-1 mt-1">
+                                        {% for f in formula_columns %}
+                                        <div class="percentage-col text-center">
+                                            <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </th>
+                                <th style="width: 60px;">尾料</th>
+                                <th style="width: 60px;">共混</th>
+                                <th style="width: 70px;">共混顺序</th>
+                                <th style="width: 80px;">共混时间(s)</th>
+                                <th style="width: 100px;">分秤</th>
+                                <th style="width: 50px;">删除</th>
                             </tr>
                             </thead>
                             <tbody id="bom-formset">
@@ -168,11 +278,15 @@
                                             <div class="invalid-feedback d-block">{{ form.raw_material.errors.0 }}</div>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {{ form.percentage }}
-                                        {% if form.percentage.errors %}
-                                            <div class="invalid-feedback d-block">{{ form.percentage.errors.0 }}</div>
-                                        {% endif %}
+                                    <td class="bom-percentages">
+                                        <div class="d-flex gap-1 percentage-columns">
+                                            <div class="percentage-col" data-col="0" style="flex:0 0 70px; min-width:70px;">
+                                                {{ form.percentage }}
+                                                {% if form.percentage.errors %}
+                                                    <div class="invalid-feedback d-block">{{ form.percentage.errors.0 }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>{{ form.is_tail }}</td>
                                     <td>{{ form.is_pre_mix }}</td>
@@ -203,20 +317,31 @@
                     </div>
                 </div>
 
-                <!-- 3. 测试结果 -->
+                <!-- 4. 测试结果 -->
                 <div class="card">
                     <div class="card-header bg-purple-lt">
                         <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-vcenter card-table text-nowrap">
+                        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
-                                <th class="w-50">测试项目</th>
-                                <th class="w-25">数值 / 结果</th>
-                                <th>测试日期</th>
-                                <th class="w-25">备注</th>
-                                <th>删除</th>
+                                <th style="width: 250px;">测试项目</th>
+                                <th style="width: auto;" id="test-value-header">
+                                    数值 / 结果
+                                    {% if batch_edit_mode and formula_columns %}
+                                    <div class="d-flex gap-1 mt-1">
+                                        {% for f in formula_columns %}
+                                        <div class="value-col text-center">
+                                            <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </th>
+                                <th style="width: 110px;">测试日期</th>
+                                <th style="width: 100px;">备注</th>
+                                <th style="width: 50px;">删除</th>
                             </tr>
                             </thead>
                             <tbody id="test-formset">
@@ -230,13 +355,17 @@
                                             <div class="invalid-feedback d-block">{{ form.test_config.errors.0 }}</div>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        {{ form.value }}
-                                        {{ form.value_text }}
-                                        {{ form.value_select }}
-                                        {% if form.value.errors %}
-                                            <div class="invalid-feedback d-block">{{ form.value.errors.0 }}</div>
-                                        {% endif %}
+                                    <td class="test-values">
+                                        <div class="d-flex gap-1 value-columns">
+                                            <div class="value-col" data-col="0" style="flex:0 0 105px; min-width:105px;">
+                                                {{ form.value }}
+                                                {{ form.value_text }}
+                                                {{ form.value_select }}
+                                                {% if form.value.errors %}
+                                                    <div class="invalid-feedback d-block">{{ form.value.errors.0 }}</div>
+                                                {% endif %}
+                                            </div>
+                                        </div>
                                     </td>
                                     <td>
                                         {{ form.test_date }}
@@ -274,7 +403,7 @@
             {{ bom_formset.empty_form.id }}
             <td>{{ bom_formset.empty_form.feeding_port }}</td>
             <td>{{ bom_formset.empty_form.raw_material }}</td>
-            <td>{{ bom_formset.empty_form.percentage }}</td>
+            <td class="bom-percentages"><div class="d-flex gap-1 percentage-columns"></div></td>
             <td>{{ bom_formset.empty_form.is_tail }}</td>
             <td>{{ bom_formset.empty_form.is_pre_mix }}</td>
             <td>{{ bom_formset.empty_form.pre_mix_order }}</td>
@@ -292,11 +421,7 @@
         <tr class="test-form">
             {{ test_formset.empty_form.id }}
             <td>{{ test_formset.empty_form.test_config }}</td>
-            <td>
-                {{ test_formset.empty_form.value }}
-                {{ test_formset.empty_form.value_text }}
-                {{ test_formset.empty_form.value_select }}
-            </td>
+            <td class="test-values"><div class="d-flex gap-1 value-columns"></div></td>
             <td>{{ test_formset.empty_form.test_date }}</td>
             <td>{{ test_formset.empty_form.remark }}</td>
             <td class="text-center">
@@ -318,50 +443,52 @@
 
         function toggleValueInput(selectElement) {
             const row = selectElement.closest('tr');
-            const valueInput = row.querySelector('.value-number');
-            const textInput = row.querySelector('.value-text');
-            const selectInput = row.querySelector('.value-select');
+            const valueInputs = row.querySelectorAll('.value-number');
+            const textInputs = row.querySelectorAll('.value-text');
+            const selectInputs = row.querySelectorAll('.value-select');
             const configId = selectElement.value;
-            
+
             if (!configId) return;
             const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
-            
-            valueInput.style.display = 'none';
-            textInput.style.display = 'none';
-            selectInput.style.display = 'none';
-            
+
+            valueInputs.forEach(el => el.style.display = 'none');
+            textInputs.forEach(el => el.style.display = 'none');
+            selectInputs.forEach(el => el.style.display = 'none');
+
             if (meta.type === 'NUMBER') {
-                valueInput.style.display = 'block';
+                valueInputs.forEach(el => el.style.display = 'block');
                 if (selectElement.dataset.initialized === 'true') {
-                     textInput.value = '';
-                     selectInput.value = '';
+                     textInputs.forEach(el => el.value = '');
+                     selectInputs.forEach(el => el.value = '');
                 }
             } else if (meta.type === 'TEXT') {
-                textInput.style.display = 'block';
+                textInputs.forEach(el => el.style.display = 'block');
                 if (selectElement.dataset.initialized === 'true') {
-                    valueInput.value = '';
-                    selectInput.value = '';
+                    valueInputs.forEach(el => el.value = '');
+                    selectInputs.forEach(el => el.value = '');
                 }
             } else if (meta.type === 'SELECT') {
-                selectInput.style.display = 'block';
+                selectInputs.forEach(el => {
+                    el.style.display = 'block';
+                    if (el.options.length <= 1) {
+                        const currentValue = el.getAttribute('data-current-value') || el.value;
+                        el.innerHTML = '';
+                        const emptyOpt = document.createElement('option');
+                        emptyOpt.value = '';
+                        emptyOpt.text = '---------';
+                        el.appendChild(emptyOpt);
+                        meta.options.forEach(opt => {
+                            const option = document.createElement('option');
+                            option.value = opt;
+                            option.text = opt;
+                            if (opt === currentValue) option.selected = true;
+                            el.appendChild(option);
+                        });
+                    }
+                });
                 if (selectElement.dataset.initialized === 'true') {
-                    valueInput.value = '';
-                    textInput.value = '';
-                }
-                if (selectInput.options.length <= 1) {
-                    const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
-                    selectInput.innerHTML = '';
-                    const emptyOpt = document.createElement('option');
-                    emptyOpt.value = '';
-                    emptyOpt.text = '---------';
-                    selectInput.appendChild(emptyOpt);
-                    meta.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.text = opt;
-                        if (opt === currentValue) option.selected = true;
-                        selectInput.appendChild(option);
-                    });
+                    valueInputs.forEach(el => el.value = '');
+                    textInputs.forEach(el => el.value = '');
                 }
             }
             selectElement.dataset.initialized = 'true';
@@ -403,32 +530,154 @@
                 });
             }
 
+            // ---- 多列变体管理 ----
+            let currentNumColumns = parseInt(document.getElementById('num_columns').value) || 1;
+
+            function getBomPrefix(rowEl) {
+                // 从 bom-formset 行中的隐藏 id 字段或 input name 提取当前行前缀
+                var inputs = rowEl.querySelectorAll('input, select');
+                for (var i = 0; i < inputs.length; i++) {
+                    var m = inputs[i].name.match(/^bom-(\d+)-/);
+                    if (m) return m[1];
+                }
+                return '__prefix__';
+            }
+
+            function getTestPrefix(rowEl) {
+                var inputs = rowEl.querySelectorAll('input, select');
+                for (var i = 0; i < inputs.length; i++) {
+                    var m = inputs[i].name.match(/^test-(\d+)-/);
+                    if (m) return m[1];
+                }
+                return '__prefix__';
+            }
+
+            function makePctHTML(prefix, colIdx) {
+                if (colIdx === 0) {
+                    return '<input type="number" name="bom-' + prefix + '-percentage" step="0.01" class="form-control" id="id_bom-' + prefix + '-percentage">';
+                }
+                return '<input type="number" name="bom-' + prefix + '-percentage_col' + colIdx + '" step="0.01" class="form-control">';
+            }
+
+            function makeValueHTML(prefix, colIdx) {
+                if (colIdx === 0) {
+                    return '<input type="number" name="test-' + prefix + '-value" step="0.001" class="form-control value-number" id="id_test-' + prefix + '-value">' +
+                        '<input type="text" name="test-' + prefix + '-value_text" class="form-control value-text" style="display:none;" id="id_test-' + prefix + '-value_text">' +
+                        '<select name="test-' + prefix + '-value_select" class="form-select value-select" style="display:none;" id="id_test-' + prefix + '-value_select"><option value="">---------</option></select>';
+                }
+                return '<input type="number" name="test-' + prefix + '-value_col' + colIdx + '" step="0.001" class="form-control value-number">' +
+                    '<input type="text" name="test-' + prefix + '-value_text_col' + colIdx + '" class="form-control value-text" style="display:none;">' +
+                    '<select name="test-' + prefix + '-value_select_col' + colIdx + '" class="form-select value-select" style="display:none;"><option value="">---------</option></select>';
+            }
+
+            function addColumn() {
+                currentNumColumns++;
+                document.getElementById('num_columns').value = currentNumColumns;
+                var colIdx = currentNumColumns - 1;
+
+                document.querySelectorAll('#bom-formset tr.bom-form').forEach(function(row) {
+                    var prefix = getBomPrefix(row);
+                    var container = row.querySelector('.percentage-columns');
+                    var div = document.createElement('div');
+                    div.className = 'percentage-col';
+                    div.setAttribute('data-col', colIdx);
+                    div.style.cssText = 'flex:0 0 70px; min-width:70px;';
+                    div.innerHTML = makePctHTML(prefix, colIdx);
+                    container.appendChild(div);
+                });
+
+                document.querySelectorAll('#test-formset tr.test-form').forEach(function(row) {
+                    var prefix = getTestPrefix(row);
+                    var container = row.querySelector('.value-columns');
+                    var div = document.createElement('div');
+                    div.className = 'value-col';
+                    div.setAttribute('data-col', colIdx);
+                    div.style.cssText = 'flex:0 0 105px; min-width:105px;';
+                    div.innerHTML = makeValueHTML(prefix, colIdx);
+                    container.appendChild(div);
+                });
+
+                updateRemoveBtn();
+            }
+
+            function removeColumn() {
+                if (currentNumColumns <= 1) return;
+                currentNumColumns--;
+                document.getElementById('num_columns').value = currentNumColumns;
+
+                document.querySelectorAll('.percentage-columns .percentage-col:last-child').forEach(function(el) { el.remove(); });
+                document.querySelectorAll('.value-columns .value-col:last-child').forEach(function(el) { el.remove(); });
+
+                updateRemoveBtn();
+            }
+
+            function updateRemoveBtn() {
+                var btn = document.getElementById('remove-pct-col');
+                if (btn) {
+                    if (currentNumColumns <= 1) { btn.classList.add('d-none'); }
+                    else { btn.classList.remove('d-none'); }
+                }
+            }
+
+            function fillRowColumns(rowEl, prefix) {
+                // 重建 newly-added 行的所有 variant 列
+                var pctContainer = rowEl.querySelector('.percentage-columns');
+                var valContainer = rowEl.querySelector('.value-columns');
+                if (!pctContainer && !valContainer) return;
+
+                for (var c = 0; c < currentNumColumns; c++) {
+                    if (pctContainer) {
+                        var pDiv = document.createElement('div');
+                        pDiv.className = 'percentage-col';
+                        pDiv.setAttribute('data-col', c);
+                        pDiv.style.cssText = 'flex:0 0 70px; min-width:70px;';
+                        pDiv.innerHTML = makePctHTML(prefix, c);
+                        pctContainer.appendChild(pDiv);
+                    }
+                    if (valContainer) {
+                        var vDiv = document.createElement('div');
+                        vDiv.className = 'value-col';
+                        vDiv.setAttribute('data-col', c);
+                        vDiv.style.cssText = 'flex:0 0 105px; min-width:105px;';
+                        vDiv.innerHTML = makeValueHTML(prefix, c);
+                        valContainer.appendChild(vDiv);
+                    }
+                }
+            }
+
+            var addPctColBtn = document.getElementById('add-pct-col');
+            var removePctColBtn = document.getElementById('remove-pct-col');
+            if (addPctColBtn) addPctColBtn.addEventListener('click', addColumn);
+            if (removePctColBtn) removePctColBtn.addEventListener('click', removeColumn);
+
             function setupFormSet(prefix, btnId, containerId, templateId) {
-                const addBtn = document.getElementById(btnId);
-                const totalForms = document.getElementById(`id_${prefix}-TOTAL_FORMS`);
-                const container = document.getElementById(containerId);
-                const template = document.getElementById(templateId).innerHTML;
+                var addBtn = document.getElementById(btnId);
+                var totalForms = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
+                var container = document.getElementById(containerId);
+                var template = document.getElementById(templateId).innerHTML;
 
                 addBtn.addEventListener('click', function () {
-                    const count = parseInt(totalForms.value);
-                    const newRow = template.replace(/__prefix__/g, count);
+                    var count = parseInt(totalForms.value);
+                    var newRow = template.replace(/__prefix__/g, count);
                     container.insertAdjacentHTML('beforeend', newRow);
                     totalForms.value = count + 1;
 
+                    var newRowElement = container.lastElementChild;
+                    fillRowColumns(newRowElement, count);
+
                     if (window.TomSelect) {
-                        const newRowElement = container.lastElementChild;
-                        newRowElement.querySelectorAll('.form-select-search').forEach(el => {
+                        newRowElement.querySelectorAll('.form-select-search').forEach(function(el) {
                             new TomSelect(el, {
                                 copyClassesToDropdown: false,
                                 dropdownParent: 'body',
                                 controlInput: '<input>',
                                 create: false,
                                 placeholder: '输入搜索...',
-                                onChange: () => toggleValueInput(el)
+                                onChange: function() { toggleValueInput(el); }
                             });
                         });
 
-                        newRowElement.querySelectorAll('.remote-search').forEach(el => {
+                        newRowElement.querySelectorAll('.remote-search').forEach(function(el) {
                             var modelType = el.getAttribute('data-model');
                             var searchUrl = "{% url 'material_api_search' %}";
                             if (['customer', 'oem', 'salesperson'].includes(modelType)) {
@@ -441,17 +690,17 @@
                                 load: function (query, callback) {
                                     var url = searchUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
                                     fetch(url)
-                                        .then(response => response.json())
-                                        .then(json => callback(json))
-                                        .catch(() => callback());
+                                        .then(function(response) { return response.json(); })
+                                        .then(function(json) { callback(json); })
+                                        .catch(function() { callback(); });
                                 },
                                 copyClassesToDropdown: false,
                                 dropdownParent: 'body',
                                 create: false,
                                 preload: 'focus',
                                 render: {
-                                    option: (data, escape) => `<div>${escape(data.text)}</div>`,
-                                    item: (data, escape) => `<div>${escape(data.text)}</div>`
+                                    option: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; },
+                                    item: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; }
                                 }
                             });
                         });
@@ -466,17 +715,71 @@
                 document.querySelectorAll('.form-select-search').forEach(select => {
                     if (select.value) {
                         const row = select.closest('tr');
-                        const selectInput = row.querySelector('.value-select');
-                        const textInput = row.querySelector('.value-text');
                         const configId = select.value;
                         const meta = testConfigMeta[configId];
-                        if (meta && meta.type === 'SELECT' && textInput.value) {
-                            selectInput.setAttribute('data-current-value', textInput.value);
+                        if (meta && meta.type === 'SELECT') {
+                            row.querySelectorAll('.value-col').forEach(col => {
+                                const textInput = col.querySelector('.value-text');
+                                const selectInput = col.querySelector('.value-select');
+                                if (textInput && selectInput && textInput.value) {
+                                    selectInput.setAttribute('data-current-value', textInput.value);
+                                }
+                            });
                         }
                         toggleValueInput(select);
                     }
                 });
             }, 100);
+
+            // 表单验证错误恢复：重建多列并回填数据
+            if (currentNumColumns > 1) {
+                for (var c = 1; c < currentNumColumns; c++) {
+                    (function(colIdx) {
+                        document.querySelectorAll('#bom-formset tr.bom-form').forEach(function(row) {
+                            var prefix = getBomPrefix(row);
+                            var container = row.querySelector('.percentage-columns');
+                            var div = document.createElement('div');
+                            div.className = 'percentage-col';
+                            div.setAttribute('data-col', colIdx);
+                            div.style.cssText = 'flex:0 0 70px; min-width:70px;';
+                            div.innerHTML = makePctHTML(prefix, colIdx);
+                            container.appendChild(div);
+                        });
+                        document.querySelectorAll('#test-formset tr.test-form').forEach(function(row) {
+                            var prefix = getTestPrefix(row);
+                            var container = row.querySelector('.value-columns');
+                            var div = document.createElement('div');
+                            div.className = 'value-col';
+                            div.setAttribute('data-col', colIdx);
+                            div.style.cssText = 'flex:0 0 105px; min-width:105px;';
+                            div.innerHTML = makeValueHTML(prefix, colIdx);
+                            container.appendChild(div);
+                        });
+                    })(c);
+                }
+                updateRemoveBtn();
+                {% if variant_data %}
+                (function() {
+                    var vd = {{ variant_data|safe }};
+                    for (var key in vd) {
+                        var el = document.querySelector('[name="' + key + '"]');
+                        if (el) el.value = vd[key];
+                    }
+                })();
+                {% endif %}
+            }
         });
     </script>
+
+{% if show_import_button %}
+{% if form.instance.pk %}
+<form method="post" action="{% url 'formula_import' form.instance.pk %}">
+{% else %}
+<form method="post" action="{% url 'formula_import_prepare' %}">
+{% endif %}
+    {% csrf_token %}
+    <input type="hidden" name="source_id" class="search-picker-value">
+    {% include 'includes/search_picker_modal.html' with modal_id='modal-import-formula' modal_title='选择来源配方' search_model='formula' search_url_name='formula_api_search' placeholder='输入配方代号或名称搜索...' show_detail_button='1' %}
+</form>
+{% endif %}
 {% endblock %}

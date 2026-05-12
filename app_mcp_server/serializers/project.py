@@ -32,7 +32,7 @@ def serialize_project_full(project) -> Dict[str, Any]:
                 "oem": repo.oem.name if repo.oem else "N/A",
                 "salesperson": repo.salesperson.name if repo.salesperson else "N/A",
                 "product_name": repo.product_name,
-                "target_material": repo.material.grade_name if repo.material else "Not Selected",
+                "target_material": project.material.grade_name if project.material else "Not Selected",
                 "target_cost": float(repo.target_cost or 0)
             }
         

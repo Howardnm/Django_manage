@@ -113,10 +113,10 @@ class ProjectFileInline(admin.TabularInline):
 
 @admin.register(ProjectRepository)
 class ProjectRepositoryAdmin(admin.ModelAdmin):
-    list_display = ('project', 'customer', 'oem', 'salesperson', 'material', 'updated_at')
+    list_display = ('project', 'customer', 'oem', 'salesperson', 'updated_at')
     search_fields = ('project__name', 'customer__company_name', 'oem__name', 'product_name')
     list_filter = ('salesperson', 'updated_at')
-    autocomplete_fields = ['project', 'customer', 'oem', 'material', 'salesperson']
+    autocomplete_fields = ['project', 'customer', 'oem', 'salesperson']
     inlines = [ProjectFileInline]
     
     def get_queryset(self, request):

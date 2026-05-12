@@ -1,0 +1,27 @@
+{% with mature_formulas=material.get_mature_formulas %}
+{% if mature_formulas %}
+<div class="card mt-3">
+    <div class="card-header bg-green-lt">
+        <h3 class="card-title text-green">
+            <i class="ti ti-star-filled me-2"></i>成熟配方 ({{ mature_formulas|length }})
+        </h3>
+    </div>
+    <div class="list-group list-group-flush">
+        {% for f in mature_formulas %}
+            <a href="{% url 'formula_detail' f.pk %}" target="_blank"
+               class="list-group-item list-group-item-action d-flex align-items-center">
+                <div class="flex-fill">
+                    <div class="fw-bold">{{ f.name }}</div>
+                    <div class="small text-muted">{{ f.code }}</div>
+                </div>
+                {% if f.project %}
+                    <span class="badge bg-blue-lt me-1" title="所属项目">{{ f.project.name }}</span>
+                {% endif %}
+                <span class="badge bg-teal-lt">¥{{ f.cost_predicted }}</span>
+                <i class="ti ti-arrow-right ms-2 text-muted"></i>
+            </a>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endwith %}

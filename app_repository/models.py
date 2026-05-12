@@ -112,7 +112,6 @@ class ProjectRepository(models.Model):
     
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
-    material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用材料")
 
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)

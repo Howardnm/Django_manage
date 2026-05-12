@@ -33,7 +33,7 @@ class ProjectListView(ProjectAccessMixin, View):
             'repository',
             'repository__customer',
             'repository__oem',
-            'repository__material'
+            'material'
         ).order_by('-created_at')
 
         # 应用 Mixin 中定义的过滤逻辑
@@ -113,10 +113,10 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 
     queryset = Project.objects.select_related(
         'manager', 'repository', 'repository__customer', 'repository__oem',
-        'repository__salesperson', 'repository__material', 'repository__material__category',
+        'repository__salesperson', 'material', 'material__category',
     ).prefetch_related(
-        'nodes', 'repository__files', 'repository__material__scenarios',
-        'repository__material__additional_files'
+        'nodes', 'repository__files', 'material__scenarios',
+        'material__additional_files'
     )
 
     def get_object(self, queryset=None):
@@ -159,7 +159,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
         context.update({
             'nodes': nodes,
             'repo': repo,
-            'material': repo.material if repo else None,
+            'material': project.material,
             'gantt_data_json': get_project_gantt_data(project),
             'project_form_count': project_form_count,
             'total_form_count': project_form_count + sum(node_form_counts.values()),

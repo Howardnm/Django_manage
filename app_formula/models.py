@@ -17,7 +17,7 @@ class LabFormula(models.Model):
     对应一次具体的改性实验
     """
     # 【修改】允许为空，由后端自动生成
-    code = models.CharField("实验单号", max_length=50, unique=True, blank=True, help_text="自动生成，如：L20231001-01")
+    code = models.CharField("实验单号", max_length=50, blank=True, help_text="自动生成，如：L20231001-01，同批次配方共享同一单号")
     name = models.CharField("配方名称", max_length=100, blank=False)
 
     # 关联
@@ -27,9 +27,15 @@ class LabFormula(models.Model):
     # 关联预研项目
     research_projects = models.ManyToManyField(ResearchProject, blank=True, verbose_name="所属预研项目", related_name="formulas")
 
-    # 关联到成品材料库 (如果这个配方成功量产，可以关联到一个 MaterialLibrary 对象)
-    # 多对多：一个成品材料可能对应多个历史实验配方
-    related_materials = models.ManyToManyField(MaterialLibrary, blank=True, related_name='formulas', verbose_name="关联成品材料")
+    # 关联商业项目及阶段节点
+    project = models.ForeignKey('app_project.Project', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联商业项目", related_name="formulas")
+    project_node = models.ForeignKey('app_project.ProjectNode', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联项目阶段节点", related_name="formulas", help_text="研发/小试/中试/量产等阶段节点")
+
+    # 成熟配方标记
+    is_mature = models.BooleanField("成熟配方", default=False, help_text="勾选后该配方将纳入项目关联材料的成熟配方集，供后续项目参考")
+
+    # 版本号
+    version = models.PositiveIntegerField("版本号", default=1, help_text="同一项目+节点的配方版本序号")
 
     # 【新增】成本字段
     cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料成本自动计算")
@@ -38,6 +44,12 @@ class LabFormula(models.Model):
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="实验员")
     created_at = models.DateTimeField("录入日期", auto_now_add=True)
     description = models.TextField("实验目的/描述", blank=True)
+
+    @property
+    def stage_display(self):
+        if self.project_node:
+            return self.project_node.get_stage_display()
+        return "-"
 
     def __str__(self):
         return f"{self.code} {self.name}"
@@ -139,10 +151,24 @@ class LabFormula(models.Model):
                     data['OTHER'].append(item)
         return data
 
+    @classmethod
+    def get_next_versions(cls, project_id, project_node_id, count=1):
+        """返回同一(项目, 节点)组内的下一组版本号，带行锁防并发"""
+        from django.db.models import Max
+        existing_max = (
+            cls.objects
+            .filter(project_id=project_id, project_node_id=project_node_id)
+            .select_for_update()
+            .aggregate(max_ver=Max('version'))['max_ver']
+        )
+        start = (existing_max or 0) + 1
+        return list(range(start, start + count))
+
     class Meta:
         verbose_name = "实验配方"
         verbose_name_plural = "实验配方库"
         ordering = ['-created_at']
+        unique_together = ('code', 'version')
 
 
 # 2. BOM 表 (Bill of Materials) - 配方明细

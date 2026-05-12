@@ -1,0 +1,270 @@
+from collections import OrderedDict
+from itertools import groupby
+from django.views.generic import DetailView
+from app_project.mixins import ProjectAccessMixin
+from app_project.models import Project, ProjectStage, ProjectNode
+from app_formula.models import LabFormula
+
+
+class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
+    """项目配方过程详情页：按RND轮次展示配方迭代过程"""
+    permission_required = 'app_project.view_project'
+    model = Project
+    template_name = 'apps/app_project/detail/detail_project_formula_process.html'
+    context_object_name = 'project'
+
+    queryset = Project.objects.select_related(
+        'manager', 'repository', 'repository__customer', 'repository__oem',
+        'material'
+    )
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        self.check_object_permission(obj)
+        return obj
+
+    def _fetch_formulas(self, project, material):
+        project_formulas = LabFormula.objects.filter(
+            project=project
+        ).select_related(
+            'project_node', 'material_type', 'creator', 'process', 'project',
+        ).prefetch_related(
+            'bom_lines__raw_material__category',
+            'test_results__test_config__category',
+        ).order_by('version')
+
+        material_formulas = LabFormula.objects.none()
+        if material:
+            material_formulas = LabFormula.objects.filter(
+                project__material=material
+            ).exclude(
+                pk__in=project_formulas.values_list('pk', flat=True)
+            ).select_related(
+                'project', 'project_node', 'material_type', 'creator', 'process'
+            ).prefetch_related(
+                'bom_lines__raw_material__category',
+                'test_results__test_config__category',
+            ).order_by('version')
+
+        return sorted(
+            list(project_formulas) + list(material_formulas),
+            key=lambda f: (f.version if f.version else 1)
+        )
+
+    def _build_comparison_matrices(self, formulas, material=None):
+        """参考 FormulaCompareView 构建对比矩阵：材料基准列 + 配方列(按创建时间降序)"""
+        if not formulas:
+            return [], [], []
+
+        # 按创建时间正序排列 (越早越靠左)
+        formulas = sorted(formulas, key=lambda f: f.created_at)
+
+        columns = []
+        if material:
+            columns.append({'type': 'material', 'obj': material})
+        for f in formulas:
+            columns.append({'type': 'formula', 'obj': f})
+
+        # BOM 对比矩阵
+        all_raw_materials = set()
+        for f in formulas:
+            for line in f.bom_lines.all():
+                all_raw_materials.add(line.raw_material)
+        sorted_raw_materials = sorted(all_raw_materials, key=lambda x: (x.category.order, x.name))
+
+        bom_matrix = []
+        for rm in sorted_raw_materials:
+            row = {'item': rm, 'values': []}
+            for col in columns:
+                if col['type'] == 'material':
+                    row['values'].append({'val': '-', 'is_empty': True})
+                else:
+                    line = col['obj'].bom_lines.filter(raw_material=rm).first()
+                    row['values'].append({
+                        'val': line.percentage if line else '-',
+                        'is_empty': line is None,
+                    })
+            bom_matrix.append(row)
+
+        # 性能对比矩阵
+        all_test_configs = set()
+        mat_props = {}
+        if material:
+            for p in material.properties.all():
+                all_test_configs.add(p.test_config)
+            mat_props = {
+                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value
+                for p in material.properties.all()
+            }
+
+        for f in formulas:
+            for r in f.test_results.all():
+                all_test_configs.add(r.test_config)
+        sorted_configs = sorted(all_test_configs, key=lambda x: (x.category.order, x.order))
+
+        formula_props = {}
+        for f in formulas:
+            formula_props[f.id] = {}
+            for r in f.test_results.all():
+                formula_props[f.id][r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
+
+        test_matrix = []
+        for tc in sorted_configs:
+            row = {'item': tc, 'values': []}
+            base_val = mat_props.get(tc.id) if material else None
+
+            for i, col in enumerate(columns):
+                if col['type'] == 'material':
+                    val = mat_props.get(tc.id)
+                    row['values'].append({
+                        'val': val if val is not None else '-',
+                        'compare_class': '',
+                        'is_base': True,
+                    })
+                else:
+                    val = formula_props.get(col['obj'].id, {}).get(tc.id)
+                    compare_class = ''
+                    if val is not None and base_val is not None and tc.data_type == 'NUMBER':
+                        try:
+                            if val > base_val:
+                                compare_class = 'text-green'
+                            elif val < base_val:
+                                compare_class = 'text-red'
+                        except Exception:
+                            pass
+
+                    row['values'].append({
+                        'val': val if val is not None else '-',
+                        'compare_class': compare_class,
+                        'is_base': False,
+                    })
+            test_matrix.append(row)
+
+        return columns, bom_matrix, test_matrix
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        project = self.object
+        material = project.material
+
+        all_formulas = self._fetch_formulas(project, material)
+
+        # 按阶段 + 轮次分组，用于顶部 tab
+        STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+        stage_grouped = OrderedDict()
+        all_stage_formulas = []  # 所有有节点的配方(用于全局对比)
+        for f in all_formulas:
+            if not f.project_node:
+                continue
+            all_stage_formulas.append(f)
+            s = f.project_node.stage
+            if s not in stage_grouped:
+                stage_grouped[s] = OrderedDict()
+            r = f.project_node.round
+            if r not in stage_grouped[s]:
+                stage_grouped[s][r] = []
+            stage_grouped[s][r].append(f)
+
+        # 构建 tab 列表：[{stage, stage_display, round, formulas}, ...]
+        stage_round_items = []
+        for stage in STAGE_ORDER:
+            if stage not in stage_grouped:
+                continue
+            for r in sorted(stage_grouped[stage].keys()):
+                stage_round_items.append({
+                    'stage': stage,
+                    'stage_display': dict(ProjectStage.choices)[stage],
+                    'round': r,
+                    'formulas': stage_grouped[stage][r],
+                })
+
+        # 当前激活的阶段和轮次
+        active_stage = self.request.GET.get('stage', STAGE_ORDER[0])
+        active_round = self.request.GET.get('round')
+        try:
+            active_round = int(active_round) if active_round else None
+        except (ValueError, TypeError):
+            active_round = None
+
+        # 查找匹配的 tab item
+        active_item = None
+        for item in stage_round_items:
+            if item['stage'] == active_stage and (active_round is None or item['round'] == active_round):
+                active_item = item
+                break
+        if active_item is None and stage_round_items:
+            active_item = stage_round_items[0]
+
+        if active_item:
+            active_stage = active_item['stage']
+            active_round = active_item['round']
+            active_formulas = active_item['formulas']
+        else:
+            active_formulas = []
+
+        # 按 code (实验单号) 分组，用于侧边栏折叠显示
+        active_formulas_sorted = sorted(active_formulas, key=lambda f: (f.code or '', f.version))
+        formula_groups = []
+        for code, items in groupby(active_formulas_sorted, key=lambda f: f.code):
+            group_list = list(items)
+            is_collapsed = len(group_list) > 1
+            formula_groups.append({
+                'code': code,
+                'formulas': group_list,
+                'is_collapsed': is_collapsed,
+            })
+
+        # 对比模式
+        compare_mode = self.request.GET.get('compare') == '1'
+        global_compare = compare_mode and not self.request.GET.get('stage')
+
+        # 选中的单个配方（非对比模式）
+        selected_formula = None
+        selected_formula_id = self.request.GET.get('formula_id')
+        if selected_formula_id and not compare_mode:
+            try:
+                selected_formula = next(
+                    f for f in active_formulas if str(f.pk) == selected_formula_id
+                )
+            except StopIteration:
+                pass
+        if not selected_formula and active_formulas:
+            selected_formula = active_formulas[0]
+
+        # 如果选中的配方在某个折叠组中，自动展开该组
+        if selected_formula:
+            for g in formula_groups:
+                if any(f.pk == selected_formula.pk for f in g['formulas']):
+                    g['is_collapsed'] = False
+                    break
+
+        # 选中的配方测试结果
+        sorted_test_results = []
+        if selected_formula:
+            sorted_test_results = selected_formula.test_results.select_related(
+                'test_config', 'test_config__category'
+            ).order_by('test_config__category__order', 'test_config__order')
+
+        # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab)
+        compare_formulas = all_stage_formulas if global_compare else active_formulas
+        columns, bom_matrix, test_matrix = [], [], []
+        if compare_mode and compare_formulas:
+            columns, bom_matrix, test_matrix = self._build_comparison_matrices(compare_formulas, material=material)
+
+        context.update({
+            'material': material,
+            'stage_round_items': stage_round_items,
+            'active_stage': active_stage,
+            'active_round': active_round,
+            'active_formulas': active_formulas,
+            'formula_groups': formula_groups,
+            'total_formula_count': len(all_stage_formulas),
+            'selected_formula': selected_formula,
+            'sorted_test_results': sorted_test_results,
+            'compare_mode': compare_mode,
+            'global_compare': global_compare,
+            'columns': columns,
+            'bom_matrix': bom_matrix,
+            'test_matrix': test_matrix,
+        })
+        return context

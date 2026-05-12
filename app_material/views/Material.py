@@ -11,7 +11,7 @@ import json
 from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialFileForm
 from app_material.models.material import MaterialLibrary, MaterialDataPoint, MaterialFile
 from app_material.utils.filters import MaterialFilter
-from app_formula.models import FormulaTestResult
+from app_formula.models import FormulaTestResult, LabFormula
 from app_material_api.integration.webhooks import send_material_webhook
 from app_material.mixins import MaterialAccessMixin
 
@@ -164,6 +164,13 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
     template_name = 'apps/app_material/material/material_detail.html'
     context_object_name = 'material'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related(
+            'category'
+        ).prefetch_related(
+            'characteristics', 'scenarios', 'additional_files'
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         sorted_properties = self.object.properties.select_related('test_config', 'test_config__category').order_by(
@@ -171,8 +178,8 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
         )
         context['sorted_properties'] = sorted_properties
 
-        related_repos = self.object.projectrepository_set.select_related('project', 'project__manager').prefetch_related('project__nodes').order_by('-updated_at')
-        context['related_projects'] = [repo.project for repo in related_repos]
+        related_projects = self.object.projects.select_related('manager').prefetch_related('nodes').order_by('-created_at')
+        context['related_projects'] = related_projects
 
         current_std = self.request.GET.get('std', 'ISO')
         std_keywords = ['ASTM'] if current_std == 'ASTM' else ['ISO', 'GB', 'DIN', 'IEC']
@@ -185,7 +192,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
                 output_field=DecimalField()
             )
 
-        formulas = self.object.formulas.select_related('creator', 'process').annotate(
+        formulas = LabFormula.objects.filter(project__material=self.object).select_related('creator', 'process').annotate(
             val_density=get_val_subquery('密度'), val_melt=get_val_subquery('熔融'),
             val_tensile=get_val_subquery('拉伸强度'), val_flex_strength=get_val_subquery('弯曲强度'),
             val_flex_modulus=get_val_subquery('弯曲模量'), val_impact=get_val_subquery('冲击'),

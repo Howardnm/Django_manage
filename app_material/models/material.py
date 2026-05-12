@@ -139,6 +139,12 @@ class MaterialLibrary(models.Model):
                 seen_cats.add(cat_name)
         return result
 
+    def get_mature_formulas(self):
+        from app_formula.models import LabFormula
+        return LabFormula.objects.filter(project__material=self, is_mature=True).select_related(
+            'project', 'project_node', 'creator'
+        ).order_by('-created_at')
+
     class Meta:
         indexes = [models.Index(fields=['-created_at']), models.Index(fields=['category'])]
         ordering = ['-created_at']

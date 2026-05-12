@@ -52,10 +52,10 @@
                             </div>
                         </td>
                         <td>
-                            {% if repo.material %}
-                                <a href="{% url 'material_detail' repo.material.pk %}" class="text-reset">
-                                    <div class="fw-bold">{{ repo.material.grade_name }}</div>
-                                    <div class="small text-muted">{{ repo.material.manufacturer }}</div>
+                            {% if repo.project.material %}
+                                <a href="{% url 'material_detail' repo.project.material.pk %}" class="text-reset">
+                                    <div class="fw-bold">{{ repo.project.material.grade_name }}</div>
+                                    <div class="small text-muted">{{ repo.project.material.manufacturer }}</div>
                                 </a>
                             {% else %}
                                 <span class="badge bg-secondary-lt">未选材</span>

@@ -9,12 +9,23 @@ User = get_user_model()
 class ProjectForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'grade', 'description']
+        fields = ['name', 'grade', 'material', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
+            'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from app_material.models.material import MaterialLibrary
+        if not self.data:
+            instance = kwargs.get('instance')
+            if instance and instance.material_id:
+                self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
+            else:
+                self.fields['material'].queryset = MaterialLibrary.objects.none()
 
 
 # 确保 ProjectNodeUpdateForm 也继承 TablerFormMixin

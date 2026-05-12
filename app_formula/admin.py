@@ -29,7 +29,7 @@ class LabFormulaAdmin(admin.ModelAdmin):
             'fields': ('code', 'name', 'material_type', 'process', 'creator', 'description')
         }),
         ('关联信息', {
-            'fields': ('research_projects', 'related_materials')
+            'fields': ('research_projects',)
         }),
         ('成本信息', {
             'fields': ('cost_predicted', 'cost_actual')
@@ -37,7 +37,7 @@ class LabFormulaAdmin(admin.ModelAdmin):
     )
     
     # 优化多对多字段的选择框
-    filter_horizontal = ('research_projects', 'related_materials')
+    filter_horizontal = ('research_projects',)
 
 # 4. BOM 明细 Admin (可选)
 @admin.register(FormulaBOM)

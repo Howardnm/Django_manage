@@ -70,6 +70,15 @@
                     {% endif %}
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label">选用成品材料</label>
+                    {{ form.material }}
+                    <small class="form-hint">搜索并选择项目目标成品材料，研发阶段新增配方前必须填写。</small>
+                    {% if form.material.errors %}
+                        <div class="invalid-feedback d-block">{{ form.material.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
                 <!-- 项目描述 -->
                 <div class="mb-3">
                     <label class="form-label">项目描述</label>
@@ -92,4 +101,39 @@
         </form>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    if (window.TomSelect) {
+        document.querySelectorAll('.remote-search').forEach(function (el) {
+            var modelType = el.getAttribute('data-model');
+            new TomSelect(el, {
+                valueField: 'value',
+                labelField: 'text',
+                searchField: 'text',
+                load: function (query, callback) {
+                    var url = "{% url 'material_api_search' %}" + "?model=" + modelType + "&q=" + encodeURIComponent(query);
+                    fetch(url)
+                        .then(response => response.json())
+                        .then(json => callback(json))
+                        .catch(() => callback());
+                },
+                copyClassesToDropdown: false,
+                dropdownParent: 'body',
+                create: false,
+                placeholder: '请输入关键词搜索...',
+                preload: 'focus',
+                render: {
+                    option: (data, escape) => `<div>${escape(data.text)}</div>`,
+                    item: (data, escape) => `<div>${escape(data.text)}</div>`,
+                    no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>',
+                    loading: (data, escape) => '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'
+                }
+            });
+        });
+    }
+});
+</script>
 {% endblock %}

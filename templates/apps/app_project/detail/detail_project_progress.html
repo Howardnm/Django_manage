@@ -1,4 +1,4 @@
-﻿<div class="card">
+<div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title">执行进度追踪</h3>
         <div class="btn-list">
@@ -11,6 +11,9 @@
             <a href="{% url 'repo_project_file_detail' project.repository.id %}" class="btn btn-outline-purple btn-sm">
                 <i class="ti ti-files me-1"></i>查看全部资料
                 <span class="badge bg-purple-lt ms-1">{{ project.repository.files.count }}</span>
+            </a>
+            <a href="{% url 'project_formula_process' project.id %}" class="btn btn-outline-teal btn-sm">
+                <i class="ti ti-flask me-1"></i>查看配方
             </a>
         </div>
     </div>
@@ -76,7 +79,7 @@
                         </div>
                     {% endif %}
 
-                    {% if node.status != 'PENDING' %}
+                    {% if node.has_been_updated %}
                         <div class="text-muted small mt-1 primary">
                             更新于: {{ node.updated_at|date:"Y-m-d H:i" }}
                         </div>
@@ -84,7 +87,7 @@
 
                     <!-- 按钮组：使用 d-flex 配合 ms-auto 将上传按钮推向右侧 -->
                     <div class="mt-2 btn-list d-flex">
-                        {% if node.status == 'AWAITING_APPROVAL' %}
+                        {% if node.is_awaiting_approval %}
                             <div class="d-flex align-items-center gap-2 mt-1 bg-blue-lt rounded-2 px-2 py-1 border">
                                 <span class="status-dot status-dot-animated bg-blue d-block"></span>
                                 <span class="text-secondary small">审批流程运行中，请等待审批结果...</span>
@@ -119,6 +122,18 @@
                                     hx-target="#modal-content-placeholder">
                                 客户意见
                             </button>
+                        {% endif %}
+
+                        {% if node.can_add_formula %}
+                            <form method="post" action="{% url 'formula_prepare' %}" style="display:inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="project_id" value="{{ project.id }}">
+                                <input type="hidden" name="project_node_id" value="{{ node.id }}">
+                                <input type="hidden" name="name" value="{{ node.formula_name }}">
+                                <button type="submit" class="btn btn-sm btn-outline-teal">
+                                    <i class="ti ti-plus me-1"></i>{{ node.formula_button_label }}
+                                </button>
+                            </form>
                         {% endif %}
 
                         <!-- 表单填写入口 -->
@@ -159,3 +174,4 @@
         </div>
     </div>
 </div>
+

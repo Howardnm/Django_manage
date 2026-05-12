@@ -11,6 +11,7 @@ from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
 from app_repository.models import ProjectRepository, ProjectFile, Customer, OEM
 from app_repository.mixins import RepositoryAccessMixin
+from app_material.models.material import ApplicationScenario, MaterialCharacteristic
 
 User = get_user_model()
 
@@ -169,5 +170,11 @@ class RepoAutocompleteView(View):
                 is_staff=True
             )[:20]
             data = [{'value': item.pk, 'text': item.get_full_name() or item.username} for item in qs]
+        elif model_type == 'scenario':
+            qs = ApplicationScenario.objects.filter(name__icontains=query)[:20]
+            data = [{'value': item.pk, 'text': item.name} for item in qs]
+        elif model_type == 'characteristic':
+            qs = MaterialCharacteristic.objects.filter(name__icontains=query)[:20]
+            data = [{'value': item.pk, 'text': item.name} for item in qs]
 
         return JsonResponse(data, safe=False)

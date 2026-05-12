@@ -30,18 +30,8 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not self.data:
-            instance = kwargs.get('instance')
-            qs_scenarios = ApplicationScenario.objects.none()
-            qs_characteristics = MaterialCharacteristic.objects.none()
-            if instance and instance.pk:
-                qs_scenarios = instance.scenarios.all()
-                qs_characteristics = instance.characteristics.all()
-            self.fields['scenarios'].queryset = qs_scenarios
-            self.fields['characteristics'].queryset = qs_characteristics
-        else:
-            self.fields['scenarios'].queryset = ApplicationScenario.objects.all()
-            self.fields['characteristics'].queryset = MaterialCharacteristic.objects.all()
+        self.fields['scenarios'].queryset = ApplicationScenario.objects.all()
+        self.fields['characteristics'].queryset = MaterialCharacteristic.objects.all()
 
 
 class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):

@@ -1,6 +1,7 @@
 from asgiref.sync import sync_to_async
 from django.db.models import Q
 from app_material.models import MaterialLibrary
+from app_formula.models import LabFormula
 from app_mcp_server.core.registry import mcp_site
 from app_mcp_server.serializers import serialize_material, serialize_formula
 
@@ -44,7 +45,7 @@ async def get_material_and_formulas(grade_name: str):
     def query():
         try:
             material = MaterialLibrary.objects.select_related('category').prefetch_related('properties', 'additional_files').get(grade_name=grade_name)
-            formulas = material.formulas.all().prefetch_related('bom_lines', 'test_results')
+            formulas = LabFormula.objects.filter(project__material=material).prefetch_related('bom_lines', 'test_results')
             
             data = serialize_material(material)
             data["associated_formulas_history"] = [serialize_formula(f) for f in formulas]
