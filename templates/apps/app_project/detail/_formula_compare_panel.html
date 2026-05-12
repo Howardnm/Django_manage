@@ -63,7 +63,7 @@
                             </div>
                             <div class="small text-muted text-truncate" title="{{ col.obj.manufacturer }}">{{ col.obj.manufacturer }}</div>
                         {% else %}
-                            <div class="fw-bold text-primary text-wrap">{{ col.obj.name }}</div>
+                            <div class="fw-bold text-primary text-wrap">{{ col.obj.project_node.get_stage_display }} 第{{ col.obj.project_node.round }}轮</div>
                             <div class="small text-muted">{{ col.obj.code }}</div>
                             <div class="mt-1">
                                 {% if col.obj.is_mature %}

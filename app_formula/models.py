@@ -151,19 +151,6 @@ class LabFormula(models.Model):
                     data['OTHER'].append(item)
         return data
 
-    @classmethod
-    def get_next_versions(cls, project_id, project_node_id, count=1):
-        """返回同一(项目, 节点)组内的下一组版本号，带行锁防并发"""
-        from django.db.models import Max
-        existing_max = (
-            cls.objects
-            .filter(project_id=project_id, project_node_id=project_node_id)
-            .select_for_update()
-            .aggregate(max_ver=Max('version'))['max_ver']
-        )
-        start = (existing_max or 0) + 1
-        return list(range(start, start + count))
-
     class Meta:
         verbose_name = "实验配方"
         verbose_name_plural = "实验配方库"

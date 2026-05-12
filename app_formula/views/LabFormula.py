@@ -362,10 +362,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             new_seq = 1
         shared_code = f"{prefix}-{new_seq:02d}"
         with transaction.atomic():
-            if project and project_node:
-                versions = LabFormula.get_next_versions(project.id, project_node.id, count=num_columns)
-            else:
-                versions = list(range(1, num_columns + 1))
+            versions = list(range(1, num_columns + 1))
 
             for col_idx in range(num_columns):
                 if col_idx > 0 and not self._column_has_data(col_idx, bom_rows, test_rows, post_data):
@@ -432,14 +429,15 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                             value_text = text_str
                         else:
                             value_text = ''
-                    FormulaTestResult.objects.create(
-                        formula=formula,
-                        test_config=test_config,
-                        value=value,
-                        value_text=value_text,
-                        test_date=row['test_date'],
-                        remark=row['remark'],
-                    )
+                    if value is not None or value_text:
+                        FormulaTestResult.objects.create(
+                            formula=formula,
+                            test_config=test_config,
+                            value=value,
+                            value_text=value_text,
+                            test_date=row['test_date'],
+                            remark=row['remark'],
+                        )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
                 formula.calculate_cost()
@@ -707,15 +705,16 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                             value_text = text_str
                         else:
                             value_text = ''
-                    FormulaTestResult.objects.create(
-                        formula=formula,
-                        test_config=tc,
-                        value=value,
-                        value_text=value_text,
-                        test_date=row['test_date'],
-                        remark=row['remark'],
-                        file_report=old_reports.get(tc.pk),
-                    )
+                    if value is not None or value_text:
+                        FormulaTestResult.objects.create(
+                            formula=formula,
+                            test_config=tc,
+                            value=value,
+                            value_text=value_text,
+                            test_date=row['test_date'],
+                            remark=row['remark'],
+                            file_report=old_reports.get(tc.pk),
+                        )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
                 formula.calculate_cost()

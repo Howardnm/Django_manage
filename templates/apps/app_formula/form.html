@@ -238,7 +238,7 @@
                                 <th style="width: auto;">
                                     <div class="d-flex align-items-center justify-content-center">
                                         <span>比例/份数</span>
-                                        {% if enable_multi_column|default:True and not batch_edit_mode %}
+                                        {% if not form.instance.pk %}
                                         <button type="button" class="btn btn-sm btn-icon ms-1" id="add-pct-col" title="添加配方变体列"><i class="ti ti-plus"></i></button>
                                         <button type="button" class="btn btn-sm btn-icon d-none" id="remove-pct-col" title="移除最后一个变体列"><i class="ti ti-minus"></i></button>
                                         {% endif %}
