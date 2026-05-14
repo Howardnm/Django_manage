@@ -81,7 +81,8 @@ class TestConfig(models.Model):
 
     def __str__(self):
         cond_str = f" ({self.condition})" if self.condition else ""
-        return f"[{self.category.name}] {self.name} - {self.standard}{cond_str}"
+        unit_str = f" ({self.unit})" if self.unit else ""
+        return f"[{self.category.name}] {self.name} - {self.standard}{cond_str}{unit_str}"
 
     def get_options_list(self):
         if not self.options_config: return []

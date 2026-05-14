@@ -1,18 +1,46 @@
 <!-- ============================================================ -->
 <!-- 【核心修改】板块 2：性能数据录入 (动态 FormSet) -->
 <!-- ============================================================ -->
+<style>
+    #data-table .form-control,
+    #data-table .form-select {
+        padding: 2px 6px;
+        font-size: 12px;
+        height: auto;
+        min-height: 28px;
+    }
+    #data-table .ts-wrapper .ts-control {
+        padding: 2px 6px;
+        font-size: 12px;
+        min-height: 28px;
+    }
+    #data-table td {
+        padding: 4px 4px;
+        vertical-align: middle;
+    }
+    #data-table th {
+        padding: 4px 6px;
+        white-space: nowrap;
+    }
+    #data-table .form-check {
+        margin: 0;
+        padding: 0;
+        display: flex;
+        justify-content: center;
+    }
+</style>
 <div class="card mb-3">
-    <div class="card-header bg-blue-lt">
-        <h3 class="card-title">2. 性能指标数据 (EAV)</h3>
+    <div class="card-header bg-purple-lt">
+        <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>物性指标</h3>
     </div>
     <div class="table-responsive">
-        <table class="table table-vcenter card-table" id="data-table">
+        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="data-table" style="font-size: 13px; table-layout: auto;">
             <thead>
             <tr>
-                <th class="w-40 required">测试项目 (指标 | 标准 | 条件)</th>
-                <th class="w-25">数值 / 结果</th>
-                <th class="w-25">备注</th>
-                <th class="w-1">删</th>
+                <th style="width: 550px;">测试项目</th>
+                <th style="width: auto;">数值 / 结果</th>
+                <th style="width: 100px;">备注</th>
+                <th style="width: 50px;">删除</th>
             </tr>
             </thead>
             <tbody>
@@ -57,12 +85,9 @@
         </table>
     </div>
     <div class="card-footer">
-        <button type="button" class="btn btn-sm btn-primary" id="add-row">
-            <i class="ti ti-plus"></i> 添加一行数据
+        <button type="button" class="btn btn-ghost-purple" id="add-row">
+            <i class="ti ti-plus me-1"></i> 添加测试项
         </button>
-        <span class="text-muted small ms-3">
-                    <i class="ti ti-info-circle me-1"></i> 每行代表一个测试项目的数值。
-                </span>
     </div>
 </div>
 

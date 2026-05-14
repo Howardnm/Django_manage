@@ -85,11 +85,11 @@
                 {{ data_formset.empty_form.remark }}
             </td>
 
-            <!-- 4. 删除按钮 (动态添加的行用 JS 移除即可) -->
-            <td>
-                <button type="button" class="btn btn-icon btn-ghost-danger btn-sm remove-row" title="移除此行">
-                    <i class="ti ti-trash"></i>
-                </button>
+            <!-- 4. 删除 -->
+            <td class="text-center">
+                <div class="form-check form-check-inline m-0" title="删除此行">
+                    {{ data_formset.empty_form.DELETE }}
+                </div>
             </td>
         </tr>
     </template>
