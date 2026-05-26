@@ -45,11 +45,7 @@ class WorkflowTaskFilter(TablerFilterMixin, django_filters.FilterSet):
     )
 
     status = django_filters.ChoiceFilter(
-        choices=[
-            ('PENDING', '待处理'),
-            ('COMPLETED', '已通过'),
-            ('REJECTED', '已驳回'),
-        ],
+        choices=WorkflowTask.STATUS_CHOICES,
         label='审批结果',
         empty_label='全部状态',
         widget=forms.Select(attrs={'class': 'form-select'})

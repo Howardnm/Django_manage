@@ -38,7 +38,7 @@ FileSystemStorage.get_available_name = custom_get_available_name
 def upload_file_path(instance, filename):
     """
     文件路径生成器
-    现在只需负责生成“理想中”的路径，冲突处理已由上面的补丁接管。
+    现在只需负责生成"理想中"的路径，冲突处理已由上面的补丁接管。
     """
     # 1. 拆分文件名和后缀
     base_name, ext = os.path.splitext(filename)

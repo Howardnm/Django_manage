@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load project_extras %}
 
 {% block extra_css %}
 <style>
@@ -138,7 +139,7 @@
                             {{ form.is_mature }}
                             <span class="form-check-label">
                                 成熟配方
-                                {% if project_node_stage == 'RND' or project_node_stage == 'PILOT' or project_node_stage == 'MID_TEST' %}
+                                {% if not can_be_mature %}
                                     <i class="ti ti-info-circle text-muted" title="当前阶段节点不可标记为成熟配方，需在量产下单阶段才可勾选"></i>
                                 {% endif %}
                             </span>

@@ -1,6 +1,16 @@
 import uuid
 from django.db import models
-from django.contrib.auth.models import AbstractUser
+from django.contrib.auth.models import AbstractUser, Group as AuthGroup
+
+
+class PermissionGroup(AuthGroup):
+    """[L0] 权限角色组：分配各模块的增删改查权限码。"""
+    class Meta:
+        proxy = True
+        app_label = 'app_user'
+        verbose_name = '[L0] 权限角色组'
+        verbose_name_plural = '[L0] 权限角色组'
+
 
 class Department(models.Model):
     """
@@ -16,8 +26,68 @@ class Department(models.Model):
         return self.name
 
     class Meta:
-        verbose_name = "部门"
-        verbose_name_plural = "部门管理"
+        verbose_name = "[L4] 部门"
+        verbose_name_plural = "[L4] 部门"
+
+
+class ReviewGroup(models.Model):
+    """审核组：为工作流审批提供可管理的用户分组。"""
+    name = models.CharField("组名称", max_length=150, unique=True)
+    description = models.TextField("描述", blank=True)
+    members = models.ManyToManyField(
+        'User',
+        related_name='review_groups',
+        blank=True,
+        verbose_name="组成员",
+    )
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="所属部门",
+        help_text="限定该审核组的部门作用域（留空表示跨部门）",
+    )
+    is_active = models.BooleanField("是否启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "[审批] 审核组"
+        verbose_name_plural = "[审批] 审核组"
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
+class WorkGroup(models.Model):
+    """工作组：部门内部的团队划分，用于 L5 数据资产隔离。"""
+    name = models.CharField("组名称", max_length=150)
+    department = models.ForeignKey(
+        Department,
+        on_delete=models.CASCADE,
+        verbose_name="所属部门",
+    )
+    members = models.ManyToManyField(
+        'User',
+        related_name='work_groups',
+        blank=True,
+        verbose_name="组成员",
+    )
+    description = models.TextField("描述", blank=True)
+    is_active = models.BooleanField("是否启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "[L5] 工作组"
+        verbose_name_plural = "[L5] 工作组"
+        ordering = ['department', 'name']
+        unique_together = [('name', 'department')]
+
+    def __str__(self):
+        return f"[{self.department.name}] {self.name}"
 
 
 class User(AbstractUser):
@@ -52,8 +122,8 @@ class User(AbstractUser):
     description = models.TextField("个人备注", blank=True)
 
     class Meta:
-        verbose_name = "用户信息"
-        verbose_name_plural = "用户信息"
+        verbose_name = "用户"
+        verbose_name_plural = "用户"
 
     def __str__(self):
         dept_str = f"[{self.department.name}]" if self.department else ""

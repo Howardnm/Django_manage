@@ -15,7 +15,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
 
     def get_queryset(self):
         """
-        实现“业务部”与“研发部”的双重部门隔离并集。
+        实现"业务部"与"研发部"的双重部门隔离并集。
         自动探测模型是否支持该过滤逻辑。
         """
         user = self.request.user
@@ -38,7 +38,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
         if user.is_superuser:
             return model.objects.all()
 
-        # 3. 执行 ProjectRepository 专属的“双重负责”隔离
+        # 3. 执行 ProjectRepository 专属的"双重负责"隔离
         if self.enforce_dept_isolation:
             if user.department:
                 return model.objects.filter(
@@ -58,7 +58,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
         user = self.request.user
         if user.is_superuser: return True
 
-        # 如果是 Customer 或 OEM 对象，不进行“负责人”校验（因为公司级对象没有单一负责人）
+        # 如果是 Customer 或 OEM 对象，不进行"负责人"校验（因为公司级对象没有单一负责人）
         if not hasattr(obj, 'salesperson'):
             return True
 

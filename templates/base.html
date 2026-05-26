@@ -29,6 +29,16 @@
         {% block page_header %}{% endblock %}
         <div class="page-body">
             <div class="container-xl">
+                {% if messages %}
+                <div class="messages mb-3">
+                    {% for message in messages %}
+                    <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible" role="alert">
+                        <div class="text-secondary">{{ message }}</div>
+                        <a class="btn-close" data-bs-dismiss="alert" aria-label="关闭"></a>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
                 {% block content %}{% endblock %}
             </div>
         </div>

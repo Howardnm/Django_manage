@@ -1,3 +1,4 @@
+{% load project_extras %}
 <div class="card">
     <div class="card-header d-flex justify-content-between align-items-center">
         <h3 class="card-title">执行进度追踪</h3>
@@ -10,7 +11,7 @@
             </a>
             <a href="{% url 'repo_project_file_detail' project.repository.id %}" class="btn btn-outline-purple btn-sm">
                 <i class="ti ti-files me-1"></i>查看全部资料
-                <span class="badge bg-purple-lt ms-1">{{ project.repository.files.count }}</span>
+                <span class="badge bg-purple-lt ms-1">{{ project.repository.files.all|length }}</span>
             </a>
             <a href="{% url 'project_formula_process' project.id %}" class="btn btn-outline-teal btn-sm">
                 <i class="ti ti-flask me-1"></i>查看配方
@@ -136,6 +137,7 @@
                             </form>
                         {% endif %}
 
+                        {% if node.can_update_status %}
                         <!-- 表单填写入口 -->
                         <a href="{% url 'form_create_wizard' %}?module=project-node&entity={{ node.pk }}"
                            class="btn btn-sm btn-outline-info ms-auto">
@@ -151,8 +153,16 @@
                                 hx-get="{% url 'repo_file_add' project.repository.id %}?node_id={{ node.id }}"
                                 hx-target="#modal-content-placeholder">
                             <i class="ti ti-upload me-1"></i>上传资料
-                            <span class="badge bg-purple-lt ms-1">{{ node.files.count }}</span>
+                            <span class="badge bg-purple-lt ms-1">{{ node.files.all|length }}</span>
                         </button>
+                        {% endif %}
+                    </div>
+                </li>
+            {% empty %}
+                <li class="step-item">
+                    <div class="text-center text-muted py-4">
+                        <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                        暂无进度节点
                     </div>
                 </li>
             {% endfor %}

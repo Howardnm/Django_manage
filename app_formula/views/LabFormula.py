@@ -2,8 +2,8 @@ import json
 from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.urls import reverse
+from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
-from django.views.decorators.http import require_POST
 from django.db import transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.db.models import Subquery, OuterRef, DecimalField, Q
@@ -12,47 +12,61 @@ from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
 from app_formula.forms import LabFormulaForm, FormulaBOMFormSet, FormulaTestResultFormSet
 from app_formula.utils.filters import LabFormulaFilter
 from app_formula.mixins import FormulaAccessMixin
+from app_project.mixins import ProjectAccessMixin
+from app_project.models import Project
 
 
-@require_POST
-def prepare_formula(request):
-    """安全中转：接收 POST 参数存入 session，重定向到配方新增页"""
-    project_id = request.POST.get('project_id')
-    project_node_id = request.POST.get('project_node_id')
-    name = request.POST.get('name', '')
+class FormulaPrepareView(ProjectAccessMixin, View):
+    """从项目节点中转：校验项目权限，存储关联信息到 session，跳转配方新增页"""
+    permission_required = 'app_project.view_project'
 
-    if project_id:
-        try:
-            from app_project.models import Project
-            project = Project.objects.only('name', 'material').get(pk=project_id)
-        except Project.DoesNotExist:
-            messages.error(request, '项目不存在')
-            return redirect('/')
-        if not project.material:
-            messages.error(request, f'项目"{project.name}"尚未关联成品材料，请先在项目详情中关联材料后再创建配方。')
-            return redirect(reverse('project_detail', kwargs={'pk': project_id}))
+    def post(self, request):
+        project_id = request.POST.get('project_id')
+        project_node_id = request.POST.get('project_node_id')
+        name = request.POST.get('name', '')
 
-    request.session['formula_prepare'] = {
-        'project_id': project_id,
-        'project_node_id': project_node_id,
-        'name': name,
-    }
-    return redirect(reverse('formula_add'))
+        if project_id:
+            project = get_object_or_404(Project.objects.select_related('manager'), pk=project_id)
+            self.check_object_permission(project)
 
+            if not project.material:
+                messages.error(request, f'项目"{project.name}"尚未关联成品材料，请先在项目详情中关联材料后再创建配方。')
+                return redirect(reverse('project_detail', kwargs={'pk': project_id}))
 
-@require_POST
-def formula_import_prepare(request):
-    """安全中转：将待导入的源配方 ID 存入 session，重定向回新增页以预填充 formsets"""
-    source_id = request.POST.get('source_id')
-    if not source_id:
-        messages.error(request, '请选择要导入的配方')
+        request.session['formula_prepare'] = {
+            'project_id': project_id,
+            'project_node_id': project_node_id,
+            'name': name,
+        }
         return redirect(reverse('formula_add'))
-    session_data = request.session.get('formula_prepare', {})
-    session_data['import_source_id'] = int(source_id)
-    request.session['formula_prepare'] = session_data
-    source = get_object_or_404(LabFormula, pk=source_id)
-    messages.success(request, f'已从「{source.code}」加载 BOM 和测试项目数据，请确认后保存。')
-    return redirect(reverse('formula_add'))
+
+
+class FormulaStartFreshView(FormulaAccessMixin, View):
+    """从配方列表页新增配方：清理 session 中残留的 project 关联"""
+    permission_required = 'app_formula.view_labformula'
+
+    def get(self, request):
+        request.session.pop('formula_prepare', None)
+        return redirect('formula_add')
+
+
+class FormulaImportPrepareView(FormulaAccessMixin, View):
+    """将待导入的源配方 ID 存入 session，跳转新增页以预填充 formsets"""
+    permission_required = 'app_formula.add_labformula'
+
+    def post(self, request):
+        source_id = request.POST.get('source_id')
+        if not source_id:
+            messages.error(request, '请选择要导入的配方')
+            return redirect(reverse('formula_add'))
+        source = get_object_or_404(LabFormula, pk=source_id)
+        self.check_object_permission(source)
+
+        session_data = request.session.get('formula_prepare', {})
+        session_data['import_source_id'] = int(source_id)
+        request.session['formula_prepare'] = session_data
+        messages.success(request, f'已从「{source.code}」加载 BOM 和测试项目数据，请确认后保存。')
+        return redirect(reverse('formula_add'))
 
 
 class LabFormulaListView(FormulaAccessMixin, ListView):
@@ -238,6 +252,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                 from app_project.models import ProjectNode
                 node = ProjectNode.objects.only('stage').get(pk=project_node_id)
                 context['project_node_stage'] = node.stage
+                context['can_be_mature'] = node.can_be_mature
             except ProjectNode.DoesNotExist:
                 context['project_node_stage'] = None
         else:
@@ -486,12 +501,16 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         context['page_title'] = '编辑实验配方'
         context['show_import_button'] = True
         context['project_node_stage'] = self.object.project_node.stage if self.object.project_node else None
+        context['can_be_mature'] = self.object.project_node.can_be_mature if self.object.project_node else True
         context['project_name'] = self.object.project.name if self.object.project else None
         context['project_node_display'] = str(self.object.project_node) if self.object.project_node else None
 
         # 检测同 code 的兄弟配方，决定是否进入批量编辑模式
         if not self.request.POST:
-            siblings = LabFormula.objects.filter(code=self.object.code).order_by('version')
+            siblings = LabFormula.objects.filter(code=self.object.code).prefetch_related(
+                'bom_lines__raw_material__category',
+                'test_results__test_config__category',
+            ).order_by('version')
             if siblings.count() > 1:
                 all_formulas = list(siblings)
                 context['enable_multi_column'] = True
@@ -640,9 +659,12 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             })
 
         updated = []
+        formula_map = {
+            f.pk: f for f in LabFormula.objects.filter(pk__in=formula_ids).prefetch_related('test_results', 'bom_lines')
+        }
         with transaction.atomic():
             for col_idx, formula_id in enumerate(formula_ids):
-                formula = LabFormula.objects.get(pk=formula_id)
+                formula = formula_map[formula_id]
 
                 formula.name = form.cleaned_data['name']
                 formula.material_type = form.cleaned_data['material_type']
@@ -777,6 +799,7 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
         context['page_title'] = '复制配方'
         context['enable_multi_column'] = True
         context['project_node_stage'] = self.original_formula.project_node.stage if self.original_formula.project_node else None
+        context['can_be_mature'] = self.original_formula.project_node.can_be_mature if self.original_formula.project_node else True
         context['project_name'] = self.original_formula.project.name if self.original_formula.project else None
         context['project_node_display'] = str(self.original_formula.project_node) if self.original_formula.project_node else None
 
@@ -849,33 +872,39 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
         return reverse('formula_detail', kwargs={'pk': self.object.pk})
 
 
-@require_POST
-def formula_import_from(request, pk):
+class FormulaImportFromView(FormulaAccessMixin, View):
     """从指定配方导入 BOM 明细(全量) + 测试项目(仅配置，不含结果)"""
-    target = get_object_or_404(LabFormula, pk=pk)
-    source_id = request.POST.get('source_id')
-    if not source_id:
-        messages.error(request, '请选择要导入的配方')
+    permission_required = 'app_formula.change_labformula'
+
+    def post(self, request, pk):
+        target = get_object_or_404(LabFormula, pk=pk)
+        self.check_object_permission(target)
+
+        source_id = request.POST.get('source_id')
+        if not source_id:
+            messages.error(request, '请选择要导入的配方')
+            return redirect(reverse('formula_edit', kwargs={'pk': pk}))
+        source = get_object_or_404(LabFormula, pk=source_id)
+        self.check_object_permission(source)
+
+        with transaction.atomic():
+            for bom in source.bom_lines.all():
+                FormulaBOM.objects.create(
+                    formula=target,
+                    feeding_port=bom.feeding_port,
+                    weighing_scale=bom.weighing_scale,
+                    raw_material=bom.raw_material,
+                    percentage=bom.percentage,
+                    is_tail=bom.is_tail,
+                    is_pre_mix=bom.is_pre_mix,
+                    pre_mix_order=bom.pre_mix_order,
+                    pre_mix_time=bom.pre_mix_time,
+                )
+            for test in source.test_results.all():
+                FormulaTestResult.objects.create(
+                    formula=target,
+                    test_config=test.test_config,
+                )
+        target.calculate_cost()
+        messages.success(request, f'已从「{source.code}」导入 {source.bom_lines.count()} 项 BOM 和 {source.test_results.count()} 个测试项目')
         return redirect(reverse('formula_edit', kwargs={'pk': pk}))
-    source = get_object_or_404(LabFormula, pk=source_id)
-    with transaction.atomic():
-        for bom in source.bom_lines.all():
-            FormulaBOM.objects.create(
-                formula=target,
-                feeding_port=bom.feeding_port,
-                weighing_scale=bom.weighing_scale,
-                raw_material=bom.raw_material,
-                percentage=bom.percentage,
-                is_tail=bom.is_tail,
-                is_pre_mix=bom.is_pre_mix,
-                pre_mix_order=bom.pre_mix_order,
-                pre_mix_time=bom.pre_mix_time,
-            )
-        for test in source.test_results.all():
-            FormulaTestResult.objects.create(
-                formula=target,
-                test_config=test.test_config,
-            )
-    target.calculate_cost()
-    messages.success(request, f'已从「{source.code}」导入 {source.bom_lines.count()} 项 BOM 和 {source.test_results.count()} 个测试项目')
-    return redirect(reverse('formula_edit', kwargs={'pk': pk}))

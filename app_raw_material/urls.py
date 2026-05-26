@@ -2,7 +2,6 @@ from django.urls import path
 from .views.Supplier import *
 from .views.RawMaterialType import *
 from .views.RawMaterial import *
-from .views.api import raw_material_api_search # 导入新的 API 视图
 
 urlpatterns = [
     # 供应商
@@ -24,6 +23,6 @@ urlpatterns = [
     # 【新增】复制副本路由
     path('materials/<int:pk>/duplicate/', RawMaterialDuplicateView.as_view(), name='raw_material_duplicate'),
 
-    # 【新增】API 搜索路由 (用于 Tom Select 远程加载)
-    path('api/search/', raw_material_api_search, name='raw_material_api_search'),
+    # API 搜索路由 (Tom Select 远程加载)
+    path('api/search/', RawMaterialAutocompleteView.as_view(), name='raw_material_api_search'),
 ]

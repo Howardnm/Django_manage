@@ -148,12 +148,11 @@ class ProjectFileDeleteView(RepositoryAccessMixin, View):
         return redirect(next_url)
 
 
-class RepoAutocompleteView(View):
-    """搜索接口：内部登录后可用，不做严格部门隔离以便跨组指派。"""
+class RepoAutocompleteView(RepositoryAccessMixin, View):
+    """搜索接口：跨组搜索以便指派任务。"""
+    permission_required = 'app_repository.view_projectrepository'
+
     def get(self, request):
-        if not request.user.is_authenticated:
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
-            
         model_type = request.GET.get('model')
         query = request.GET.get('q', '')
         data = []

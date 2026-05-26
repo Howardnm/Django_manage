@@ -16,6 +16,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
     queryset = Project.objects.select_related(
         'manager', 'repository', 'repository__customer', 'repository__oem',
         'material'
+    ).prefetch_related(
+        'material__properties__test_config__category'
     )
 
     def get_object(self, queryset=None):
@@ -65,11 +67,14 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         for f in formulas:
             columns.append({'type': 'formula', 'obj': f})
 
-        # BOM 对比矩阵
+        # BOM 对比矩阵 — 先建内存索引，避免 .filter() 绕过 prefetch 缓存
         all_raw_materials = set()
+        bom_map = {}  # {formula_id: {raw_material_id: percentage}}
         for f in formulas:
+            bom_map[f.id] = {}
             for line in f.bom_lines.all():
                 all_raw_materials.add(line.raw_material)
+                bom_map[f.id][line.raw_material_id] = line.percentage
         sorted_raw_materials = sorted(all_raw_materials, key=lambda x: (x.category.order, x.name))
 
         bom_matrix = []
@@ -79,10 +84,10 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                 if col['type'] == 'material':
                     row['values'].append({'val': '-', 'is_empty': True})
                 else:
-                    line = col['obj'].bom_lines.filter(raw_material=rm).first()
+                    pct = bom_map.get(col['obj'].id, {}).get(rm.id)
                     row['values'].append({
-                        'val': line.percentage if line else '-',
-                        'is_empty': line is None,
+                        'val': pct if pct is not None else '-',
+                        'is_empty': pct is None,
                     })
             bom_matrix.append(row)
 
@@ -90,23 +95,21 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         all_test_configs = set()
         mat_props = {}
         if material:
-            for p in material.properties.all():
+            mat_properties = list(material.properties.select_related('test_config').all())
+            for p in mat_properties:
                 all_test_configs.add(p.test_config)
             mat_props = {
                 p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value
-                for p in material.properties.all()
+                for p in mat_properties
             }
-
-        for f in formulas:
-            for r in f.test_results.all():
-                all_test_configs.add(r.test_config)
-        sorted_configs = sorted(all_test_configs, key=lambda x: (x.category.order, x.order))
 
         formula_props = {}
         for f in formulas:
             formula_props[f.id] = {}
             for r in f.test_results.all():
+                all_test_configs.add(r.test_config)
                 formula_props[f.id][r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
+        sorted_configs = sorted(all_test_configs, key=lambda x: (x.category.order, x.order))
 
         test_matrix = []
         for tc in sorted_configs:

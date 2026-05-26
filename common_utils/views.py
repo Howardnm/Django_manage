@@ -3,6 +3,7 @@ from django.urls import reverse
 from django.views import View
 from django.db.models import Q
 from app_material.models.material import MaterialType, ApplicationScenario, MaterialLibrary, TestConfig, MaterialCharacteristic
+from app_material.mixins import MaterialAccessMixin
 from app_raw_material.models import RawMaterial
 from app_process.models import ProcessProfile
 from app_basic_research.models import ResearchProject
@@ -10,7 +11,8 @@ from app_project.models import Project
 from django.contrib.auth.models import User
 
 
-class MaterialAutocompleteView(View):
+class MaterialAutocompleteView(MaterialAccessMixin, View):
+    permission_required = 'app_material.view_materiallibrary'
     """
     通用搜索接口（分页模式供 search_picker_modal，数组模式兼容 TomSelect remote-search）
     """

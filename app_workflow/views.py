@@ -5,13 +5,19 @@ from django.urls import reverse
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
+from django.contrib.auth import get_user_model
+from app_user.models import ReviewGroup
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
-from .utils import WorkflowEngine, related_object_router
+from .services import WorkflowService
+from .engine import WorkflowEngine
+from .utils import related_object_router
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
+from .exceptions import TaskNotFoundError, CancelNotAllowedError, InvalidActionError
 from lxml import etree
 import json
-from SpiffWorkflow.exceptions import WorkflowException
+
+User = get_user_model()
 
 
 def _batch_resolve_content_objects(instances):
@@ -72,6 +78,8 @@ def _resolve_task_names_from_bpmn(tasks):
 # ==========================================
 
 class WorkflowDefinitionListView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.view_workflowdefinition'
+
     def get(self, request):
         qs = WorkflowDefinition.objects.all().select_related('created_by').order_by('-created_at')
         filter_set = WorkflowDefinitionFilter(request.GET, queryset=qs)
@@ -84,6 +92,8 @@ class WorkflowDefinitionListView(WorkflowAccessMixin, View):
 
 
 class WorkflowEditorView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.change_workflowdefinition'
+
     def get(self, request, pk=None):
         definition = None
         if pk:
@@ -96,6 +106,8 @@ class WorkflowEditorView(WorkflowAccessMixin, View):
 
 
 class WorkflowSaveView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.change_workflowdefinition'
+
     def post(self, request):
         if not request.user.is_superuser:
             return JsonResponse({'status': 'error', 'message': '仅超级管理员可编辑流程定义。'}, status=403)
@@ -124,6 +136,8 @@ class WorkflowSaveView(WorkflowAccessMixin, View):
 
 
 class WorkflowDefinitionDeleteView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.delete_workflowdefinition'
+
     def post(self, request, pk):
         if not request.user.is_superuser:
             return JsonResponse({'status': 'error', 'message': '仅超级管理员可删除流程定义。'}, status=403)
@@ -137,6 +151,8 @@ class WorkflowDefinitionDeleteView(WorkflowAccessMixin, View):
 
 
 class WorkflowToggleActiveView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.change_workflowdefinition'
+
     def post(self, request, pk):
         if not request.user.is_superuser:
             return JsonResponse({'status': 'error', 'message': '仅超级管理员可切换流程启用状态。'}, status=403)
@@ -152,26 +168,36 @@ class WorkflowToggleActiveView(WorkflowAccessMixin, View):
 # ==========================================
 
 class MyTaskListView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.view_workflowtask'
+
     def get(self, request):
         user = request.user
-        user_groups = set(user.groups.all().values_list('name', flat=True))
+        user_groups = set(user.review_groups.filter(
+            is_active=True
+        ).values_list('name', flat=True))
 
         # --- A. 收集任务 ID（已指派 + 候选签收）---
         assigned_ids = list(WorkflowTask.objects.filter(
             assigned_to=user, status='PENDING'
         ).values_list('pk', flat=True))
 
-        candidate_qs = WorkflowTask.objects.filter(
-            assigned_to__isnull=True, status='PENDING'
-        ).prefetch_related('candidate_users')
+        # 直接候选用户匹配（DB 层）
+        direct_candidate_ids = set(WorkflowTask.objects.filter(
+            assigned_to__isnull=True, status='PENDING',
+            candidate_users=user,
+        ).values_list('pk', flat=True))
 
-        unassigned_ids = []
-        for t in candidate_qs:
-            is_candidate = (user in t.candidate_users.all())
-            if not is_candidate and t.candidate_groups:
-                is_candidate = bool(user_groups.intersection(set(t.candidate_groups)))
-            if is_candidate:
-                unassigned_ids.append(t.pk)
+        # 候选组匹配（仍需 Python 处理 JSON 字段）
+        group_candidate_ids = []
+        if user_groups:
+            remaining = WorkflowTask.objects.filter(
+                assigned_to__isnull=True, status='PENDING'
+            ).exclude(pk__in=direct_candidate_ids).only('pk', 'candidate_groups')
+            for t in remaining:
+                if t.candidate_groups and user_groups.intersection(set(t.candidate_groups)):
+                    group_candidate_ids.append(t.pk)
+
+        unassigned_ids = list(direct_candidate_ids) + group_candidate_ids
 
         # --- B. 批量查询任务及其关联，应用筛选 ---
         base_qs = WorkflowTask.objects.filter(
@@ -214,10 +240,12 @@ class MyTaskListView(WorkflowAccessMixin, View):
 
 
 class CompletedTaskListView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.view_workflowtask'
+
     def get(self, request):
         base_qs = WorkflowTask.objects.filter(
             assigned_to=request.user,
-            status__in=['COMPLETED', 'REJECTED']
+            status__in=['COMPLETED', 'REJECTED', 'CANCELED']
         ).select_related(
             'instance__definition',
             'instance__started_by',
@@ -248,6 +276,8 @@ class CompletedTaskListView(WorkflowAccessMixin, View):
 
 class InitiatedInstanceListView(WorkflowAccessMixin, View):
     """我发起的流程：跟踪自己发起的流程实例状态"""
+    permission_required = 'app_workflow.view_workflowinstance'
+
     def get(self, request):
         base_qs = WorkflowInstance.objects.filter(
             started_by=request.user
@@ -296,6 +326,8 @@ class InitiatedInstanceListView(WorkflowAccessMixin, View):
 
 
 class TaskClaimView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.change_workflowtask'
+
     def post(self, request, pk):
         task = get_object_or_404(WorkflowTask, pk=pk)
         user = request.user
@@ -303,140 +335,200 @@ class TaskClaimView(WorkflowAccessMixin, View):
         if task.assigned_to is not None:
             return JsonResponse({'status': 'error', 'message': '任务已被签收。'}, status=400)
 
-        user_groups = user.groups.all().values_list('name', flat=True)
+        user_groups = set(user.review_groups.filter(
+            is_active=True
+        ).values_list('name', flat=True))
         can_claim = (user in task.candidate_users.all() or
-                     any(group_name in task.candidate_groups for group_name in user_groups))
+                     any(g in task.candidate_groups for g in user_groups))
 
         if not can_claim:
             return JsonResponse({'status': 'error', 'message': '您没有权限签收此任务。'}, status=403)
 
-        task.assigned_to = user
-        task.save()
+        try:
+            WorkflowService.claim(task, user)
+        except InvalidActionError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
         messages.success(request, f"任务 '{task.task_name}' 已成功签收。")
         return JsonResponse({'status': 'success'})
 
 
-class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
+class TaskReassignView(WorkflowAccessMixin, View):
+    """转交任务给其他用户"""
+    permission_required = 'app_workflow.change_workflowtask'
 
-    def _build_process_timeline(self, instance):
-        """解析 BPMN XML，按流程序列提取所有 UserTask 节点，匹配数据库状态"""
-        nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
+    def post(self, request, pk):
+        task = get_object_or_404(WorkflowTask, pk=pk)
+        to_user_id = request.POST.get('to_user_id')
+        if not to_user_id:
+            return JsonResponse({'status': 'error', 'message': '请指定目标用户。'}, status=400)
+
+        to_user = get_object_or_404(User, pk=to_user_id)
+
         try:
-            root = etree.fromstring(instance.definition.bpmn_xml.encode('utf-8'))
-        except Exception:
-            return []
+            WorkflowService.reassign(task, request.user, to_user)
+            messages.success(request, f"任务 '{task.task_name}' 已转交给 {to_user.username}。")
+        except InvalidActionError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-        # 1. 构建邻接表 (sequenceFlow sourceRef → targetRef)
-        flows = {}
-        for sf in root.xpath('//bpmn:sequenceFlow', namespaces=nsmap):
-            src, tgt = sf.get('sourceRef'), sf.get('targetRef')
-            if src and tgt:
-                flows.setdefault(src, []).append(tgt)
+        return JsonResponse({'status': 'success'})
 
-        # 2. 从 StartEvent BFS 遍历，提取 UserTask
-        starts = root.xpath('//bpmn:startEvent', namespaces=nsmap)
-        if not starts:
-            return []
 
-        visited = set()
-        queue = [starts[0].get('id')]
-        visited.add(queue[0])
-        timeline = []
+class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
+    permission_required = 'app_workflow.view_workflowinstance'
 
-        def elem_info(elem_id):
-            for tag, kind in [('bpmn:userTask', 'task'),
-                              ('bpmn:parallelGateway', 'parallel'),
-                              ('bpmn:exclusiveGateway', 'exclusive'),
-                              ('bpmn:endEvent', 'end')]:
-                el = root.xpath(f'//{tag}[@id="{elem_id}"]', namespaces=nsmap)
-                if el:
-                    return kind, (el[0].get('name') or elem_id)
-            return None, elem_id
+    def _build_status_map(self, instance):
+        """构建 BPMN 节点状态映射表, 供前端 bpmn-js 查看器叠加状态与备注"""
+        STATUS_LABEL = {
+            'completed': '已通过', 'rejected': '已驳回', 'running': '进行中',
+            'canceled': '已取消', 'pending': '待处理',
+        }
+        bpmn_xml = instance.definition.bpmn_xml
+        nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
 
-        while queue:
-            elem_id = queue.pop(0)
-            kind, name = elem_info(elem_id)
+        # 1. 解析 camunda 指派信息
+        camunda_assignments = WorkflowEngine.parse_camunda_assignments(bpmn_xml)
 
-            if kind == 'task':
-                timeline.append({'bpmn_id': elem_id, 'name': name})
-            elif kind == 'parallel' or kind == 'exclusive':
-                timeline.append({'bpmn_id': elem_id, 'name': name, 'is_gateway': True, 'gateway_type': kind})
-
-            for tgt in flows.get(elem_id, []):
-                if tgt not in visited:
-                    visited.add(tgt)
-                    queue.append(tgt)
-
-        # 3. 解析 camunda 指派信息
-        camunda_assignments = WorkflowEngine._parse_camunda_assignments(instance.definition.bpmn_xml)
-        for item in timeline:
-            if item.get('is_gateway'):
-                continue
-            camunda_info = camunda_assignments.get(item['bpmn_id'], {})
-            parts = []
-            if camunda_info.get('assignee'):
-                parts.append(camunda_info['assignee'])
-            if camunda_info.get('candidate_users'):
-                parts.append('候选人: ' + ', '.join(camunda_info['candidate_users']))
-            if camunda_info.get('candidate_groups'):
-                parts.append('候选组: ' + ', '.join(camunda_info['candidate_groups']))
-            item['assignee_label'] = ' / '.join(parts) if parts else '流程发起人'
-
-        # 4. 匹配数据库状态
+        # 2. 预加载 DB 数据
         db_tasks = {
             t.spiff_task_id: t
             for t in WorkflowTask.objects.filter(instance=instance).select_related('assigned_to').prefetch_related('candidate_users')
         }
         history_by_task = {}
-        for h in ApprovalHistory.objects.filter(instance=instance, task__isnull=False).select_related('task', 'approver'):
+        for h in ApprovalHistory.objects.filter(instance=instance, task__isnull=False).select_related('task', 'approver').order_by('-timestamp'):
             history_by_task.setdefault(h.task.spiff_task_id, []).append(h)
 
-        # 预解析候选组的成员列表
-        from django.contrib.auth.models import Group
         group_member_map = {}
         all_group_names = set()
         for task in db_tasks.values():
             if task.candidate_groups:
                 all_group_names.update(task.candidate_groups)
         if all_group_names:
-            for g in Group.objects.filter(name__in=all_group_names).prefetch_related('user_set'):
-                group_member_map[g.name] = [u.username for u in g.user_set.all()[:3]]
+            for rg in ReviewGroup.objects.filter(name__in=all_group_names).prefetch_related('members'):
+                group_member_map[rg.name] = [u.username for u in rg.members.all()[:3]]
 
-        for item in timeline:
-            if item.get('is_gateway'):
-                item['status'] = 'gateway'
-                continue
+        # 3. 从 BPMN XML 解析 userTask 的 name 属性（优先于 DB 中 task_name）
+        try:
+            root = etree.fromstring(bpmn_xml.encode('utf-8'))
+        except Exception:
+            root = None
+        bpmn_task_names = {}
+        if root is not None:
+            for ut in root.xpath('//bpmn:userTask', namespaces=nsmap):
+                tid = ut.get('id')
+                tname = ut.get('name')
+                if tid and tname:
+                    bpmn_task_names[tid] = tname
 
-            bpmn_id = item['bpmn_id']
+        # 4. 构建任务节点状态映射
+        status_map = {}
+        all_bpmn_ids = set(camunda_assignments.keys()) | set(db_tasks.keys())
+        for bpmn_id in all_bpmn_ids:
+            entry = {}
+            camunda_info = camunda_assignments.get(bpmn_id, {})
             task = db_tasks.get(bpmn_id)
-            item_records = history_by_task.get(bpmn_id, [])
+            history_items = history_by_task.get(bpmn_id, [])
 
             if task:
-                item['task'] = task
-                item['status'] = task.status.lower()
-                item['completed_at'] = task.completed_at
-                item['assigned_to'] = task.assigned_to
-                # 待签收：提供候选信息
-                if task.assigned_to is None:
-                    item['candidate_usernames'] = [u.username for u in task.candidate_users.all()]
-                    item['candidate_groups'] = task.candidate_groups
+                entry['status'] = task.status.lower()
+                entry['task_name'] = bpmn_task_names.get(bpmn_id) or task.task_name
+                if task.completed_at:
+                    entry['completed_at'] = task.completed_at.strftime('%Y-%m-%d %H:%M')
+                if task.assigned_to:
+                    entry['assigned_to_name'] = task.assigned_to.username
+                if not task.assigned_to:
+                    entry['candidate_usernames'] = [u.username for u in task.candidate_users.all()]
+                    entry['candidate_groups'] = task.candidate_groups
                     if task.candidate_groups:
-                        item['candidate_group_members'] = {
+                        entry['candidate_group_members'] = {
                             gn: group_member_map.get(gn, []) for gn in task.candidate_groups
                         }
             else:
-                item['status'] = 'pending'
-                item['task'] = None
+                entry['status'] = 'pending'
 
-            if item_records:
-                latest = item_records[0]
-                item['action'] = latest.action
-                item['approver'] = latest.approver
-                item['remark'] = latest.remark
+            if camunda_info.get('assignee'):
+                entry['assignee_label'] = camunda_info['assignee']
+            elif camunda_info.get('candidate_users'):
+                entry['assignee_label'] = '候选人: ' + ', '.join(camunda_info['candidate_users'])
 
-        return timeline
+            if history_items:
+                latest = history_items[0]
+                entry['approver_name'] = latest.approver.username
+                entry['remark'] = latest.remark
+                entry['action'] = latest.action
 
-    def get_context_data(self, request, pk):
+            # ── 状态判定逻辑收归后端 ──
+            has_active = bool(
+                entry.get('assigned_to_name') or
+                entry.get('candidate_usernames') or
+                entry.get('candidate_groups')
+            )
+            status = entry['status']
+            if status == 'pending' and has_active:
+                entry['display_status'] = 'running'
+            else:
+                entry['display_status'] = status
+            entry['status_label'] = STATUS_LABEL[entry['display_status']]
+
+            status_map[bpmn_id] = entry
+
+        # 5. 解析网关元素并判定颜色状态
+        if root is None:
+            return status_map
+
+        flows = {}
+        for sf in root.xpath('//bpmn:sequenceFlow', namespaces=nsmap):
+            src, tgt = sf.get('sourceRef'), sf.get('targetRef')
+            if src and tgt:
+                flows.setdefault(src, []).append(tgt)
+
+        task_statuses = {bid: status_map[bid]['display_status'] for bid in all_bpmn_ids}
+
+        for tag in ['bpmn:parallelGateway', 'bpmn:exclusiveGateway',
+                     'bpmn:inclusiveGateway', 'bpmn:eventBasedGateway']:
+            for gw in root.xpath(f'//{tag}', namespaces=nsmap):
+                gw_id = gw.get('id')
+                if not gw_id or gw_id in status_map:
+                    continue
+
+                # BFS 查找下游 UserTask 的状态
+                downstream_statuses = []
+                visited = set()
+                queue = [gw_id]
+                while queue and len(visited) < 50:
+                    cur = queue.pop(0)
+                    if cur in visited:
+                        continue
+                    visited.add(cur)
+                    for nxt in flows.get(cur, []):
+                        if nxt in task_statuses:
+                            downstream_statuses.append(task_statuses[nxt])
+                        elif nxt not in visited:
+                            queue.append(nxt)
+
+                if not downstream_statuses:
+                    gw_status = 'pending'
+                elif all(s == 'completed' for s in downstream_statuses):
+                    gw_status = 'completed'
+                elif any(s == 'running' for s in downstream_statuses):
+                    gw_status = 'running'
+                elif any(s == 'rejected' for s in downstream_statuses):
+                    gw_status = 'rejected'
+                else:
+                    gw_status = 'pending'
+
+                status_map[gw_id] = {
+                    'status': gw_status,
+                    'display_status': gw_status,
+                    'status_label': STATUS_LABEL[gw_status],
+                    'task_name': gw.get('name') or gw_id,
+                    'is_gateway': True,
+                }
+
+        return status_map
+
+    def get_context_data(self, **kwargs):
+        pk = self.kwargs['pk']
         instance = get_object_or_404(
             WorkflowInstance.objects.select_related('definition', 'started_by', 'content_type'),
             pk=pk
@@ -452,7 +544,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
 
         current_task = WorkflowTask.objects.filter(
             instance=instance,
-            assigned_to=request.user,
+            assigned_to=self.request.user,
             status='PENDING'
         ).first()
 
@@ -462,26 +554,29 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         related_display_name = related_object_router.get_display_name(related_object)
         related_object_url = related_object_router.resolve(related_object)
 
-        process_timeline = self._build_process_timeline(instance)
+        status_map = self._build_status_map(instance)
+        bpmn_xml = instance.definition.bpmn_xml
 
         return {
             'instance': instance,
             'history': history,
             'current_task': current_task,
+            'can_cancel': instance.is_cancelable_by(self.request.user),
             'related_object': related_object,
             'related_display_name': related_display_name,
             'related_model_name': related_model_name,
             'related_object_url': related_object_url,
             'content_type_model': content_type_model,
-            'process_timeline': process_timeline,
+            'status_map': status_map,
+            'bpmn_xml': bpmn_xml,
         }
 
     def get(self, request, pk):
-        context = self.get_context_data(request, pk)
+        context = self.get_context_data()
         return render(request, 'apps/app_workflow/instance_detail.html', context)
 
     def post(self, request, pk):
-        context = self.get_context_data(request, pk)
+        context = self.get_context_data()
         current_task = context.get('current_task')
 
         if not current_task:
@@ -500,11 +595,36 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
 
         try:
-            WorkflowEngine.complete_task(current_task, request.user, action, remark)
+            WorkflowService.complete_task(current_task, request.user, action, remark)
             messages.success(request, f"任务已成功{'通过' if action == 'APPROVE' else '驳回'}。")
-        except WorkflowException as e:
-            messages.error(request, f"流程执行错误: {e}")
+        except TaskNotFoundError as e:
+            messages.error(request, f"任务处理失败: {e}")
         except Exception as e:
-            messages.error(request, f"处理任务失败: {e}")
+            messages.error(request, f"流程执行错误: {e}")
 
         return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
+
+
+# ==========================================
+# 3. 流程取消 & 任务转交
+# ==========================================
+
+class WorkflowCancelView(WorkflowAccessMixin, View):
+    """取消流程实例"""
+    permission_required = 'app_workflow.change_workflowinstance'
+
+    def post(self, request, pk):
+        instance = get_object_or_404(WorkflowInstance, pk=pk)
+
+        if instance.started_by != request.user and not request.user.is_superuser:
+            return JsonResponse({'status': 'error', 'message': '仅发起人或管理员可取消流程。'}, status=403)
+
+        reason = request.POST.get('reason', '').strip()
+
+        try:
+            WorkflowService.cancel(instance, request.user, reason)
+            messages.success(request, '流程已取消。')
+        except CancelNotAllowedError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+        return JsonResponse({'status': 'success'})

@@ -3,13 +3,15 @@ from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.db.models import Q
-from collections import defaultdict
 
 from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
+from app_formula.mixins import FormulaAccessMixin
 from app_material.models import TestConfig
 from app_raw_material.models import RawMaterial
 
-class FormulaChartCompareView(LoginRequiredMixin, TemplateView):
+class FormulaChartCompareView(FormulaAccessMixin, TemplateView):
+    permission_required = 'app_formula.view_labformula'
+    model = LabFormula
     template_name = 'apps/app_formula/chart_compare.html'
 
     def get_context_data(self, **kwargs):
@@ -39,7 +41,9 @@ class FormulaChartCompareView(LoginRequiredMixin, TemplateView):
         return context
 
 
-class FormulaChartDataAPI(LoginRequiredMixin, TemplateView):
+class FormulaChartDataAPI(FormulaAccessMixin, TemplateView):
+    permission_required = 'app_formula.view_labformula'
+    model = LabFormula
     
     def get(self, request, *args, **kwargs):
         x_axis_type = request.GET.get('x_axis_type')

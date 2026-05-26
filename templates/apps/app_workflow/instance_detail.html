@@ -1,33 +1,143 @@
 {% extends "base.html" %}
 {% load static %}
 {% load i18n %} {# 引入 i18n 用于翻译，如果需要的话 #}
+{% load project_extras %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
 <style>
-    @keyframes workflow-pulse {
+    .bjs-powered-by { display: none; }
+
+    #bpmn-viewer-canvas {
+        width: 100%;
+        height: 350px;
+        background-color: #fcfcfc;
+        border-radius: 6px;
+        border: 1px solid var(--tblr-border-color, #e6e8e9);
+    }
+
+    .bpmn-loading {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: var(--tblr-muted, #656d77);
+        background: rgba(252,252,252,0.92);
+        border-radius: 6px;
+        z-index: 10;
+    }
+
+    .bpmn-error {
+        position: absolute;
+        top: 0; left: 0; right: 0; bottom: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: var(--tblr-danger, #d63939);
+        background: rgba(252,252,252,0.95);
+        border-radius: 6px;
+        z-index: 10;
+    }
+
+    /* ── Status marker styles ── */
+    .djs-shape.status-completed .djs-outline { stroke: #2fb344 !important; stroke-width: 2.5px; }
+    .djs-shape.status-rejected  .djs-outline { stroke: #d63939 !important; stroke-width: 2.5px; }
+    .djs-shape.status-running   .djs-outline { stroke: #0054a6 !important; stroke-width: 2.5px; }
+    .djs-shape.status-canceled  .djs-outline { stroke: #888     !important; stroke-width: 2px;   }
+    .djs-shape.status-pending   .djs-outline { stroke: #b0b3b8 !important; stroke-width: 1.5px; }
+
+    .djs-shape.status-completed .djs-visual > :first-child { fill: rgba(47,179,68,0.08)  !important; }
+    .djs-shape.status-rejected  .djs-visual > :first-child { fill: rgba(214,57,57,0.08)  !important; }
+    .djs-shape.status-running   .djs-visual > :first-child { fill: rgba(0,84,166,0.08)   !important; }
+
+    @keyframes bpmn-pulse {
         0%, 100% { opacity: 1; }
-        50% { opacity: 0.5; }
+        50% { opacity: 0.55; }
     }
-    /* Tabler steps 状态增强 */
-    .steps .step-item.step-completed::before {
-        background: var(--tblr-success, #2fb344);
-        color: #fff;
+    .djs-shape.status-running { animation: bpmn-pulse 2s infinite; }
+
+    /* ── Overlay badge styles ── */
+    .approval-overlay {
+        font-size: 11px;
+        max-width: 280px;
+        pointer-events: auto;
     }
-    .steps .step-item.step-rejected::before {
-        background: var(--tblr-danger, #d63939);
-        color: #fff;
+    .overlay-badge-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
-    .steps .step-item.step-current::before {
-        animation: workflow-pulse 2s infinite;
+    .approval-overlay .badge-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin-top: 2px;
     }
-    .steps .step-item.step-gateway::before {
-        background: #fff;
-        border: 2px solid var(--tblr-border-color, #b0b3b8);
-        color: transparent;
+    .approval-overlay .overlay-badge {
+        display: inline-block;
+        padding: 1px 6px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 500;
+        white-space: nowrap;
     }
-    .steps .step-item.step-pending {
-        opacity: 0.5;
+    .overlay-badge.badge-approved  { background: #d4f1da; color: #1a7a2e; }
+    .overlay-badge.badge-rejected  { background: #fce4e4; color: #b02a2a; }
+    .overlay-badge.badge-pending   { background: #e6f0ff; color: #0054a6; }
+    .overlay-badge.badge-candidate { background: #f0ebff; color: #5a3e9a; }
+    .overlay-badge.badge-assignee  { background: #e6f0ff; color: #0054a6; }
+
+    /* ── Status capsule on right side of node ── */
+    .status-capsule {
+        display: inline-block;
+        padding: 1px 8px;
+        border-radius: 10px;
+        font-size: 10px;
+        font-weight: 500;
+        white-space: nowrap;
     }
+    .status-capsule.capsule-completed { background: #d4f1da; color: #1a7a2e; }
+    .status-capsule.capsule-rejected  { background: #fce4e4; color: #b02a2a; }
+    .status-capsule.capsule-running   { background: #e6f0ff; color: #0054a6; }
+    .status-capsule.capsule-canceled  { background: #f0f0f0; color: #666; }
+    .status-capsule.capsule-pending   { background: #f8f9fa; color: #656d77; }
+
+    .approval-overlay .remark-text {
+        font-size: 10px;
+        color: #656d77;
+        margin-top: 2px;
+        line-height: 1.4;
+        max-height: 28px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* ── Chat bubble comment styles ── */
+    .chat-list { display: flex; flex-direction: column; gap: 12px; }
+    .chat-bubble { display: flex; gap: 10px; }
+    .chat-avatar {
+        flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; font-weight: 600; color: #fff;
+    }
+    .chat-avatar.avatar-start    { background: #409eff; }
+    .chat-avatar.avatar-approve  { background: #2fb344; }
+    .chat-avatar.avatar-reject   { background: #d63939; }
+    .chat-avatar.avatar-cancel   { background: #888; }
+    .chat-body { flex: 1; min-width: 0; }
+    .chat-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+    .chat-header strong { font-size: 13px; }
+    .chat-header .chat-time { font-size: 11px; color: #909399; margin-left: auto; }
+    .chat-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+    .chat-badge.badge-approve { background: #d4f1da; color: #1a7a2e; }
+    .chat-badge.badge-reject  { background: #fce4e4; color: #b02a2a; }
+    .chat-badge.badge-start   { background: #e6f0ff; color: #0054a6; }
+    .chat-badge.badge-cancel  { background: #f0f0f0; color: #666; }
+    .chat-task { font-size: 11px; color: #909399; margin-bottom: 4px; }
+    .chat-msg { font-size: 13px; color: #303133; background: #f5f7fa; border-radius: 0 10px 10px 10px; padding: 10px 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
 </style>
 {% endblock %}
 
@@ -45,9 +155,14 @@
             </div>
             <div class="col-auto ms-auto d-print-none">
                 <div class="btn-list">
-                    <span class="badge {% if instance.status == 'COMPLETED' %}bg-success{% elif instance.status == 'REJECTED' %}bg-danger{% elif instance.status == 'RUNNING' %}bg-primary{% else %}bg-secondary{% endif %} text-white">
+                    <span class="badge {{ instance.status_css_class }} text-white">
                         {{ instance.get_status_display }}
                     </span>
+                    {% if can_cancel %}
+                    <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                        <i class="ti ti-x me-1"></i>取消流程
+                    </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -65,68 +180,214 @@
             {% endfor %}
         {% endif %}
 
-        <div class="row row-cards">
-            <!-- 基本信息 -->
-            <div class="col-md-4">
+        <!-- ★ 关联业务对象 — 顶部突出展示 -->
+        {% if related_object %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="avatar bg-green-lt" style="width:40px;height:40px;font-size:18px;">
+                            <i class="ti ti-link"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="text-muted" style="font-size:13px;">关联对象</span>
+                            <span class="badge bg-azure-lt">{{ related_model_name }}</span>
+                            <span class="text-muted">›</span>
+                            {% if related_object_url %}
+                                <a href="{{ related_object_url }}" class="fw-bold text-reset" style="font-size:15px;">{{ related_display_name }}</a>
+                                <a href="{{ related_object_url }}" class="btn btn-sm btn-icon btn-ghost-secondary" title="打开关联页面">
+                                    <i class="ti ti-external-link"></i>
+                                </a>
+                            {% else %}
+                                <strong style="font-size:15px;">{{ related_display_name }}</strong>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted small mt-1">所属流程：{{ instance.definition.name }}</div>
+                    </div>
+                    {% if related_object_url %}
+                    <div class="col-auto">
+                        <a href="{{ related_object_url }}" class="btn btn-primary btn-sm">
+                            <i class="ti ti-arrow-right me-1"></i>查看详情
+                        </a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 审批操作表单 — 当前用户待处理任务 -->
+        {% if current_task %}
+        <div class="card mb-3">
+            <div class="card-header bg-yellow-lt">
+                <h3 class="card-title">
+                    <i class="ti ti-checks me-2"></i>待处理任务：{{ current_task.task_name }}
+                </h3>
+            </div>
+            <div class="card-body">
+                <form method="post" action="{% url 'workflow_instance_detail' pk=instance.pk %}">
+                    {% csrf_token %}
+                    <div class="row align-items-end">
+                        <div class="col">
+                            <label class="form-label">审批意见</label>
+                            <textarea name="remark" class="form-control" rows="2" placeholder="请输入审批意见..."></textarea>
+                        </div>
+                        <div class="col-auto">
+                            <div class="btn-list">
+                                <button type="submit" name="action" value="APPROVE" class="btn btn-success">
+                                    <i class="ti ti-check me-2"></i>通过
+                                </button>
+                                <button type="submit" name="action" value="REJECT" class="btn btn-danger">
+                                    <i class="ti ti-x me-2"></i>驳回
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- 主体：流程进度 + 审批意见 双栏 -->
+        <div class="row">
+            <div class="col-md-7">
                 <div class="card">
-                    <div class="card-header bg-azure-lt">
+                    <div class="card-header bg-blue-lt">
+                        <h3 class="card-title">
+                            <i class="ti ti-timeline me-2"></i>流程进度
+                        </h3>
+                        <div class="card-actions">
+                            <span class="badge {{ instance.status_css_class }} text-white">
+                                {{ instance.get_status_display }}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-0" style="position:relative;">
+                        <div id="bpmn-viewer-canvas"></div>
+                        <div id="bpmn-loading" class="bpmn-loading">
+                            <div class="text-center">
+                                <div class="spinner-border text-primary mb-2" role="status"></div>
+                                <div class="small">正在加载流程图...</div>
+                            </div>
+                        </div>
+                        <div id="bpmn-error" class="bpmn-error">
+                            <div class="text-center">
+                                <i class="ti ti-alert-triangle mb-2" style="font-size:24px;"></i>
+                                <div class="small">流程图加载失败，请检查流程定义。</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-5">
+                {% if history %}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-messages me-2"></i>审批意见
+                        </h3>
+                        <span class="text-muted small">{{ history|length }} 条记录</span>
+                    </div>
+                    <div class="card-body" style="max-height: calc(350px + 3rem); overflow-y: auto;">
+                        <div class="chat-list">
+                            {% for item in history %}
+                            <div class="chat-bubble">
+                                <span class="chat-avatar
+                                    {% if item.action == 'START' %}avatar-start
+                                    {% elif item.action == 'APPROVE' %}avatar-approve
+                                    {% elif item.action == 'REJECT' %}avatar-reject
+                                    {% elif item.action == 'CANCEL' %}avatar-cancel
+                                    {% else %}avatar-start{% endif %}
+                                ">{{ item.approver.username|first|upper }}</span>
+                                <div class="chat-body">
+                                    <div class="chat-header">
+                                        <strong>{{ item.approver.username }}</strong>
+                                        {% if item.action == 'APPROVE' %}
+                                            <span class="chat-badge badge-approve">通过</span>
+                                        {% elif item.action == 'REJECT' %}
+                                            <span class="chat-badge badge-reject">驳回</span>
+                                        {% elif item.action == 'START' %}
+                                            <span class="chat-badge badge-start">发起</span>
+                                        {% elif item.action == 'CANCEL' %}
+                                            <span class="chat-badge badge-cancel">取消</span>
+                                        {% endif %}
+                                        <span class="chat-time">{{ item.timestamp|date:"m-d H:i" }}</span>
+                                    </div>
+                                    {% if item.task %}
+                                    <div class="chat-task">{{ item.task.task_name }}</div>
+                                    {% endif %}
+                                    {% if item.remark %}
+                                    <div class="chat-msg">{{ item.remark }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="ti ti-messages me-2"></i>审批意见
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="text-center text-muted py-5">
+                            <i class="ti ti-inbox mb-2" style="font-size:32px;display:block;"></i>
+                            暂无审批记录
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 底部：基本信息 + 流程上下文数据 -->
+        <div class="row mt-3">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
                         <h3 class="card-title">
                             <i class="ti ti-info-circle me-2"></i>基本信息
                         </h3>
                     </div>
                     <div class="card-body">
-                        <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">发起人</div>
-                                <div class="datagrid-content">{{ instance.started_by.username }}</div>
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="text-muted small">发起人</div>
+                                <div>{{ instance.started_by.username }}</div>
                             </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">发起时间</div>
-                                <div class="datagrid-content">{{ instance.started_at|date:"Y-m-d H:i" }}</div>
+                            <div class="col-6">
+                                <div class="text-muted small">发起时间</div>
+                                <div>{{ instance.started_at|date:"Y-m-d H:i" }}</div>
                             </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">结束时间</div>
-                                <div class="datagrid-content">{{ instance.completed_at|date:"Y-m-d H:i"|default:"--" }}</div>
+                            <div class="col-6">
+                                <div class="text-muted small">结束时间</div>
+                                <div>{{ instance.completed_at|date:"Y-m-d H:i"|default:"--" }}</div>
                             </div>
+                            {% if instance.status == 'CANCELED' %}
+                            <div class="col-6">
+                                <div class="text-muted small">取消人</div>
+                                <div>{{ instance.canceled_by.username|default:"--" }}</div>
+                            </div>
+                            <div class="col-12">
+                                <div class="text-muted small">取消原因</div>
+                                <div>{{ instance.cancel_reason|default:"--" }}</div>
+                            </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 关联业务对象详情 -->
-                {% if related_object %}
-                <div class="card mt-3">
-                    <div class="card-header bg-green-lt">
-                        <h3 class="card-title">
-                            <i class="ti ti-folder-open me-2"></i>关联业务对象
-                        </h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">关联模块</div>
-                                <div class="datagrid-content">
-                                    <span class="badge bg-azure-lt">{{ related_model_name|default:"—" }}</span>
-                                </div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">关联实体</div>
-                                <div class="datagrid-content">
-                                    {% if related_object_url %}
-                                        <a href="{{ related_object_url }}" class="text-reset"><strong>{{ related_display_name|default:"—" }}</strong></a>
-                                    {% else %}
-                                        <strong>{{ related_display_name|default:"—" }}</strong>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- 流程上下文数据 -->
-                {% if instance.context_data %}
-                <div class="card mt-3">
-                    <div class="card-header bg-purple-lt" data-bs-toggle="collapse" data-bs-target="#collapse-context" role="button" style="cursor: pointer;">
+            <div class="col-md-6">
+                <div class="card">
+                    {% if instance.context_data %}
+                    <div class="card-header" data-bs-toggle="collapse" data-bs-target="#collapse-context" role="button" style="cursor: pointer;">
                         <h3 class="card-title">
                             <i class="ti ti-database me-2"></i>流程上下文数据
                         </h3>
@@ -147,174 +408,179 @@
                             </div>
                         </div>
                     </div>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- 审批流程进度 & 操作 -->
-            <div class="col-md-8">
-                <!-- 审批操作表单 -->
-                {% if current_task %}
-                <div class="card mb-3">
-                    <div class="card-header bg-yellow-lt">
+                    {% else %}
+                    <div class="card-header">
                         <h3 class="card-title">
-                            <i class="ti ti-checks me-2"></i>待处理任务: {{ current_task.task_name }}
+                            <i class="ti ti-database me-2"></i>流程上下文数据
                         </h3>
                     </div>
                     <div class="card-body">
-                        <form method="post" action="{% url 'workflow_instance_detail' pk=instance.pk %}">
-                            {% csrf_token %}
-                            <div class="mb-3">
-                                <label class="form-label">审批意见</label>
-                                <textarea name="remark" class="form-control" rows="4" placeholder="请输入审批意见..."></textarea>
-                            </div>
-                            <div class="btn-list">
-                                <button type="submit" name="action" value="APPROVE" class="btn btn-success">
-                                    <i class="ti ti-check me-2"></i>通过
-                                </button>
-                                <button type="submit" name="action" value="REJECT" class="btn btn-danger">
-                                    <i class="ti ti-x me-2"></i>驳回
-                                </button>
-                            </div>
-                        </form>
+                        <div class="text-center text-muted py-4 small">无上下文数据</div>
                     </div>
-                </div>
-                {% endif %}
-
-                <!-- 流程进度时间轴 -->
-                <div class="card">
-                    <div class="card-header bg-blue-lt">
-                        <h3 class="card-title">
-                            <i class="ti ti-timeline me-2"></i>流程进度
-                        </h3>
-                        <div class="card-actions">
-                            <span class="badge {% if instance.status == 'COMPLETED' %}bg-success{% elif instance.status == 'REJECTED' %}bg-danger{% elif instance.status == 'RUNNING' %}bg-primary{% endif %} text-white">
-                                {{ instance.get_status_display }}
-                            </span>
-                        </div>
-                    </div>
-                    <div class="card-body">
-                        <ul class="steps steps-vertical">
-                            <!-- 发起步骤 -->
-                            <li class="step-item step-completed">
-                                <div class="h4 m-0">流程发起</div>
-                                <div class="text-muted">{{ instance.started_by.username }} &middot; {{ instance.started_at|date:"Y-m-d H:i" }}</div>
-                            </li>
-
-                            {% for item in process_timeline %}
-
-                            {% if item.is_gateway %}
-                            <li class="step-item step-gateway">
-                                <div class="text-muted small fw-bold text-uppercase">{{ item.name }}</div>
-                            </li>
-
-                            {% elif item.status == 'completed' %}
-                            <li class="step-item step-completed">
-                                <div class="fw-bold">{{ item.name }}</div>
-                                {% if item.approver %}
-                                <div class="text-muted small">
-                                    <span class="badge bg-green-lt">{{ item.approver.username }}</span>
-                                </div>
-                                {% endif %}
-                                {% if item.completed_at %}
-                                <div class="text-muted xsmall">{{ item.completed_at|date:"Y-m-d H:i" }}</div>
-                                {% endif %}
-                                {% if item.remark %}
-                                <div class="mt-2">
-                                    <div class="card card-sm border-0 bg-muted-lt">
-                                        <div class="card-body p-2">
-                                            <div class="d-flex align-items-start">
-                                                <div class="me-2 text-secondary">
-                                                    <i class="ti ti-note"></i>
-                                                </div>
-                                                <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ item.remark }}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endif %}
-                            </li>
-
-                            {% elif item.status == 'rejected' %}
-                            <li class="step-item step-rejected">
-                                <div class="fw-bold">{{ item.name }}</div>
-                                {% if item.approver %}
-                                <div class="text-muted small"><span class="badge bg-red-lt">{{ item.approver.username }}</span> 驳回</div>
-                                {% endif %}
-                                {% if item.remark %}
-                                <div class="mt-2">
-                                    <div class="card card-sm border-0 bg-muted-lt">
-                                        <div class="card-body p-2">
-                                            <div class="d-flex align-items-start">
-                                                <div class="me-2 text-secondary">
-                                                    <i class="ti ti-note"></i>
-                                                </div>
-                                                <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ item.remark }}</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                {% endif %}
-                            </li>
-
-                            {% elif item.status == 'pending' and item.task %}
-                            <li class="step-item step-current active">
-                                <div class="fw-bold text-primary">{{ item.name }}</div>
-                                {% if item.assigned_to %}
-                                <div class="text-muted small">负责人: <span class="badge bg-blue-lt">{{ item.assigned_to.username }}</span></div>
-                                {% else %}
-                                <div class="text-muted small fw-bold mb-1">待签收</div>
-                                {% if item.candidate_usernames %}
-                                <div class="mb-1">
-                                    <span class="text-muted xsmall me-1">候选人:</span>
-                                    {% for username in item.candidate_usernames %}
-                                    <span class="badge bg-azure-lt">{{ username }}</span>
-                                    {% endfor %}
-                                </div>
-                                {% endif %}
-                                {% for group_name, members in item.candidate_group_members.items %}
-                                <div class="mb-1">
-                                    <span class="text-muted xsmall me-1">{{ group_name }}:</span>
-                                    {% for member in members %}
-                                    <span class="badge bg-purple-lt">{{ member }}</span>
-                                    {% endfor %}
-                                    {% if not members %}
-                                    <span class="badge bg-secondary-lt">无成员</span>
-                                    {% endif %}
-                                </div>
-                                {% endfor %}
-                                {% endif %}
-                            </li>
-
-                            {% else %}
-                            <li class="step-item step-pending">
-                                <div class="text-muted">{{ item.name }}</div>
-                                <div class="text-muted xsmall">{{ item.assignee_label }}</div>
-                            </li>
-                            {% endif %}
-
-                            {% endfor %}
-
-                            {% if instance.status == 'COMPLETED' %}
-                            <li class="step-item step-completed">
-                                <div class="h4 m-0">流程完成</div>
-                                <div class="text-muted small">{{ instance.completed_at|date:"Y-m-d H:i" }}</div>
-                            </li>
-                            {% elif instance.status == 'REJECTED' %}
-                            <li class="step-item step-rejected">
-                                <div class="h4 m-0">流程已驳回</div>
-                                <div class="text-muted small">{{ instance.completed_at|date:"Y-m-d H:i" }}</div>
-                            </li>
-                            {% endif %}
-                        </ul>
-                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+<script id="bpmn-xml-data" type="text/plain">{{ bpmn_xml|safe }}</script>
+{{ status_map|json_script:"status-map-data" }}
+<!-- 取消流程确认弹窗 -->
+{% if can_cancel %}
+<div class="modal modal-blur fade" id="cancelModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">确认取消流程？</div>
+                <p class="text-muted mb-3">取消后所有待处理任务将被终止，此操作不可撤销。</p>
+                <div class="mb-3">
+                    <label class="form-label">取消原因</label>
+                    <textarea id="cancelReason" class="form-control" rows="2" placeholder="请输入取消原因（选填）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">返回</button>
+                <button type="button" class="btn btn-danger" id="confirmCancel" data-pk="{{ instance.pk }}">
+                    <i class="ti ti-x me-1"></i>确认取消
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
-<!-- 这里可以添加任何页面特有的JS，目前不需要 -->
+<script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-navigated-viewer.development.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+
+    // ── bpmn-js viewer initialization ──
+    var xmlEl = document.getElementById('bpmn-xml-data');
+    var statusEl = document.getElementById('status-map-data');
+    var loadingEl = document.getElementById('bpmn-loading');
+    var errorEl = document.getElementById('bpmn-error');
+    var canvasEl = document.getElementById('bpmn-viewer-canvas');
+
+    if (xmlEl && canvasEl) {
+        var bpmnXml = xmlEl.textContent.trim();
+        var statusMap = {};
+        try { statusMap = JSON.parse(statusEl.textContent); } catch(e) {}
+
+        if (!bpmnXml || bpmnXml.length < 50) {
+            loadingEl.style.display = 'none';
+            errorEl.style.display = 'flex';
+        } else {
+            var viewer = new BpmnJS({ container: '#bpmn-viewer-canvas' });
+
+            viewer.importXML(bpmnXml).then(function(result) {
+                var canvas = viewer.get('canvas');
+                var overlays = viewer.get('overlays');
+                var elementRegistry = viewer.get('elementRegistry');
+
+                loadingEl.style.display = 'none';
+
+                Object.keys(statusMap).forEach(function(bpmnId) {
+                    var info = statusMap[bpmnId];
+                    var element = elementRegistry.get(bpmnId);
+                    if (!element) return;
+
+                    var displayStatus = info.display_status || 'pending';
+                    var statusLabel = info.status_label || '';
+                    var candidateUsernames = info.candidate_usernames || [];
+                    var candidateGroupMembers = info.candidate_group_members || {};
+
+                    canvas.addMarker(bpmnId, 'status-' + displayStatus);
+
+                    // Gateways: marker only, no overlay
+                    if (info.is_gateway) return;
+
+                    var overlayHtml = '<div class="approval-overlay">';
+                    var approverName = info.approver_name || '';
+                    var remark = info.remark || '';
+                    var assigneeLabel = info.assignee_label || '';
+
+                    // Name badge + status capsule row
+                    overlayHtml += '<div class="overlay-badge-row">';
+                    if (approverName) {
+                        if (displayStatus === 'rejected') {
+                            overlayHtml += '<span class="overlay-badge badge-rejected">' + approverName + ' 驳回</span>';
+                        } else {
+                            overlayHtml += '<span class="overlay-badge badge-approved">' + approverName + '</span>';
+                        }
+                    } else if (info.assigned_to_name) {
+                        overlayHtml += '<span class="overlay-badge badge-assignee">' + info.assigned_to_name + '</span>';
+                    } else if (candidateUsernames.length > 0 || Object.keys(candidateGroupMembers).length > 0) {
+                        overlayHtml += '<span class="overlay-badge badge-candidate">待签收</span>';
+                    } else if (assigneeLabel) {
+                        overlayHtml += '<span class="overlay-badge badge-pending">' + assigneeLabel + '</span>';
+                    }
+                    if (statusLabel) {
+                        overlayHtml += '<span class="status-capsule capsule-' + displayStatus + '">' + statusLabel + '</span>';
+                    }
+                    overlayHtml += '</div>';
+
+                    // Candidate users
+                    if (candidateUsernames.length > 0) {
+                        overlayHtml += '<div class="badge-row">';
+                        candidateUsernames.forEach(function(u) {
+                            overlayHtml += '<span class="overlay-badge badge-assignee">' + u + '</span>';
+                        });
+                        overlayHtml += '</div>';
+                    }
+
+                    // Remark
+                    if (remark) {
+                        overlayHtml += '<div class="remark-text">' + remark + '</div>';
+                    }
+
+                    overlayHtml += '</div>';
+
+                    try {
+                        overlays.add(bpmnId, {
+                            position: { bottom: -5, left: 0 },
+                            html: overlayHtml
+                        });
+                    } catch(e) {}
+                });
+
+                try { canvas.zoom('fit-viewport'); } catch(e) {}
+
+            }).catch(function(err) {
+                console.error('BPMN import failed:', err);
+                loadingEl.style.display = 'none';
+                errorEl.style.display = 'flex';
+            });
+        }
+    }
+
+    // ── Cancel modal handler ──
+    var cancelBtn = document.getElementById('confirmCancel');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', async function() {
+            var pk = this.getAttribute('data-pk');
+            var reason = document.getElementById('cancelReason').value;
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            try {
+                var formData = new FormData();
+                formData.append('reason', reason);
+                var resp = await fetch('/workflow/instance/' + pk + '/cancel/', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: formData,
+                });
+                var result = await resp.json();
+                if (result.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert('取消失败：' + result.message);
+                }
+            } catch (err) {
+                alert('取消请求发生错误。');
+            }
+        });
+    }
+});
+</script>
 {% endblock %}

@@ -1,13 +1,11 @@
 from django.views.generic import TemplateView, View
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import get_object_or_404, redirect
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
-from app_material.models import TestConfig, MaterialLibrary
+from app_material.models import MaterialLibrary
 from app_formula.models import LabFormula
+from app_formula.mixins import FormulaAccessMixin
 from app_raw_material.models import RawMaterial
-from collections import defaultdict
-from decimal import Decimal
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
@@ -16,13 +14,14 @@ import json
 # ==========================================
 # 1. 对比购物车 API
 # ==========================================
-class FormulaCompareCartView(LoginRequiredMixin, View):
+class FormulaCompareCartView(FormulaAccessMixin, View):
     """
     处理对比列表的增删改查 (基于 Session)
     Session Key: 'cart_formulas_v2' -> [id1, id2, ...] (V2版本，彻底隔离)
     Session Key: 'cart_materials_v2' -> [id1, id2, ...]
     Session Key: 'cart_raw_materials_v2' -> [id1, id2, ...] (新增：原材料)
     """
+    permission_required = 'app_formula.view_labformula'
     
     def get(self, request):
         """获取当前对比列表"""
@@ -145,7 +144,9 @@ class FormulaCompareCartView(LoginRequiredMixin, View):
 # ==========================================
 # 2. 对比页面视图
 # ==========================================
-class FormulaCompareView(LoginRequiredMixin, TemplateView):
+class FormulaCompareView(FormulaAccessMixin, TemplateView):
+    permission_required = 'app_formula.view_labformula'
+    model = LabFormula
     template_name = 'apps/app_formula/compare.html'
 
     def post(self, request, *args, **kwargs):
@@ -184,10 +185,17 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
                 material_ids = self.request.session.get('cart_materials_v2', [])
                 raw_material_ids = self.request.session.get('cart_raw_materials_v2', [])
 
-        # 2. 获取对象
-        formulas = list(LabFormula.objects.filter(pk__in=formula_ids).order_by('created_at'))
-        materials = list(MaterialLibrary.objects.filter(pk__in=material_ids).order_by('created_at'))
-        raw_materials = list(RawMaterial.objects.filter(pk__in=raw_material_ids).order_by('created_at'))
+        # 2. 获取对象 (prefetch_related 避免 N+1)
+        formulas = list(LabFormula.objects.filter(pk__in=formula_ids)
+            .prefetch_related('bom_lines__raw_material__category',
+                              'test_results__test_config__category')
+            .order_by('created_at'))
+        materials = list(MaterialLibrary.objects.filter(pk__in=material_ids)
+            .prefetch_related('properties__test_config__category')
+            .order_by('created_at'))
+        raw_materials = list(RawMaterial.objects.filter(pk__in=raw_material_ids)
+            .prefetch_related('properties__test_config__category')
+            .order_by('created_at'))
         
         # 兼容旧的单基准材料逻辑
         base_material = None
@@ -216,10 +224,14 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
         # ==========================================
         bom_matrix = []
         all_raw_materials = set()
+        bom_lookup = {}  # {formula_id: {raw_material_id: line}} 避免 .filter() N+1
         for f in formulas:
+            f_bom = {}
             for line in f.bom_lines.all():
                 all_raw_materials.add(line.raw_material)
-        
+                f_bom[line.raw_material_id] = line
+            bom_lookup[f.id] = f_bom
+
         sorted_raw_materials = sorted(list(all_raw_materials), key=lambda x: (x.category.order, x.name))
 
         for rm in sorted_raw_materials:
@@ -231,7 +243,7 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
             for col in columns:
                 if col['type'] == 'formula':
                     f = col['obj']
-                    line = f.bom_lines.filter(raw_material=rm).first()
+                    line = bom_lookup.get(f.id, {}).get(rm.id)
                     if line:
                         row['values'].append({'val': line.percentage, 'is_highlight': True})
                     else:
@@ -241,49 +253,35 @@ class FormulaCompareView(LoginRequiredMixin, TemplateView):
                     row['values'].append({'val': '-', 'is_highlight': False})
             bom_matrix.append(row)
 
-        # ==========================================
-        # 5. 构建 性能对比矩阵 (混合)
-        # ==========================================
+        # 5. 构建 性能对比矩阵 (单次迭代，利用 prefetch)
         test_matrix = []
         all_test_configs = set()
-        
-        # 收集所有涉及的测试配置
+
+        mat_props = {}
         for m in materials:
+            props = {}
             for p in m.properties.all():
                 all_test_configs.add(p.test_config)
-        
+                props[p.test_config_id] = p.value_text if p.test_config.data_type != 'NUMBER' else p.value
+            mat_props[m.id] = props
+
+        raw_mat_props = {}
         for rm in raw_materials:
+            props = {}
             for p in rm.properties.all():
                 all_test_configs.add(p.test_config)
-            
+                props[p.test_config_id] = p.value_text if p.test_config.data_type != 'NUMBER' else p.value
+            raw_mat_props[rm.id] = props
+
+        formula_props = {}
         for f in formulas:
-            for res in f.test_results.all():
-                all_test_configs.add(res.test_config)
-                
+            props = {}
+            for r in f.test_results.all():
+                all_test_configs.add(r.test_config)
+                props[r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
+            formula_props[f.id] = props
+
         sorted_configs = sorted(list(all_test_configs), key=lambda x: (x.category.order, x.order))
-        
-        # 预加载数据
-        mat_props = {} # {mat_id: {config_id: val}}
-        for m in materials:
-            # 兼容非数值类型
-            mat_props[m.id] = {
-                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value 
-                for p in m.properties.all()
-            }
-            
-        raw_mat_props = {} # {raw_mat_id: {config_id: val}}
-        for rm in raw_materials:
-            raw_mat_props[rm.id] = {
-                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value 
-                for p in rm.properties.all()
-            }
-            
-        formula_props = {} # {formula_id: {config_id: val}}
-        for f in formulas:
-            formula_props[f.id] = {
-                r.test_config_id: r.value_text if r.test_config.data_type != 'NUMBER' else r.value 
-                for r in f.test_results.all()
-            }
 
         # 确定基准值 (取第一列的值作为基准)
         first_col = columns[0] if columns else None

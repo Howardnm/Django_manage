@@ -7,7 +7,7 @@ from django.contrib import messages
 from app_project.forms import ProjectNodeUpdateForm
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import ProjectNode
-from app_workflow.utils import WorkflowEngine
+from app_workflow.services import WorkflowService
 
 
 # ==========================================
@@ -20,8 +20,11 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
 
     def get_node_and_check_perm(self, pk):
         """辅助方法：获取节点并检查项目级权限"""
-        node = get_object_or_404(ProjectNode, pk=pk)
-        # 统一检查“能否动这个项目” (负责人/同部门/协同成员)
+        node = get_object_or_404(
+            ProjectNode.objects.select_related('project__manager'),
+            pk=pk
+        )
+        # 统一检查"能否动这个项目" (负责人/同部门/协同成员)
         self.check_object_permission(node.project)
         return node
 
@@ -71,7 +74,7 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
                         }
                     }
 
-                    instance = WorkflowEngine.start_instance(
+                    instance = WorkflowService.start(
                         definition=node.project.approval_workflow,
                         started_by=request.user,
                         related_object=node,

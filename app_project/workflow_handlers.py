@@ -10,7 +10,7 @@ def handle_project_node_workflow_callback(instance: WorkflowInstance, target_sta
     这个函数由 app_workflow 模块调用，用于在流程完成或驳回时更新 ProjectNode 的状态。
 
     :param instance: 流程实例对象
-    :param target_status: 流程的最终状态 ('DONE' 或 'ROLLBACK')
+    :param target_status: 流程的最终状态 ('DONE', 'ROLLBACK' 或 'CANCELED')
     :param kwargs: 额外的回调参数，例如可以从 callback_config 中传递
     """
     node_pk = kwargs.get('node_pk')
@@ -33,8 +33,11 @@ def handle_project_node_workflow_callback(instance: WorkflowInstance, target_sta
             obj.status = 'DONE'
             logger.info(f"ProjectNode {obj.pk} status updated to DONE by workflow {instance.pk}")
         elif target_status == 'ROLLBACK':
-            obj.status = 'DOING' # 驳回时，将节点状态改回“进行中”
+            obj.status = 'DOING'  # 驳回时，将节点状态改回"进行中"
             logger.info(f"ProjectNode {obj.pk} status updated to DOING (ROLLBACK) by workflow {instance.pk}")
+        elif target_status == 'CANCELED':
+            obj.status = 'DOING'  # 取消时，将节点状态改回"进行中"
+            logger.info(f"ProjectNode {obj.pk} status updated to DOING (CANCELED) by workflow {instance.pk}")
         
         obj.save()
         logger.debug(f"ProjectNode {obj.pk} saved with new status {obj.status}")

@@ -50,6 +50,9 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     # 维度4：允许访问的角色组 (使用 IdentityConfig 中的分组)
     identity_required = []
 
+    # 维度5：工作组数据隔离开关（默认关闭，各模块按需开启）
+    enforce_group_isolation = False
+
     def has_permission(self):
         """核心判定引擎"""
         user = self.request.user
@@ -111,8 +114,37 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
             user_field = self._detect_user_link_field(qs.model)
             if user_field:
                 if user.department:
-                    return qs.filter(**{f"{user_field}__department": user.department})
-                return qs.filter(**{user_field: user})
+                    qs = qs.filter(**{f"{user_field}__department": user.department})
+                else:
+                    qs = qs.filter(**{user_field: user})
+
+        # 3. L5: 工作组级数据隔离
+        if self.enforce_group_isolation and user.department:
+            user_field = (self._detect_user_link_field(qs.model)
+                          if hasattr(qs, 'model') and qs.model else None)
+            if user_field:
+                from django.db.models import Q, Exists, OuterRef
+                from .models import WorkGroup
+                user_wg_ids = list(
+                    user.work_groups.filter(is_active=True).values_list('id', flat=True)
+                )
+                if user_wg_ids:
+                    qs = qs.filter(
+                        Q(**{user_field: user}) |
+                        Q(**{
+                            f"{user_field}__work_groups__id__in": user_wg_ids,
+                            f"{user_field}__work_groups__is_active": True,
+                        })
+                    ).distinct()
+                else:
+                    owner_has_wg = WorkGroup.members.through.objects.filter(
+                        **{f"{user_field}_id": OuterRef(user_field)}
+                    )
+                    qs = qs.filter(
+                        Q(**{user_field: user}) |
+                        ~Q(Exists(owner_has_wg))
+                    ).distinct()
+
         return qs
 
     def _detect_user_link_field(self, model):
@@ -123,21 +155,47 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         return None
 
     def check_object_permission(self, obj):
-        """对象级细分控制"""
+        """对象级细分控制：所有者 → L4部门 → L5工作组"""
         user = self.request.user
-        if user.is_superuser: return True
+        if user.is_superuser:
+            return True
 
+        # 1. 探测数据所有者
         owner = None
         for attr in self.user_link_fields:
             if hasattr(obj, attr):
                 owner = getattr(obj, attr)
-                if owner: break
+                if owner:
+                    break
+        if not owner:
+            return True
 
-        if not owner: return True 
+        # 2. 所有者本人 → 放行
+        if owner == user:
+            return True
 
-        is_owner = (owner == user)
-        is_same_dept = user.department and getattr(owner, 'department', None) == user.department
+        # 3. L4: 部门级检查
+        if self.enforce_dept_isolation:
+            is_same_dept = (
+                user.department
+                and getattr(owner, 'department', None) == user.department
+            )
+            if not is_same_dept:
+                raise PermissionDenied("您的账号无权操作其他部门的数据资产")
 
-        if not (is_owner or is_same_dept):
-            raise PermissionDenied("您的账号无权操作其他部门的数据资产")
+        # 4. L5: 工作组级检查
+        if self.enforce_group_isolation:
+            user_wg_ids = set(
+                user.work_groups.filter(is_active=True).values_list('id', flat=True)
+            )
+            owner_wg_ids = set(
+                owner.work_groups.filter(is_active=True).values_list('id', flat=True)
+            )
+            if user_wg_ids:
+                if not user_wg_ids.intersection(owner_wg_ids):
+                    raise PermissionDenied("您的工作组无权操作该数据资产")
+            else:
+                if owner_wg_ids:
+                    raise PermissionDenied("您的工作组无权操作该数据资产")
+
         return True

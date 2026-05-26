@@ -68,5 +68,5 @@ class Command(BaseCommand):
             self.stdout.write(self.style.ERROR(f'❌ 失败: {error_count}'))
         
         self.stdout.write(self.style.WARNING(
-            '\n注意：本脚本仅同步“公司档案”。\n具体对接人账号请在“用户管理”模块创建，并关联至上述公司。'
+            '\n注意：本脚本仅同步"公司档案"。\n具体对接人账号请在"用户管理"模块创建，并关联至上述公司。'
         ))

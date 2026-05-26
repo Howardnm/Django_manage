@@ -12,6 +12,7 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
     - 角色限制：仅 ENGINEER / ADMIN
     - 数据范围：部门隔离（按 creator 字段过滤）
     """
+    permission_required = 'app_formula.view_labformula'
     model = LabFormula
 
     def get(self, request):
@@ -31,7 +32,7 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
             for item in qs[offset:offset + page_size]:
                 results.append({
                     'value': item.pk,
-                    'text': f"[{item.code}] {item.name} ({item.project.name} | {item.project_node})",
+                    'text': f"{item.name} (实验单号: {item.code} | 版本号: v{item.version})",
                     'url': reverse('formula_detail', kwargs={'pk': item.pk}),
                 })
             return JsonResponse({
@@ -45,6 +46,6 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
 
         data = [{
             'value': item.pk,
-            'text': f"[{item.code}] {item.name} ({item.project.name} | {item.project_node})",
+            'text': f"{item.name} (实验单号: {item.code} | 版本号: v{item.version})",
         } for item in qs[:20]]
         return JsonResponse(data, safe=False)

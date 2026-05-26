@@ -1,11 +1,13 @@
 from django.contrib import messages
+from django.http import JsonResponse
 from django.urls import reverse
+from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
 from django.shortcuts import redirect
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 
-from app_raw_material.models import RawMaterial, RawMaterialProperty
+from app_raw_material.models import RawMaterial, RawMaterialProperty, Supplier
 from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 from app_raw_material.mixins import RawMaterialAccessMixin
@@ -228,3 +230,20 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
 
     def get_success_url(self):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
+
+
+class RawMaterialAutocompleteView(RawMaterialAccessMixin, View):
+    """Tom Select 远程搜索接口：供应商名称"""
+    permission_required = 'app_raw_material.view_rawmaterial'
+
+    def get(self, request):
+        model_name = request.GET.get('model')
+        query = request.GET.get('q', '')
+        results = []
+        if model_name == 'supplier':
+            queryset = Supplier.objects.filter(
+                Q(name__icontains=query)
+            ).order_by('name')[:20]
+            for item in queryset:
+                results.append({'value': item.pk, 'text': str(item)})
+        return JsonResponse(results, safe=False)

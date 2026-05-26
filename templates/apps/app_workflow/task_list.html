@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load project_extras %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -91,6 +92,29 @@
 </div>
 
 <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+
+<!-- 转交任务弹窗 -->
+<div class="modal modal-blur fade" id="reassignModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">转交任务</div>
+                <p class="text-muted mb-3">将任务转交给其他用户处理</p>
+                <div class="mb-3">
+                    <label class="form-label">目标用户ID</label>
+                    <input type="text" id="reassignUserId" class="form-control" placeholder="请输入用户ID">
+                    <small class="text-muted">转交后该用户将获得此任务的处理权限</small>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="confirmReassign">
+                    <i class="ti ti-arrow-right me-1"></i>确认转交
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
@@ -109,9 +133,9 @@
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': csrfToken,
-                        'Content-Type': 'application/json' // 明确指定 Content-Type
+                        'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({}) // POST 请求通常需要 body，即使为空
+                    body: JSON.stringify({})
                 });
                 const result = await response.json();
                 if (result.status === 'success') {
@@ -126,5 +150,41 @@
             }
         });
     });
+
+    let currentReassignPk = null;
+    document.querySelectorAll('.reassign-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentReassignPk = this.getAttribute('data-pk');
+        });
+    });
+
+    var confirmReassignBtn = document.getElementById('confirmReassign');
+    if (confirmReassignBtn) {
+        confirmReassignBtn.addEventListener('click', async function() {
+            if (!currentReassignPk) return;
+            var toUserId = document.getElementById('reassignUserId').value.trim();
+            if (!toUserId) { alert('请输入目标用户ID'); return; }
+
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            var formData = new FormData();
+            formData.append('to_user_id', toUserId);
+
+            try {
+                var resp = await fetch('/workflow/task/' + currentReassignPk + '/reassign/', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: formData,
+                });
+                var result = await resp.json();
+                if (result.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert('转交失败：' + result.message);
+                }
+            } catch (err) {
+                alert('转交请求发生错误。');
+            }
+        });
+    }
 </script>
 {% endblock %}

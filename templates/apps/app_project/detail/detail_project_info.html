@@ -1,3 +1,4 @@
+{% load project_extras %}
 <div class="card mb-3 shadow-sm border-0 overflow-hidden">
     <!-- 1. 顶部：负责人信息 + 项目质量分展示 -->
     <div class="card-header bg-primary-lt border-0 d-flex align-items-center py-3">
@@ -94,7 +95,7 @@
         <div class="col-6 border-end d-flex flex-column">
             <div class="card-header d-flex justify-content-between align-items-center bg-light-lt py-2 border-0">
                 <h4 class="card-title text-muted" style="font-size: 0.8rem;">
-                    <i class="ti ti-users me-1"></i>协同成员 ({{ project.members.count }})
+                    <i class="ti ti-users me-1"></i>协同成员 ({{ project.members.all|length }})
                 </h4>
                 <button class="btn btn-ghost-primary btn-sm px-2 py-1"
                         data-bs-toggle="modal"
@@ -158,7 +159,7 @@
         <div class="col-6 d-flex flex-column">
             <div class="card-header d-flex justify-content-between align-items-center bg-light-lt py-2 border-0">
                 <h4 class="card-title text-muted" style="font-size: 0.8rem;">
-                    <i class="ti ti-briefcase me-1"></i>销售成员 ({{ project.sales_members.count }})
+                    <i class="ti ti-briefcase me-1"></i>销售成员 ({{ project.sales_members.all|length }})
                 </h4>
                 <button class="btn btn-ghost-success btn-sm px-2 py-1"
                         data-bs-toggle="modal"

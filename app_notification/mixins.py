@@ -6,7 +6,7 @@ class NotificationAccessMixin(UnifiedAccessMixin):
     
     特点：
     1. 负责人识别：明确为 recipient (接收者)。
-    2. 严格私有：关闭部门隔离，启用“本人隔离”。
+    2. 严格私有：关闭部门隔离，启用"本人隔离"。
     3. 准入：内部全员。
     """
     # 锁定负责人字段为接收者

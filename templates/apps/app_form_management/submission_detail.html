@@ -6,10 +6,14 @@
     <title>{{ submission.template.name }} - 提交详情</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    {% if workflow_data %}
+    <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
+    <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
+    {% endif %}
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #303133; overflow-x: auto; }
-        .page { width: 1300px; margin: 0 auto; padding: 24px; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; color: #303133; }
+        .page { max-width: 1400px; margin: 0 auto; padding: 24px; }
         .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 20px; }
         .header h2 { font-size: 20px; font-weight: 600; }
         .meta { font-size: 13px; color: #909399; margin-top: 4px; }
@@ -17,7 +21,7 @@
         .status-badge.submitted { background: #67c23a; }
         .status-badge.draft { background: #e6a23c; }
         .card { background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 24px; margin-bottom: 16px; }
-        .card-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        .card-title { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
         .remark-box { margin-top: 20px; padding: 12px 16px; background: #f5f7fa; border-radius: 6px; }
         .remark-label { font-size: 12px; color: #909399; margin-bottom: 6px; }
         .remark-text { font-size: 14px; color: #606266; white-space: pre-wrap; }
@@ -27,11 +31,109 @@
         .related-field-label { font-size: 13px; color: #909399; }
         .related-field-badge { display: inline-block; padding: 2px 10px; border-radius: 3px; font-size: 12px; background: #e8f4fd; color: #409eff; }
         .related-field-link { font-weight: 600; color: #303133; text-decoration: none; }
+
+        /* ── Tabs ── */
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        .tabs { display: flex; border: 1px solid #dcdfe6; border-radius: 6px; overflow: hidden; }
+        .tab-btn { padding: 7px 20px; border: none; background: #fff; color: #606266; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn + .tab-btn { border-left: 1px solid #dcdfe6; }
+        .tab-btn.active { background: #409eff; color: #fff; }
+        .tab-btn:hover:not(.active) { background: #f0f2f5; }
+        .btn-back { padding: 8px 16px; border: 1px solid #dcdfe6; border-radius: 4px; background: #fff; cursor: pointer; font-size: 13px; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+
+        /* ── Two-column layout ── */
+        .content-layout { display: flex; gap: 20px; align-items: flex-start; }
+        .tab-content { flex: 1; min-width: 0; }
+        .comments-sidebar { width: 360px; flex-shrink: 0; }
+
+        /* ── Approval footer bar ── */
+        .approval-footer { margin-top: 12px; background: #fff; border-radius: 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); padding: 12px 20px; }
+        .approval-footer-inner { display: flex; align-items: center; gap: 12px; }
+        .approval-footer-left { flex-shrink: 0; }
+        .approval-task-label { font-size: 13px; color: #606266; font-weight: 500; }
+        .approval-remark-input { flex: 1; min-width: 0; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 6px; font-size: 13px; resize: none; outline: none; transition: border-color 0.2s; font-family: inherit; }
+        .approval-remark-input:focus { border-color: #409eff; }
+        .approval-footer-actions { display: flex; gap: 8px; flex-shrink: 0; }
+        .approval-footer-actions button { display: flex; align-items: center; gap: 4px; padding: 8px 18px; border: none; border-radius: 6px; font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s; }
+        .btn-approve { background: #2fb344; color: #fff; }
+        .btn-approve:hover { background: #289a3b; }
+        .btn-reject { background: #d63939; color: #fff; }
+        .btn-reject:hover { background: #bd2f2f; }
+        .btn-transfer { background: #f0f0f0; color: #606266; }
+        .btn-transfer:hover { background: #e0e0e0; }
+        .btn-icon { font-size: 14px; }
+        .approval-toast { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); padding: 10px 24px; border-radius: 6px; font-size: 14px; z-index: 9999; animation: toastIn 0.3s; }
+        .approval-toast.success { background: #d4f1da; color: #1a7a2e; }
+        .approval-toast.error { background: #fce4e4; color: #b02a2a; }
+        @keyframes toastIn { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
+        /* ── BPMN viewer ── */
+        .bjs-powered-by { display: none; }
+        #bpmn-viewer-canvas { width: 100%; height: calc(100vh - 200px); min-height: 500px; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+        .bpmn-loading { display: flex; align-items: center; justify-content: center; height: calc(100vh - 200px); min-height: 500px; color: #909399; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+        .bpmn-error { display: none; align-items: center; justify-content: center; height: 200px; color: #d63939; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+
+        .djs-shape.status-completed .djs-outline { stroke: #2fb344 !important; stroke-width: 2.5px; }
+        .djs-shape.status-rejected  .djs-outline { stroke: #d63939 !important; stroke-width: 2.5px; }
+        .djs-shape.status-running   .djs-outline { stroke: #0054a6 !important; stroke-width: 2.5px; }
+        .djs-shape.status-canceled  .djs-outline { stroke: #888     !important; stroke-width: 2px;   }
+        .djs-shape.status-pending   .djs-outline { stroke: #b0b3b8 !important; stroke-width: 1.5px; }
+        .djs-shape.status-completed .djs-visual > :first-child { fill: rgba(47,179,68,0.08) !important; }
+        .djs-shape.status-rejected  .djs-visual > :first-child { fill: rgba(214,57,57,0.08) !important; }
+        .djs-shape.status-running   .djs-visual > :first-child { fill: rgba(0,84,166,0.08) !important; }
+        @keyframes bpmn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
+        .djs-shape.status-running { animation: bpmn-pulse 2s infinite; }
+
+        /* ── Overlay badges ── */
+        .approval-overlay { font-size: 11px; max-width: 240px; pointer-events: auto; }
+        .overlay-badge-row { display: flex; align-items: center; gap: 4px; }
+        .approval-overlay .badge-row { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+        .overlay-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+        .overlay-badge.badge-approved  { background: #d4f1da; color: #1a7a2e; }
+        .overlay-badge.badge-rejected  { background: #fce4e4; color: #b02a2a; }
+        .overlay-badge.badge-pending   { background: #e6f0ff; color: #0054a6; }
+        .overlay-badge.badge-candidate { background: #f0ebff; color: #5a3e9a; }
+        .overlay-badge.badge-assignee  { background: #e6f0ff; color: #0054a6; }
+        .status-capsule { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+        .status-capsule.capsule-completed { background: #d4f1da; color: #1a7a2e; }
+        .status-capsule.capsule-rejected  { background: #fce4e4; color: #b02a2a; }
+        .status-capsule.capsule-running   { background: #e6f0ff; color: #0054a6; }
+        .status-capsule.capsule-canceled  { background: #f0f0f0; color: #666; }
+        .status-capsule.capsule-pending   { background: #f8f9fa; color: #656d77; }
+        .approval-overlay .remark-text { font-size: 10px; color: #656d77; margin-top: 2px; line-height: 1.4; max-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        /* ── Chat bubbles ── */
+        .comments-sidebar .card { position: sticky; top: 24px; max-height: calc(100vh - 80px); overflow-y: auto; }
+        .chat-list { display: flex; flex-direction: column; gap: 12px; }
+        .chat-bubble { display: flex; gap: 10px; }
+        .chat-avatar {
+            flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 14px; font-weight: 600; color: #fff;
+        }
+        .chat-avatar.avatar-start    { background: #409eff; }
+        .chat-avatar.avatar-approve  { background: #2fb344; }
+        .chat-avatar.avatar-reject   { background: #d63939; }
+        .chat-avatar.avatar-cancel   { background: #888; }
+        .chat-body { flex: 1; min-width: 0; }
+        .chat-header { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+        .chat-header strong { font-size: 13px; }
+        .chat-header .chat-time { font-size: 11px; color: #909399; margin-left: auto; }
+        .chat-badge { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .chat-badge.badge-approve { background: #d4f1da; color: #1a7a2e; }
+        .chat-badge.badge-reject  { background: #fce4e4; color: #b02a2a; }
+        .chat-badge.badge-start   { background: #e6f0ff; color: #0054a6; }
+        .chat-badge.badge-cancel  { background: #f0f0f0; color: #666; }
+        .chat-task { font-size: 11px; color: #909399; margin-bottom: 4px; }
+        .chat-msg { font-size: 13px; color: #303133; background: #f5f7fa; border-radius: 0 10px 10px 10px; padding: 10px 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
     </style>
 </head>
 <body>
 
 <div class="page">
+    <!-- Header -->
     <div class="header">
         <div>
             <h2>{{ submission.template.name }}</h2>
@@ -43,9 +145,18 @@
                 &nbsp;·&nbsp; 提交时间：{{ submission.created_at|date:"Y-m-d H:i" }}
             </div>
         </div>
-        <button onclick="history.back()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
+        <div class="header-right">
+            {% if workflow_data %}
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="form">表单</button>
+                <button class="tab-btn" data-tab="flow">流程图</button>
+            </div>
+            {% endif %}
+            <button class="btn-back" onclick="history.back()">返回</button>
+        </div>
     </div>
 
+    <!-- Related business object -->
     {% if related_module and related_entity %}
     <div class="card related-card">
         <div class="related-field">
@@ -63,28 +174,119 @@
     </div>
     {% endif %}
 
-    <div id="submission-detail-app">
-        <div v-if="rule.length === 0" class="card">
-            <div class="empty-state">该表单模板未配置字段</div>
+    <div class="content-layout">
+        <!-- Left: Tab content -->
+        <div class="tab-content">
+            <!-- Form Tab -->
+            <div id="tab-form" class="tab-pane active">
+                <div id="submission-detail-app">
+                    <div v-if="rule.length === 0" class="card">
+                        <div class="empty-state">该表单模板未配置字段</div>
+                    </div>
+                    <div v-else class="card">
+                        <div class="card-title">表单内容</div>
+                        <form-create v-model:api="fApi" :rule="rule" :option="formOption" :value="formData" />
+                    </div>
+                    {% if submission.remark %}
+                    <div class="card">
+                        <div class="remark-label">备注</div>
+                        <div class="remark-text">{{ submission.remark }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Flow Diagram Tab -->
+            {% if workflow_data %}
+            <div id="tab-flow" class="tab-pane">
+                <div id="bpmn-loading" class="bpmn-loading">
+                    <div style="text-align:center;">
+                        <div style="width:32px;height:32px;border:3px solid #e6e8e9;border-top-color:#409eff;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 8px;"></div>
+                        <span style="font-size:13px;">正在加载流程图...</span>
+                    </div>
+                </div>
+                <div id="bpmn-error" class="bpmn-error">
+                    <span>流程图加载失败，请检查流程定义。</span>
+                </div>
+                <div id="bpmn-viewer-canvas"></div>
+            </div>
+            {% endif %}
         </div>
 
-        <div v-else class="card">
-            <div class="card-title">表单内容</div>
-            <form-create v-model:api="fApi" :rule="rule" :option="formOption" :value="formData" />
-        </div>
-
-        {% if submission.remark %}
-        <div class="card">
-            <div class="remark-label">备注</div>
-            <div class="remark-text">{{ submission.remark }}</div>
+        <!-- Right: Comments sidebar -->
+        {% if workflow_data and workflow_data.history %}
+        <div class="comments-sidebar">
+            <div class="card">
+                <div class="card-title">审批意见</div>
+                <div class="chat-list">
+                    {% for item in workflow_data.history %}
+                    <div class="chat-bubble">
+                        <span class="chat-avatar
+                            {% if item.action == 'START' %}avatar-start
+                            {% elif item.action == 'APPROVE' %}avatar-approve
+                            {% elif item.action == 'REJECT' %}avatar-reject
+                            {% elif item.action == 'CANCEL' %}avatar-cancel
+                            {% else %}avatar-start{% endif %}
+                        ">{{ item.approver.username|first|upper }}</span>
+                        <div class="chat-body">
+                            <div class="chat-header">
+                                <strong>{{ item.approver.username }}</strong>
+                                {% if item.action == 'APPROVE' %}
+                                    <span class="chat-badge badge-approve">通过</span>
+                                {% elif item.action == 'REJECT' %}
+                                    <span class="chat-badge badge-reject">驳回</span>
+                                {% elif item.action == 'START' %}
+                                    <span class="chat-badge badge-start">发起</span>
+                                {% elif item.action == 'CANCEL' %}
+                                    <span class="chat-badge badge-cancel">取消</span>
+                                {% endif %}
+                                <span class="chat-time">{{ item.timestamp|date:"m-d H:i" }}</span>
+                            </div>
+                            {% if item.task %}
+                            <div class="chat-task">{{ item.task.task_name }}</div>
+                            {% endif %}
+                            {% if item.remark %}
+                            <div class="chat-msg">{{ item.remark }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
         {% endif %}
     </div>
+
+    {% if current_task %}
+    <div class="approval-footer">
+        <div class="approval-footer-inner">
+            <div class="approval-footer-left">
+                <span class="approval-task-label">待处理: {{ current_task_name }}</span>
+            </div>
+            <textarea id="approval-remark" class="approval-remark-input" placeholder="请输入审批意见..." rows="1"></textarea>
+            <div class="approval-footer-actions">
+                <button class="btn-approve" onclick="submitApproval('APPROVE')">
+                    <span class="btn-icon">&#10003;</span>通过
+                </button>
+                <button class="btn-reject" onclick="submitApproval('REJECT')">
+                    <span class="btn-icon">&#10007;</span>驳回
+                </button>
+                <button class="btn-transfer" onclick="showTransferDialog()">
+                    <span class="btn-icon">&#8644;</span>移交
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
 <script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
 <script id="submission-data" type="application/json">{{ submission_data_json|safe }}</script>
+{% if workflow_data %}
+<script id="bpmn-xml-data" type="text/plain">{{ workflow_data.bpmn_xml|safe }}</script>
+{{ workflow_data.status_map|json_script:"status-map-data" }}
+{% endif %}
 
 <script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
@@ -92,8 +294,8 @@
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 
 <script>
+    // ── Vue form renderer ──
     const { createApp } = Vue;
-
     const app = createApp({
         data() {
             const configEl = document.getElementById('form-config-data');
@@ -105,28 +307,16 @@
             try { rule = JSON.parse(configEl.textContent.trim()); } catch(e) {}
             try { option = JSON.parse(optionEl.textContent.trim()); } catch(e) {}
             try { formData = JSON.parse(dataEl.textContent.trim()); } catch(e) {}
-
-            const formOption = Object.assign({
-                submitBtn: false,
-                resetBtn: false,
-            }, option, {
+            const formOption = Object.assign({ submitBtn: false, resetBtn: false }, option, {
                 form: Object.assign({}, option.form || {})
             });
-
-            return {
-                rule: rule,
-                formData: formData,
-                fApi: null,
-                formOption: formOption
-            };
+            return { rule, formData, fApi: null, formOption };
         },
-
         mounted() {
             if (this.fApi && this.formData && Object.keys(this.formData).length > 0) {
                 this.fApi.setValue(this.formData);
             }
         },
-
         watch: {
             fApi(api) {
                 if (api && this.formData && Object.keys(this.formData).length > 0) {
@@ -135,11 +325,166 @@
             }
         }
     });
-
     app.use(ElementPlus);
     app.use(FcDesigner.formCreate);
     app.mount('#submission-detail-app');
+
+    // ── Tab switching ──
+    document.querySelectorAll('.tab-btn').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            var tabName = this.getAttribute('data-tab');
+            document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+            this.classList.add('active');
+            document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
+            document.getElementById('tab-' + tabName).classList.add('active');
+
+            // Initialize BPMN viewer on first tab switch
+            if (tabName === 'flow' && !window._bpmnInitialized) {
+                window._bpmnInitialized = true;
+                initBpmnViewer();
+            }
+        });
+    });
+
+    // ── Approval actions ──
+    {% if current_task %}
+    function showToast(msg, type) {
+        var t = document.createElement('div');
+        t.className = 'approval-toast ' + type;
+        t.textContent = msg;
+        document.body.appendChild(t);
+        setTimeout(function() { t.remove(); }, 2500);
+    }
+
+    async function submitApproval(action) {
+        var remark = document.getElementById('approval-remark').value.trim();
+        if (action === 'REJECT' && !remark) {
+            showToast('驳回操作需要填写审批意见', 'error');
+            return;
+        }
+        var btn = document.querySelector(action === 'APPROVE' ? '.btn-approve' : '.btn-reject');
+        btn.disabled = true;
+        btn.textContent = '提交中...';
+        try {
+            var csrfToken = document.cookie.split('; ').find(function(r) { return r.startsWith('csrftoken='); });
+            csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
+            var formData = new FormData();
+            formData.append('action', action);
+            formData.append('remark', remark);
+            var resp = await fetch('/workflow/instance/{{ workflow_data.instance.pk }}/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            });
+            if (resp.ok) {
+                showToast(action === 'APPROVE' ? '审批通过' : '已驳回', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                var data = await resp.json().catch(function() { return {}; });
+                showToast('操作失败: ' + (data.message || '请重试'), 'error');
+            }
+        } catch(e) {
+            showToast('网络错误，请重试', 'error');
+        }
+        btn.disabled = false;
+        btn.textContent = action === 'APPROVE' ? '✓ 通过' : '✗ 驳回';
+    }
+    {% endif %}
 </script>
 
+{% if workflow_data %}
+<script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-navigated-viewer.development.js' %}"></script>
+<script>
+function initBpmnViewer() {
+    var xmlEl = document.getElementById('bpmn-xml-data');
+    var statusEl = document.getElementById('status-map-data');
+    var loadingEl = document.getElementById('bpmn-loading');
+    var errorEl = document.getElementById('bpmn-error');
+    var canvasEl = document.getElementById('bpmn-viewer-canvas');
+    if (!xmlEl || !canvasEl) return;
+
+    var bpmnXml = xmlEl.textContent.trim();
+    var statusMap = {};
+    try { statusMap = JSON.parse(statusEl.textContent); } catch(e) {}
+
+    if (!bpmnXml || bpmnXml.length < 50) {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'flex';
+        return;
+    }
+
+    var viewer = new BpmnJS({ container: '#bpmn-viewer-canvas' });
+    viewer.importXML(bpmnXml).then(function(result) {
+        var canvas = viewer.get('canvas');
+        var overlays = viewer.get('overlays');
+        var elementRegistry = viewer.get('elementRegistry');
+        loadingEl.style.display = 'none';
+
+        Object.keys(statusMap).forEach(function(bpmnId) {
+            var info = statusMap[bpmnId];
+            var element = elementRegistry.get(bpmnId);
+            if (!element) return;
+
+            var displayStatus = info.display_status || 'pending';
+            var statusLabel = info.status_label || '';
+            var candidateUsernames = info.candidate_usernames || [];
+            var candidateGroupMembers = info.candidate_group_members || {};
+
+            canvas.addMarker(bpmnId, 'status-' + displayStatus);
+            if (info.is_gateway) return;
+
+            var overlayHtml = '<div class="approval-overlay">';
+            var approverName = info.approver_name || '';
+            var remark = info.remark || '';
+            var assigneeLabel = info.assignee_label || '';
+
+            overlayHtml += '<div class="overlay-badge-row">';
+            if (approverName) {
+                if (displayStatus === 'rejected') {
+                    overlayHtml += '<span class="overlay-badge badge-rejected">' + approverName + ' 驳回</span>';
+                } else {
+                    overlayHtml += '<span class="overlay-badge badge-approved">' + approverName + '</span>';
+                }
+            } else if (info.assigned_to_name) {
+                overlayHtml += '<span class="overlay-badge badge-assignee">' + info.assigned_to_name + '</span>';
+            } else if (candidateUsernames.length > 0 || Object.keys(candidateGroupMembers).length > 0) {
+                overlayHtml += '<span class="overlay-badge badge-candidate">待签收</span>';
+            } else if (assigneeLabel) {
+                overlayHtml += '<span class="overlay-badge badge-pending">' + assigneeLabel + '</span>';
+            }
+            if (statusLabel) {
+                overlayHtml += '<span class="status-capsule capsule-' + displayStatus + '">' + statusLabel + '</span>';
+            }
+            overlayHtml += '</div>';
+
+            if (candidateUsernames.length > 0) {
+                overlayHtml += '<div class="badge-row">';
+                candidateUsernames.forEach(function(u) {
+                    overlayHtml += '<span class="overlay-badge badge-assignee">' + u + '</span>';
+                });
+                overlayHtml += '</div>';
+            }
+            if (remark) {
+                overlayHtml += '<div class="remark-text">' + remark + '</div>';
+            }
+            overlayHtml += '</div>';
+
+            try {
+                overlays.add(bpmnId, { position: { bottom: -5, left: 0 }, html: overlayHtml });
+            } catch(e) {}
+        });
+        try { canvas.zoom('fit-viewport'); } catch(e) {}
+    }).catch(function(err) {
+        console.error('BPMN import failed:', err);
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'flex';
+    });
+}
+</script>
+{% endif %}
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
 </body>
 </html>

@@ -64,7 +64,7 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
             elif project_id:
                 self.fields['project_node'].queryset = ProjectNode.objects.filter(
                     project_id=project_id,
-                    stage__in=['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+                    stage__in=ProjectNode.FORMULA_STAGES
                 ).select_related('project')
             else:
                 self.fields['project_node'].queryset = ProjectNode.objects.none()
@@ -82,8 +82,7 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
 
             self.fields['research_projects'].queryset = qs_projects
 
-            # 6. 非量产阶段禁用 is_mature
-            NON_MATURE_STAGES = ('RND', 'PILOT', 'MID_TEST')
+            # 6. 仅量产阶段可标记为成熟配方
             node = None
             if instance and instance.pk and instance.project_node_id:
                 node = instance.project_node
@@ -95,16 +94,15 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
                     except ProjectNode.DoesNotExist:
                         pass
 
-            if node and node.stage in NON_MATURE_STAGES:
+            if node and not node.can_be_mature:
                 self.fields['is_mature'].disabled = True
-                self.fields['is_mature'].help_text = '当前阶段节点不可标记为成熟配方'
+                self.fields['is_mature'].help_text = '仅量产下单阶段可标记为成熟配方'
 
     def clean_is_mature(self):
         is_mature = self.cleaned_data.get('is_mature')
         project_node = self.cleaned_data.get('project_node')
-        NON_MATURE_STAGES = ('RND', 'PILOT', 'MID_TEST')
-        if is_mature and project_node and project_node.stage in NON_MATURE_STAGES:
-            raise forms.ValidationError('当前阶段节点不可标记为成熟配方，请先修改项目阶段节点为量产下单后再勾选。')
+        if is_mature and project_node and not project_node.can_be_mature:
+            raise forms.ValidationError('仅量产下单阶段可标记为成熟配方，请修改项目阶段节点后再勾选。')
         return is_mature
 
 

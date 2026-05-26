@@ -48,13 +48,13 @@
 <div class="page-body">
     <div class="card">
         <div class="table-responsive">
-            <table class="table table-vcenter table-bordered card-table text-center table-sm" style="font-size: 13px; table-layout: fixed;">
+            <table class="table table-vcenter table-bordered card-table text-center table-sm" style="font-size: 13px;">
                 <thead>
                     <tr class="bg-light">
-                        <!-- 修改表头结构：拆分第一列 -->
-                        <th class="text-start align-middle" style="width: 130px; min-width: 130px;">分类 / 项目</th>
-                        <th class="text-start align-middle" style="width: 160px; min-width: 160px;">详情 / 标准</th>
-                        <th class="align-middle" style="width: 60px; min-width: 60px;">单位</th>
+                        <!-- 前3列自适应内容宽度 -->
+                        <th class="text-start align-middle text-nowrap">分类 / 项目</th>
+                        <th class="text-start align-middle text-nowrap">详情 / 标准</th>
+                        <th class="align-middle text-nowrap">单位</th>
                         
                         <!-- 动态生成列头 -->
                         {% for col in columns %}

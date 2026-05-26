@@ -110,7 +110,7 @@ class ResearchProject(models.Model):
             # 1. 删除后续所有未开始的节点
             self.nodes.filter(order__gt=current_node_order, status='PENDING').delete()
 
-            # 2. 插入一个“终止”节点作为结局
+            # 2. 插入一个"终止"节点作为结局
             ResearchProjectNode.objects.create(
                 project=self,
                 stage=ResearchStage.TERMINATED,

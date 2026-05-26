@@ -10,6 +10,8 @@ from app_project.models import ProjectMember, ProjectSalesMember, ProjectNode, P
 User = get_user_model()
 
 class UserPerformanceListView(PanelAccessMixin, View):
+    permission_required = 'app_project.view_project'
+
     def get(self, request):
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
@@ -122,6 +124,8 @@ class UserPerformanceListView(PanelAccessMixin, View):
 
 
 class UserPerformanceDetailView(PanelAccessMixin, View):
+    permission_required = 'app_project.view_project'
+
     def get(self, request, user_id):
         target_user = get_object_or_404(User, pk=user_id)
         start_date = request.GET.get('start_date')

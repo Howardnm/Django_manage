@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load i18n %}
+{% load project_extras %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -60,18 +61,8 @@
                                 </a>
                             </td>
                             <td>
-                                {% with status=item.instance.status %}
-                                {% if status == 'RUNNING' %}
-                                    <span class="badge bg-primary-lt">
-                                {% elif status == 'COMPLETED' %}
-                                    <span class="badge bg-success-lt">
-                                {% elif status == 'REJECTED' %}
-                                    <span class="badge bg-danger-lt">
-                                {% elif status == 'CANCELED' %}
-                                    <span class="badge bg-secondary-lt">
-                                {% endif %}
+                                <span class="badge {{ item.instance.status_css_class }}-lt">
                                 {{ item.instance.get_status_display }}</span>
-                                {% endwith %}
                             </td>
                             <td>
                                 {% if item.pending_tasks %}

@@ -27,7 +27,7 @@ def update_formula_costs(sender, instance, created, **kwargs):
     new_price = instance.cost_price
 
     if old_price != new_price:
-        print(f"♻️ 原材料 [{instance.name}] 价格变动: {old_price} -> {new_price}，正在更新关联配方...")
+        print(f"[signal] RawMaterial [{instance.name}] price change: {old_price} -> {new_price}, updating formulas...")
         
         # 1. 找到所有使用了该原材料的 BOM 行
         # select_related('formula') 优化查询
@@ -42,4 +42,4 @@ def update_formula_costs(sender, instance, created, **kwargs):
             formula.calculate_cost()
             count += 1
             
-        print(f"✅ 已更新 {count} 个配方的成本。")
+        print(f"[signal] Updated {count} formulas.")

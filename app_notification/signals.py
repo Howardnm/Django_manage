@@ -27,7 +27,7 @@ def _send_notification_to_recipients(recipients, actor, verb, target, action_obj
 @receiver(post_save, sender=ProjectNode)
 def project_node_saved_handler(sender, instance, created, **kwargs):
     """
-    当 ProjectNode 模型被保存时，仅在“更新”时发送通知。
+    当 ProjectNode 模型被保存时，仅在"更新"时发送通知。
     """
     # 关键修改：如果节点是新创建的，则不发送通知。
     if created:

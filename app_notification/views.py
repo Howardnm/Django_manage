@@ -8,26 +8,22 @@ from .models import Notification
 from app_project.models import ProjectNode
 from .mixins import NotificationAccessMixin
 
-# 1. 标记已读 (函数视图适配权限检查)
-def mark_as_read(request, pk):
-    """
-    将单条通知标记为已读，并智能重定向。
-    """
-    if not request.user.is_authenticated:
-        return redirect('login')
-        
-    # 核心安全：增加 recipient=request.user 确保只能操作自己的通知
-    notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
-    notification.mark_as_read()
-    
-    target = notification.target
-    if isinstance(target, ProjectNode):
-        project_url = reverse('project_detail', kwargs={'pk': target.project.pk})
-        next_url = f"{project_url}#node-{target.pk}"
-    else:
-        next_url = reverse('panel_home')
+# 1. 标记已读
+class MarkAsReadView(NotificationAccessMixin, View):
+    """将单条通知标记为已读，然后智能重定向。Mixin 已确保 recipient 隔离。"""
 
-    return redirect(next_url)
+    def get(self, request, pk):
+        notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
+        notification.mark_as_read()
+
+        target = notification.target
+        if isinstance(target, ProjectNode):
+            project_url = reverse('project_detail', kwargs={'pk': target.project.pk})
+            next_url = f"{project_url}#node-{target.pk}"
+        else:
+            next_url = reverse('panel_home')
+
+        return redirect(next_url)
 
 
 # 2. 全部标记已读

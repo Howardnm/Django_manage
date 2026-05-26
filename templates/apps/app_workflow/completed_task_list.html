@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load project_extras %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -51,13 +52,7 @@
                                 </a>
                             </td>
                             <td>
-                                {% if task.status == 'COMPLETED' %}
-                                    <span class="badge bg-success-lt">已通过</span>
-                                {% elif task.status == 'REJECTED' %}
-                                    <span class="badge bg-danger-lt">已驳回</span>
-                                {% else %}
-                                    <span class="badge bg-secondary-lt">{{ task.get_status_display }}</span>
-                                {% endif %}
+                                <span class="badge {{ task.status_css_class }}-lt">{{ task.get_status_display }}</span>
                             </td>
                             <td class="text-muted">{{ task.completed_at|date:"Y-m-d H:i" }}</td>
                             <td>

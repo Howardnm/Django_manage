@@ -6,6 +6,7 @@ from django.http import JsonResponse
 from django.contrib import messages
 from django.http import Http404
 from django.contrib.contenttypes.models import ContentType
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 
 from .models import FormTemplate, FormSubmission
@@ -157,6 +158,8 @@ class FormTemplateDetailView(FormManagementAccessMixin, View):
 # ==========================================
 
 class FormSubmissionCreateView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.add_formsubmission'
+
     def _resolve_target(self, target_alias=None, object_id=None):
         """通过白名单别名解析目标对象。不在 registry 中的 alias 直接 404。"""
         if target_alias and object_id:
@@ -247,9 +250,9 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
 
         # 提交时如果模板关联了审批流程，自动启动流程实例
         if status == 'SUBMITTED' and template.workflow_id and not submission.workflow_instance_id:
-            from app_workflow.utils import WorkflowEngine
+            from app_workflow.services import WorkflowService
             try:
-                instance = WorkflowEngine.start_instance(
+                instance = WorkflowService.start(
                     definition=template.workflow,
                     started_by=request.user,
                     related_object=submission,
@@ -266,7 +269,7 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
 class FormSubmissionDetailView(FormManagementAccessMixin, View):
     def get(self, request, pk):
         submission = get_object_or_404(
-            FormSubmission.objects.select_related('template', 'submitted_by'),
+            FormSubmission.objects.select_related('template', 'submitted_by', 'workflow_instance__definition'),
             pk=pk
         )
         template = submission.template
@@ -285,14 +288,41 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             related_entity = cfg.display(target) if cfg else str(target)
             related_entity_url = related_object_router.resolve(target)
 
+        # 关联审批流程数据
+        workflow_data = None
+        current_task = None
+        if submission.workflow_instance_id:
+            from app_workflow.views import WorkflowInstanceDetailView
+            from app_workflow.models import ApprovalHistory, WorkflowTask
+            wi = submission.workflow_instance
+            detail_view = WorkflowInstanceDetailView()
+            workflow_data = {
+                'instance': wi,
+                'status_map': detail_view._build_status_map(wi),
+                'bpmn_xml': wi.definition.bpmn_xml,
+                'history': list(ApprovalHistory.objects.filter(instance=wi).select_related('approver', 'task').order_by('timestamp')),
+            }
+            current_task = WorkflowTask.objects.filter(
+                instance=wi, assigned_to=request.user, status='PENDING'
+            ).first()
+            if current_task:
+                # 优先取 BPMN userTask name 属性，其次用已存的 task_name
+                status_entry = workflow_data['status_map'].get(current_task.spiff_task_id, {})
+                current_task_name = status_entry.get('task_name') or current_task.task_name
+            else:
+                current_task_name = None
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
+            'current_task_name': current_task_name,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),
             'related_module': related_module,
             'related_entity': related_entity,
             'related_entity_url': related_entity_url,
+            'workflow_data': workflow_data,
+            'current_task': current_task,
         })
 
 
@@ -301,6 +331,8 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
 # ==========================================
 
 class FormCreateWizardView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formtemplate'
+
     def get(self, request):
         templates = FormTemplate.objects.filter(is_active=True).order_by('group', 'name')
         initial_module = request.GET.get('module', '')
@@ -334,6 +366,8 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
 
 
 class EntitySearchView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formtemplate'
+
     def get(self, request):
         alias = request.GET.get('alias', '')
         search = request.GET.get('search', '')
@@ -419,8 +453,10 @@ class MySubmissionsView(FormManagementAccessMixin, View):
 class FormSubmissionDeleteView(FormManagementAccessMixin, View):
     def post(self, request, pk):
         submission = get_object_or_404(FormSubmission, pk=pk)
-        if submission.submitted_by != request.user:
-            return JsonResponse({'status': 'error', 'message': '您没有权限删除此记录。'}, status=403)
+        try:
+            self.check_object_permission(submission)
+        except PermissionDenied as e:
+            return JsonResponse({'status': 'error', 'message': str(e) or '您没有权限删除此记录。'}, status=403)
         if submission.status != 'DRAFT':
             return JsonResponse({'status': 'error', 'message': '只能删除草稿记录。'}, status=400)
         submission.delete()

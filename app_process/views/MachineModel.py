@@ -1,8 +1,11 @@
 from django.contrib import messages
+from django.http import JsonResponse
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView
+from django.db.models import Q
 
-from app_process.models import MachineModel
+from app_process.models import MachineModel, ScrewCombination
 from app_process.forms import MachineModelForm
 from app_process.utils.filters import MachineModelFilter
 from app_process.mixins import ProcessAccessMixin
@@ -63,3 +66,29 @@ class MachineModelUpdateView(ProcessAccessMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "机台型号已更新")
         return super().form_valid(form)
+
+
+class ProcessAutocompleteView(ProcessAccessMixin, View):
+    """Tom Select 远程搜索接口：机台型号 / 螺杆组合"""
+    permission_required = 'app_process.view_machinemodel'
+
+    def get(self, request):
+        model_name = request.GET.get('model')
+        query = request.GET.get('q', '')
+        results = []
+        if model_name == 'machinemodel':
+            queryset = MachineModel.objects.filter(
+                Q(brand__icontains=query) |
+                Q(model_name__icontains=query) |
+                Q(machine_code__icontains=query)
+            ).order_by('brand', 'model_name')[:20]
+            for item in queryset:
+                results.append({'value': item.pk, 'text': str(item)})
+        elif model_name == 'screwcombination':
+            queryset = ScrewCombination.objects.filter(
+                Q(name__icontains=query) |
+                Q(combination_code__icontains=query)
+            ).order_by('name')[:20]
+            for item in queryset:
+                results.append({'value': item.pk, 'text': str(item)})
+        return JsonResponse(results, safe=False)

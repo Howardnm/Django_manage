@@ -80,7 +80,7 @@ class CustomerUpdateView(RepositoryAccessMixin, UpdateView):
 
 
 class CustomerDetailView(RepositoryAccessMixin, DetailView):
-    """客户详情：增加了“联系人列表”和“关联项目”的联动展示"""
+    """客户详情：增加了"联系人列表"和"关联项目"的联动展示"""
     permission_required = 'app_repository.view_customer'
     model = Customer
     template_name = 'apps/app_repository/customer/customer_detail.html'

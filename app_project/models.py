@@ -6,7 +6,7 @@ from django.db import transaction  # 用于事务处理，保证排序修改的�
 from django.utils.functional import cached_property  # 引入缓存装饰器
 
 
-# 1. 定义标准流程阶段 (枚举) - 这相当于“类型库”
+# 1. 定义标准流程阶段 (枚举) - 这相当于"类型库"
 class ProjectStage(models.TextChoices):
     INIT = 'INIT', '① 项目立项'
     COLLECT = 'COLLECT', '② 收集资料'
@@ -266,6 +266,10 @@ class ProjectNode(models.Model):
         return self.status != 'PENDING'
 
     FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+
+    @property
+    def can_be_mature(self):
+        return self.stage == ProjectStage.MASS_PROD
 
     @property
     def can_add_formula(self):

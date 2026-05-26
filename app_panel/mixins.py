@@ -13,5 +13,5 @@ class PanelAccessMixin(UnifiedAccessMixin):
     identity_required = IdentityConfig.INTERNAL_STAFF
     
     # 看板通常涉及跨部门统计，关闭部门隔离以显示全局概况（如系统总材料数）
-    # 如果后续需要“部门看板”，可在具体视图中手动开启
+    # 如果后续需要"部门看板"，可在具体视图中手动开启
     enforce_dept_isolation = False

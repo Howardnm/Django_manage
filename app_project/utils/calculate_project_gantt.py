@@ -10,7 +10,7 @@ def get_project_gantt_data(project):
 
     # 1. 【修改】完全移除根节点的定义
     # 原来的 project_id 和 gantt_data.append({...}) 全部删掉
-    # 这样图表中就不会出现第一行的“项目总览”条了
+    # 这样图表中就不会出现第一行的"项目总览"条了
 
     # 我们只需要保留这个变量名用于逻辑（其实不用也没关系，为了代码改动最小，可以先删掉定义）
     # project_id = f"proj_{project.id}"

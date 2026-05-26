@@ -78,6 +78,14 @@ class WorkflowInstance(models.Model):
     )
     started_at = models.DateTimeField("开始时间", auto_now_add=True)
     completed_at = models.DateTimeField("结束时间", null=True, blank=True)
+    canceled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="canceled_workflows",
+        verbose_name="取消人"
+    )
+    cancel_reason = models.TextField("取消原因", blank=True, default="")
 
     class Meta:
         verbose_name = "流程实例"
@@ -88,6 +96,24 @@ class WorkflowInstance(models.Model):
 
     def __str__(self):
         return f"{self.definition.name} - {self.get_status_display()} ({self.started_at.strftime('%Y-%m-%d %H:%M')})"
+
+    # ── 模板辅助属性 ──────────────────────────────────────────
+
+    @property
+    def status_css_class(self):
+        """状态徽章 CSS 类名"""
+        return {
+            'RUNNING': 'bg-primary',
+            'COMPLETED': 'bg-success',
+            'REJECTED': 'bg-danger',
+            'CANCELED': 'bg-secondary',
+        }.get(self.status, 'bg-secondary')
+
+    def is_cancelable_by(self, user):
+        """判断当前用户是否可取消此流程"""
+        return self.status == 'RUNNING' and (
+            self.started_by == user or user.is_superuser
+        )
 
 
 class WorkflowTask(models.Model):
@@ -134,6 +160,7 @@ class WorkflowTask(models.Model):
     # SpiffWorkflow 内部任务实例 ID (唯一标识每个运行中的任务，支持多实例)
     spiff_instance_id = models.CharField("Spiff任务实例ID", max_length=100, db_index=True, unique=True, null=True, blank=True)
     
+    due_date = models.DateTimeField("截止日期", null=True, blank=True)
     remark = models.TextField("审批备注", blank=True, null=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     completed_at = models.DateTimeField("处理时间", null=True, blank=True)
@@ -141,6 +168,9 @@ class WorkflowTask(models.Model):
     class Meta:
         verbose_name = "流程任务"
         verbose_name_plural = verbose_name
+        indexes = [
+            models.Index(fields=['status', 'assigned_to'], name='wf_task_status_assignee_idx'),
+        ]
 
     def __str__(self):
         if self.assigned_to:
@@ -148,6 +178,18 @@ class WorkflowTask(models.Model):
         elif self.candidate_users.exists() or self.candidate_groups:
             return f"{self.task_name} - 待签收"
         return f"{self.task_name} - 未指派"
+
+    # ── 模板辅助属性 ──────────────────────────────────────────
+
+    @property
+    def status_css_class(self):
+        """状态徽章 CSS 类名"""
+        return {
+            'PENDING': 'bg-primary',
+            'COMPLETED': 'bg-success',
+            'REJECTED': 'bg-danger',
+            'CANCELED': 'bg-secondary',
+        }.get(self.status, 'bg-secondary')
 
 
 class ApprovalHistory(models.Model):
