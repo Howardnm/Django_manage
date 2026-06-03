@@ -59,7 +59,6 @@ INSTALLED_APPS = [
     'app_workflow.apps.AppWorkflowConfig',             # 工作流模块
     'app_form_management.apps.AppFormManagementConfig',  # 表单管理模块
     'app_trial_production.apps.AppTrialProductionConfig',  # 试验排产模块
-    'app_sap_services.apps.AppSapServicesConfig',   # SAP 集成服务
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
@@ -217,16 +216,6 @@ DIFY_SYNC_CONFIG = {
     }
 }
 
-# --- SAP RFC 连接配置 ---
-SAP_CONFIG = {
-    'ashost': 'your-sap-host.example.com',  # SAP 服务器地址
-    'sysnr': '00',                           # 系统编号
-    'client': '800',                         # 客户端
-    'user': 'your-username',                 # 用户名
-    'passwd': 'your-password',               # 密码
-    'lang': 'ZH',                            # 语言
-}
-
 # --- REST FRAMEWORK ---
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
@@ -262,7 +251,6 @@ LOGGING = {
     'loggers': {
         'app_material_api.integration': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
         'app_catalog.api': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
-        'app_sap_services': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
     },
 }
 

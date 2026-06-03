@@ -37,9 +37,6 @@ urlpatterns = [
     # 试验排产模块
     path('trial-production/', include('app_trial_production.urls')),
 
-    # SAP 集成服务
-    path('sap/', include('app_sap_services.urls')),
-
     # MCP Server 接口
     path('mcp/', include('app_mcp_server.urls')),
     
