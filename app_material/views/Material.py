@@ -142,6 +142,35 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
         context.update({'page_title': f'编辑: {self.object.grade_name}', 'is_edit': True})
         return context
 
+    def _build_error_message(self, form, formset=None):
+        """构建详细的字段错误信息"""
+        from django.utils.safestring import mark_safe
+        lines = ['<strong>保存失败，请修正以下问题：</strong>']
+
+        for field_name, errs in form.errors.items():
+            label = form[field_name].label if field_name != '__all__' and field_name in form.fields else field_name
+            for e in errs:
+                lines.append(f'• {label}: {e}')
+
+        if formset:
+            for i, sf in enumerate(formset):
+                if not sf.errors:
+                    continue
+                for field_name, errs in sf.errors.items():
+                    if field_name == '__all__':
+                        for e in errs:
+                            lines.append(f'• 第{i+1}行: {e}')
+                    else:
+                        label = sf[field_name].label if field_name in sf.fields else field_name
+                        for e in errs:
+                            lines.append(f'• 第{i+1}行 {label}: {e}')
+
+        return mark_safe('<br>'.join(lines))
+
+    def form_invalid(self, form):
+        messages.error(self.request, self._build_error_message(form))
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         context = self.get_context_data()
         data_formset = context['data_formset']
@@ -150,7 +179,9 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
             if data_formset.is_valid():
                 data_formset.save()
             else:
+                messages.error(self.request, self._build_error_message(form, data_formset))
                 return self.render_to_response(self.get_context_data(form=form))
+        messages.success(self.request, f'材料 "{self.object.grade_name}" 保存成功。')
         return super().form_valid(form)
 
     def get_success_url(self):

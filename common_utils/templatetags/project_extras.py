@@ -31,6 +31,30 @@ def sort_toggle(field_name, current_sort):
         return field_name
 
 
+from decimal import Decimal
+
+
+@register.filter
+def smart_decimal(value):
+    """强制2位小数; 若第3位非0则显示3位"""
+    if value is None:
+        return '-'
+    try:
+        d = Decimal(str(value)).quantize(Decimal('0.001'))
+    except Exception:
+        return str(value)
+    third = d.as_tuple().exponent  # e.g. -3 means 3 decimal places
+    # 保留3位小数后，检查第3位是否为0
+    if third == -3:
+        # 第3位是否为0
+        if d.as_tuple().digits[-1] == 0:
+            return '{:.2f}'.format(d)
+        else:
+            return '{:.3f}'.format(d)
+    # 不足3位，直接按2位显示
+    return '{:.2f}'.format(d)
+
+
 @register.simple_tag(takes_context=True)
 def sort_url_multi(context, field):
     """

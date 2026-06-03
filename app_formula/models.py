@@ -158,8 +158,8 @@ class LabFormula(models.Model):
         unique_together = ('code', 'version')
 
 
-# 2. BOM 表 (Bill of Materials) - 配方明细
-class FormulaBOM(models.Model):
+# 2. BOM 表 (Bill of Materials) — 抽象基类
+class AbstractBOMEntry(models.Model):
     FEEDING_CHOICES = [
         ('1_MAIN', '主喂料 (Main)'),
         ('2_SIDE_1', '侧喂料1 (Side 1)'),
@@ -167,7 +167,6 @@ class FormulaBOM(models.Model):
         ('4_LIQUID', '液体注塑 (Liquid)'),
     ]
 
-    # 【新增】分秤选项 (改性塑料行业标准)
     WEIGHING_CHOICES = [
         ('A', 'A秤 (主料1)'),
         ('B', 'B秤 (主料2)'),
@@ -176,24 +175,25 @@ class FormulaBOM(models.Model):
         ('E', 'E秤 (其他)'),
     ]
 
-    formula = models.ForeignKey(LabFormula, on_delete=models.CASCADE, related_name='bom_lines')
-    # 喂料口位置
     feeding_port = models.CharField("喂料口", max_length=20, choices=FEEDING_CHOICES, default='1_MAIN')
-
-    # 【新增】分秤字段
     weighing_scale = models.CharField("分秤", max_length=5, choices=WEIGHING_CHOICES, default='A', help_text="用于生产投料区分")
-
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.PROTECT, verbose_name="原材料")
-    percentage = models.DecimalField("比例/份数", max_digits=7, decimal_places=2, help_text="百分比/份数")
-    is_tail = models.BooleanField("是否尾料", default=False, help_text="是否为上一批次的尾料回掺")
-    # 共混工艺参数
+    percentage = models.DecimalField("比例/份数", max_digits=8, decimal_places=3, help_text="百分比/份数")
     is_pre_mix = models.BooleanField("是否共混", default=False, help_text="是否需要在挤出前进行预混合")
     pre_mix_order = models.PositiveIntegerField("共混顺序", default=0, help_text="数字越小越先加入")
     pre_mix_time = models.PositiveIntegerField("共混时间 (秒)", default=0, help_text="该步骤的混合时长")
 
     class Meta:
+        abstract = True
+
+
+class FormulaBOM(AbstractBOMEntry):
+    """配方 BOM 明细行"""
+    formula = models.ForeignKey(LabFormula, on_delete=models.CASCADE, related_name='bom_lines')
+    is_tail = models.BooleanField("是否尾料", default=False, help_text="是否为上一批次的尾料回掺")
+
+    class Meta:
         verbose_name = "BOM明细"
-        # 【修改】排序规则：先按喂料口，再按分秤，再按原材料类型权重，最后按原材料名称
         ordering = ['feeding_port', 'weighing_scale', 'raw_material__category__order', 'raw_material__name']
 
 
@@ -225,3 +225,45 @@ class FormulaTestResult(models.Model):
             models.Index(fields=['value_text']),
         ]
         unique_together = ('formula', 'test_config')
+
+
+# 4. 色粉配比表 (Color Powder BOM) - 配色部门填写，与配方1:1绑定
+class ColorPowderBOM(models.Model):
+    """色粉配比主表 - 与配方1:1绑定，配色部门在试产后填写"""
+    formula = models.OneToOneField(
+        LabFormula, on_delete=models.CASCADE,
+        related_name='color_powder_bom', verbose_name="关联配方")
+    filled_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="填表人")
+    remark = models.TextField("备注", blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "色粉配比表"
+        verbose_name_plural = "色粉配比表"
+
+    def __str__(self):
+        return f"{self.formula.code} 色粉配比"
+
+    @property
+    def cost(self):
+        """计算每kg主配方需要添加的色粉成本 (元) = Σ(份数 × 单价) / 100"""
+        if not self.pk:
+            return None
+        total = 0
+        for e in self.entries.select_related('raw_material').all():
+            if e.percentage and e.raw_material.cost_price:
+                total += float(e.percentage) * float(e.raw_material.cost_price)
+        return round(total / 100, 2) if total > 0 else None
+
+
+class ColorPowderBOMEntry(AbstractBOMEntry):
+    """色粉配比明细行 — 继承 AbstractBOMEntry，与 FormulaBOM 结构对齐"""
+    color_powder_bom = models.ForeignKey(
+        ColorPowderBOM, on_delete=models.CASCADE,
+        related_name='entries', verbose_name="所属色粉配比表")
+
+    class Meta:
+        verbose_name = "色粉配比明细"

@@ -97,11 +97,15 @@ class User(AbstractUser):
     class UserType(models.TextChoices):
         ENGINEER = 'ENGINEER', '研发工程师'
         PROCESS_ENGINEER = 'PROCESS_ENGINEER', '工艺工程师'
-        SALES = 'SALES', '业务经理'
+        SALES = 'SALES', '业务员'
         PURCHASING = 'PURCHASING', '采购专员'
         CUSTOMER = 'CUSTOMER', '外部客户'
         OEM = 'OEM', '主机厂成员'
         ADMIN = 'ADMIN', '系统管理员'
+        EXTRUSION_OPERATOR = 'EXTRUSION_OPERATOR', '挤出操作员'
+        COLOR_OPERATOR = 'COLOR_OPERATOR', '配色员'
+        INJECTION_OPERATOR = 'INJECTION_OPERATOR', '注塑操作员'
+        TESTING_OPERATOR = 'TESTING_OPERATOR', '测试员'
 
     # --- 1. 核心权限决策字段 ---
     user_type = models.CharField("用户角色", max_length=20, choices=UserType.choices, default=UserType.ENGINEER)
@@ -140,3 +144,11 @@ class User(AbstractUser):
     def is_purchasing(self): return self.user_type == self.UserType.PURCHASING
     @property
     def is_external(self): return self.user_type in [self.UserType.CUSTOMER, self.UserType.OEM]
+    @property
+    def is_extrusion_operator(self): return self.user_type == self.UserType.EXTRUSION_OPERATOR
+    @property
+    def is_color_operator(self): return self.user_type == self.UserType.COLOR_OPERATOR
+    @property
+    def is_injection_operator(self): return self.user_type == self.UserType.INJECTION_OPERATOR
+    @property
+    def is_testing_operator(self): return self.user_type == self.UserType.TESTING_OPERATOR

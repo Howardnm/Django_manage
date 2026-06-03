@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}{{ mold.name|default:"新模具" }} - 模具表单{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_mold_type_list' %}">模具台账</a></li>
+                        <li class="breadcrumb-item active">{% if object %}编辑{% else %}添加{% endif %}</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">{% if object %}编辑模具{% else %}添加新模具{% endif %}</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row row-cards mt-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">模具信息</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">模具编号</label>
+                            {{ form.mold_code }}
+                            {% if form.mold_code.errors %}
+                            <div class="invalid-feedback d-block">{{ form.mold_code.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label required">模具名称</label>
+                            {{ form.name }}
+                            {% if form.name.errors %}
+                            <div class="invalid-feedback d-block">{{ form.name.errors.0 }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">模具类型</label>
+                            {{ form.mold_type }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">测试标准</label>
+                            {{ form.standard }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">穴数</label>
+                            {{ form.cavity_count }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">状态</label>
+                            {{ form.status }}
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">样条描述</label>
+                            {{ form.specimen_description }}
+                        </div>
+                        <div class="col-12 mb-3">
+                            <label class="form-label">备注</label>
+                            {{ form.description }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">操作</h3>
+                </div>
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-check me-1"></i>保存
+                    </button>
+                    <a href="{% url 'trial_mold_type_list' %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

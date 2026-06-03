@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+
+{% block title %}完成注塑 - #{{ object.pk }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_injection_list' %}">注塑工单</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_injection_detail' object.pk %}">#{{ object.pk }}</a></li>
+                        <li class="breadcrumb-item active">完成注塑</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">完成注塑生产</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row row-cards mt-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-green-lt">
+                    <h3 class="card-title text-green"><i class="ti ti-clipboard-check me-2"></i>样条产出记录</h3>
+                </div>
+                <div class="card-body">
+                    {{ specimens_formset.management_form }}
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter">
+                            <thead>
+                                <tr>
+                                    <th>模具</th>
+                                    <th>实际产出数量</th>
+                                    <th>合格数量</th>
+                                    <th>存放位置</th>
+                                    <th>批次标签</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for frm in specimens_formset %}
+                                <tr>
+                                    <td>{{ frm.mold }}{{ frm.id }}</td>
+                                    <td>{{ frm.quantity_produced }}</td>
+                                    <td>{{ frm.quantity_qualified }}</td>
+                                    <td>{{ frm.storage_location }}</td>
+                                    <td>{{ frm.batch_label }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">状态更新</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.status.label }}</label>
+                        {{ form.status }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.remark.label }}</label>
+                        {{ form.remark }}
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-check me-1"></i>完成注塑
+                    </button>
+                    <a href="{% url 'trial_injection_detail' object.pk %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

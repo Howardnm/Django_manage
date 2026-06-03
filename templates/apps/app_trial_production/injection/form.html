@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}创建注塑工单 - {{ production_order.code }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .mold-matrix th, .mold-matrix td {
+        padding: 6px 10px;
+        vertical-align: middle;
+        text-align: center;
+    }
+    .mold-matrix .form-control,
+    .mold-matrix .form-select {
+        padding: 2px 6px;
+        font-size: 13px;
+        min-height: 30px;
+    }
+    .qty-input {
+        width: 80px;
+        text-align: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_injection_list' %}">注塑工单</a></li>
+                        <li class="breadcrumb-item active">创建</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">创建注塑工单</h2>
+            <div class="text-muted mt-1">排产单：{{ production_order.code }}</div>
+        </div>
+    </div>
+</div>
+
+<form method="post" id="injection-form">
+    {% csrf_token %}
+    <input type="hidden" name="mold_count" id="mold_count" value="3">
+    <div class="row row-cards mt-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue"><i class="ti ti-mold me-2"></i>模具需求（模具 × 配方矩阵）</h3>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter mold-matrix" id="mold-matrix-table">
+                            <thead>
+                                <tr>
+                                    <th style="width:200px;">模具</th>
+                                    {% if formulas %}
+                                    {% for f in formulas %}
+                                    <th>
+                                        <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                        <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                                    </th>
+                                    {% endfor %}
+                                    {% else %}
+                                    <th>注塑数量</th>
+                                    {% endif %}
+                                    <th style="width:50px;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="mold-matrix-body">
+                                {% for i in "012" %}
+                                <tr class="mold-row">
+                                    <td>
+                                        <select name="mold_{{ forloop.counter0 }}" class="form-select mold-select">
+                                            <option value="">-- 选择模具 --</option>
+                                            {% for mold in mold_types %}
+                                            <option value="{{ mold.pk }}">{{ mold.name }} [{{ mold.mold_code }}] ×{{ mold.cavity_count }}穴 {{ mold.standard }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </td>
+                                    {% if formulas %}
+                                    {% for f in formulas %}
+                                    <td>
+                                        <input type="number" name="qty_{{ forloop.parentloop.counter0 }}_{{ f.pk }}"
+                                               class="form-control qty-input" min="0" value="0" placeholder="0">
+                                    </td>
+                                    {% endfor %}
+                                    {% else %}
+                                    <td>
+                                        <input type="number" name="qty_{{ forloop.counter0 }}"
+                                               class="form-control qty-input" min="0" value="0" placeholder="0">
+                                    </td>
+                                    {% endif %}
+                                    <td>
+                                        <button type="button" class="btn btn-sm btn-ghost-danger remove-mold-row" title="删除此行">
+                                            <i class="ti ti-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="card-footer d-flex justify-content-between align-items-center">
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-mold-row">
+                        <i class="ti ti-plus me-1"></i>新增模具
+                    </button>
+                    <div class="rounded bg-warning-lt text-warning mb-0 p-2 d-flex align-items-center gap-2">
+                        <i class="ti ti-info-circle fs-4"></i>
+                        <span>填写注塑<strong>次数</strong>（非样条数量）。实际样条数 = 注塑次数 × 模具穴数，数量为0则不创建该配方版本的注塑需求</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">物料来源</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.sample_split.label }}</label>
+                        {{ form.sample_split }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.sample_inventory.label }}</label>
+                        {{ form.sample_inventory }}
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">注塑设置</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.assigned_operator.label }}</label>
+                        {{ form.assigned_operator }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">{{ form.injection_params_note.label }}</label>
+                        {{ form.injection_params_note }}
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">操作</h3>
+                </div>
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-check me-1"></i>创建注塑工单
+                    </button>
+                    <a href="{% url 'trial_injection_list' %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script type="text/template" id="mold-row-template">
+    <tr class="mold-row">
+        <td>
+            <select name="mold__ROW_" class="form-select mold-select">
+                <option value="">-- 选择模具 --</option>
+                {% for mold in mold_types %}
+                <option value="{{ mold.pk }}">{{ mold.name }} [{{ mold.mold_code }}] ×{{ mold.cavity_count }}穴 {{ mold.standard }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        {% if formulas %}
+        {% for f in formulas %}
+        <td>
+            <input type="number" name="qty__ROW__{{ f.pk }}" class="form-control qty-input" min="0" value="0" placeholder="0">
+        </td>
+        {% endfor %}
+        {% else %}
+        <td>
+            <input type="number" name="qty__ROW_" class="form-control qty-input" min="0" value="0" placeholder="0">
+        </td>
+        {% endif %}
+        <td>
+            <button type="button" class="btn btn-sm btn-ghost-danger remove-mold-row" title="删除此行">
+                <i class="ti ti-trash"></i>
+            </button>
+        </td>
+    </tr>
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tbody = document.getElementById('mold-matrix-body');
+    const template = document.getElementById('mold-row-template').innerHTML;
+    const moldCountInput = document.getElementById('mold_count');
+
+    function updateMoldCount() {
+        const rows = tbody.querySelectorAll('.mold-row');
+        moldCountInput.value = rows.length;
+        rows.forEach(function(row, idx) {
+            row.querySelectorAll('[name]').forEach(function(el) {
+                el.name = el.name.replace(/^(mold|qty)_\d+/, '$1_' + idx);
+            });
+        });
+    }
+
+    document.getElementById('add-mold-row').addEventListener('click', function () {
+        const count = tbody.querySelectorAll('.mold-row').length;
+        const newRow = template.replace(/__ROW_/g, count);
+        tbody.insertAdjacentHTML('beforeend', newRow);
+        updateMoldCount();
+    });
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-mold-row');
+        if (!btn) return;
+        const row = btn.closest('.mold-row');
+        const rows = tbody.querySelectorAll('.mold-row');
+        if (rows.length <= 1) return;
+        row.remove();
+        updateMoldCount();
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+
+{% block title %}试验排产{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">试验排产</div>
+            <h2 class="page-title">排产总览</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-2">
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-primary text-white avatar">
+                            <i class="ti ti-files"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">总工单数</div>
+                        <div class="h2 mb-0">{{ total_orders }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-azure text-white avatar">
+                            <i class="ti ti-player-play"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">进行中</div>
+                        <div class="h2 mb-0">{{ active_orders }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-green text-white avatar">
+                            <i class="ti ti-check"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">已完成</div>
+                        <div class="h2 mb-0">{{ completed_orders }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-3">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-secondary text-white avatar">
+                            <i class="ti ti-edit"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">草稿</div>
+                        <div class="h2 mb-0">{{ draft_orders }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 进度流 -->
+    <div class="col-12 mt-2">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-timeline me-2"></i>进度流
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    {% for stage in orders_by_status %}
+                    <div class="col-3 col-sm-auto col-md text-center">
+                        <div class="card card-sm" style="min-width: 90px;">
+                            <div class="card-body py-2 px-3 text-center">
+                                <span class="badge {{ stage.css_class }} mb-1" style="font-size: 12px;">
+                                    {{ stage.label }}
+                                </span>
+                                <div class="fw-bold fs-3">{{ stage.count }}</div>
+                                <div class="text-muted" style="font-size: 11px;">个工单</div>
+                            </div>
+                        </div>
+                    </div>
+                    {% if not forloop.last %}
+                    <div class="col-auto d-none d-md-flex align-items-center px-0">
+                        <i class="ti ti-chevron-right text-muted"></i>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 工单列表 (带筛选和分页) -->
+    <div class="col-12 mt-2">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h3 class="card-title">工单列表</h3>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="text-muted small">共 {{ page_obj.paginator.count }} 条</span>
+                    <form method="get" class="d-flex gap-2">
+                        <select name="status" class="form-select form-select-sm" style="width: 140px;" onchange="this.form.submit()">
+                            <option value="">全部状态</option>
+                            {% for key, label in status_choices %}
+                            <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if status_filter %}
+                        <a href="{% url 'trial_production_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="ti ti-x"></i> 清除
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>工单号</th>
+                            <th>实验单号</th>
+                            <th>关联项目</th>
+                            <th>工艺方案</th>
+                            <th>配方数</th>
+                            <th>计划产量(kg)</th>
+                            <th>状态</th>
+                            <th>创建人</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td class="fw-bold">{{ order.code }}</td>
+                            <td>{{ order.trial_code|default:"-" }}</td>
+                            <td>{{ order.project.name|default:"-" }}</td>
+                            <td>{{ order.process_profile.name|default:"-" }}</td>
+                            <td>{{ order.formula_details.count }}</td>
+                            <td>{{ order.quantity_planned }}</td>
+                            <td><span class="badge {{ order.status_css_class }}">{{ order.get_status_display }}</span></td>
+                            <td>{{ order.creator.realname|default:order.creator.username }}</td>
+                            <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                            <td>
+                                <a href="{% url 'trial_production_order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="10" class="text-center py-4 text-muted">暂无工单</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+        </div>
+    </div>
+</div>
+{% endblock %}

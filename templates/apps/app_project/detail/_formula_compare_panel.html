@@ -1,3 +1,4 @@
+{% load project_extras %}
 <style>
     .compare-table td:nth-child(1),
     .compare-table td:nth-child(2),
@@ -123,7 +124,19 @@
                 {% endfor %}
             </tr>
 
-            <!-- 3. BOM 区 -->
+            <!-- 3. 色粉预测成本 -->
+            <tr>
+                <td class="text-start bg-light fw-bold text-pink align-middle"><i class="ti ti-palette me-1"></i>色粉预测成本</td>
+                <td class="align-middle">-</td>
+                <td class="text-muted align-middle">元/kg</td>
+                {% for col in columns %}
+                    <td class="fw-bold text-pink align-middle">
+                        {% if col.type == 'material' %}<span class="text-muted text-opacity-25">-</span>{% elif col.obj.color_powder_bom and col.obj.color_powder_bom.cost %}{{ col.obj.color_powder_bom.cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+
+            <!-- 4. BOM 区 -->
             <tr class="bg-orange-lt">
                 <td class="text-start fw-bold text-orange align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #fef0e6;">
                     <i class="ti ti-list me-1"></i>BOM 结构对比
@@ -147,7 +160,7 @@
                                 {% if cell.is_empty %}
                                     <span class="text-muted text-opacity-25">-</span>
                                 {% else %}
-                                    <span class="fw-bold text-dark">{{ cell.val }}</span>
+                                    <span class="fw-bold text-dark">{{ cell.val|smart_decimal }}</span>
                                 {% endif %}
                             </td>
                         {% endfor %}
@@ -157,7 +170,41 @@
                 <tr><td colspan="{{ columns|length|add:3 }}" class="text-center text-muted py-3">暂无 BOM 数据</td></tr>
             {% endif %}
 
-            <!-- 4. 性能区 -->
+            <!-- 5. 色粉BOM区 -->
+            <tr class="bg-pink-lt">
+                <td class="text-start fw-bold text-pink align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #fbe9f0;">
+                    <i class="ti ti-palette me-1"></i>色粉BOM结构对比
+                </td>
+                {% if columns|length > 1 %}
+                <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #fbe9f0;">&nbsp;</td>
+                {% endif %}
+            </tr>
+            {% if cpbom_matrix %}
+                {% for row in cpbom_matrix %}
+                    <tr>
+                        <td class="text-start align-middle text-muted small">{{ row.item.category.name }}</td>
+                        <td class="text-start align-middle">
+                            <div class="fw-bold text-truncate" title="{{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}">
+                                {{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}
+                            </div>
+                        </td>
+                        <td class="text-muted align-middle">%</td>
+                        {% for cell in row.values %}
+                            <td class="align-middle">
+                                {% if cell.is_empty %}
+                                    <span class="text-muted text-opacity-25">-</span>
+                                {% else %}
+                                    <span class="fw-bold text-dark">{{ cell.val|smart_decimal }}</span>
+                                {% endif %}
+                            </td>
+                        {% endfor %}
+                    </tr>
+                {% endfor %}
+            {% else %}
+                <tr><td colspan="{{ columns|length|add:3 }}" class="text-center text-muted py-3">暂无 色粉BOM 数据</td></tr>
+            {% endif %}
+
+            <!-- 6. 性能区 -->
             <tr class="bg-purple-lt">
                 <td class="text-start fw-bold text-purple align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #f1ebf8;">
                     <i class="ti ti-flask me-1"></i>性能指标对比

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_1"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- ====================================================================
+       排产工单审批流程 — 产前审批
+
+       流程说明:
+         创建排产单 → 提交审批 → 产前审批
+           ├─ 通过 → 进入挤出生产 (EXTRUDING)
+           └─ 驳回 → 退回草稿 (DRAFT)
+
+       camunda:candidateGroups 由用户在审批流模块自行配置
+       ==================================================================== -->
+
+  <bpmn:process id="production_order_approval" name="排产工单审批流程" isExecutable="true">
+
+    <!-- ── 开始事件 ── -->
+    <bpmn:startEvent id="StartEvent" name="发起排产审批">
+      <bpmn:outgoing>Flow_to_review</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <!-- ── 产前审批 ── -->
+    <bpmn:userTask id="Task_pre_production_review" name="产前审批">
+      <bpmn:incoming>Flow_to_review</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <!-- ── 审批结果判断 ── -->
+    <bpmn:exclusiveGateway id="Gateway_decision" name="审批结果">
+      <bpmn:incoming>Flow_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_approved</bpmn:outgoing>
+      <bpmn:outgoing>Flow_rejected</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <!-- ── 审批通过 → 进入挤出生产 ── -->
+    <bpmn:endEvent id="EndEvent_approved" name="审批通过">
+      <bpmn:incoming>Flow_approved</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ── 审批驳回 → 退回草稿 ── -->
+    <bpmn:endEvent id="EndEvent_rejected" name="审批驳回">
+      <bpmn:incoming>Flow_rejected</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <!-- ===== 连线定义 ===== -->
+    <bpmn:sequenceFlow id="Flow_to_review" sourceRef="StartEvent" targetRef="Task_pre_production_review" />
+    <bpmn:sequenceFlow id="Flow_to_gateway" sourceRef="Task_pre_production_review" targetRef="Gateway_decision" />
+
+    <bpmn:sequenceFlow id="Flow_approved" sourceRef="Gateway_decision" targetRef="EndEvent_approved">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">Task_pre_production_review_action == 'APPROVE'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+    <bpmn:sequenceFlow id="Flow_rejected" sourceRef="Gateway_decision" targetRef="EndEvent_rejected">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">Task_pre_production_review_action == 'REJECT'</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+
+  </bpmn:process>
+
+  <!-- ===== 图示布局 ===== -->
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="production_order_approval">
+
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent">
+        <dc:Bounds x="180" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Task_review_di" bpmnElement="Task_pre_production_review">
+        <dc:Bounds x="280" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="Gateway_di" bpmnElement="Gateway_decision">
+        <dc:Bounds x="440" y="225" width="50" height="50" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_approved_di" bpmnElement="EndEvent_approved">
+        <dc:Bounds x="550" y="160" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNShape id="EndEvent_rejected_di" bpmnElement="EndEvent_rejected">
+        <dc:Bounds x="550" y="310" width="36" height="36" />
+      </bpmndi:BPMNShape>
+
+      <!-- 连线坐标 -->
+      <bpmndi:BPMNEdge id="Flow_to_review_di" bpmnElement="Flow_to_review">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="216" y="248" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="280" y="250" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_to_gateway_di" bpmnElement="Flow_to_gateway">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="380" y="250" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="440" y="250" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_approved_di" bpmnElement="Flow_approved">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="465" y="225" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="550" y="178" />
+      </bpmndi:BPMNEdge>
+
+      <bpmndi:BPMNEdge id="Flow_rejected_di" bpmnElement="Flow_rejected">
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="465" y="275" />
+        <di:waypoint xmlns:di="http://www.omg.org/spec/DD/20100524/DI" x="550" y="328" />
+      </bpmndi:BPMNEdge>
+
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

@@ -14,6 +14,10 @@ class IdentityConfig:
     R_SALES = User.UserType.SALES
     R_PURCHASING = User.UserType.PURCHASING
     R_ADMIN = User.UserType.ADMIN
+    R_EXTRUSION_OP = User.UserType.EXTRUSION_OPERATOR
+    R_COLOR_OP = User.UserType.COLOR_OPERATOR
+    R_INJECTION_OP = User.UserType.INJECTION_OPERATOR
+    R_TESTING_OP = User.UserType.TESTING_OPERATOR
 
     # 技术核心：涉及研发、工艺、配方的全员
     TECH_CORE = [R_ENGINEER, R_PROCESS, R_ADMIN]
@@ -27,8 +31,12 @@ class IdentityConfig:
     # 供应链/采购核心
     SUPPLY_CHAIN = [R_PURCHASING, R_ADMIN]
 
-    # 内部全员 (包含采购)
-    INTERNAL_STAFF = [R_ENGINEER, R_PROCESS, R_SALES, R_PURCHASING, R_ADMIN]
+    # 生产操作人员
+    PRODUCTION_CREW = [R_EXTRUSION_OP, R_COLOR_OP, R_INJECTION_OP, R_TESTING_OP, R_ADMIN]
+
+    # 内部全员 (包含采购 + 生产操作人员)
+    INTERNAL_STAFF = [R_ENGINEER, R_PROCESS, R_SALES, R_PURCHASING, R_ADMIN,
+                      R_EXTRUSION_OP, R_COLOR_OP, R_INJECTION_OP, R_TESTING_OP]
 
 
 class UnifiedAccessMixin(PermissionRequiredMixin):

@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load project_extras %}
 
 {% block content %}
     <div class="page-header d-print-none mb-3">
@@ -58,7 +59,7 @@
                                     </a>
                                     <span class="text-muted small">({{ item.raw_material.model_name }})</span>
                                 </td>
-                                <td class="fs-3">{{ item.percentage }}</td>
+                                <td class="fs-3">{{ item.percentage|smart_decimal }}</td>
                                 <td>
                                     {% if item.is_pre_mix %}
                                         <span class="badge bg-purple-lt">

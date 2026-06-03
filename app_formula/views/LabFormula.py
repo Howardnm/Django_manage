@@ -14,6 +14,45 @@ from app_formula.utils.filters import LabFormulaFilter
 from app_formula.mixins import FormulaAccessMixin
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
+from django.utils.safestring import mark_safe
+
+
+def _build_formula_error_message(form, bom_formset=None, test_formset=None):
+    """构建详细的字段错误信息（主表单 + BOM明细 + 测试结果）"""
+    lines = ['<strong>保存失败，请修正以下问题：</strong>']
+    found = False
+
+    for field_name, errs in form.errors.items():
+        for e in errs:
+            if field_name == '__all__':
+                lines.append(f'• {e}')
+            else:
+                label = form[field_name].label if field_name in form.fields else field_name
+                lines.append(f'• {label}: {e}')
+            found = True
+
+    for label, formset in [('BOM明细', bom_formset), ('测试结果', test_formset)]:
+        if not formset:
+            continue
+        for e in formset.non_form_errors():
+            lines.append(f'• {label}: {e}')
+            found = True
+        for i, sf in enumerate(formset):
+            if not sf.errors:
+                continue
+            for field_name, errs in sf.errors.items():
+                for e in errs:
+                    if field_name == '__all__':
+                        lines.append(f'• {label} 第{i+1}行: {e}')
+                    else:
+                        flabel = sf[field_name].label if field_name in sf.fields else field_name
+                        lines.append(f'• {label} 第{i+1}行 {flabel}: {e}')
+                    found = True
+
+    if not found:
+        lines.append('• 请检查各字段的错误提示信息。')
+
+    return mark_safe('<br>'.join(lines))
 
 
 class FormulaPrepareView(ProjectAccessMixin, View):
@@ -460,12 +499,17 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
 
         return created
 
+    def form_invalid(self, form):
+        messages.error(self.request, _build_formula_error_message(form))
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         self.request.session.pop('formula_prepare', None)
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
         if not (bom_formset.is_valid() and test_formset.is_valid()):
+            messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
             return self.render_to_response(self.get_context_data(form=form))
         created = self._create_formula_variants(form, bom_formset, test_formset)
         self.object = created[0]
@@ -744,11 +788,16 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
 
         return updated
 
+    def form_invalid(self, form):
+        messages.error(self.request, _build_formula_error_message(form))
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
         if not (bom_formset.is_valid() and test_formset.is_valid()):
+            messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
             return self.render_to_response(self.get_context_data(form=form))
 
         if context.get('batch_edit_mode'):
@@ -847,11 +896,16 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
         })
         return initial
 
+    def form_invalid(self, form):
+        messages.error(self.request, _build_formula_error_message(form))
+        return super().form_invalid(form)
+
     def form_valid(self, form):
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
         if not (bom_formset.is_valid() and test_formset.is_valid()):
+            messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
             return self.render_to_response(self.get_context_data(form=form))
         form.instance.pk = None
         form.instance.code = None

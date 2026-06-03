@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+
+{% block title %}样品库存{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">样品库存</h2>
+            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="card-header">
+        <ul class="nav nav-tabs card-header-tabs">
+            <li class="nav-item">
+                <a class="nav-link {% if not current_status %}active{% endif %}"
+                   href="{% url 'trial_sample_inventory' %}">
+                    <i class="ti ti-package me-1"></i>在库/已寄出
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if current_status == 'SHIPPED' %}active{% endif %}"
+                   href="?status=SHIPPED">
+                    <i class="ti ti-truck-delivery me-1"></i>已寄出
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if current_status == 'USED' %}active{% endif %}"
+                   href="?status=USED">
+                    <i class="ti ti-check me-1"></i>已消耗
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if current_status == 'IN_STOCK' %}active{% endif %}"
+                   href="?status=IN_STOCK">
+                    <i class="ti ti-building-warehouse me-1"></i>在库
+                </a>
+            </li>
+        </ul>
+    </div>
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap">
+            <thead>
+                <tr>
+                    <th>工单号</th>
+                    <th>实验单号</th>
+                    <th>配方版本</th>
+                    <th>分拨目的</th>
+                    <th>数量(kg)</th>
+                    <th>状态</th>
+                    <th>存放位置</th>
+                    <th>客户</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sample in samples %}
+                <tr>
+                    <td class="fw-bold">{{ sample.production_order.code }}</td>
+                    <td>{{ sample.production_order.trial_code|default:"-" }}</td>
+                    <td>
+                        {% if sample.sample_split.formula %}
+                        <span class="badge bg-azure-lt">v{{ sample.sample_split.formula.version }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if sample.sample_split %}
+                        <span class="badge bg-secondary-lt">{{ sample.sample_split.get_destination_display }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>{{ sample.quantity }}</td>
+                    <td>
+                        {% if sample.status == 'IN_STOCK' %}
+                        <span class="badge bg-green-lt">在库</span>
+                        {% elif sample.status == 'SHIPPED' %}
+                        <span class="badge bg-blue-lt">已寄出</span>
+                        {% else %}
+                        <span class="badge bg-secondary-lt">已消耗</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ sample.storage_location|default:"-" }}</td>
+                    <td>{{ sample.customer_name|default:"-" }}</td>
+                    <td>{{ sample.created_at|date:"Y-m-d" }}</td>
+                    <td>
+                        {% if sample.status == 'IN_STOCK' %}
+                        <a href="{% url 'trial_sample_ship' sample.pk %}" class="btn btn-sm btn-outline-primary">
+                            <i class="ti ti-truck-delivery me-1"></i>寄出
+                        </a>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="10" class="text-center py-4 text-muted">暂无样品库存</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+</div>
+{% endblock %}

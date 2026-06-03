@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+
+{% block title %}挤出生产记录 - {{ production_order.code }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_production_order_detail' production_order.pk %}">{{ production_order.code }}</a></li>
+                        <li class="breadcrumb-item active">挤出生产记录</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">挤出生产记录</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger mt-3">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row row-cards mt-3">
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-red-lt">
+                    <h3 class="card-title text-red"><i class="ti ti-temperature me-2"></i>温度参数 (℃)</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_1.label }}</label>
+                            {{ form.temp_zone_1 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_2.label }}</label>
+                            {{ form.temp_zone_2 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_3.label }}</label>
+                            {{ form.temp_zone_3 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_4.label }}</label>
+                            {{ form.temp_zone_4 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_5.label }}</label>
+                            {{ form.temp_zone_5 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_6.label }}</label>
+                            {{ form.temp_zone_6 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_7.label }}</label>
+                            {{ form.temp_zone_7 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_8.label }}</label>
+                            {{ form.temp_zone_8 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_9.label }}</label>
+                            {{ form.temp_zone_9 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_10.label }}</label>
+                            {{ form.temp_zone_10 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_11.label }}</label>
+                            {{ form.temp_zone_11 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_zone_12.label }}</label>
+                            {{ form.temp_zone_12 }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.temp_head.label }}</label>
+                            {{ form.temp_head }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card">
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue"><i class="ti ti-engine me-2"></i>主机参数</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.screw_speed.label }}</label>
+                            {{ form.screw_speed }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.torque.label }}</label>
+                            {{ form.torque }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.current.label }}</label>
+                            {{ form.current }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.melt_pressure.label }}</label>
+                            {{ form.melt_pressure }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.melt_temp.label }}</label>
+                            {{ form.melt_temp }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.vacuum.label }}</label>
+                            {{ form.vacuum }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-green-lt">
+                    <h3 class="card-title text-green"><i class="ti ti-arrow-forward-up me-2"></i>喂料参数</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.main_feeder_speed.label }}</label>
+                            {{ form.main_feeder_speed }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.side_feeder_speed.label }}</label>
+                            {{ form.side_feeder_speed }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.liquid_pump_speed.label }}</label>
+                            {{ form.liquid_pump_speed }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header bg-purple-lt">
+                    <h3 class="card-title text-purple"><i class="ti ti-settings me-2"></i>产能与后处理</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.throughput.label }}</label>
+                            {{ form.throughput }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.cooling_method.label }}</label>
+                            {{ form.cooling_method }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.strand_count.label }}</label>
+                            {{ form.strand_count }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.water_temp.label }}</label>
+                            {{ form.water_temp }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.water_bath_length.label }}</label>
+                            {{ form.water_bath_length }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.air_knife_pressure.label }}</label>
+                            {{ form.air_knife_pressure }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.pelletizing_speed.label }}</label>
+                            {{ form.pelletizing_speed }}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label">{{ form.screen_mesh.label }}</label>
+                            {{ form.screen_mesh }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h3 class="card-title">备注</h3>
+                </div>
+                <div class="card-body">
+                    {{ form.remark }}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-body">
+                    <div class="form-footer text-end">
+                        <a href="{% url 'trial_production_order_detail' production_order.pk %}" class="btn btn-link link-secondary">取消</a>
+                        <button type="submit" class="btn btn-primary ms-auto">
+                            <i class="ti ti-check me-1"></i>保存记录
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}

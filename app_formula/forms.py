@@ -1,15 +1,28 @@
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
-from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
+from common_utils.filters import TablerFormMixin
 from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
-from app_material.models import TestConfig, MaterialLibrary
+from app_material.models import TestConfig
 from app_raw_material.models import RawMaterial
 from app_basic_research.models import ResearchProject
 from app_project.models import Project, ProjectNode
 
+
+class _IsInvalidMixin:
+    """在 _post_clean 中给有错误的字段添加 is-invalid CSS 类"""
+    def _post_clean(self):
+        super()._post_clean()
+        for field_name in self.errors:
+            if field_name in self.fields:
+                field = self.fields[field_name]
+                cls = field.widget.attrs.get('class', '')
+                if 'is-invalid' not in cls:
+                    field.widget.attrs['class'] = f'{cls} is-invalid'.strip()
+
+
 # 1. 配方主表单
-class LabFormulaForm(TablerFormMixin, forms.ModelForm):
+class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     class Meta:
         model = LabFormula
         fields = ['code', 'name', 'material_type', 'process', 'project', 'project_node', 'research_projects', 'cost_actual', 'is_mature', 'description']
@@ -107,10 +120,9 @@ class LabFormulaForm(TablerFormMixin, forms.ModelForm):
 
 
 # 2. BOM 明细表单
-class FormulaBOMForm(TablerFormMixin, forms.ModelForm):
+class FormulaBOMForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     class Meta:
         model = FormulaBOM
-        # 【新增】weighing_scale 字段
         fields = ['feeding_port', 'weighing_scale', 'raw_material', 'percentage', 'is_tail', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time']
         widgets = {
             'feeding_port': forms.Select(attrs={'class': 'form-select'}),
@@ -123,7 +135,7 @@ class FormulaBOMForm(TablerFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         rm_ids = set()
-        
+
         # 1. 如果表单已绑定数据 (POST 请求)，从 POST 数据中获取 raw_material 的 ID
         if self.data:
             field_key = self.add_prefix('raw_material')
@@ -154,20 +166,16 @@ class FormulaBOMForm(TablerFormMixin, forms.ModelForm):
 
 
 # 3. 测试结果表单
-class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
-    # 动态添加的选择字段，用于 data_type='SELECT' 的情况
+class FormulaTestResultForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     value_select = forms.ChoiceField(choices=[], required=False, widget=forms.Select(attrs={'class': 'form-select value-select', 'style': 'display:none;'}))
 
     class Meta:
         model = FormulaTestResult
-        fields = ['test_config', 'value', 'value_text', 'test_date', 'remark'] # 增加 value_text
+        fields = ['test_config', 'value', 'value_text', 'test_date', 'remark']
         widgets = {
-            # 【修改】移除 remote-search 类，改为 form-select-search (普通搜索)
             'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
-            # 【修改】允许3位小数
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
-            'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}), # 默认隐藏
-            # 【修复】为 test_date 明确指定 format 和 type
+            'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
             'test_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
@@ -223,35 +231,63 @@ class FormulaTestResultForm(TablerFormMixin, forms.ModelForm):
             
         return cleaned_data
 
-# 【新增】自定义 FormSet，用于控制查询集的排序
 class BaseFormulaTestResultFormSet(BaseInlineFormSet):
     def get_queryset(self):
-        # 默认的 get_queryset 不会 select_related，也不会按 TestConfig 排序
-        # 这里我们重写它，确保编辑时显示的顺序是正确的
         if not hasattr(self, '_queryset'):
-            # 【修复】这里不能直接调用 super().get_queryset()，因为 BaseInlineFormSet 的 get_queryset 
-            # 依赖于 self.instance (即 LabFormula 对象)。
-            # 如果是 CreateView，self.instance 是一个新的未保存对象，没有关联的 test_results，
-            # 所以 super().get_queryset() 会返回空 QuerySet，这是正常的。
-            # 但如果我们在 CreateView 中传入了 queryset=LabFormula.objects.none() (为了显示空行)，
-            # 这里的逻辑可能会有问题。
-            
-            # 关键点：FieldError: Cannot resolve keyword 'test_config' into field.
-            # 这说明我们试图对 LabFormula 进行排序，而不是 FormulaTestResult。
-            # BaseInlineFormSet.get_queryset 返回的是 FormulaTestResult 的 QuerySet。
-            
             qs = super().get_queryset()
-            
-            # 只有当 qs 是 FormulaTestResult 的 QuerySet 时，才能按 test_config 排序
             if qs.model == FormulaTestResult:
                 self._queryset = qs.select_related('test_config', 'test_config__category').order_by(
-                    'test_config__category__order', 
+                    'test_config__category__order',
                     'test_config__order'
                 )
             else:
                 self._queryset = qs
-                
         return self._queryset
+
+    def _is_form_deleted(self, form):
+        """判断 form 是否被标记为删除"""
+        # 优先从 cleaned_data 读取
+        try:
+            return bool(form.cleaned_data.get('DELETE'))
+        except AttributeError:
+            pass
+        # 兜底：直接从原始 POST 数据检查
+        try:
+            return bool(form.data.get(form.add_prefix('DELETE')))
+        except Exception:
+            return False
+
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+
+        # 补充检查：新增行是否与数据库中已有记录重复
+        # Django 的 validate_unique 只检查 formset 内部，不检查与 DB 的冲突
+        if self.instance and self.instance.pk:
+            deleting_ids = {
+                form.instance.pk
+                for form in self.forms
+                if self.can_delete and self._is_form_deleted(form)
+                if form.instance and form.instance.pk
+            }
+            existing_tc_ids = set(
+                FormulaTestResult.objects
+                .filter(formula=self.instance)
+                .exclude(pk__in=deleting_ids)
+                .values_list('test_config_id', flat=True)
+            )
+            if existing_tc_ids:
+                for form in self.forms:
+                    if self._is_form_deleted(form):
+                        continue
+                    if form.instance and form.instance.pk:
+                        continue
+                    tc = form.cleaned_data.get('test_config')
+                    if tc and tc.pk in existing_tc_ids:
+                        raise forms.ValidationError(
+                            '测试项目"%s"已存在于此配方中，请勿重复添加。' % tc.name
+                        )
 
 # 定义 FormSet
 FormulaBOMFormSet = inlineformset_factory(
@@ -266,7 +302,7 @@ FormulaTestResultFormSet = inlineformset_factory(
     LabFormula,
     FormulaTestResult,
     form=FormulaTestResultForm,
-    formset=BaseFormulaTestResultFormSet, # 使用自定义 FormSet
+    formset=BaseFormulaTestResultFormSet,
     extra=0,
     can_delete=True
 )

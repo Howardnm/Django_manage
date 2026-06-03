@@ -34,6 +34,12 @@ urlpatterns = [
     # 核心 API 重构：由 app_material_api 管控
     path('api/material/', include('app_material_api.urls')),
 
+    # 试验排产模块
+    path('trial-production/', include('app_trial_production.urls')),
+
+    # SAP 集成服务
+    path('sap/', include('app_sap_services.urls')),
+
     # MCP Server 接口
     path('mcp/', include('app_mcp_server.urls')),
     

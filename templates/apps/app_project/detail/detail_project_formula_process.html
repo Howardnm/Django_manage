@@ -14,6 +14,16 @@
     .formula-group-toggle:hover {
         background-color: rgba(0,0,0,.03) !important;
     }
+    .compact-table td {
+        padding: 4px 4px;
+        vertical-align: middle;
+        font-size: 13px;
+    }
+    .compact-table th {
+        padding: 4px 6px;
+        white-space: nowrap;
+        font-size: 13px;
+    }
 </style>
 <div class="page-header d-print-none mb-3">
     <div class="row align-items-center">
@@ -197,6 +207,17 @@
                             <a href="{% url 'formula_detail' selected_formula.pk %}" class="btn btn-outline-primary btn-sm" target="_blank">
                                 <i class="ti ti-external-link me-1"></i> 打开详情
                             </a>
+                            <form method="post" action="{% url 'trial_production_order_initiate' %}" class="d-inline">
+                                {% csrf_token %}
+                                <input type="hidden" name="trial_code" value="{{ selected_formula.code }}">
+                                <input type="hidden" name="project_id" value="{{ project.pk }}">
+                                {% if selected_formula.project_node %}
+                                <input type="hidden" name="project_node_id" value="{{ selected_formula.project_node.pk }}">
+                                {% endif %}
+                                <button type="submit" class="btn btn-outline-success btn-sm">
+                                    <i class="ti ti-factory me-1"></i> 试验排产
+                                </button>
+                            </form>
                         </div>
                     </div>
                 </div>
@@ -208,7 +229,7 @@
                     <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table">
+                    <table class="table table-vcenter card-table compact-table">
                         <thead>
                         <tr>
                             <th>喂料口</th>
@@ -231,7 +252,7 @@
                                     </a>
                                     <span class="text-muted small">({{ item.raw_material.model_name }})</span>
                                 </td>
-                                <td class="fs-3">{{ item.percentage }}</td>
+                                <td class="fs-3">{{ item.percentage|smart_decimal }}</td>
                                 <td>
                                     {% if item.is_pre_mix %}
                                         <span class="badge bg-purple-lt">{{ item.pre_mix_order }}. 共混({{ item.pre_mix_time }}s)</span>
@@ -254,13 +275,72 @@
                 </div>
             </div>
 
+            {% if selected_formula.color_powder_bom %}
+            <!-- 色粉BOM -->
+            <div class="card mb-3">
+                <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-orange mb-0">
+                        <i class="ti ti-palette me-2"></i>色粉配比BOM
+                        <span class="badge bg-green-lt ms-1">已填写</span>
+                        {% if selected_formula.color_powder_bom.cost %}
+                        <span class="badge bg-yellow-lt ms-1">¥{{ selected_formula.color_powder_bom.cost }}/kg</span>
+                        {% endif %}
+                    </h3>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table compact-table">
+                        <thead>
+                        <tr>
+                            <th>喂料口</th>
+                            <th>原材料类型</th>
+                            <th>颜料/色粉</th>
+                            <th>比例(份) <span class="fw-bold small">kg/100kg</span></th>
+                            <th>共混信息</th>
+                            <th>分秤</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for entry in selected_formula.color_powder_bom.entries.all %}
+                        <tr>
+                            <td><span class="badge bg-secondary-lt">{{ entry.get_feeding_port_display }}</span></td>
+                            <td><span class="badge bg-blue-lt">{{ entry.raw_material.category.name }}</span></td>
+                            <td class="fw-bold">
+                                <a href="{% url 'raw_material_detail' entry.raw_material.pk %}" target="_blank" class="text-reset">
+                                    {{ entry.raw_material.name }}
+                                </a>
+                                <span class="text-muted small">({{ entry.raw_material.model_name }})</span>
+                            </td>
+                            <td class="fs-3">{{ entry.percentage|smart_decimal }}</td>
+                            <td>
+                                {% if entry.is_pre_mix %}
+                                    <span class="badge bg-purple-lt">{{ entry.pre_mix_order }}. 共混({{ entry.pre_mix_time }}s)</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>
+                                {% if entry.weighing_scale %}
+                                    <span class="badge bg-azure-lt">{{ entry.get_weighing_scale_display }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if selected_formula.color_powder_bom.remark %}
+                <div class="card-footer text-muted small">
+                    <i class="ti ti-notes me-1"></i>备注: {{ selected_formula.color_powder_bom.remark }}
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
             <!-- 测试结果 -->
             <div class="card mb-3">
                 <div class="card-header bg-purple-lt">
                     <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table">
+                    <table class="table table-vcenter card-table compact-table">
                         <thead>
                         <tr>
                             <th>分类</th>

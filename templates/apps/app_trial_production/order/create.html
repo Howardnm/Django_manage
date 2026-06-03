@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+
+{% block title %}创建生产工单{% endblock %}
+
+{% block extra_css %}
+<style>
+    .bom-table th, .bom-table td {
+        padding: 4px 8px;
+        font-size: 13px;
+        vertical-align: middle;
+    }
+    .bom-table thead th {
+        text-align: center;
+    }
+    .bom-table .pct-cell {
+        text-align: right;
+    }
+    .bom-table .row-title {
+        width: 1%;
+        white-space: nowrap;
+    }
+    .mold-matrix th, .mold-matrix td {
+        padding: 6px 10px;
+        vertical-align: middle;
+    }
+    .mold-matrix thead th {
+        text-align: center;
+    }
+    .mold-matrix .form-control,
+    .mold-matrix .form-select {
+        padding: 2px 6px;
+        font-size: 13px;
+        min-height: 30px;
+    }
+    .qty-input {
+        width: 80px;
+    }
+    .test-masonry {
+        column-count: 3;
+        column-gap: 1rem;
+    }
+    .test-masonry .test-masonry-item {
+        break-inside: avoid;
+        margin-bottom: 1rem;
+    }
+    @media (max-width: 992px) {
+        .test-masonry { column-count: 2; }
+    }
+    @media (max-width: 576px) {
+        .test-masonry { column-count: 1; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_production_order_list' %}">工单列表</a></li>
+                        <li class="breadcrumb-item active">创建工单</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">创建生产工单</h2>
+            {% if trial_code %}
+            <div class="text-muted mt-1">实验单号: <strong>{{ trial_code }}</strong></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<form method="post" id="order-create-form">
+    {% csrf_token %}
+    <input type="hidden" name="mold_count" id="mold_count" value="{{ test_specimen_molds|length }}">
+    {% if initiate_data %}
+    <input type="hidden" name="trial_code" value="{{ initiate_data.trial_code }}">
+    <input type="hidden" name="project_id" value="{{ initiate_data.project_id }}">
+    <input type="hidden" name="project_node_id" value="{{ initiate_data.project_node_id }}">
+    {% endif %}
+
+    <div class="mt-3">
+
+            <!-- 工单信息 -->
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title"><i class="ti ti-file-text me-2"></i>工单信息</h3></div>
+                <div class="card-body">
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    {% endif %}
+
+                    {% if initiate_data %}
+                    <div class="datagrid mb-3">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">关联项目</div>
+                            <div class="datagrid-content">{{ initiate_data.project_name|default:"-" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">实验单号</div>
+                            <div class="datagrid-content fw-bold">{{ initiate_data.trial_code }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">配方名称</div>
+                            <div class="datagrid-content">{{ initiate_data.formula_name|default:"-" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">配方版本数</div>
+                            <div class="datagrid-content">{{ trial_formulas|length }} 个版本</div>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">工艺方案 {{ form.process_profile.field.required|yesno:"*," }}</label>
+                            {{ form.process_profile }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label">{{ form.remark.label }}</label>
+                            {{ form.remark }}
+                        </div>
+                    </div>
+                    <span class="d-none">{{ form.quantity_planned }}</span>
+                </div>
+            </div>
+
+            {% if trial_formulas %}
+            <!-- 计划产量 (按配方版本分别填写) -->
+            <div class="card mb-3">
+                <div class="card-header bg-green-lt d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-green"><i class="ti ti-weight me-2"></i>计划产量</h3>
+                    <span>总计划产量: <strong id="total-planned-qty">0</strong> kg</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-bordered card-table bom-table text-center" style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th class="row-title">配方版本</th>
+                                {% for f in trial_formulas %}
+                                <th class="row-title"><span class="badge bg-azure-lt">v{{ f.version }}</span></th>
+                                {% endfor %}
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <th class="row-title text-end text-muted small">计划产量(kg)</th>
+                                {% for f in trial_formulas %}
+                                <td>
+                                    <input type="number" name="planned_qty_{{ f.pk }}"
+                                           class="form-control form-control-sm planned-qty text-center"
+                                           min="0" step="0.1" value="0" placeholder="0"
+                                           data-formula-pk="{{ f.pk }}"
+                                           style="width:80px; margin:0 auto;">
+                                </td>
+                                {% endfor %}
+                                <td></td>
+                            </tr>
+                            <tr>
+                                <th class="row-title text-end text-muted small">需要配色</th>
+                                {% for f in trial_formulas %}
+                                <td>
+                                    <label class="form-check form-check-inline mb-0">
+                                        <input type="checkbox" name="needs_color_{{ f.pk }}"
+                                               class="form-check-input needs-color-cb"
+                                               data-formula-pk="{{ f.pk }}">
+                                    </label>
+                                </td>
+                                {% endfor %}
+                                <td></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- BOM 明细 & 配料表 (比例 + 配料量按配方交叉显示) -->
+            <div class="card mb-3" id="feeding-table-card">
+                <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM明细 & 配料表</h3>
+                    <span class="badge bg-orange-lt">{{ trial_formulas|length }} 个版本</span>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-bordered card-table bom-table text-nowrap" style="font-size:13px;">
+                        <thead>
+                            <tr>
+                                <th rowspan="2">喂料口</th>
+                                <th rowspan="2">原材料类型</th>
+                                <th rowspan="2">原材料</th>
+                                {% for f in trial_formulas %}
+                                <th colspan="2" class="text-center">
+                                    <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                </th>
+                                {% endfor %}
+                                <th rowspan="2" class="bg-green-lt">合计</th>
+                                <th rowspan="2">共混信息</th>
+                                <th rowspan="2">分秤</th>
+                                <th rowspan="2">备注</th>
+                            </tr>
+                            <tr>
+                                {% for f in trial_formulas %}
+                                <th class="bg-info-lt">比例</th>
+                                <th>配料(kg)</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody id="feeding-table-body">
+                            {% for row in merged_bom_rows %}
+                            <tr class="feeding-row" data-row="{{ forloop.counter0 }}">
+                                <td><span class="badge bg-secondary-lt">{{ row.feeding_port }}</span></td>
+                                <td><span class="badge bg-blue-lt">{{ row.raw_material.category.name }}</span></td>
+                                <td class="fw-bold">{{ row.raw_material.name }}
+                                    <span class="text-muted small">({{ row.raw_material.model_name }})</span>
+                                </td>
+                                {% for col in row.pct_columns %}
+                                <td class="pct-cell fw-bold bg-info-lt">{{ col.value|default:"-" }}</td>
+                                <td class="pct-cell fw-bold feeding-qty-cell"
+                                     data-row="{{ forloop.parentloop.counter0 }}"
+                                     data-formula-pk="{{ col.formula_pk }}">-</td>
+                                {% endfor %}
+                                <td class="pct-cell fw-bold feeding-row-total bg-green-lt" data-row="{{ forloop.counter0 }}">-</td>
+                                <td>
+                                    {% if row.is_pre_mix %}
+                                    <span class="badge bg-purple-lt">共混{{ row.pre_mix_order }} ({{ row.pre_mix_time }}s)</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if row.weighing_scale %}
+                                    <span class="badge bg-azure-lt">{{ row.weighing_scale }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if row.is_tail %}<span class="badge bg-orange-lt">尾料回掺</span>{% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="99" class="text-center text-muted py-2">请先填写上方计划产量</td></tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot id="feeding-total-foot" style="display:none;">
+                            <tr class="bg-green-lt">
+                                <td colspan="3" class="fw-bold text-end">合计</td>
+                                {% for f in trial_formulas %}
+                                <td class="pct-cell fw-bold text-muted bg-green-lt">-</td>
+                                <td class="pct-cell fw-bold feeding-formula-total bg-green-lt" data-formula-pk="{{ f.pk }}">0</td>
+                                {% endfor %}
+                                <td class="pct-cell fw-bold bg-green-lt" id="feeding-grand-total">0</td>
+                                <td colspan="3"></td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- 注塑需求（模具 × 配方矩阵） -->
+            <div class="card mt-3">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h3 class="card-title"><i class="ti ti-mold me-2"></i>注塑需求（模具 × 配方矩阵）</h3>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-mold-row">
+                        <i class="ti ti-plus me-1"></i>新增模具
+                    </button>
+                </div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter table-bordered mold-matrix" id="mold-matrix-table">
+                        <thead>
+                            <tr>
+                                <th style="min-width:250px;">模具</th>
+                                {% if trial_formulas %}
+                                {% for f in trial_formulas %}
+                                <th>
+                                    <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                    <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                                </th>
+                                {% endfor %}
+                                {% else %}
+                                <th>注塑数量</th>
+                                {% endif %}
+                                <th style="width:50px;">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mold-matrix-body">
+                            {% for mold in test_specimen_molds %}
+                            <tr class="mold-row" data-row="{{ forloop.counter0 }}">
+                                <td>
+                                    <select name="mold_{{ forloop.counter0 }}" class="form-select mold-select">
+                                        <option value="">-- 选择模具 --</option>
+                                        {% for mt in mold_types %}
+                                        <option value="{{ mt.pk }}" {% if mt.pk == mold.pk %}selected{% endif %}>{{ mt.name }} [{{ mt.mold_code }}] ×{{ mt.cavity_count }}穴 {{ mt.standard }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                {% if trial_formulas %}
+                                {% for f in trial_formulas %}
+                                <td>
+                                    <input type="number" name="qty_{{ forloop.parentloop.counter0 }}_{{ f.pk }}"
+                                           class="form-control qty-input" min="0" value="0" placeholder="0">
+                                </td>
+                                {% endfor %}
+                                {% else %}
+                                <td>
+                                    <input type="number" name="qty_{{ forloop.counter0 }}"
+                                           class="form-control qty-input" min="0" value="0" placeholder="0">
+                                </td>
+                                {% endif %}
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-ghost-danger remove-mold-row" title="删除此行">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr class="mold-row" data-row="0">
+                                <td>
+                                    <select name="mold_0" class="form-select mold-select">
+                                        <option value="">-- 选择模具 --</option>
+                                        {% for mt in mold_types %}
+                                        <option value="{{ mt.pk }}">{{ mt.name }} [{{ mt.mold_code }}] ×{{ mt.cavity_count }}穴 {{ mt.standard }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </td>
+                                {% if trial_formulas %}
+                                {% for f in trial_formulas %}
+                                <td>
+                                    <input type="number" name="qty_0_{{ f.pk }}"
+                                           class="form-control qty-input" min="0" value="0" placeholder="0">
+                                </td>
+                                {% endfor %}
+                                {% else %}
+                                <td>
+                                    <input type="number" name="qty_0"
+                                           class="form-control qty-input" min="0" value="0" placeholder="0">
+                                </td>
+                                {% endif %}
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-ghost-danger remove-mold-row" title="删除此行">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <div class="rounded bg-warning-lt text-warning mb-0 p-2 d-flex align-items-center gap-2">
+                        <i class="ti ti-info-circle fs-4"></i>
+                        <span>填写注塑<strong>次数</strong>（非样条数量）。实际样条数 = 注塑次数 × 模具穴数，数量为0则不创建该配方版本的注塑需求</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 测试需求 -->
+            <div class="card mt-3">
+                <div class="card-header bg-yellow-lt">
+                    <h3 class="card-title text-yellow"><i class="ti ti-test-pipe me-2"></i>测试需求</h3>
+                </div>
+                <div class="card-body">
+                    {% if grouped_test_items %}
+                    <div class="test-masonry">
+                        {% for group in grouped_test_items %}
+                        <div class="test-masonry-item">
+                            <div class="card card-sm">
+                                <div class="card-header bg-muted-lt py-1">
+                                    <strong>{{ group.category.name }}</strong>
+                                </div>
+                                <div class="card-body py-2">
+                                    {% for item in group.items %}
+                                    <label class="form-check mb-1" style="cursor:pointer; font-size:13px;">
+                                        <input type="checkbox" name="test_items" value="{{ item.pk }}"
+                                               class="form-check-input">
+                                        <span class="fw-bold">{{ item.name }}</span>
+                                        <span class="text-muted small d-block">
+                                            {{ item.standard }}{% if item.condition %} / {{ item.condition }}{% endif %}
+                                            {% if item.unit %}({{ item.unit }}){% endif %}
+                                        </span>
+                                    </label>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="text-center text-muted py-3">暂无可用测试项目</div>
+                    {% endif %}
+                </div>
+            </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <a href="javascript:history.back()" class="btn btn-link link-secondary">取消</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-check me-1"></i>创建工单
+            </button>
+        </div>
+    </div>
+</form>
+
+<script type="text/template" id="mold-row-template">
+    <tr class="mold-row">
+        <td>
+            <select name="mold__ROW_" class="form-select mold-select">
+                <option value="">-- 选择模具 --</option>
+                {% for mold in mold_types %}
+                <option value="{{ mold.pk }}">{{ mold.name }} [{{ mold.mold_code }}] ×{{ mold.cavity_count }}穴 {{ mold.standard }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        {% if trial_formulas %}
+        {% for f in trial_formulas %}
+        <td>
+            <input type="number" name="qty__ROW__{{ f.pk }}" class="form-control qty-input" min="0" value="0" placeholder="0">
+        </td>
+        {% endfor %}
+        {% else %}
+        <td>
+            <input type="number" name="qty__ROW_" class="form-control qty-input" min="0" value="0" placeholder="0">
+        </td>
+        {% endif %}
+        <td>
+            <button type="button" class="btn btn-sm btn-ghost-danger remove-mold-row" title="删除此行">
+                <i class="ti ti-trash"></i>
+            </button>
+        </td>
+    </tr>
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const tbody = document.getElementById('mold-matrix-body');
+    const template = document.getElementById('mold-row-template').innerHTML;
+    const moldCountInput = document.getElementById('mold_count');
+
+    function updateMoldCount() {
+        const rows = tbody.querySelectorAll('.mold-row');
+        moldCountInput.value = rows.length;
+        rows.forEach(function(row, idx) {
+            row.setAttribute('data-row', idx);
+            row.querySelectorAll('[name]').forEach(function(el) {
+                el.name = el.name.replace(/^(mold|qty)_\d+/, '$1_' + idx);
+            });
+        });
+    }
+
+    document.getElementById('add-mold-row').addEventListener('click', function () {
+        const count = tbody.querySelectorAll('.mold-row').length;
+        const newRow = template.replace(/__ROW_/g, count);
+        tbody.insertAdjacentHTML('beforeend', newRow);
+        updateMoldCount();
+    });
+
+    tbody.addEventListener('click', function (e) {
+        const btn = e.target.closest('.remove-mold-row');
+        if (!btn) return;
+        const row = btn.closest('.mold-row');
+        const rows = tbody.querySelectorAll('.mold-row');
+        if (rows.length <= 1) return;
+        row.remove();
+        updateMoldCount();
+    });
+
+    // ---- BOM 配料表动态计算 ----
+    const bomData = {{ bom_data_json|safe }};
+    const qtyInputs = document.querySelectorAll('.planned-qty');
+    const totalDisplay = document.getElementById('total-planned-qty');
+    const totalField = document.getElementById('id_quantity_planned');
+    const feedingTotalFoot = document.getElementById('feeding-total-foot');
+
+    function recalcFeeding() {
+        let grandTotal = 0;
+        const formulaQtys = {};
+
+        qtyInputs.forEach(function(input) {
+            const pk = input.getAttribute('data-formula-pk');
+            const qty = parseFloat(input.value) || 0;
+            formulaQtys[pk] = qty;
+            grandTotal += qty;
+        });
+
+        totalDisplay.textContent = grandTotal.toFixed(1);
+        totalField.value = grandTotal.toFixed(1);
+
+        // 计算每行每列的配料量
+        const formulaColumnTotals = {};
+        bomData.formulas.forEach(function(f) {
+            formulaColumnTotals[f.pk] = 0;
+        });
+        let grandFeedingTotal = 0;
+
+        document.querySelectorAll('.feeding-row').forEach(function(row) {
+            const rowIdx = parseInt(row.getAttribute('data-row'));
+            const rowData = bomData.rows[rowIdx];
+            let rowSum = 0;
+
+            // 每个配方版本的配料量
+            row.querySelectorAll('.feeding-qty-cell').forEach(function(cell) {
+                const formulaPk = cell.getAttribute('data-formula-pk');
+                const pct = parseFloat(rowData.percentages[formulaPk]) || 0;
+                const qty = formulaQtys[formulaPk] || 0;
+                const val = qty * pct / 100;
+                cell.textContent = val > 0 ? val.toFixed(3) : '-';
+                rowSum += val;
+                formulaColumnTotals[formulaPk] += val;
+            });
+
+            // 行合计
+            const rowTotalEl = row.querySelector('.feeding-row-total');
+            if (rowTotalEl) {
+                rowTotalEl.textContent = rowSum > 0 ? rowSum.toFixed(3) : '-';
+            }
+            grandFeedingTotal += rowSum;
+        });
+
+        // 列合计
+        bomData.formulas.forEach(function(f) {
+            const el = document.querySelector('.feeding-formula-total[data-formula-pk="' + f.pk + '"]');
+            if (el) {
+                el.textContent = formulaColumnTotals[f.pk] > 0 ? formulaColumnTotals[f.pk].toFixed(3) : '0';
+            }
+        });
+        document.getElementById('feeding-grand-total').textContent = grandFeedingTotal > 0 ? grandFeedingTotal.toFixed(3) : '0';
+
+        if (grandFeedingTotal > 0) {
+            feedingTotalFoot.style.display = '';
+        } else {
+            feedingTotalFoot.style.display = 'none';
+        }
+    }
+
+    qtyInputs.forEach(function(input) {
+        input.addEventListener('input', recalcFeeding);
+    });
+
+    recalcFeeding();
+});
+</script>
+{% endblock %}

@@ -148,6 +148,26 @@ class MenuModule:
         }
 
     @staticmethod
+    def get_trial_production():
+        """试验排产中心"""
+        return {
+            "name": "试验排产中心",
+            "icon": "ti-building-factory",
+            "visible_to": IdentityConfig.INTERNAL_STAFF,
+            "url_name": "trial_production_dashboard",
+            "sub_items": [
+                {"name": "排产总览", "url_name": "trial_production_dashboard"},
+                {"name": "挤出任务", "url_name": "trial_production_order_list"},
+                {"name": "配色任务", "url_name": "trial_color_matching_list"},
+                {"name": "注塑任务", "url_name": "trial_injection_list"},
+                {"name": "测试任务", "url_name": "trial_testing_list"},
+                {"name": "样品库存", "url_name": "trial_sample_inventory"},
+                {"name": "模具台账", "url_name": "trial_mold_type_list"},
+                {"name": "排产配置", "url_name": "trial_production_config"},
+            ]
+        }
+
+    @staticmethod
     def get_admin():
         return {
             "name": "系统管理设置",

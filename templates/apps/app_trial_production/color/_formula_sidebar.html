@@ -1,0 +1,89 @@
+<!-- 左侧：配方列表 + 对比按钮 -->
+<div class="col-lg-3">
+    <div class="card">
+        <div class="card-header bg-primary-lt d-flex justify-content-between align-items-center py-2 px-3">
+            <div class="d-flex align-items-center gap-2">
+                <i class="ti ti-list-check text-primary" style="font-size: 16px;"></i>
+                <span class="fw-semibold text-primary" style="font-size: 14px;">配方列表</span>
+                <span class="badge bg-primary text-white" style="font-size: 10px;">{{ active_formulas|length }}</span>
+            </div>
+            {% if active_formulas|length > 1 %}
+            <a href="?stage={{ active_stage }}&round={{ active_round }}&compare=1"
+               class="btn btn-sm btn-outline-secondary py-0" style="font-size: 12px;">
+                <i class="ti ti-columns me-1"></i>对比
+            </a>
+            {% endif %}
+        </div>
+        <div class="list-group list-group-flush" style="max-height: 70vh; overflow-y: auto;">
+            {% for group in formula_groups %}
+                {% if group.formulas|length == 1 %}
+                    {% with f=group.formulas.0 %}
+                    <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ f.pk }}"
+                       class="list-group-item list-group-item-action py-2 px-3 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
+                            <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">
+                                {% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}
+                            </span>
+                            {% if f.color_powder_bom and f.color_powder_bom.cost %}
+                            <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;">¥{{ f.color_powder_bom.cost }}</span>
+                            {% endif %}
+                            {% if f.is_mature %}
+                            <i class="ti ti-star-filled text-yellow flex-shrink-0" style="font-size: 12px;" title="成熟配方"></i>
+                            {% endif %}
+                            {% if f.project_id == project.pk %}
+                            <span class="badge bg-blue-lt text-blue flex-shrink-0" style="font-size: 10px;" title="本项目">本</span>
+                            {% else %}
+                            <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;" title="来源: {{ f.project.name }}">史</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted mt-1" style="font-size: 11px;">
+                            <i class="ti ti-file-text me-1" style="font-size: 10px;"></i>{{ group.code }}
+                        </div>
+                    </a>
+                    {% endwith %}
+                {% else %}
+                    <div class="border-bottom">
+                        <button class="formula-group-toggle accordion-button {% if group.is_collapsed %}collapsed{% endif %} py-2 px-3 w-100 border-0 bg-transparent d-flex align-items-center gap-2"
+                                style="font-size: 13px; box-shadow: none;"
+                                data-bs-toggle="collapse" data-bs-target="#collapse-{{ group.code|slugify }}">
+                            <i class="ti ti-file-text text-muted flex-shrink-0" style="font-size: 13px;"></i>
+                            <span class="text-muted flex-fill text-start fw-medium">{{ group.code }}</span>
+                            <span class="badge bg-primary-lt text-primary flex-shrink-0" style="font-size: 10px;">{{ group.formulas|length }}版本</span>
+                            <i class="ti ti-chevron-down text-muted flex-shrink-0" style="font-size: 12px; transition: transform .2s;"></i>
+                        </button>
+                        <div id="collapse-{{ group.code|slugify }}" class="collapse {% if not group.is_collapsed %}show{% endif %}">
+                            {% for f in group.formulas %}
+                            <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ f.pk }}"
+                               class="list-group-item list-group-item-action py-2 px-3 ps-5 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
+                                    <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">
+                                        {% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}
+                                    </span>
+                                    {% if f.color_powder_bom and f.color_powder_bom.cost %}
+                                    <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;">¥{{ f.color_powder_bom.cost }}</span>
+                                    {% endif %}
+                                    {% if f.is_mature %}
+                                    <i class="ti ti-star-filled text-yellow flex-shrink-0" style="font-size: 12px;" title="成熟配方"></i>
+                                    {% endif %}
+                                    {% if f.project_id == project.pk %}
+                                    <span class="badge bg-blue-lt text-blue flex-shrink-0" style="font-size: 10px;" title="本项目">本</span>
+                                    {% else %}
+                                    <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;" title="来源: {{ f.project.name }}">史</span>
+                                    {% endif %}
+                                </div>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endif %}
+            {% empty %}
+            <div class="list-group-item text-center text-muted py-5">
+                <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                该轮次暂无配方数据
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>

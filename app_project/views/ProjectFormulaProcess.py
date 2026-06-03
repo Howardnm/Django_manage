@@ -33,6 +33,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         ).prefetch_related(
             'bom_lines__raw_material__category',
             'test_results__test_config__category',
+            'color_powder_bom__entries__raw_material',
         ).order_by('version')
 
         material_formulas = LabFormula.objects.none()
@@ -46,6 +47,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             ).prefetch_related(
                 'bom_lines__raw_material__category',
                 'test_results__test_config__category',
+                'color_powder_bom__entries__raw_material',
             ).order_by('version')
 
         return sorted(
@@ -90,6 +92,32 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                         'is_empty': pct is None,
                     })
             bom_matrix.append(row)
+
+        # 色粉BOM 对比矩阵
+        all_cp_materials = set()
+        cpbom_map = {}
+        for f in formulas:
+            cpbom_map[f.id] = {}
+            bom = getattr(f, 'color_powder_bom', None)
+            if bom:
+                for entry in bom.entries.select_related('raw_material__category'):
+                    all_cp_materials.add(entry.raw_material)
+                    cpbom_map[f.id][entry.raw_material_id] = entry.percentage
+        sorted_cp_materials = sorted(all_cp_materials, key=lambda x: (x.category.order, x.name))
+
+        cpbom_matrix = []
+        for rm in sorted_cp_materials:
+            row = {'item': rm, 'values': []}
+            for col in columns:
+                if col['type'] == 'material':
+                    row['values'].append({'val': '-', 'is_empty': True})
+                else:
+                    pct = cpbom_map.get(col['obj'].id, {}).get(rm.id)
+                    row['values'].append({
+                        'val': pct if pct is not None else '-',
+                        'is_empty': pct is None,
+                    })
+            cpbom_matrix.append(row)
 
         # 性能对比矩阵
         all_test_configs = set()
@@ -143,7 +171,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     })
             test_matrix.append(row)
 
-        return columns, bom_matrix, test_matrix
+        return columns, bom_matrix, test_matrix, cpbom_matrix
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -250,9 +278,9 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab)
         compare_formulas = all_stage_formulas if global_compare else active_formulas
-        columns, bom_matrix, test_matrix = [], [], []
+        columns, bom_matrix, test_matrix, cpbom_matrix = [], [], [], []
         if compare_mode and compare_formulas:
-            columns, bom_matrix, test_matrix = self._build_comparison_matrices(compare_formulas, material=material)
+            columns, bom_matrix, test_matrix, cpbom_matrix = self._build_comparison_matrices(compare_formulas, material=material)
 
         context.update({
             'material': material,
@@ -269,5 +297,6 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'columns': columns,
             'bom_matrix': bom_matrix,
             'test_matrix': test_matrix,
+            'cpbom_matrix': cpbom_matrix,
         })
         return context
