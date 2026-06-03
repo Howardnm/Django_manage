@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}排产配置{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">试验排产中心</div>
+            <h2 class="page-title">排产流程审核配置</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <div class="col-lg-6">
+        <form method="post" class="card">
+            {% csrf_token %}
+            <div class="card-header">
+                <h3 class="card-title">审批配置</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">审批流程定义</label>
+                    {{ form.workflow_definition }}
+                    <small class="form-hint">
+                        排产单提交审批时使用的 BPMN 流程定义。审批通过后工单进入挤出任务。
+                    </small>
+                </div>
+            </div>
+            <div class="card-footer text-end">
+                <button type="submit" class="btn btn-primary">
+                    <i class="ti ti-device-floppy me-1"></i>保存配置
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
