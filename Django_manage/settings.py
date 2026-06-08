@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'app_trial_production.apps.AppTrialProductionConfig',  # 试验排产模块
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
+    'app_sap_services.apps.AppSapServicesConfig',     # SAP RFC 服务
     # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
     # 'app_dify_sync.apps.AppDifySyncConfig',           # Dify 数据同步
 ]
@@ -257,3 +258,33 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+# ==============================================================================
+# SAP RFC 服务配置
+# ==============================================================================
+SAP_SERVICES_CONFIG = {
+    # SAP NW RFC SDK lib 目录的绝对路径（必须存在）
+    'sap_lib_path': r"D:\SAP_SDK\win-nwrfc750P_6-70002755\nwrfcsdk\lib",
+
+    # SAP 连接参数
+    'connection': {
+        'ashost': '192.168.103.181',  # SAP 服务器 IP 或主机名
+        'sysnr': '00',                 # SAP 系统编号
+        'client': '400',               # SAP 客户端号
+        'user': 'RFC07',               # SAP 通信账号
+        'passwd': 'Saite@2026',        # SAP 通信密码
+        'lang': 'ZH',                  # 语言（ZH=中文, EN=英文）
+    },
+
+    # 连接池参数
+    'max_idle_seconds': 300,  # 闲置连接超过此时长（秒）后自动重建
+    'max_retries': 3,         # 连接失败重试次数
+    'retry_delay': 1.0,       # 重试初始间隔（秒），每次重试翻倍
+}
+
+# SAP 日志配置
+LOGGING['loggers']['sap'] = {
+    'handlers': ['file', 'console'],
+    'level': 'INFO',
+    'propagate': True,
+}
