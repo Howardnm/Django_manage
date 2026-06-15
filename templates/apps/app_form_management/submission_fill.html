@@ -21,6 +21,8 @@
         .remark-input { width: 100%; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; resize: vertical; font-family: inherit; }
         .remark-input:focus { outline: none; border-color: #409eff; }
         .btn-row { display: flex; justify-content: space-between; margin-top: 16px; }
+        .step-card { min-height: 200px; }
+        .workflow-notice { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 6px; font-size: 13px; color: #409eff; margin-bottom: 16px; }
     </style>
 </head>
 <body>
@@ -36,7 +38,7 @@
         <button onclick="goBack()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
     </div>
 
-    <div v-if="rule.length === 0" class="card">
+    <div v-if="allRules.length === 0" class="card">
         <div class="empty-state">
             <p>该表单模板未配置字段</p>
             <p style="font-size:13px;margin-top:8px;">请先在表单设计器中添加字段</p>
@@ -44,20 +46,35 @@
     </div>
 
     <div v-else>
-        <div class="card">
-            <div class="card-title">表单填写</div>
+        <div class="workflow-notice" v-if="hasSteps && workflowRestricted">
+            <span style="font-size:18px;">&#9432;</span>
+            该表单关联了审批流程，您只需填写<strong>{% templatetag openvariable %} stepGroups[0].label {% templatetag closevariable %}</strong>，后续步骤将由审批节点负责人依次填写。
+        </div>
+
+        <div class="card step-card">
+            <div class="card-title">表单内容</div>
             {% if template.description %}
             <div class="card-desc">{{ template.description }}</div>
             {% endif %}
-            <form-create v-model:api="fApi" :rule="rule" :option="formOption" :value="formData" />
+            <form-create v-model:api="fApi" :rule="allRules" :option="formOption" :value="formData" />
+        </div>
+
+        <!-- Step progress (below form) -->
+        <div class="card" v-if="hasSteps">
+            <el-steps :active="activeStep" finish-status="success" align-center>
+                <el-step v-for="(s, idx) in stepGroups" :key="s.step" :title="s.label" />
+            </el-steps>
         </div>
 
         <div class="card">
             <label class="remark-label">备注</label>
             <textarea class="remark-input" id="remark-input" rows="3" placeholder="备注...">{{ existing.remark|default:'' }}</textarea>
             <div class="btn-row">
-                <el-button @click="saveDraft" :loading="saving">保存草稿</el-button>
-                <el-button type="primary" @click="submitForm" :loading="saving">提交</el-button>
+                <div></div>
+                <div style="display:flex;gap:8px;">
+                    <el-button @click="saveDraft" :loading="saving">保存草稿</el-button>
+                    <el-button type="primary" @click="submitForm" :loading="saving">提交</el-button>
+                </div>
             </div>
         </div>
     </div>
@@ -73,21 +90,50 @@
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 
 <script>
+    function buildStepGroups(rules) {
+        if (!rules || rules.length === 0) return [];
+        var stepMap = {};
+        var stepLabels = {};
+        var maxStep = 0;
+        rules.forEach(function(r) {
+            var step = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
+            if (step > maxStep) maxStep = step;
+            if (!stepMap[step]) stepMap[step] = [];
+            stepMap[step].push(r);
+            if (r.props && r.props.stepLabel && !stepLabels[step]) {
+                stepLabels[step] = r.props.stepLabel;
+            }
+        });
+        if (maxStep <= 1) {
+            return [{ step: 1, label: '表单填写', description: '', rules: rules }];
+        }
+        var groups = [];
+        for (var i = 1; i <= maxStep; i++) {
+            groups.push({
+                step: i,
+                label: stepLabels[i] || ('第' + i + '步'),
+                description: '',
+                rules: stepMap[i] || []
+            });
+        }
+        return groups;
+    }
+
     const { createApp } = Vue;
 
     const app = createApp({
         data() {
-            const configEl = document.getElementById('form-config-data');
-            const optionEl = document.getElementById('form-option-data');
-            const dataEl = document.getElementById('existing-data');
-            let rule = [];
-            let option = {};
-            let formData = {};
-            try { rule = JSON.parse(configEl.textContent.trim()); } catch(e) {}
+            var configEl = document.getElementById('form-config-data');
+            var optionEl = document.getElementById('form-option-data');
+            var dataEl = document.getElementById('existing-data');
+            var allRules = [];
+            var option = {};
+            var formData = {};
+            try { allRules = JSON.parse(configEl.textContent.trim()); } catch(e) {}
             try { option = JSON.parse(optionEl.textContent.trim()); } catch(e) {}
             try { formData = JSON.parse(dataEl.textContent.trim()); } catch(e) {}
 
-            const formOption = Object.assign({
+            var formOption = Object.assign({
                 form: { labelWidth: '120px' }
             }, option, {
                 submitBtn: false,
@@ -95,8 +141,32 @@
                 form: Object.assign({ labelWidth: '120px' }, option.form || {})
             });
 
+            var stepGroups = buildStepGroups(allRules);
+            var hasSteps = stepGroups.length > 1;
+            var hasWorkflow = {% if template.workflow_id %}true{% else %}false{% endif %};
+            var workflowRestricted = hasSteps && hasWorkflow;
+
+            // 工作流限制时：禁用非步骤1的字段、移除必填校验
+            if (workflowRestricted) {
+                allRules = allRules.map(function(r) {
+                    var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
+                    if (ruleStep !== 1) {
+                        return Object.assign({}, r, {
+                            $required: false,
+                            validate: undefined,
+                            props: Object.assign({}, r.props || {}, { disabled: true })
+                        });
+                    }
+                    return r;
+                });
+            }
+
             return {
-                rule: rule,
+                allRules: allRules,
+                stepGroups: stepGroups,
+                hasSteps: hasSteps,
+                workflowRestricted: workflowRestricted,
+                activeStep: 0,
                 formData: formData,
                 fApi: null,
                 saving: false,
@@ -120,10 +190,10 @@
 
         methods: {
             async sendData(formData, status) {
-                const remark = document.getElementById('remark-input').value.trim();
-                const url = '{{ submit_url|escapejs }}';
+                var remark = document.getElementById('remark-input').value.trim();
+                var url = '{{ submit_url|escapejs }}';
 
-                const resp = await fetch(url, {
+                var resp = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -135,7 +205,7 @@
                         remark: remark
                     })
                 });
-                const result = await resp.json();
+                var result = await resp.json();
                 if (result.status !== 'success') {
                     ElementPlus.ElMessage.error(result.message || '操作失败');
                 }
@@ -146,8 +216,7 @@
                 if (!this.fApi) return;
                 this.saving = true;
                 try {
-                    const data = this.fApi.form;
-                    const result = await this.sendData(data, 'DRAFT');
+                    var result = await this.sendData(this.fApi.form, 'DRAFT');
                     if (result && result.status === 'success') {
                         ElementPlus.ElMessage.success('草稿已保存');
                     }
@@ -163,9 +232,9 @@
                 this.saving = true;
                 try {
                     await this.fApi.validate();
-                    const data = this.fApi.form;
+                    var data = this.fApi.form;
                     if (data && Object.keys(data).length > 0) {
-                        const result = await this.sendData(data, 'SUBMITTED');
+                        var result = await this.sendData(data, 'SUBMITTED');
                         if (result && result.status === 'success') {
                             window.location.href = '{% url "my_submissions" %}';
                         }

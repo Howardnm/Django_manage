@@ -394,6 +394,16 @@
           "name": "priority",
           "isAttr": true,
           "type": "String"
+        },
+        {
+          "name": "formStep",
+          "isAttr": true,
+          "type": "String"
+        },
+        {
+          "name": "formStepLabel",
+          "isAttr": true,
+          "type": "String"
         }
       ]
     },

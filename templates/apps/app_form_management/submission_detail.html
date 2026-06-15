@@ -180,12 +180,29 @@
             <!-- Form Tab -->
             <div id="tab-form" class="tab-pane active">
                 <div id="submission-detail-app">
-                    <div v-if="rule.length === 0" class="card">
+                    <div v-if="allRules.length === 0" class="card">
                         <div class="empty-state">该表单模板未配置字段</div>
                     </div>
-                    <div v-else class="card">
-                        <div class="card-title">表单内容</div>
-                        <form-create v-model:api="fApi" :rule="rule" :option="formOption" :value="formData" />
+                    <div v-else>
+                        <!-- Notice: current approver can edit specific step -->
+                        <div class="card" v-if="canEditStep" style="border-left: 4px solid #409eff;">
+                            <div style="font-size:13px;color:#409eff;">
+                                您负责填写 <strong>{% verbatim %}{{ editableStepLabel }}{% endverbatim %}</strong>，该步骤字段已开放填写，其余步骤只读
+                            </div>
+                        </div>
+
+                        <!-- Full form: step-matching fields editable, others disabled -->
+                        <div class="card">
+                            <div class="card-title">表单内容</div>
+                            <form-create v-model:api="fApi" :rule="allRules" :option="formOption" :value="formData" />
+                        </div>
+
+                        <!-- Step progress (below form) -->
+                        <div class="card" v-if="hasSteps">
+                            <el-steps :active="activeStep" finish-status="success" align-center>
+                                <el-step v-for="(s, idx) in stepGroups" :key="s.step" :title="s.label" />
+                            </el-steps>
+                        </div>
                     </div>
                     {% if submission.remark %}
                     <div class="card">
@@ -294,23 +311,104 @@
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 
 <script>
+    function buildStepGroups(rules) {
+        if (!rules || rules.length === 0) return [];
+        var stepMap = {};
+        var stepLabels = {};
+        var maxStep = 0;
+        rules.forEach(function(r) {
+            var step = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
+            if (step > maxStep) maxStep = step;
+            if (!stepMap[step]) stepMap[step] = [];
+            stepMap[step].push(r);
+            if (r.props && r.props.stepLabel && !stepLabels[step]) {
+                stepLabels[step] = r.props.stepLabel;
+            }
+        });
+        if (maxStep <= 1) {
+            return [{ step: 1, label: '表单内容', description: '', rules: rules }];
+        }
+        var groups = [];
+        for (var i = 1; i <= maxStep; i++) {
+            groups.push({
+                step: i,
+                label: stepLabels[i] || ('第' + i + '步'),
+                description: '',
+                rules: stepMap[i] || []
+            });
+        }
+        return groups;
+    }
+
     // ── Vue form renderer ──
+    window._mainFormApi = null;
+    window._stepFieldMap = {}; // field -> step mapping for data filtering on approval
     const { createApp } = Vue;
     const app = createApp({
         data() {
-            const configEl = document.getElementById('form-config-data');
-            const optionEl = document.getElementById('form-option-data');
-            const dataEl = document.getElementById('submission-data');
-            let rule = [];
-            let option = {};
-            let formData = {};
-            try { rule = JSON.parse(configEl.textContent.trim()); } catch(e) {}
+            var configEl = document.getElementById('form-config-data');
+            var optionEl = document.getElementById('form-option-data');
+            var dataEl = document.getElementById('submission-data');
+            var allRules = [];
+            var option = {};
+            var formData = {};
+            try { allRules = JSON.parse(configEl.textContent.trim()); } catch(e) {}
             try { option = JSON.parse(optionEl.textContent.trim()); } catch(e) {}
             try { formData = JSON.parse(dataEl.textContent.trim()); } catch(e) {}
-            const formOption = Object.assign({ submitBtn: false, resetBtn: false }, option, {
+            var formOption = Object.assign({ submitBtn: false, resetBtn: false }, option, {
                 form: Object.assign({}, option.form || {})
             });
-            return { rule, formData, fApi: null, formOption };
+
+            var currentTaskFormStep = {% if current_task_form_step %}{{ current_task_form_step }}{% else %}0{% endif %};
+            var canEditStep = currentTaskFormStep > 0;
+            var editableStepLabel = '';
+
+            // Build field->step map & disable non-current-step fields / relax validation
+            allRules = allRules.map(function(r) {
+                var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
+                if (r.field) {
+                    window._stepFieldMap[r.field] = ruleStep;
+                }
+                if (canEditStep && ruleStep !== currentTaskFormStep) {
+                    return Object.assign({}, r, {
+                        $required: false,
+                        validate: undefined,
+                        props: Object.assign({}, r.props || {}, { disabled: true })
+                    });
+                }
+                return r;
+            });
+
+            var stepGroups = buildStepGroups(allRules);
+            var hasSteps = stepGroups.length > 1;
+
+            {% if current_task_form_step %}
+            if (canEditStep) {
+                for (var i = 0; i < stepGroups.length; i++) {
+                    if (stepGroups[i].step === {{ current_task_form_step }}) {
+                        editableStepLabel = stepGroups[i].label;
+                        break;
+                    }
+                }
+            }
+            {% endif %}
+
+            var highlightStep = 0;
+            {% if workflow_data and workflow_data.instance.status == 'COMPLETED' %}
+            // 流程已完成 → 所有步骤标绿
+            highlightStep = stepGroups.length;
+            {% elif current_task_form_step %}
+            // 审批进行中 → 高亮当前步骤
+            for (var j = 0; j < stepGroups.length; j++) {
+                if (stepGroups[j].step === {{ current_task_form_step }}) { highlightStep = j; break; }
+            }
+            {% endif %}
+            return {
+                allRules: allRules, stepGroups: stepGroups, hasSteps: hasSteps,
+                canEditStep: canEditStep, editableStepLabel: editableStepLabel,
+                activeStep: highlightStep,
+                formData: formData, fApi: null, formOption: formOption
+            };
         },
         mounted() {
             if (this.fApi && this.formData && Object.keys(this.formData).length > 0) {
@@ -319,8 +417,11 @@
         },
         watch: {
             fApi(api) {
-                if (api && this.formData && Object.keys(this.formData).length > 0) {
-                    api.setValue(this.formData);
+                if (api) {
+                    window._mainFormApi = api;
+                    if (this.formData && Object.keys(this.formData).length > 0) {
+                        api.setValue(this.formData);
+                    }
                 }
             }
         }
@@ -362,15 +463,50 @@
             showToast('驳回操作需要填写审批意见', 'error');
             return;
         }
+
+        // 通过前校验当前步骤的必填字段
+        if (action === 'APPROVE' && window._mainFormApi) {
+            try {
+                await window._mainFormApi.validate();
+            } catch(e) {
+                showToast('请完善当前步骤的必填项后再审批', 'error');
+                return;
+            }
+        }
+
         var btn = document.querySelector(action === 'APPROVE' ? '.btn-approve' : '.btn-reject');
+        var btnOriginalHTML = btn.innerHTML;
         btn.disabled = true;
         btn.textContent = '提交中...';
+
+        // Collect current-step form data from the main form API
+        var currentStep = {% if current_task_form_step %}{{ current_task_form_step }}{% else %}0{% endif %};
+        var stepFormData = null;
+        if (currentStep > 0 && window._mainFormApi) {
+            try {
+                var allFormData = window._mainFormApi.form;
+                var filtered = {};
+                var stepFieldMap = window._stepFieldMap || {};
+                Object.keys(allFormData).forEach(function(field) {
+                    if ((stepFieldMap[field] || 1) === currentStep) {
+                        filtered[field] = allFormData[field];
+                    }
+                });
+                if (Object.keys(filtered).length > 0) {
+                    stepFormData = filtered;
+                }
+            } catch(e) {}
+        }
+
         try {
             var csrfToken = document.cookie.split('; ').find(function(r) { return r.startsWith('csrftoken='); });
             csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
             var formData = new FormData();
             formData.append('action', action);
             formData.append('remark', remark);
+            if (stepFormData && Object.keys(stepFormData).length > 0) {
+                formData.append('step_form_data', JSON.stringify(stepFormData));
+            }
             var resp = await fetch('/workflow/instance/{{ workflow_data.instance.pk }}/', {
                 method: 'POST',
                 headers: { 'X-CSRFToken': csrfToken },
@@ -387,7 +523,7 @@
             showToast('网络错误，请重试', 'error');
         }
         btn.disabled = false;
-        btn.textContent = action === 'APPROVE' ? '✓ 通过' : '✗ 驳回';
+        btn.innerHTML = btnOriginalHTML;
     }
     {% endif %}
 </script>

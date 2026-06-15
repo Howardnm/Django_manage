@@ -291,6 +291,11 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         # 关联审批流程数据
         workflow_data = None
         current_task = None
+        current_task_name = None
+        current_task_form_step = None
+        current_step_rules_json = '[]'
+        current_step_label = ''
+
         if submission.workflow_instance_id:
             from app_workflow.views import WorkflowInstanceDetailView
             from app_workflow.models import ApprovalHistory, WorkflowTask
@@ -306,15 +311,31 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                 instance=wi, assigned_to=request.user, status='PENDING'
             ).first()
             if current_task:
-                # 优先取 BPMN userTask name 属性，其次用已存的 task_name
                 status_entry = workflow_data['status_map'].get(current_task.spiff_task_id, {})
                 current_task_name = status_entry.get('task_name') or current_task.task_name
-            else:
-                current_task_name = None
+
+                # 分步填写：当前审批人负责的表单步骤
+                if current_task.form_step:
+                    current_task_form_step = current_task.form_step
+                    template_config = template.form_config or []
+                    step_rules = [r for r in template_config
+                                  if r.get('props', {}).get('step', 1) == current_task.form_step]
+                    if step_rules:
+                        current_step_rules_json = json.dumps(step_rules, ensure_ascii=False)
+                        for r in step_rules:
+                            label = r.get('props', {}).get('stepLabel')
+                            if label:
+                                current_step_label = label
+                                break
+                        if not current_step_label:
+                            current_step_label = f'第{current_task_form_step}步'
 
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
+            'current_task_form_step': current_task_form_step,
+            'current_step_rules_json': current_step_rules_json,
+            'current_step_label': current_step_label,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),

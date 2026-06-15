@@ -585,6 +585,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
 
         action = request.POST.get('action')
         remark = request.POST.get('remark', '').strip()
+        step_form_data_json = request.POST.get('step_form_data', '')
 
         if action not in ['APPROVE', 'REJECT']:
             messages.error(request, "无效的审批动作。")
@@ -594,8 +595,16 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             messages.warning(request, "驳回操作需要填写备注。")
             return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
 
+        extra_data = {}
+        if step_form_data_json:
+            try:
+                extra_data['step_form_data'] = json.loads(step_form_data_json)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
         try:
-            WorkflowService.complete_task(current_task, request.user, action, remark)
+            WorkflowService.complete_task(current_task, request.user, action, remark,
+                                          extra_data=extra_data)
             messages.success(request, f"任务已成功{'通过' if action == 'APPROVE' else '驳回'}。")
         except TaskNotFoundError as e:
             messages.error(request, f"任务处理失败: {e}")

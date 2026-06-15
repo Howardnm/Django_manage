@@ -154,6 +154,9 @@ class WorkflowTask(models.Model):
 
     status = models.CharField("任务状态", max_length=20, choices=STATUS_CHOICES, default='PENDING')
     
+    # 表单分步填写：该任务对应表单的哪个步骤（从 camunda:formStep 解析）
+    form_step = models.PositiveSmallIntegerField("表单步骤号", null=True, blank=True)
+
     # BPMN 元素 ID (task_spec.bpmn_id)
     spiff_task_id = models.CharField("BPMN任务ID", max_length=100, db_index=True)
     

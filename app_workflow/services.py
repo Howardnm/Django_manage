@@ -84,9 +84,12 @@ class WorkflowService:
             raise TaskNotFoundError("未找到匹配的可执行任务或任务已处理")
 
         with transaction.atomic():
+            # 从 extra_data 中剥离 step_form_data，避免大表单数据膨胀 workflow 状态
+            engine_extra = {k: v for k, v in (extra_data or {}).items()
+                            if k != 'step_form_data'}
             is_completed = engine.complete(
                 workflow, spiff_task, action,
-                extra_data={'remark': remark, **(extra_data or {})},
+                extra_data={'remark': remark, **engine_extra},
             )
 
             task.status = 'COMPLETED' if action == 'APPROVE' else 'REJECTED'
@@ -103,6 +106,17 @@ class WorkflowService:
             )
 
             instance.spiff_workflow_data = engine.serialize(workflow)
+
+            # 合并分步表单数据 → FormSubmission.form_data
+            step_form_data = (extra_data or {}).get('step_form_data')
+            if step_form_data and instance.content_object:
+                from app_form_management.models import FormSubmission
+                related = instance.content_object
+                if isinstance(related, FormSubmission):
+                    merged = dict(related.form_data or {})
+                    merged.update(step_form_data)
+                    related.form_data = merged
+                    related.save(update_fields=['form_data'])
 
             workflow_completed_status = None
             if action == 'REJECT':
@@ -212,6 +226,9 @@ class WorkflowService:
                 assigned_to_user, candidate_users_list, candidate_groups_list = (
                     engine.resolve_assignee(st, workflow, instance)
                 )
+                camunda_cache = workflow.data.get('_camunda_assignments', {})
+                camunda_info = camunda_cache.get(st_bpmn_id, {})
+                form_step = camunda_info.get('form_step')
                 workflow_task = WorkflowTask.objects.create(
                     instance=instance,
                     task_name=st.task_spec.name or st_bpmn_id,
@@ -220,6 +237,7 @@ class WorkflowService:
                     spiff_instance_id=str(st.id),
                     status='PENDING',
                     candidate_groups=candidate_groups_list,
+                    form_step=form_step,
                 )
                 workflow_task.candidate_users.set(candidate_users_list)
                 task_created.send(sender=WorkflowService, task=workflow_task)

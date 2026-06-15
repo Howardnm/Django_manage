@@ -18455,7 +18455,73 @@ function UserAssignmentProps(props) {
     id: 'priority',
     component: Priority,
     isEdited: propertiesPanel.isTextFieldEntryEdited
+  }, {
+    id: 'formStep',
+    component: FormStep,
+    isEdited: propertiesPanel.isTextFieldEntryEdited
+  }, {
+    id: 'formStepLabel',
+    component: FormStepLabel,
+    isEdited: propertiesPanel.isTextFieldEntryEdited
   }];
+}
+function FormStep(props) {
+  const {
+    element
+  } = props;
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+  const businessObject = ModelUtil.getBusinessObject(element);
+  const getValue = () => {
+    return businessObject.get('camunda:formStep');
+  };
+  const setValue = value => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: businessObject,
+      properties: {
+        'camunda:formStep': value
+      }
+    });
+  };
+  return propertiesPanel.TextFieldEntry({
+    element,
+    id: 'formStep',
+    label: translate('步骤号'),
+    getValue,
+    setValue,
+    debounce
+  });
+}
+function FormStepLabel(props) {
+  const {
+    element
+  } = props;
+  const commandStack = useService('commandStack');
+  const translate = useService('translate');
+  const debounce = useService('debounceInput');
+  const businessObject = ModelUtil.getBusinessObject(element);
+  const getValue = () => {
+    return businessObject.get('camunda:formStepLabel');
+  };
+  const setValue = value => {
+    commandStack.execute('element.updateModdleProperties', {
+      element,
+      moddleElement: businessObject,
+      properties: {
+        'camunda:formStepLabel': value
+      }
+    });
+  };
+  return propertiesPanel.TextFieldEntry({
+    element,
+    id: 'formStepLabel',
+    label: translate('步骤标签'),
+    getValue,
+    setValue,
+    debounce
+  });
 }
 function Assignee(props) {
   const {

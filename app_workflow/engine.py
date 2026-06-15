@@ -177,6 +177,15 @@ class WorkflowEngine:
                 cand_groups = ut.get(f'{{{WorkflowEngine.CAMUNDA_NS}}}candidateGroups')
                 if cand_groups:
                     info['candidate_groups'] = [g.strip() for g in cand_groups.split(',') if g.strip()]
+                form_step = ut.get(f'{{{WorkflowEngine.CAMUNDA_NS}}}formStep')
+                if form_step:
+                    try:
+                        info['form_step'] = int(form_step)
+                    except (ValueError, TypeError):
+                        pass
+                form_step_label = ut.get(f'{{{WorkflowEngine.CAMUNDA_NS}}}formStepLabel')
+                if form_step_label:
+                    info['form_step_label'] = form_step_label
                 if info:
                     assignments[task_id] = info
         except Exception as e:
