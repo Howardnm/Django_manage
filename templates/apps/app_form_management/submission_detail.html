@@ -311,38 +311,17 @@
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 
 <script>
-    function buildStepGroups(rules) {
-        if (!rules || rules.length === 0) return [];
-        var stepMap = {};
-        var stepLabels = {};
-        var maxStep = 0;
-        rules.forEach(function(r) {
-            var step = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
-            if (step > maxStep) maxStep = step;
-            if (!stepMap[step]) stepMap[step] = [];
-            stepMap[step].push(r);
-            if (r.props && r.props.stepLabel && !stepLabels[step]) {
-                stepLabels[step] = r.props.stepLabel;
-            }
-        });
-        if (maxStep <= 1) {
-            return [{ step: 1, label: '表单内容', description: '', rules: rules }];
-        }
-        var groups = [];
-        for (var i = 1; i <= maxStep; i++) {
-            groups.push({
-                step: i,
-                label: stepLabels[i] || ('第' + i + '步'),
-                description: '',
-                rules: stepMap[i] || []
-            });
-        }
-        return groups;
-    }
+    // ── 服务端预计算数据 ──
+    var stepGroups = {{ step_groups_json|safe }};
+    var hasSteps = stepGroups.length > 1;
+    var canEditStep = {{ can_edit_step|yesno:"true,false" }};
+    var editableStepLabel = "{{ editable_step_label|escapejs }}";
+    var activeStepIndex = {{ active_step_index }};
+    var currentTaskFormStep = {% if current_task_form_step %}{{ current_task_form_step }}{% else %}0{% endif %};
+    window._mainFormApi = null;
+    window._stepFieldMap = {{ field_step_map_json|safe }};
 
     // ── Vue form renderer ──
-    window._mainFormApi = null;
-    window._stepFieldMap = {}; // field -> step mapping for data filtering on approval
     const { createApp } = Vue;
     const app = createApp({
         data() {
@@ -359,54 +338,25 @@
                 form: Object.assign({}, option.form || {})
             });
 
-            var currentTaskFormStep = {% if current_task_form_step %}{{ current_task_form_step }}{% else %}0{% endif %};
-            var canEditStep = currentTaskFormStep > 0;
-            var editableStepLabel = '';
-
-            // Build field->step map & disable non-current-step fields / relax validation
-            allRules = allRules.map(function(r) {
-                var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
-                if (r.field) {
-                    window._stepFieldMap[r.field] = ruleStep;
-                }
-                if (canEditStep && ruleStep !== currentTaskFormStep) {
-                    return Object.assign({}, r, {
-                        $required: false,
-                        validate: undefined,
-                        props: Object.assign({}, r.props || {}, { disabled: true })
-                    });
-                }
-                return r;
-            });
-
-            var stepGroups = buildStepGroups(allRules);
-            var hasSteps = stepGroups.length > 1;
-
-            {% if current_task_form_step %}
+            // 禁用非当前步骤字段、移除必填校验
             if (canEditStep) {
-                for (var i = 0; i < stepGroups.length; i++) {
-                    if (stepGroups[i].step === {{ current_task_form_step }}) {
-                        editableStepLabel = stepGroups[i].label;
-                        break;
+                allRules = allRules.map(function(r) {
+                    var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
+                    if (ruleStep !== currentTaskFormStep) {
+                        return Object.assign({}, r, {
+                            $required: false,
+                            validate: undefined,
+                            props: Object.assign({}, r.props || {}, { disabled: true })
+                        });
                     }
-                }
+                    return r;
+                });
             }
-            {% endif %}
 
-            var highlightStep = 0;
-            {% if workflow_data and workflow_data.instance.status == 'COMPLETED' %}
-            // 流程已完成 → 所有步骤标绿
-            highlightStep = stepGroups.length;
-            {% elif current_task_form_step %}
-            // 审批进行中 → 高亮当前步骤
-            for (var j = 0; j < stepGroups.length; j++) {
-                if (stepGroups[j].step === {{ current_task_form_step }}) { highlightStep = j; break; }
-            }
-            {% endif %}
             return {
                 allRules: allRules, stepGroups: stepGroups, hasSteps: hasSteps,
                 canEditStep: canEditStep, editableStepLabel: editableStepLabel,
-                activeStep: highlightStep,
+                activeStep: activeStepIndex,
                 formData: formData, fApi: null, formOption: formOption
             };
         },
@@ -438,8 +388,6 @@
             this.classList.add('active');
             document.querySelectorAll('.tab-pane').forEach(function(p) { p.classList.remove('active'); });
             document.getElementById('tab-' + tabName).classList.add('active');
-
-            // Initialize BPMN viewer on first tab switch
             if (tabName === 'flow' && !window._bpmnInitialized) {
                 window._bpmnInitialized = true;
                 initBpmnViewer();
@@ -480,15 +428,13 @@
         btn.textContent = '提交中...';
 
         // Collect current-step form data from the main form API
-        var currentStep = {% if current_task_form_step %}{{ current_task_form_step }}{% else %}0{% endif %};
         var stepFormData = null;
-        if (currentStep > 0 && window._mainFormApi) {
+        if (currentTaskFormStep > 0 && window._mainFormApi) {
             try {
                 var allFormData = window._mainFormApi.form;
                 var filtered = {};
-                var stepFieldMap = window._stepFieldMap || {};
                 Object.keys(allFormData).forEach(function(field) {
-                    if ((stepFieldMap[field] || 1) === currentStep) {
+                    if ((window._stepFieldMap[field] || 1) === currentTaskFormStep) {
                         filtered[field] = allFormData[field];
                     }
                 });

@@ -27,6 +27,72 @@ class FormTemplate(models.Model):
     def __str__(self):
         return self.name
 
+    @property
+    def has_workflow(self):
+        """是否关联审批流程"""
+        return self.workflow_id is not None
+
+    @property
+    def is_multi_step(self):
+        """是否为多步骤表单"""
+        return len(self.step_groups) > 1
+
+    @property
+    def step_groups(self):
+        """从 form_config 中提取步骤分组信息。
+        返回 [{'step': 1, 'label': '基本信息', 'description': ''}, ...]
+        """
+        rules = self.form_config or []
+        if not rules:
+            return []
+        step_map = {}
+        step_labels = {}
+        step_descs = {}
+        max_step = 0
+        for r in rules:
+            props = r.get('props') or {}
+            step = props.get('step')
+            if step is None:
+                step = 1
+            else:
+                step = int(step)
+            if step > max_step:
+                max_step = step
+            step_map.setdefault(step, [])
+            step_map[step].append(r)
+            if props.get('stepLabel') and step not in step_labels:
+                step_labels[step] = props['stepLabel']
+            if props.get('stepDesc') and step not in step_descs:
+                step_descs[step] = props['stepDesc']
+        if max_step <= 1:
+            return [{'step': 1, 'label': '表单填写', 'description': ''}]
+        return [{
+            'step': i,
+            'label': step_labels.get(i) or f'第{i}步',
+            'description': step_descs.get(i, ''),
+        } for i in range(1, max_step + 1)]
+
+    @property
+    def step_group_json(self):
+        """步骤分组 JSON，直接注入模板"""
+        import json
+        return json.dumps(self.step_groups, ensure_ascii=False)
+
+    def get_step_fields(self, step):
+        """获取指定步骤的所有字段名列表，用于审批时校验和过滤数据"""
+        return [
+            r.get('field') for r in (self.form_config or [])
+            if r.get('field') and int((r.get('props') or {}).get('step', 1)) == step
+        ]
+
+    def get_field_step_map(self):
+        """返回 {field_name: step_number} 映射"""
+        return {
+            r.get('field'): int((r.get('props') or {}).get('step', 1))
+            for r in (self.form_config or [])
+            if r.get('field')
+        }
+
 class FormSubmission(models.Model):
     """表单提交记录 — 通过 GenericForeignKey 关联任意模型"""
     STATUS_CHOICES = [

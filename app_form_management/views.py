@@ -206,6 +206,10 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'existing_data_json': json.dumps(existing.form_data, ensure_ascii=False) if existing else '{}',
+            'step_groups_json': template.step_group_json,
+            'has_workflow': template.has_workflow,
+            'is_multi_step': template.is_multi_step,
+            'workflow_restricted': template.is_multi_step and template.has_workflow,
         })
 
     def post(self, request, template_pk, target_alias=None, obj_pk=None):
@@ -292,9 +296,10 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         workflow_data = None
         current_task = None
         current_task_name = None
-        current_task_form_step = None
-        current_step_rules_json = '[]'
-        current_step_label = ''
+        can_edit_step = False
+        editable_step_label = ''
+        active_step_index = 0
+        is_workflow_completed = False
 
         if submission.workflow_instance_id:
             from app_workflow.views import WorkflowInstanceDetailView
@@ -307,6 +312,8 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                 'bpmn_xml': wi.definition.bpmn_xml,
                 'history': list(ApprovalHistory.objects.filter(instance=wi).select_related('approver', 'task').order_by('timestamp')),
             }
+            is_workflow_completed = wi.status == 'COMPLETED'
+
             current_task = WorkflowTask.objects.filter(
                 instance=wi, assigned_to=request.user, status='PENDING'
             ).first()
@@ -315,35 +322,41 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                 current_task_name = status_entry.get('task_name') or current_task.task_name
 
                 # 分步填写：当前审批人负责的表单步骤
-                if current_task.form_step:
-                    current_task_form_step = current_task.form_step
-                    template_config = template.form_config or []
-                    step_rules = [r for r in template_config
-                                  if r.get('props', {}).get('step', 1) == current_task.form_step]
-                    if step_rules:
-                        current_step_rules_json = json.dumps(step_rules, ensure_ascii=False)
-                        for r in step_rules:
-                            label = r.get('props', {}).get('stepLabel')
-                            if label:
-                                current_step_label = label
-                                break
-                        if not current_step_label:
-                            current_step_label = f'第{current_task_form_step}步'
+                if current_task.form_step and template.is_multi_step:
+                    can_edit_step = True
+                    form_step = current_task.form_step
+                    for g in template.step_groups:
+                        if g['step'] == form_step:
+                            editable_step_label = g['label']
+                            break
+                    if not editable_step_label:
+                        editable_step_label = f'第{form_step}步'
+                    # 计算步骤进度高亮索引
+                    active_step_index = next(
+                        (i for i, g in enumerate(template.step_groups) if g['step'] == form_step), 0
+                    )
+
+        if is_workflow_completed and template.is_multi_step:
+            active_step_index = len(template.step_groups)  # 全部标绿
 
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
-            'current_task_form_step': current_task_form_step,
-            'current_step_rules_json': current_step_rules_json,
-            'current_step_label': current_step_label,
+            'current_task': current_task,
+            'can_edit_step': can_edit_step,
+            'editable_step_label': editable_step_label,
+            'active_step_index': active_step_index,
+            'is_workflow_completed': is_workflow_completed,
+            'current_task_form_step': current_task.form_step if (current_task and current_task.form_step) else None,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),
+            'step_groups_json': template.step_group_json,
+            'field_step_map_json': json.dumps(template.get_field_step_map(), ensure_ascii=False),
             'related_module': related_module,
             'related_entity': related_entity,
             'related_entity_url': related_entity_url,
             'workflow_data': workflow_data,
-            'current_task': current_task,
         })
 
 

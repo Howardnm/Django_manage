@@ -90,34 +90,10 @@
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 
 <script>
-    function buildStepGroups(rules) {
-        if (!rules || rules.length === 0) return [];
-        var stepMap = {};
-        var stepLabels = {};
-        var maxStep = 0;
-        rules.forEach(function(r) {
-            var step = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
-            if (step > maxStep) maxStep = step;
-            if (!stepMap[step]) stepMap[step] = [];
-            stepMap[step].push(r);
-            if (r.props && r.props.stepLabel && !stepLabels[step]) {
-                stepLabels[step] = r.props.stepLabel;
-            }
-        });
-        if (maxStep <= 1) {
-            return [{ step: 1, label: '表单填写', description: '', rules: rules }];
-        }
-        var groups = [];
-        for (var i = 1; i <= maxStep; i++) {
-            groups.push({
-                step: i,
-                label: stepLabels[i] || ('第' + i + '步'),
-                description: '',
-                rules: stepMap[i] || []
-            });
-        }
-        return groups;
-    }
+    // 服务端预计算的业务数据
+    var stepGroups = {{ step_groups_json|safe }};
+    var hasSteps = {{ is_multi_step|yesno:"true,false" }};
+    var workflowRestricted = {{ workflow_restricted|yesno:"true,false" }};
 
     const { createApp } = Vue;
 
@@ -140,11 +116,6 @@
                 resetBtn: false,
                 form: Object.assign({ labelWidth: '120px' }, option.form || {})
             });
-
-            var stepGroups = buildStepGroups(allRules);
-            var hasSteps = stepGroups.length > 1;
-            var hasWorkflow = {% if template.workflow_id %}true{% else %}false{% endif %};
-            var workflowRestricted = hasSteps && hasWorkflow;
 
             // 工作流限制时：禁用非步骤1的字段、移除必填校验
             if (workflowRestricted) {
@@ -192,7 +163,6 @@
             async sendData(formData, status) {
                 var remark = document.getElementById('remark-input').value.trim();
                 var url = '{{ submit_url|escapejs }}';
-
                 var resp = await fetch(url, {
                     method: 'POST',
                     headers: {
