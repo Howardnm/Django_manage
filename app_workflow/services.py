@@ -6,8 +6,9 @@ from SpiffWorkflow.bpmn.specs.defaults import UserTask
 from SpiffWorkflow.util.task import TaskState
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
 from .engine import WorkflowEngine
-from .signals import workflow_started, task_created, task_completed, workflow_completed
-from .exceptions import TaskNotFoundError, CancelNotAllowedError, InvalidActionError
+from .signals import workflow_started, task_created, task_completed, workflow_completed, task_returned
+from .exceptions import (TaskNotFoundError, CancelNotAllowedError, InvalidActionError,
+                         ReturnNotAllowedError)
 
 logger = logging.getLogger(__name__)
 
@@ -173,6 +174,131 @@ class WorkflowService:
             workflow_completed.send(
                 sender=WorkflowService, instance=instance, status='CANCELED',
             )
+
+    # ── 退回 ──────────────────────────────────────────────────
+
+    @staticmethod
+    def return_task(task: WorkflowTask, user, target_task, remark: str = '',
+                    extra_data: dict = None) -> WorkflowInstance:
+        """将当前任务退回给指定前序节点。
+        target_task: WorkflowTask 实例（退回到审批节点）或 WorkflowTask 实例（退回到发起人）
+        退回发起人时传入 is_initiator=True 标记。
+        """
+        instance = task.instance
+        is_initiator_target = isinstance(target_task, dict) and target_task.get('is_initiator')
+
+        # 1. 校验
+        if task.status != 'PENDING':
+            raise InvalidActionError("只能退回待处理的任务")
+        if task.assigned_to and task.assigned_to != user:
+            raise InvalidActionError("您不是该任务的负责人，无法退回")
+
+        if not is_initiator_target:
+            if target_task.instance_id != instance.id:
+                raise ReturnNotAllowedError("退回目标任务不属于同一流程实例")
+            if target_task.created_at >= task.created_at:
+                raise ReturnNotAllowedError("只能退回到前序节点")
+            if target_task.status not in ('COMPLETED', 'RETURNED'):
+                raise ReturnNotAllowedError("退回目标任务必须处于已完成状态")
+
+        engine = WorkflowEngine(instance.definition)
+
+        with transaction.atomic():
+            # 2. 合并当前步骤的表单数据（如有）
+            step_form_data = (extra_data or {}).get('step_form_data')
+            if step_form_data and instance.content_object:
+                from app_form_management.models import FormSubmission
+                related = instance.content_object
+                if isinstance(related, FormSubmission):
+                    merged = dict(related.form_data or {})
+                    merged.update(step_form_data)
+                    related.form_data = merged
+                    related.save(update_fields=['form_data'])
+
+            if is_initiator_target:
+                # 退回到发起人：取消所有待处理任务，标记需要发起人重新填写
+                WorkflowTask.objects.filter(instance=instance, status='PENDING').update(
+                    status='CANCELED')
+                task.status = 'RETURNED'
+                task.remark = remark
+                task.completed_at = timezone.now()
+                task.save()
+
+                # 标记需要发起人修订，不创建 BPMN 任务
+                ctx = dict(instance.context_data or {})
+                ctx['_need_revision'] = True
+                instance.context_data = ctx
+                instance.spiff_workflow_data = {}  # 清空，提交时重建
+
+                # 记录历史
+                ApprovalHistory.objects.create(
+                    instance=instance,
+                    task=task,
+                    approver=user,
+                    action='RETURN',
+                    remark=remark or '退回到发起人（重新填写）',
+                )
+            else:
+                # 退回到前序审批节点
+                workflow = engine.deserialize(instance.spiff_workflow_data)
+
+                # 查找 Spiff 任务
+                spiff_task = None
+                if task.spiff_instance_id:
+                    try:
+                        spiff_task = workflow.get_task_from_id(int(task.spiff_instance_id))
+                    except Exception:
+                        pass
+                if not spiff_task:
+                    for st in engine.get_ready_user_tasks(workflow):
+                        st_bpmn_id = getattr(st.task_spec, 'bpmn_id',
+                                             getattr(st.task_spec, 'id', None))
+                        if isinstance(st.task_spec, UserTask) and str(st_bpmn_id) == task.spiff_task_id:
+                            spiff_task = st
+                            break
+                if not spiff_task:
+                    raise TaskNotFoundError("未找到可退回的待处理任务")
+
+                # 引擎回退
+                engine.return_to_task(workflow, spiff_task, target_task.spiff_task_id)
+
+                # 当前任务标记为 RETURNED
+                task.status = 'RETURNED'
+                task.remark = remark
+                task.completed_at = timezone.now()
+                task.save()
+
+                # 删除目标任务之后、当前任务之间的 PENDING 任务
+                WorkflowTask.objects.filter(
+                    instance=instance,
+                    created_at__gt=target_task.created_at,
+                    status='PENDING',
+                ).update(status='CANCELED')
+
+                # 序列化引擎状态
+                instance.spiff_workflow_data = engine.serialize(workflow)
+
+                # 记录历史
+                ApprovalHistory.objects.create(
+                    instance=instance,
+                    task=task,
+                    return_target_task=target_task,
+                    approver=user,
+                    action='RETURN',
+                    remark=remark or f'退回到 {target_task.task_name}',
+                )
+
+            instance.save()
+
+            # 同步新任务（退回发起人时不创建 BPMN 任务）
+            if not is_initiator_target:
+                WorkflowService.sync_tasks(instance, workflow, engine)
+
+            # 信号
+            task_returned.send(sender=WorkflowService, task=task, user=user,
+                               target_task=target_task if not is_initiator_target else None)
+
+            return instance
 
     # ── 签收 / 转交 ───────────────────────────────────────────
 

@@ -136,6 +136,7 @@
     .chat-badge.badge-reject  { background: #fce4e4; color: #b02a2a; }
     .chat-badge.badge-start   { background: #e6f0ff; color: #0054a6; }
     .chat-badge.badge-cancel  { background: #f0f0f0; color: #666; }
+    .chat-badge.badge-return  { background: #fdf6ec; color: #b06d0f; }
     .chat-task { font-size: 11px; color: #909399; margin-bottom: 4px; }
     .chat-msg { font-size: 13px; color: #303133; background: #f5f7fa; border-radius: 0 10px 10px 10px; padding: 10px 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
 </style>
@@ -223,7 +224,7 @@
         <div class="card mb-3">
             <div class="card-header bg-yellow-lt">
                 <h3 class="card-title">
-                    <i class="ti ti-checks me-2"></i>待处理任务：{{ current_task.task_name }}
+                    <i class="ti ti-checks me-2"></i>待处理任务：{{ current_task.display_name }}
                 </h3>
             </div>
             <div class="card-body">
@@ -241,6 +242,9 @@
                                 </button>
                                 <button type="submit" name="action" value="REJECT" class="btn btn-danger">
                                     <i class="ti ti-x me-2"></i>驳回
+                                </button>
+                                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#returnModal">
+                                    <i class="ti ti-arrow-back-up me-2"></i>退回
                                 </button>
                             </div>
                         </div>
@@ -313,11 +317,13 @@
                                             <span class="chat-badge badge-start">发起</span>
                                         {% elif item.action == 'CANCEL' %}
                                             <span class="chat-badge badge-cancel">取消</span>
+                                        {% elif item.action == 'RETURN' %}
+                                            <span class="chat-badge badge-return">退回</span>
                                         {% endif %}
                                         <span class="chat-time">{{ item.timestamp|date:"m-d H:i" }}</span>
                                     </div>
                                     {% if item.task %}
-                                    <div class="chat-task">{{ item.task.task_name }}</div>
+                                    <div class="chat-task">{{ item.task.display_name }}</div>
                                     {% endif %}
                                     {% if item.remark %}
                                     <div class="chat-msg">{{ item.remark }}</div>
@@ -425,6 +431,41 @@
 </div>
 <script id="bpmn-xml-data" type="text/plain">{{ bpmn_xml|safe }}</script>
 {{ status_map|json_script:"status-map-data" }}
+<!-- 退回重审弹窗 -->
+{% if current_task %}
+<div class="modal modal-blur fade" id="returnModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">退回重审</div>
+                <p class="text-muted mb-3">选择退回到哪个节点重新处理，被退回节点将重新生成待办任务。</p>
+                <div class="mb-3">
+                    <label class="form-label">退回到</label>
+                    <select id="returnTarget" class="form-select">
+                        <option value="">-- 请选择退回目标 --</option>
+                        {% for t in current_task.returnable_targets %}
+                        <option value="{{ t.pk }}">
+                            {% if t.is_initiator %}[发起人] {% endif %}{{ t.display_name }}
+                            ({{ t.assigned_to.username|default:"未指派" }})
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">退回原因</label>
+                    <textarea id="returnReason" class="form-control" rows="2" placeholder="请输入退回原因（必填）"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-warning" id="confirmReturn" data-pk="{{ current_task.pk }}">
+                    <i class="ti ti-arrow-back-up me-1"></i>确认退回
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 <!-- 取消流程确认弹窗 -->
 {% if can_cancel %}
 <div class="modal modal-blur fade" id="cancelModal" tabindex="-1" role="dialog" aria-hidden="true">
@@ -503,7 +544,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Name badge + status capsule row
                     overlayHtml += '<div class="overlay-badge-row">';
                     if (approverName) {
-                        if (displayStatus === 'rejected') {
+                        if (displayStatus === 'returned') {
+                            overlayHtml += '<span class="overlay-badge badge-returned">' + approverName + ' 退回</span>';
+                        } else if (displayStatus === 'rejected') {
                             overlayHtml += '<span class="overlay-badge badge-rejected">' + approverName + ' 驳回</span>';
                         } else {
                             overlayHtml += '<span class="overlay-badge badge-approved">' + approverName + '</span>';
@@ -552,6 +595,39 @@ document.addEventListener('DOMContentLoaded', function() {
                 errorEl.style.display = 'flex';
             });
         }
+    }
+
+    // ── Return modal handler ──
+    var returnBtn = document.getElementById('confirmReturn');
+    if (returnBtn) {
+        returnBtn.addEventListener('click', async function() {
+            var pk = this.getAttribute('data-pk');
+            var targetPk = document.getElementById('returnTarget').value;
+            var reason = document.getElementById('returnReason').value.trim();
+            var csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            if (!targetPk) { alert('请选择退回到哪个节点。'); return; }
+            if (!reason) { alert('请填写退回原因。'); return; }
+
+            try {
+                var formData = new FormData();
+                formData.append('target_task_pk', targetPk);
+                formData.append('remark', reason);
+                var resp = await fetch('/workflow/task/' + pk + '/return/', {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken},
+                    body: formData,
+                });
+                var result = await resp.json();
+                if (result.status === 'success') {
+                    window.location.reload();
+                } else {
+                    alert('退回失败：' + result.message);
+                }
+            } catch (err) {
+                alert('退回请求发生错误。');
+            }
+        });
     }
 
     // ── Cancel modal handler ──

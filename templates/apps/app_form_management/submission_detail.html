@@ -63,7 +63,28 @@
         .btn-reject:hover { background: #bd2f2f; }
         .btn-transfer { background: #f0f0f0; color: #606266; }
         .btn-transfer:hover { background: #e0e0e0; }
+        .btn-return { background: #f0ad4e; color: #fff; }
+        .btn-return:hover { background: #ec971f; }
         .btn-icon { font-size: 14px; }
+
+        /* ── Return dialog ── */
+        .return-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.45); z-index: 10000; align-items: center; justify-content: center; }
+        .return-overlay.show { display: flex; }
+        .return-dialog { background: #fff; border-radius: 8px; width: 480px; max-height: 80vh; overflow-y: auto; box-shadow: 0 6px 30px rgba(0,0,0,0.2); }
+        .return-dialog-header { padding: 16px 20px; border-bottom: 1px solid #eee; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+        .return-dialog-body { padding: 20px; }
+        .return-dialog-footer { padding: 12px 20px; border-top: 1px solid #eee; display: flex; justify-content: flex-end; gap: 8px; }
+        .return-target-list { display: flex; flex-direction: column; gap: 8px; max-height: 260px; overflow-y: auto; }
+        .return-target-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid #e6e8e9; border-radius: 6px; cursor: pointer; transition: all 0.15s; }
+        .return-target-item:hover { border-color: #409eff; background: #f0f5ff; }
+        .return-target-item.selected { border-color: #409eff; background: #ecf5ff; }
+        .return-target-radio { width: 18px; height: 18px; border: 2px solid #c0c4cc; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .return-target-item.selected .return-target-radio { border-color: #409eff; }
+        .return-target-item.selected .return-target-radio::after { content: ''; width: 8px; height: 8px; background: #409eff; border-radius: 50%; }
+        .return-target-name { font-size: 14px; font-weight: 500; }
+        .return-target-user { font-size: 12px; color: #909399; }
+        .return-remark { width: 100%; margin-top: 12px; padding: 10px 12px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 14px; resize: vertical; font-family: inherit; }
+        .return-remark:focus { outline: none; border-color: #409eff; }
         .approval-toast { position: fixed; top: 24px; left: 50%; transform: translateX(-50%); padding: 10px 24px; border-radius: 6px; font-size: 14px; z-index: 9999; animation: toastIn 0.3s; }
         .approval-toast.success { background: #d4f1da; color: #1a7a2e; }
         .approval-toast.error { background: #fce4e4; color: #b02a2a; }
@@ -80,9 +101,11 @@
         .djs-shape.status-running   .djs-outline { stroke: #0054a6 !important; stroke-width: 2.5px; }
         .djs-shape.status-canceled  .djs-outline { stroke: #888     !important; stroke-width: 2px;   }
         .djs-shape.status-pending   .djs-outline { stroke: #b0b3b8 !important; stroke-width: 1.5px; }
+        .djs-shape.status-returned  .djs-outline { stroke: #f0ad4e !important; stroke-width: 2.5px; }
         .djs-shape.status-completed .djs-visual > :first-child { fill: rgba(47,179,68,0.08) !important; }
         .djs-shape.status-rejected  .djs-visual > :first-child { fill: rgba(214,57,57,0.08) !important; }
         .djs-shape.status-running   .djs-visual > :first-child { fill: rgba(0,84,166,0.08) !important; }
+        .djs-shape.status-returned  .djs-visual > :first-child { fill: rgba(240,173,78,0.10) !important; }
         @keyframes bpmn-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.55; } }
         .djs-shape.status-running { animation: bpmn-pulse 2s infinite; }
 
@@ -96,12 +119,14 @@
         .overlay-badge.badge-pending   { background: #e6f0ff; color: #0054a6; }
         .overlay-badge.badge-candidate { background: #f0ebff; color: #5a3e9a; }
         .overlay-badge.badge-assignee  { background: #e6f0ff; color: #0054a6; }
+        .overlay-badge.badge-returned  { background: #fdf6ec; color: #b06d0f; }
         .status-capsule { display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
         .status-capsule.capsule-completed { background: #d4f1da; color: #1a7a2e; }
         .status-capsule.capsule-rejected  { background: #fce4e4; color: #b02a2a; }
         .status-capsule.capsule-running   { background: #e6f0ff; color: #0054a6; }
         .status-capsule.capsule-canceled  { background: #f0f0f0; color: #666; }
         .status-capsule.capsule-pending   { background: #f8f9fa; color: #656d77; }
+        .status-capsule.capsule-returned  { background: #fdf6ec; color: #b06d0f; }
         .approval-overlay .remark-text { font-size: 10px; color: #656d77; margin-top: 2px; line-height: 1.4; max-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
         /* ── Chat bubbles ── */
@@ -126,6 +151,7 @@
         .chat-badge.badge-reject  { background: #fce4e4; color: #b02a2a; }
         .chat-badge.badge-start   { background: #e6f0ff; color: #0054a6; }
         .chat-badge.badge-cancel  { background: #f0f0f0; color: #666; }
+        .chat-badge.badge-return  { background: #fdf6ec; color: #b06d0f; }
         .chat-task { font-size: 11px; color: #909399; margin-bottom: 4px; }
         .chat-msg { font-size: 13px; color: #303133; background: #f5f7fa; border-radius: 0 10px 10px 10px; padding: 10px 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
     </style>
@@ -180,6 +206,22 @@
             <!-- Form Tab -->
             <div id="tab-form" class="tab-pane active">
                 <div id="submission-detail-app">
+                    <!-- Revision prompt: initiator needs to re-fill -->
+                    {% if need_revision %}
+                    <div class="card" style="border-left: 4px solid #f0ad4e; background: #fdf6ec;">
+                        <div style="display:flex;align-items:center;justify-content:space-between;">
+                            <div>
+                                <strong style="color:#b06d0f;">审批已退回，请重新填写表单后提交</strong>
+                                <div style="font-size:13px;color:#909399;margin-top:4px;">表单步骤1的字段已开放编辑，完成后点击提交将重新启动审批流程</div>
+                            </div>
+                            <a href="{% url 'form_submission_fill' template_pk=submission.template.pk %}"
+                               style="padding:8px 18px;background:#f0ad4e;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;white-space:nowrap;">
+                                去填写
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <div v-if="allRules.length === 0" class="card">
                         <div class="empty-state">该表单模板未配置字段</div>
                     </div>
@@ -256,11 +298,13 @@
                                     <span class="chat-badge badge-start">发起</span>
                                 {% elif item.action == 'CANCEL' %}
                                     <span class="chat-badge badge-cancel">取消</span>
+                                {% elif item.action == 'RETURN' %}
+                                    <span class="chat-badge badge-return">退回</span>
                                 {% endif %}
                                 <span class="chat-time">{{ item.timestamp|date:"m-d H:i" }}</span>
                             </div>
                             {% if item.task %}
-                            <div class="chat-task">{{ item.task.task_name }}</div>
+                            <div class="chat-task">{{ item.task.display_name }}</div>
                             {% endif %}
                             {% if item.remark %}
                             <div class="chat-msg">{{ item.remark }}</div>
@@ -291,11 +335,55 @@
                 <button class="btn-transfer" onclick="showTransferDialog()">
                     <span class="btn-icon">&#8644;</span>移交
                 </button>
+                <button class="btn-return" onclick="showReturnDialog()">
+                    <span class="btn-icon">&#8634;</span>退回
+                </button>
             </div>
         </div>
     </div>
     {% endif %}
 </div>
+
+<!-- Return Dialog -->
+<div class="return-overlay" id="returnOverlay">
+    <div class="return-dialog">
+        <div class="return-dialog-header">
+            <span>退回重审</span>
+            <span style="cursor:pointer;font-size:20px;" onclick="closeReturnDialog()">&times;</span>
+        </div>
+        <div class="return-dialog-body">
+            <div style="font-size:13px;color:#909399;margin-bottom:12px;">选择退回到哪个节点重新处理：</div>
+            <div class="return-target-list" id="returnTargetList">
+                {% for t in returnable_targets %}
+                <div class="return-target-item" data-pk="{{ t.pk }}" data-task-name="{{ t.display_name }}"
+                     {% if t.is_initiator %}style="border-color:#409eff;background:#f0f5ff;"{% endif %}
+                     onclick="selectReturnTarget(this)">
+                    <div class="return-target-radio"></div>
+                    <div>
+                        <div class="return-target-name">
+                            {% if t.is_initiator %}&#127760; {% endif %}{{ t.display_name }}
+                        </div>
+                        <div class="return-target-user">
+                            {{ t.assigned_to.username|default:"—" }}
+                            {% if t.is_initiator %}（表单将重新开放编辑）{% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div style="text-align:center;color:#909399;padding:20px;">无可退回到的前序节点</div>
+                {% endfor %}
+            </div>
+            <textarea class="return-remark" id="returnRemark" rows="2" placeholder="请输入退回原因（必填）..."></textarea>
+        </div>
+        <div class="return-dialog-footer">
+            <button class="btn-transfer" onclick="closeReturnDialog()" style="border:none;padding:8px 18px;border-radius:6px;cursor:pointer;">取消</button>
+            <button class="btn-return" onclick="submitReturn()" style="border:none;padding:8px 18px;border-radius:6px;cursor:pointer;">确认退回</button>
+        </div>
+    </div>
+</div>
+
+<!-- Transfer: use shared user picker -->
+{% include 'includes/user_picker_modal.html' with picker_id='transferPicker' %}
 
 <script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
 <script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
@@ -471,6 +559,116 @@
         btn.disabled = false;
         btn.innerHTML = btnOriginalHTML;
     }
+
+    // ── Return dialog ──
+    var _selectedReturnTarget = null;
+
+    function showReturnDialog() {
+        document.getElementById('returnOverlay').classList.add('show');
+        document.getElementById('returnRemark').value = '';
+        _selectedReturnTarget = null;
+        var items = document.querySelectorAll('.return-target-item');
+        items.forEach(function(item) { item.classList.remove('selected'); });
+    }
+
+    function closeReturnDialog() {
+        document.getElementById('returnOverlay').classList.remove('show');
+    }
+
+    function selectReturnTarget(el) {
+        var items = document.querySelectorAll('.return-target-item');
+        items.forEach(function(item) { item.classList.remove('selected'); });
+        el.classList.add('selected');
+        _selectedReturnTarget = { pk: el.getAttribute('data-pk'), name: el.getAttribute('data-task-name') };
+    }
+
+    async function submitReturn() {
+        var remark = document.getElementById('returnRemark').value.trim();
+        if (!remark) {
+            showToast('请填写退回原因', 'error');
+            return;
+        }
+        if (!_selectedReturnTarget) {
+            showToast('请选择退回到哪个节点', 'error');
+            return;
+        }
+
+        var csrfToken = document.cookie.split('; ').find(function(r) { return r.startsWith('csrftoken='); });
+        csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
+
+        // Collect step form data if applicable
+        var stepFormData = null;
+        if (currentTaskFormStep > 0 && window._mainFormApi) {
+            try {
+                var allFormData = window._mainFormApi.form;
+                var filtered = {};
+                Object.keys(allFormData).forEach(function(field) {
+                    if ((window._stepFieldMap[field] || 1) === currentTaskFormStep) {
+                        filtered[field] = allFormData[field];
+                    }
+                });
+                if (Object.keys(filtered).length > 0) {
+                    stepFormData = filtered;
+                }
+            } catch(e) {}
+        }
+
+        var formData = new FormData();
+        formData.append('target_task_pk', _selectedReturnTarget.pk);
+        formData.append('remark', remark);
+        if (stepFormData && Object.keys(stepFormData).length > 0) {
+            formData.append('step_form_data', JSON.stringify(stepFormData));
+        }
+
+        try {
+            var resp = await fetch('/workflow/task/{{ current_task.pk }}/return/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            });
+            if (resp.ok) {
+                showToast('已退回', 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                var data = await resp.json().catch(function() { return {}; });
+                showToast('退回失败: ' + (data.message || '请重试'), 'error');
+            }
+        } catch(e) {
+            showToast('网络错误，请重试', 'error');
+        }
+    }
+
+    // ── Transfer: opens shared user picker ──
+    function showTransferDialog() {
+        openUserPicker('transferPicker', function(user) {
+            submitTransfer(user);
+        });
+    }
+
+    async function submitTransfer(user) {
+        var csrfToken = document.cookie.split('; ').find(function(r) { return r.startsWith('csrftoken='); });
+        csrfToken = csrfToken ? csrfToken.split('=')[1] : '';
+
+        var formData = new FormData();
+        formData.append('to_user_id', user.id);
+
+        try {
+            var resp = await fetch('/workflow/task/{{ current_task.pk }}/reassign/', {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body: formData
+            });
+            if (resp.ok) {
+                showToast('任务已移交给 ' + user.label, 'success');
+                setTimeout(function() { location.reload(); }, 1200);
+            } else {
+                var data = await resp.json().catch(function() { return {}; });
+                showToast('移交失败: ' + (data.message || '请重试'), 'error');
+            }
+        } catch(e) {
+            showToast('网络错误，请重试', 'error');
+        }
+    }
     {% endif %}
 </script>
 
@@ -522,7 +720,9 @@ function initBpmnViewer() {
 
             overlayHtml += '<div class="overlay-badge-row">';
             if (approverName) {
-                if (displayStatus === 'rejected') {
+                if (displayStatus === 'returned') {
+                    overlayHtml += '<span class="overlay-badge badge-returned">' + approverName + ' 退回</span>';
+                } else if (displayStatus === 'rejected') {
                     overlayHtml += '<span class="overlay-badge badge-rejected">' + approverName + ' 驳回</span>';
                 } else {
                     overlayHtml += '<span class="overlay-badge badge-approved">' + approverName + '</span>';

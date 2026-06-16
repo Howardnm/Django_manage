@@ -66,34 +66,49 @@
                 </div>
             </div>
 
-            <!-- 卡片2：选择关联对象 -->
+            <!-- 卡片2：关联业务对象 -->
             <div class="col-12">
                 <div class="card">
                     <div class="card-status-top bg-green"></div>
                     <div class="card-header">
                         <h3 class="card-title">
-                            <i class="ti ti-link me-2 text-green"></i> 关联业务对象<small class="text-muted ms-2 fw-normal">（可选）</small>
+                            <i class="ti ti-link me-2 text-green"></i> 关联业务对象
                         </h3>
                     </div>
                     <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">关联模块</label>
-                            <select id="module-select" class="form-select">
-                                <option value="">-- 独立表单（不关联任何模块） --</option>
-                                {% for alias, label in modules %}
-                                <option value="{{ alias }}">{{ label }}</option>
-                                {% endfor %}
-                            </select>
-                            <small class="form-hint">将表单关联到指定模块，便于后续追溯和统计。</small>
+                        {% if is_bound_target %}
+                        <!-- Read-only display: association pre-bound via project node button -->
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">关联模块</div>
+                                <div class="datagrid-content">
+                                    <span class="badge bg-primary-lt">{{ initial_module_label }}</span>
+                                </div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">关联实体</div>
+                                <div class="datagrid-content">
+                                    <strong>{{ initial_entity_label }}</strong>
+                                </div>
+                            </div>
                         </div>
-
-                        <div class="mb-0" id="entity-group" style="display:none">
-                            <label class="form-label required">关联实体</label>
-                            <select id="entity-select" class="form-select" placeholder="输入关键词搜索...">
-                                <option value=""></option>
-                            </select>
-                            <small class="form-hint">输入关键词搜索目标实体，选中后表单将关联到该实体。</small>
+                        <small class="text-muted">此关联由项目节点绑定，如需修改请从项目页面重新发起。</small>
+                        <!-- Hidden fields to carry through -->
+                        <input type="hidden" id="bound-module" value="{{ initial_module }}">
+                        <input type="hidden" id="bound-entity-pk" value="{{ initial_entity_pk }}">
+                        {% else %}
+                        <!-- No pre-bound target: inform user -->
+                        <div class="empty">
+                            <div class="empty-icon">
+                                <i class="ti ti-link-off icon" style="font-size: 36px;"></i>
+                            </div>
+                            <p class="empty-title">未关联业务对象</p>
+                            <p class="empty-subtitle text-muted">
+                                此表单为独立表单，不关联任何项目或节点。<br>
+                                如需关联，请从项目节点页面通过「创建表单」按钮发起。
+                            </p>
                         </div>
+                        {% endif %}
                     </div>
                     <div class="card-footer text-end">
                         <a href="{% url 'form_template_list' %}" class="btn btn-link link-secondary">取消</a>
@@ -110,8 +125,7 @@
 
 {% block extra_js %}
 <script>
-    const initialModule = '{{ initial_module|escapejs }}';
-    const initialEntityPk = '{{ initial_entity_pk|escapejs }}';
+    const isBoundTarget = {{ is_bound_target|yesno:"true,false" }};
 
     function getSelectedTemplate() {
         const radio = document.querySelector('input[name="template"]:checked');
@@ -120,92 +134,27 @@
 
     function checkReady() {
         const tpl = getSelectedTemplate();
-        const mod = document.getElementById('module-select').value;
-        const entityGroup = document.getElementById('entity-group');
-        const entityVal = entityGroup.style.display !== 'none'
-            ? document.getElementById('entity-select').value
-            : '__NONE__';
-
-        const ready = tpl && (mod === '' || entityVal);
-        document.getElementById('btn-start').disabled = !ready;
-    }
-
-    function initEntitySelect(alias, preselectPk) {
-        const entityGroup = document.getElementById('entity-group');
-        entityGroup.style.display = '';
-        const entitySelect = document.getElementById('entity-select');
-
-        if (entitySelect.tomselect) {
-            entitySelect.tomselect.destroy();
-        }
-        entitySelect.innerHTML = '<option value=""></option>';
-
-        new TomSelect(entitySelect, {
-            valueField: 'id',
-            labelField: 'text',
-            searchField: ['text'],
-            placeholder: '输入关键词搜索...',
-            load: function(query, callback) {
-                const params = 'alias=' + encodeURIComponent(alias) + '&search=' + encodeURIComponent(query);
-                fetch('{% url "form_entity_search" %}?' + params)
-                    .then(resp => resp.json())
-                    .then(data => { callback(data.results); })
-                    .catch(() => { callback(); });
-            },
-            render: {
-                no_results: function() { return '<div class="no-results p-2 text-muted small">无匹配结果</div>'; }
-            },
-            onChange: function() { checkReady(); },
-            onInitialize: function() {
-                if (preselectPk) {
-                    const params = 'alias=' + encodeURIComponent(alias) + '&pk=' + encodeURIComponent(preselectPk);
-                    fetch('{% url "form_entity_search" %}?' + params)
-                        .then(resp => resp.json())
-                        .then(data => {
-                            if (data.results.length > 0) {
-                                const item = data.results[0];
-                                this.addOption({id: item.id, text: item.text});
-                                this.setValue(item.id);
-                            }
-                        });
-                }
-            }
-        });
+        document.getElementById('btn-start').disabled = !tpl;
     }
 
     document.querySelectorAll('input[name="template"]').forEach(function(el) {
         el.addEventListener('change', checkReady);
     });
 
-    document.getElementById('module-select').addEventListener('change', function() {
-        const alias = this.value;
-        if (!alias) {
-            document.getElementById('entity-group').style.display = 'none';
-            checkReady();
-            return;
-        }
-        initEntitySelect(alias, null);
-        checkReady();
-    });
-
     document.getElementById('btn-start').addEventListener('click', function() {
         const tplPk = getSelectedTemplate();
-        const mod = document.getElementById('module-select').value;
-        const entityPk = document.getElementById('entity-select').value;
-
         if (!tplPk) return;
 
         const base = '{% url "form_template_list" %}';
-        const path = mod && entityPk
-            ? tplPk + '/fill/' + mod + '/' + entityPk + '/'
-            : tplPk + '/fill/';
-        window.location.href = base + path;
+        if (isBoundTarget) {
+            const mod = document.getElementById('bound-module').value;
+            const entityPk = document.getElementById('bound-entity-pk').value;
+            window.location.href = base + tplPk + '/fill/' + mod + '/' + entityPk + '/';
+        } else {
+            window.location.href = base + tplPk + '/fill/';
+        }
     });
 
-    if (initialModule) {
-        document.getElementById('module-select').value = initialModule;
-        initEntitySelect(initialModule, initialEntityPk);
-    }
     checkReady();
 </script>
 {% endblock %}

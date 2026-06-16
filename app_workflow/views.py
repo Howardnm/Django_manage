@@ -13,7 +13,8 @@ from .engine import WorkflowEngine
 from .utils import related_object_router
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
-from .exceptions import TaskNotFoundError, CancelNotAllowedError, InvalidActionError
+from .exceptions import (TaskNotFoundError, CancelNotAllowedError, InvalidActionError,
+                         ReturnNotAllowedError)
 from lxml import etree
 import json
 
@@ -359,16 +360,67 @@ class TaskReassignView(WorkflowAccessMixin, View):
 
     def post(self, request, pk):
         task = get_object_or_404(WorkflowTask, pk=pk)
-        to_user_id = request.POST.get('to_user_id')
+        to_user_id = request.POST.get('to_user_id', '').strip()
         if not to_user_id:
             return JsonResponse({'status': 'error', 'message': '请指定目标用户。'}, status=400)
 
-        to_user = get_object_or_404(User, pk=to_user_id)
+        # 支持用户名或用户 ID
+        try:
+            to_user = User.objects.get(pk=int(to_user_id))
+        except (ValueError, User.DoesNotExist):
+            to_user = get_object_or_404(User, username=to_user_id)
 
         try:
             WorkflowService.reassign(task, request.user, to_user)
             messages.success(request, f"任务 '{task.task_name}' 已转交给 {to_user.username}。")
         except InvalidActionError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+        return JsonResponse({'status': 'success'})
+
+
+class TaskReturnView(WorkflowAccessMixin, View):
+    """退回任务到前序节点"""
+    permission_required = 'app_workflow.change_workflowtask'
+
+    def post(self, request, pk):
+        task = get_object_or_404(
+            WorkflowTask.objects.select_related('instance'), pk=pk
+        )
+        target_task_pk = request.POST.get('target_task_pk', '')
+        remark = request.POST.get('remark', '').strip()
+
+        if not remark:
+            return JsonResponse({'status': 'error', 'message': '退回操作需要填写原因。'}, status=400)
+        if not target_task_pk:
+            return JsonResponse({'status': 'error', 'message': '请选择退回到哪个节点。'}, status=400)
+
+        # 解析可选步骤表单数据
+        step_form_data_json = request.POST.get('step_form_data', '')
+        extra_data = {}
+        if step_form_data_json:
+            try:
+                extra_data['step_form_data'] = json.loads(step_form_data_json)
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        try:
+            if target_task_pk == '0':
+                # 退回到发起人（虚拟节点）
+                target_task = {'is_initiator': True, 'pk': 0}
+                target_name = '发起人（重新填写）'
+            else:
+                target_task = get_object_or_404(WorkflowTask, pk=target_task_pk)
+                target_name = target_task.task_name
+
+            WorkflowService.return_task(task, request.user, target_task, remark,
+                                        extra_data=extra_data)
+            messages.success(request, f"任务 '{task.task_name}' 已退回到 '{target_name}'。")
+        except InvalidActionError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        except ReturnNotAllowedError as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        except TaskNotFoundError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
         return JsonResponse({'status': 'success'})
@@ -381,7 +433,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         """构建 BPMN 节点状态映射表, 供前端 bpmn-js 查看器叠加状态与备注"""
         STATUS_LABEL = {
             'completed': '已通过', 'rejected': '已驳回', 'running': '进行中',
-            'canceled': '已取消', 'pending': '待处理',
+            'canceled': '已取消', 'pending': '待处理', 'returned': '已退回',
         }
         bpmn_xml = instance.definition.bpmn_xml
         nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}

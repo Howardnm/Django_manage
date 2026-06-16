@@ -184,6 +184,18 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
 
         existing = None
         submit_url = reverse('form_submission_fill', kwargs={'template_pk': template_pk})
+
+        # 检查是否是退回修订场景
+        revision_submission = None
+        if not target:
+            revision_submission = FormSubmission.objects.filter(
+                template=template, submitted_by=request.user, status='SUBMITTED',
+                workflow_instance__isnull=False,
+                workflow_instance__status='RUNNING',
+            ).first()
+            if revision_submission and not (revision_submission.workflow_instance.context_data or {}).get('_need_revision'):
+                revision_submission = None
+
         if target:
             existing = submission_service.get_draft(template, target, request.user)
             if target_alias and obj_pk:
@@ -197,15 +209,21 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                 template=template, submitted_by=request.user, status='DRAFT'
             ).first()
 
+        existing_data = {}
+        if revision_submission:
+            existing_data = revision_submission.form_data or {}
+        elif existing:
+            existing_data = existing.form_data or {}
+
         return render(request, 'apps/app_form_management/submission_fill.html', {
             'template': template,
             'target': target,
             'target_display': self._get_target_display(target),
-            'existing': existing,
+            'existing': existing or revision_submission,
             'submit_url': submit_url,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
-            'existing_data_json': json.dumps(existing.form_data, ensure_ascii=False) if existing else '{}',
+            'existing_data_json': json.dumps(existing_data, ensure_ascii=False),
             'step_groups_json': template.step_group_json,
             'has_workflow': template.has_workflow,
             'is_multi_step': template.is_multi_step,
@@ -235,9 +253,20 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                 remark=remark,
             )
         else:
+            # 优先查找退回修订的已提交记录
             submission = FormSubmission.objects.filter(
-                template=template, submitted_by=request.user, status='DRAFT'
+                template=template, submitted_by=request.user, status='SUBMITTED',
+                workflow_instance__isnull=False,
+                workflow_instance__status='RUNNING',
             ).first()
+            if submission and not (submission.workflow_instance.context_data or {}).get('_need_revision'):
+                submission = None
+
+            if not submission:
+                submission = FormSubmission.objects.filter(
+                    template=template, submitted_by=request.user, status='DRAFT'
+                ).first()
+
             if submission:
                 submission.form_data = form_data
                 submission.remark = remark
@@ -253,19 +282,43 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                 )
 
         # 提交时如果模板关联了审批流程，自动启动流程实例
-        if status == 'SUBMITTED' and template.workflow_id and not submission.workflow_instance_id:
+        if status == 'SUBMITTED' and template.workflow_id:
             from app_workflow.services import WorkflowService
-            try:
-                instance = WorkflowService.start(
-                    definition=template.workflow,
-                    started_by=request.user,
-                    related_object=submission,
-                    context_data={'form_data': form_data, 'remark': remark},
-                )
-                submission.workflow_instance = instance
-                submission.save(update_fields=['workflow_instance'])
-            except Exception:
-                pass  # 流程启动失败不阻塞表单提交
+            from app_workflow.engine import WorkflowEngine
+            from app_workflow.models import WorkflowTask
+
+            existing_instance = submission.workflow_instance
+            is_revision = (existing_instance and
+                           existing_instance.status == 'RUNNING' and
+                           (existing_instance.context_data or {}).get('_need_revision'))
+
+            if is_revision:
+                # 退回修订后重新提交：重建工作流
+                try:
+                    engine = WorkflowEngine(existing_instance.definition)
+                    workflow = engine.create_workflow(
+                        context_data={'form_data': form_data, 'remark': remark})
+                    existing_instance.spiff_workflow_data = engine.serialize(workflow)
+                    ctx = dict(existing_instance.context_data or {})
+                    ctx.pop('_need_revision', None)
+                    existing_instance.context_data = ctx
+                    existing_instance.save()
+                    WorkflowService.sync_tasks(existing_instance, workflow, engine)
+                except Exception:
+                    pass
+            elif not existing_instance:
+                # 首次提交：启动新流程
+                try:
+                    instance = WorkflowService.start(
+                        definition=template.workflow,
+                        started_by=request.user,
+                        related_object=submission,
+                        context_data={'form_data': form_data, 'remark': remark},
+                    )
+                    submission.workflow_instance = instance
+                    submission.save(update_fields=['workflow_instance'])
+                except Exception:
+                    pass  # 流程启动失败不阻塞表单提交
 
         return JsonResponse({'status': 'success'})
 
@@ -339,10 +392,17 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         if is_workflow_completed and template.is_multi_step:
             active_step_index = len(template.step_groups)  # 全部标绿
 
+        returnable_targets = current_task.returnable_targets if current_task else []
+        need_revision = (workflow_data and
+                         (workflow_data['instance'].context_data or {}).get('_need_revision')
+                         and request.user == submission.submitted_by)
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
             'current_task': current_task,
+            'returnable_targets': returnable_targets,
+            'need_revision': need_revision,
             'can_edit_step': can_edit_step,
             'editable_step_label': editable_step_label,
             'active_step_index': active_step_index,
@@ -376,6 +436,22 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
         if initial_module and get_target(initial_module) is None:
             initial_module = ''
 
+        # 预填实体信息（只读，不允许手动修改）
+        initial_module_label = ''
+        initial_entity_label = ''
+        if initial_module and initial_entity_pk:
+            target_model = get_target(initial_module)
+            if target_model:
+                from .registry import _TARGET_REGISTRY
+                cfg = _TARGET_REGISTRY.get(initial_module)
+                initial_module_label = cfg.label if cfg else ''
+                try:
+                    obj = target_model.objects.get(pk=int(initial_entity_pk))
+                    initial_entity_label = cfg.display(obj) if cfg else str(obj)
+                except Exception:
+                    initial_module = ''
+                    initial_entity_pk = ''
+
         # 按分组整理模板 — 有分组的在前，未分组的末尾
         template_groups = []
         seen = set()
@@ -396,6 +472,9 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
             'modules': get_module_choices(),
             'initial_module': initial_module,
             'initial_entity_pk': initial_entity_pk,
+            'initial_module_label': initial_module_label,
+            'initial_entity_label': initial_entity_label,
+            'is_bound_target': bool(initial_module and initial_entity_pk),
         })
 
 

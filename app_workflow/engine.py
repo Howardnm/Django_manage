@@ -89,6 +89,31 @@ class WorkflowEngine:
         self._do_engine_steps(workflow)
         return workflow.is_completed()
 
+    # ── 退回 ──────────────────────────────────────────────────
+
+    def return_to_task(self, workflow: BpmnWorkflow, current_spiff_task,
+                       target_bpmn_id: str) -> list:
+        """回退工作流到指定 BPMN 任务节点。
+        通过 BPMN 元素 ID 查找对应的 Spiff 内部任务，调用 reset_from_task_id。
+        返回被重置的后代任务 ID 列表。
+        """
+        target_spiff_id = None
+        for t in workflow.get_tasks():
+            tid = getattr(t.task_spec, 'bpmn_id', getattr(t.task_spec, 'id', None))
+            if str(tid) == target_bpmn_id:
+                target_spiff_id = t.id
+                break
+        if target_spiff_id is None:
+            raise WorkflowError(f"未找到可回退的目标任务: {target_bpmn_id}")
+
+        # 重置目标任务的表单数据标记
+        if hasattr(current_spiff_task, 'data'):
+            current_spiff_task.data['_returned_to'] = target_bpmn_id
+
+        reset_ids = workflow.reset_from_task_id(target_spiff_id)
+        self._do_engine_steps(workflow)
+        return reset_ids
+
     def get_ready_user_tasks(self, workflow: BpmnWorkflow) -> list:
         """获取所有处于 READY 状态的 UserTask"""
         return [t for t in workflow.get_tasks(state=TaskState.READY)

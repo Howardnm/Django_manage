@@ -16,3 +16,7 @@ class InvalidActionError(WorkflowError):
 
 class CancelNotAllowedError(WorkflowError):
     """流程不允许取消 (已结束或状态不允许)"""
+
+
+class ReturnNotAllowedError(WorkflowError):
+    """退回操作不被允许 (目标任务无效或已取消)"""

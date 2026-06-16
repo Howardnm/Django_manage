@@ -88,3 +88,83 @@ class MaterialAutocompleteView(MaterialAccessMixin, View):
 
         data = [self.MODEL_FORMATTERS[model_type](item) for item in qs[:20]]
         return JsonResponse(data, safe=False)
+
+
+class UserTreeAPIView(View):
+    """组织架构人员树 API——返回 Department → WorkGroup → User + ReviewGroup 树形 JSON"""
+
+    def get(self, request):
+        from app_user.models import Department, WorkGroup, ReviewGroup
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        search = request.GET.get('q', '').strip()
+
+        nodes = []
+
+        # 1. Department → WorkGroup → User
+        depts = Department.objects.prefetch_related('workgroup_set__members').all()
+        for dept in depts:
+            wg_children = []
+            for wg in dept.workgroup_set.filter(is_active=True):
+                users = wg.members.filter(is_active=True)
+                if search:
+                    users = users.filter(
+                        Q(username__icontains=search) | Q(first_name__icontains=search))
+                if not users.exists():
+                    continue
+                wg_children.append({
+                    'id': f'wg_{wg.pk}',
+                    'label': wg.name,
+                    'type': 'workgroup',
+                    'children': [self._format_user(u) for u in users]
+                })
+            if wg_children:
+                nodes.append({
+                    'id': f'dept_{dept.pk}',
+                    'label': dept.name,
+                    'type': 'department',
+                    'children': wg_children,
+                    'collapsed': True,
+                })
+
+        # 2. ReviewGroup
+        for rg in ReviewGroup.objects.filter(is_active=True).prefetch_related('members'):
+            users = rg.members.filter(is_active=True)
+            if search:
+                users = users.filter(
+                    Q(username__icontains=search) | Q(first_name__icontains=search))
+            if not users.exists():
+                continue
+            nodes.append({
+                'id': f'rg_{rg.pk}',
+                'label': f'[{rg.name}]',
+                'type': 'reviewgroup',
+                'children': [self._format_user(u) for u in users],
+                'collapsed': True,
+            })
+
+        # 3. Unassigned users
+        unassigned = User.objects.filter(
+            is_active=True, work_groups__isnull=True, review_groups__isnull=True
+        ).distinct()
+        if search:
+            unassigned = unassigned.filter(
+                Q(username__icontains=search) | Q(first_name__icontains=search))
+        if unassigned.exists():
+            nodes.append({
+                'id': 'other',
+                'label': '其他用户',
+                'type': 'other',
+                'children': [self._format_user(u) for u in unassigned],
+                'collapsed': False,
+            })
+
+        return JsonResponse({'nodes': nodes})
+
+    @staticmethod
+    def _format_user(u):
+        return {
+            'id': u.pk,
+            'label': f'{u.first_name or u.username} ({u.username})',
+            'type': 'user',
+        }

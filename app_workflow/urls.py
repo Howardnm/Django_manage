@@ -11,6 +11,7 @@ from .views import (
     WorkflowInstanceDetailView,
     TaskClaimView,
     TaskReassignView,
+    TaskReturnView,
     WorkflowCancelView,
 )
 
@@ -29,6 +30,7 @@ urlpatterns = [
     path('initiated/', InitiatedInstanceListView.as_view(), name='workflow_initiated_list'),
     path('task/<int:pk>/claim/', TaskClaimView.as_view(), name='workflow_task_claim'),
     path('task/<int:pk>/reassign/', TaskReassignView.as_view(), name='workflow_task_reassign'),
+    path('task/<int:pk>/return/', TaskReturnView.as_view(), name='workflow_task_return'),
     path('instance/<int:pk>/', WorkflowInstanceDetailView.as_view(), name='workflow_instance_detail'),
     path('instance/<int:pk>/cancel/', WorkflowCancelView.as_view(), name='workflow_cancel'),
 ]

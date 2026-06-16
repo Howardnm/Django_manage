@@ -15,3 +15,7 @@ task_completed = Signal()
 # 流程结束信号 (整个流程实例完成或终止)
 # 提供参数: instance (WorkflowInstance), status (COMPLETED/REJECTED/CANCELED)
 workflow_completed = Signal()
+
+# 任务退回信号 (审批任务被回退到前序节点)
+# 提供参数: task (WorkflowTask), user (User), target_task (WorkflowTask)
+task_returned = Signal()

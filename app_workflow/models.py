@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
+from lxml import etree
 import re
 
 
@@ -115,6 +116,13 @@ class WorkflowInstance(models.Model):
             self.started_by == user or user.is_superuser
         )
 
+    @property
+    def returnable_tasks(self):
+        """返回可被退回的目标任务列表（所有已完成的前序任务）"""
+        return list(self.tasks.filter(
+            status__in=['COMPLETED', 'RETURNED']
+        ).select_related('assigned_to').order_by('created_at'))
+
 
 class WorkflowTask(models.Model):
     """流程任务：分配给具体用户的待办事项"""
@@ -122,6 +130,7 @@ class WorkflowTask(models.Model):
         ('PENDING', '待处理'),
         ('COMPLETED', '已通过'),
         ('REJECTED', '已驳回'),
+        ('RETURNED', '已退回'),
         ('CANCELED', '已取消'),
     ]
 
@@ -175,12 +184,49 @@ class WorkflowTask(models.Model):
             models.Index(fields=['status', 'assigned_to'], name='wf_task_status_assignee_idx'),
         ]
 
+    @property
+    def display_name(self):
+        """从 BPMN XML 解析 userTask 的 name 属性作为显示名称。"""
+        try:
+            nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
+            root = etree.fromstring(self.instance.definition.bpmn_xml.encode('utf-8'))
+            for ut in root.xpath('//bpmn:userTask', namespaces=nsmap):
+                if ut.get('id') == self.spiff_task_id:
+                    return ut.get('name') or self.task_name
+        except Exception:
+            pass
+        return self.task_name
+
     def __str__(self):
         if self.assigned_to:
-            return f"{self.task_name} - {self.assigned_to.username}"
+            return f"{self.display_name} - {self.assigned_to.username}"
         elif self.candidate_users.exists() or self.candidate_groups:
-            return f"{self.task_name} - 待签收"
-        return f"{self.task_name} - 未指派"
+            return f"{self.display_name} - 待签收"
+        return f"{self.display_name} - 未指派"
+
+    @property
+    def returnable_targets(self):
+        """当前任务可退回的前序任务列表，按 BPMN 节点去重，始终包含发起人"""
+        raw = WorkflowTask.objects.filter(
+            instance=self.instance,
+            status='COMPLETED',
+            created_at__lt=self.created_at,
+        ).select_related('assigned_to').order_by('created_at')
+        seen = {}
+        for t in raw:
+            seen[t.spiff_task_id] = t
+        targets = sorted(seen.values(), key=lambda t: t.created_at)
+        return [{
+            'pk': 0,
+            'display_name': '发起人（重新填写）',
+            'assigned_to': self.instance.started_by,
+            'is_initiator': True,
+        }] + [{
+            'pk': t.pk,
+            'display_name': t.display_name,
+            'assigned_to': t.assigned_to,
+            'is_initiator': False,
+        } for t in targets]
 
     # ── 模板辅助属性 ──────────────────────────────────────────
 
@@ -191,6 +237,7 @@ class WorkflowTask(models.Model):
             'PENDING': 'bg-primary',
             'COMPLETED': 'bg-success',
             'REJECTED': 'bg-danger',
+            'RETURNED': 'bg-warning',
             'CANCELED': 'bg-secondary',
         }.get(self.status, 'bg-secondary')
 
@@ -201,25 +248,33 @@ class ApprovalHistory(models.Model):
         ('START', '流程发起'),
         ('APPROVE', '审批通过'),
         ('REJECT', '审批驳回'),
+        ('RETURN', '退回重审'),
         ('CANCEL', '流程取消'),
     ]
 
     instance = models.ForeignKey(
-        WorkflowInstance, 
-        on_delete=models.CASCADE, 
+        WorkflowInstance,
+        on_delete=models.CASCADE,
         related_name="history",
         verbose_name="所属实例"
     )
     task = models.ForeignKey(
-        WorkflowTask, 
-        on_delete=models.SET_NULL, 
-        null=True, 
+        WorkflowTask,
+        on_delete=models.SET_NULL,
+        null=True,
         blank=True,
         verbose_name="关联任务"
     )
+    return_target_task = models.ForeignKey(
+        WorkflowTask,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='returned_from',
+        verbose_name='退回到任务'
+    )
     approver = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         verbose_name="操作人"
     )
     action = models.CharField("操作类型", max_length=20, choices=ACTION_CHOICES)
