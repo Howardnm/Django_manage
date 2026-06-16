@@ -123,5 +123,25 @@ class FormSubmission(models.Model):
             models.Index(fields=['content_type', 'object_id']),
         ]
 
+    @property
+    def current_approval_node(self):
+        """当前审批节点名称（流程运行时）"""
+        if not self.workflow_instance_id or self.workflow_instance.status != 'RUNNING':
+            return ''
+        task = self.workflow_instance.tasks.filter(status='PENDING').order_by('created_at').first()
+        return task.display_name if task else ''
+
+    @property
+    def current_approver(self):
+        """当前审批人（流程运行时）"""
+        if not self.workflow_instance_id or self.workflow_instance.status != 'RUNNING':
+            return ''
+        task = self.workflow_instance.tasks.filter(status='PENDING').order_by('created_at').first()
+        if not task:
+            return ''
+        if task.assigned_to:
+            return task.assigned_to.username
+        return '待签收'
+
     def __str__(self):
         return f'{self.template.name} - {self.submitted_by} ({self.get_status_display()})'

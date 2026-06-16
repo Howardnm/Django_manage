@@ -231,6 +231,15 @@ class WorkflowTask(models.Model):
     # ── 模板辅助属性 ──────────────────────────────────────────
 
     @property
+    def pending_days(self):
+        """待处理天数（仅 PENDING 状态有效）"""
+        if self.status != 'PENDING' or not self.created_at:
+            return 0
+        from django.utils import timezone
+        delta = timezone.now() - self.created_at
+        return max(1, delta.days)
+
+    @property
     def status_css_class(self):
         """状态徽章 CSS 类名"""
         return {
