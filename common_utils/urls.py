@@ -1,0 +1,7 @@
+from django.urls import path
+from .views import MaterialAutocompleteView, UserTreeAPIView
+
+urlpatterns = [
+    path('api/search/', MaterialAutocompleteView.as_view(), name='common_autocomplete'),
+    path('api/user-tree/', UserTreeAPIView.as_view(), name='user_tree_api'),
+]
