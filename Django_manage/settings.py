@@ -63,7 +63,6 @@ INSTALLED_APPS = [
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
     'app_sap_services.apps.AppSapServicesConfig',     # SAP RFC 服务
-    # 'app_knowledge_base.apps.AppKnowledgeBaseConfig', # 文献知识库
 ]
 
 MIDDLEWARE = [
