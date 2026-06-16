@@ -1,0 +1,85 @@
+{# ============================================================ #}
+{# 上传弹窗内容（HTMX GET /upload/ 加载到此）                #}
+{# 提交：POST /upload/ → 成功后触发 HX-Refresh               #}
+{# ============================================================ #}
+<form hx-post="{% url 'attachment:upload' content_type_id object_id %}"
+      hx-encoding="multipart/form-data"
+      hx-target="this"
+      hx-swap="outerHTML">
+    {% csrf_token %}
+    <div class="modal-header">
+        <h5 class="modal-title">上传附件</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+        {% if form.non_field_errors %}
+        <div class="alert alert-danger">
+            {{ form.non_field_errors }}
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+            <label class="form-label required">选择文件</label>
+            {{ form.file }}
+            {% if form.file.errors %}
+            <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
+            {% endif %}
+            <small class="form-hint">支持 PDF、Word、Excel、图片、CAD 等格式，最大 50MB</small>
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">显示名称</label>
+            {{ form.display_name }}
+            <small class="form-hint">留空则自动使用文件名</small>
+        </div>
+
+        {% if config.categories|length > 1 %}
+        <div class="mb-3">
+            <label class="form-label">文件分类</label>
+            {{ form.category }}
+        </div>
+        {% else %}
+        <input type="hidden" name="category" value="{{ config.categories.0.0 }}">
+        {% endif %}
+
+        {% if config.group_field %}
+        <div class="mb-3">
+            <label class="form-label">{{ config.group_label }}</label>
+            <div class="input-group">
+                <span id="group-key-label" class="form-control bg-light text-muted" style="border-right:0;">
+                    {% if form.group_key.value %}
+                        {{ group_label }}
+                    {% else %}
+                        通用资料（不关联节点）
+                    {% endif %}
+                </span>
+                {% if form.group_key.value %}
+                <button type="button" class="btn btn-outline-secondary"
+                        onclick="document.getElementById('id_group_key').value=''; document.getElementById('group-key-label').textContent='通用资料（不关联节点）'; this.style.display='none';">
+                    <i class="ti ti-link-off me-1"></i>解除关联
+                </button>
+                {% endif %}
+            </div>
+            <input type="hidden" name="group_key" id="id_group_key" value="{{ form.group_key.value|default:'' }}">
+        </div>
+        {% else %}
+        {{ form.group_key }}
+        {% endif %}
+
+        <div class="mb-3">
+            <label class="form-label">版本号</label>
+            {{ form.version }}
+        </div>
+
+        <div class="mb-3">
+            <label class="form-label">备注</label>
+            {{ form.description }}
+        </div>
+    </div>
+    <div class="modal-footer">
+        <button type="button" class="btn me-auto" data-bs-dismiss="modal">取消</button>
+        <button type="submit" class="btn btn-primary">
+            <i class="ti ti-upload me-1"></i>上传
+        </button>
+    </div>
+</form>

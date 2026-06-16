@@ -37,9 +37,6 @@
             <!-- 3. 文档下载卡片 -->
             {% include 'apps/app_material/material/detail_card/card_material_file.html' %}
 
-            <!-- 4. 额外附件列表 (胶囊样式) -->
-            {% include 'apps/app_material/material/detail_card/card_material_file_extra.html' %}
-
         </div>
 
         <!-- ======================================================= -->
@@ -57,6 +54,10 @@
 
             <!-- 4. 关联项目应用记录 (宽幅表格) -->
             {% include 'apps/app_material/material/detail_card/card_material_projects.html' %}
+
+            <!-- 5. 附件管理 -->
+            {% load attachment_tags %}
+            {% attachment_panel material %}
 
         </div>
     </div>

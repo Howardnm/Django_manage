@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from pgvector.django import VectorField, HnswIndex
 from django.contrib.postgres.indexes import GinIndex
 from django.contrib.postgres.search import SearchVector, SearchVectorField
-from common_utils.upload_file_path import upload_file_path
+from app_attachment.storage import upload_file_path
 
 
 class Category(models.Model):

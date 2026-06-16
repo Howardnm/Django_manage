@@ -52,7 +52,7 @@ async def get_project_details(project_id: int = None, project_name: str = ""):
     def query():
         try:
             qs = Project.objects.select_related('manager', 'repository', 'repository__customer', 'repository__oem', 'repository__salesperson') \
-                                .prefetch_related('nodes', 'repository__files', 'repository__files__node')
+                                .prefetch_related('nodes')
             
             if project_id:
                 project = qs.get(id=project_id)

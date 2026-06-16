@@ -1,7 +1,6 @@
 from django.db import models
 from django.conf import settings
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size
+
 
 
 class TestingOrder(models.Model):
@@ -26,9 +25,6 @@ class TestingOrder(models.Model):
         ('RESULTS_WRITTEN_BACK', '已回写'),
     ]
     status = models.CharField("状态", max_length=30, choices=STATUS_CHOICES, default='PENDING')
-    test_report = models.FileField("测试报告",
-        upload_to=upload_file_path, null=True, blank=True,
-        validators=[validate_file_size])
     remark = models.TextField("备注", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     completed_at = models.DateTimeField("完成时间", null=True, blank=True)

@@ -3,8 +3,8 @@ from django.contrib import admin
 from django.utils.html import format_html
 from django.urls import reverse, path
 from django.shortcuts import get_object_or_404, redirect
-from .models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig, 
-                    MaterialDataPoint, MaterialFile, MaterialLibrary, MaterialCharacteristic)
+from .models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig,
+                    MaterialDataPoint, MaterialLibrary, MaterialCharacteristic)
 from .models.sync import WebhookTask
 
 @admin.register(MaterialCharacteristic)
@@ -40,20 +40,14 @@ class MaterialDataPointInline(admin.TabularInline):
     extra = 1
     autocomplete_fields = ['test_config']
 
-class MaterialFileInline(admin.TabularInline):
-    model = MaterialFile
-    fields = ('file', 'name', 'file_type', 'version', 'description')
-    extra = 1
-
 @admin.register(MaterialLibrary)
 class MaterialLibraryAdmin(admin.ModelAdmin):
-    # 增加 is_published 到展示列表并允许直接编辑
-    list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'is_published', 'file_tds', 'file_msds', 'file_rohs', 'created_at')
+    list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'is_published', 'created_at')
     list_editable = ('is_published',)
     search_fields = ('grade_name', 'manufacturer')
     list_filter = ('is_published', 'category', 'flammability', 'scenarios', 'characteristics', 'created_at')
     filter_horizontal = ('scenarios', 'characteristics')
-    inlines = [MaterialDataPointInline, MaterialFileInline]
+    inlines = [MaterialDataPointInline]
     autocomplete_fields = ['category']
 
 @admin.register(WebhookTask)

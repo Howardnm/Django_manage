@@ -6,8 +6,8 @@ from django.urls import reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView, View
 
 from app_project.models import ProjectNode
-from app_repository.forms import OEMForm, OEMStandardFileForm
-from app_repository.models import OEM, OEMStandardFile, ProjectRepository
+from app_repository.forms import OEMForm
+from app_repository.models import OEM, ProjectRepository
 from app_repository.utils.filters import OEMFilter
 from app_repository.mixins import RepositoryAccessMixin
 
@@ -56,7 +56,7 @@ class OEMDetailView(RepositoryAccessMixin, DetailView):
     context_object_name = 'oem'
 
     def get_queryset(self):
-        return super().get_queryset().prefetch_related('standard_files__uploader', 'members')
+        return super().get_queryset().prefetch_related('members')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -122,33 +122,3 @@ class OEMUpdateView(RepositoryAccessMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'编辑主机厂: {self.object.name}'
         return context
-
-
-class OEMStandardFileFormView(RepositoryAccessMixin, View):
-    permission_required = 'app_repository.change_oem'
-    def get(self, request, pk):
-        oem = get_object_or_404(OEM, pk=pk)
-        form = OEMStandardFileForm()
-        return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
-
-
-class OEMStandardFileUploadView(RepositoryAccessMixin, View):
-    permission_required = 'app_repository.change_oem'
-    def post(self, request, pk):
-        oem = get_object_or_404(OEM, pk=pk)
-        form = OEMStandardFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            instance = form.save(commit=False)
-            instance.oem, instance.uploader = oem, request.user
-            instance.save()
-            return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
-        return render(request, 'apps/app_repository/oem/_modal_file_upload.html', {'oem': oem, 'form': form})
-
-
-class OEMStandardFileDeleteView(RepositoryAccessMixin, View):
-    permission_required = 'app_repository.change_oem'
-    def post(self, request, pk):
-        file_obj = get_object_or_404(OEMStandardFile, pk=pk)
-        oem_pk = file_obj.oem.pk
-        file_obj.delete()
-        return redirect(reverse('repo_oem_detail', kwargs={'pk': oem_pk}))

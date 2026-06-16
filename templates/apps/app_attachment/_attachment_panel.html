@@ -1,0 +1,55 @@
+{% load i18n %}
+{# ============================================================ #}
+{# 附件面板：包含文件列表 + 上传按钮 + 上传弹窗              #}
+{# 通过 {% attachment_panel obj %} 调用                      #}
+{# ============================================================ #}
+<div class="card mb-3" id="attachment-panel-{{ content_type_id }}-{{ object_id }}">
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-paperclip me-2 text-blue"></i>附件管理
+            <span class="badge bg-blue-lt ms-2">{{ attachments.count }}</span>
+        </h3>
+        <div class="card-actions">
+            {% if config and config.allow_upload %}
+            <button type="button" class="btn btn-sm btn-primary"
+                    hx-get="{% url 'attachment:upload' content_type_id object_id %}"
+                    hx-target="#modal-attachment-{{ content_type_id }}-{{ object_id }} .modal-content"
+                    hx-trigger="click"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modal-attachment-{{ content_type_id }}-{{ object_id }}">
+                <i class="ti ti-upload me-1"></i>上传附件
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {# 文件列表（HTMX 动态加载） #}
+    <div
+        hx-get="{% url 'attachment:list' content_type_id object_id %}"
+        hx-trigger="load, attachment-refresh-{{ content_type_id }}-{{ object_id }} from:body"
+        hx-swap="innerHTML"
+    >
+        <div class="d-flex justify-content-center py-4">
+            <span class="spinner-border spinner-border-sm text-secondary me-2"></span>
+            <span class="text-muted">加载附件列表...</span>
+        </div>
+    </div>
+</div>
+
+{# 上传弹窗 #}
+<div class="modal modal-blur fade"
+     id="modal-attachment-{{ content_type_id }}-{{ object_id }}"
+     tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content">
+            {# HTMX 会将 GET /upload/ 的内容加载到这里 #}
+            <div class="modal-header">
+                <h5 class="modal-title">上传附件</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body text-center py-4">
+                <span class="spinner-border spinner-border-sm text-secondary"></span>
+            </div>
+        </div>
+    </div>
+</div>

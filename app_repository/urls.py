@@ -18,17 +18,12 @@ urlpatterns = [
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
     path('project/repo/<int:pk>/detail/', ProjectFileDetailView.as_view(), name='repo_project_file_detail'),
     path('api/search/', RepoAutocompleteView.as_view(), name='repo_api_search'),
-    path('repo/<int:repo_id>/file/add/', ProjectFileUploadView.as_view(), name='repo_file_add'),
-    path('file/<int:pk>/delete/', ProjectFileDeleteView.as_view(), name='repo_file_delete'),
 
     # 主机厂 (OEM 用户画像管理)
     path('oems/', OEMListView.as_view(), name='repo_oem_list'),
     path('oems/add/', OEMCreateView.as_view(), name='repo_oem_add'),
     path('oems/<int:pk>/', OEMDetailView.as_view(), name='repo_oem_detail'),
     path('oems/<int:pk>/edit/', OEMUpdateView.as_view(), name='repo_oem_edit'),
-    path('oems/<int:pk>/file/form/', OEMStandardFileFormView.as_view(), name='repo_oem_file_form'),
-    path('oems/<int:pk>/file/upload/', OEMStandardFileUploadView.as_view(), name='repo_oem_file_upload'),
-    path('oems/file/<int:pk>/delete/', OEMStandardFileDeleteView.as_view(), name='repo_oem_file_delete'),
 
     # 等级因子管理 (绩效规则扩展) 【新增】
     path('performance/grade-factors/', GradeFactorListView.as_view(), name='repo_grade_factor_list'),

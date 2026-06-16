@@ -12,7 +12,8 @@
             {% include 'apps/app_basic_research/detail/detail_project_info.html' %}
 
             <!-- 2. 项目附件 -->
-            {% include 'apps/app_basic_research/detail/detail_project_files.html' %}
+            {% load attachment_tags %}
+            {% attachment_panel project %}
 
             <!-- 3. 关联实验配方 -->
             {% include 'apps/app_basic_research/detail/detail_project_formulas.html' %}

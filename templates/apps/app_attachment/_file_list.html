@@ -1,0 +1,72 @@
+{# ============================================================ #}
+{# 文件列表表格（HTMX 局部刷新目标）                          #}
+{# 请求：GET /attachment/<ct_id>/<obj_id>/                    #}
+{# ============================================================ #}
+<div class="table-responsive">
+    <table class="table card-table table-vcenter text-nowrap">
+        <thead>
+            <tr>
+                <th>附件名称</th>
+                {% if config.categories|length > 1 %}
+                <th>分类</th>
+                {% endif %}
+                <th>版本</th>
+                <th>大小</th>
+                <th>上传人</th>
+                <th>上传时间</th>
+                {% if config.allow_delete %}
+                <th class="w-1"></th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for att in attachments %}
+            <tr>
+                <td>
+                    <a href="{% url 'attachment:download' token=att.download_token %}"
+                       target="_blank"
+                       class="text-reset fw-bold">
+                        <i class="ti ti-file me-1"></i>
+                        {{ att.display_name }}
+                    </a>
+                    {% if att.description %}
+                    <br><small class="text-muted text-truncate d-inline-block" style="max-width: 200px;" title="{{ att.description }}">{{ att.description|truncatechars:40 }}</small>
+                    {% endif %}
+                </td>
+                {% if config.categories|length > 1 %}
+                <td>
+                    <span class="badge bg-azure-lt">{{ att.category|default:"-" }}</span>
+                </td>
+                {% endif %}
+                <td class="text-muted">v{{ att.version }}</td>
+                <td class="text-muted">{{ att.file_size|filesizeformat }}</td>
+                <td>
+                    <span class="avatar avatar-xs rounded me-1" style="background-image: url(...)">{{ att.uploader.username|slice:":1"|upper|default:"?" }}</span>
+                    {{ att.uploader.username|default:"-" }}
+                </td>
+                <td class="text-muted">{{ att.uploaded_at|date:"Y-m-d H:i" }}</td>
+                {% if config.allow_delete %}
+                <td>
+                    <button class="btn btn-sm btn-icon btn-ghost-danger"
+                            hx-post="{% url 'attachment:delete' att.pk %}"
+                            hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                            hx-confirm="确定要删除此附件吗？"
+                            hx-target="#attachment-panel-{{ content_type_id }}-{{ object_id }}"
+                            hx-swap="none"
+                            title="删除">
+                        <i class="ti ti-trash"></i>
+                    </button>
+                </td>
+                {% endif %}
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="{% if config.categories|length > 1 %}{% if config.allow_delete %}7{% else %}6{% endif %}{% else %}{% if config.allow_delete %}6{% else %}5{% endif %}{% endif %}"
+                    class="text-center py-4 text-muted small">
+                    暂无附件，点击上方"上传附件"按钮添加文件
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

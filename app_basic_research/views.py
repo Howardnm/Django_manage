@@ -5,8 +5,8 @@ from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 from django.http import HttpResponse
 
-from app_basic_research.forms import ResearchProjectForm, ResearchProjectNodeUpdateForm, ResearchProjectFileForm
-from app_basic_research.models import ResearchProject, ResearchStage, ResearchProjectNode, ResearchProjectFile
+from app_basic_research.forms import ResearchProjectForm, ResearchProjectNodeUpdateForm
+from app_basic_research.models import ResearchProject, ResearchStage, ResearchProjectNode
 from app_basic_research.utils.filters import ResearchProjectFilter
 from app_basic_research.mixins import BasicResearchAccessMixin
 
@@ -103,7 +103,7 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
     context_object_name = 'project'
 
     queryset = ResearchProject.objects.select_related('manager').prefetch_related(
-        'nodes', 'formulas', 'formulas__test_results', 'formulas__test_results__test_config', 'files'
+        'nodes', 'formulas', 'formulas__test_results', 'formulas__test_results__test_config'
     )
 
     def get_object(self, queryset=None):
@@ -137,7 +137,6 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
             'related_formulas': related_formulas,
             'current_std': current_std,
             'cart_formula_ids': self.request.session.get('compare_cart', {}).get('formula', []),
-            'file_form': ResearchProjectFileForm()
         })
         return context
 
@@ -185,21 +184,3 @@ class ResearchNodeFailedView(BasicResearchObjectView):
         self.check_object_permission(node.project)
         node.perform_failure_logic(request.POST.get('remark', '实验不通过'))
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
-
-class ResearchProjectFileUploadView(BasicResearchObjectView):
-    def post(self, request, pk):
-        project = self.get_project_and_check(pk)
-        form = ResearchProjectFileForm(request.POST, request.FILES)
-        if form.is_valid():
-            instance = form.save(commit=False)
-            instance.project, instance.uploader = project, request.user
-            instance.save()
-        return redirect('basic_research_detail', pk=pk)
-
-class ResearchProjectFileDeleteView(BasicResearchObjectView):
-    def post(self, request, pk):
-        file_obj = get_object_or_404(ResearchProjectFile, pk=pk)
-        self.check_object_permission(file_obj.project)
-        project_pk = file_obj.project.pk
-        file_obj.delete()
-        return redirect('basic_research_detail', pk=project_pk)

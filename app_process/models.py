@@ -1,8 +1,7 @@
 from django.db import models
 from django.conf import settings
 from app_material.models import MaterialType
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size
+
 
 
 # 【新增】机台型号库
@@ -35,7 +34,6 @@ class ScrewCombination(models.Model):
     machines = models.ManyToManyField(MachineModel, verbose_name="适用机台", related_name="screw_combinations")
     suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="screw_combinations")
     description = models.TextField("组合描述", blank=True, help_text="详细描述螺杆排列逻辑，如：输送-熔融-剪切-排气")
-    drawing_file = models.FileField("组合图纸", upload_to=upload_file_path, blank=True, null=True, help_text="上传螺杆排列图 (PDF/图片)", validators=[validate_file_size])
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

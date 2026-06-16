@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% load project_extras %}
+{% load attachment_tags %}
 
 {% block title %}主机厂详情: {{ oem.name }}{% endblock %}
 
@@ -123,57 +124,7 @@
 
             <!-- 3. 主机厂标准文件 -->
             <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">主机厂标准文件库</h3>
-                        <div class="ms-auto">
-                            <button class="btn btn-outline-primary btn-sm"
-                                    hx-get="{% url 'repo_oem_file_form' oem.pk %}"
-                                    hx-target="#htmx-modal-content"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#htmx-modal">
-                                <i class="ti ti-upload me-1"></i>上传标准
-                            </button>
-                        </div>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table card-table table-vcenter table-sm">
-                            <thead>
-                                <tr>
-                                    <th>文件名称</th>
-                                    <th>类型</th>
-                                    <th>版本</th>
-                                    <th>备注说明</th>
-                                    <th>上传日期</th>
-                                    <th class="w-1"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for file in oem.standard_files.all %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'secure_download' 'app_repository' 'OEMStandardFile' file.id 'file' %}" class="text-reset fw-bold">
-                                            {{ file.name }}
-                                        </a>
-                                    </td>
-                                    <td><span class="badge bg-secondary-lt">{{ file.get_file_type_display }}</span></td>
-                                    <td class="text-muted">V{{ file.version }}</td>
-                                    <td class="text-muted small text-truncate" style="max-width: 200px;">{{ file.description|default:"-" }}</td>
-                                    <td class="text-muted small">{{ file.uploaded_at|date:"Y-m-d" }}</td>
-                                    <td class="text-end">
-                                        <form action="{% url 'repo_oem_file_delete' file.pk %}" method="post" class="d-inline" onsubmit="return confirm('确定删除该文件吗？');">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-sm btn-ghost-danger">删除</button>
-                                        </form>
-                                    </td>
-                                </tr>
-                                {% empty %}
-                                <tr><td colspan="6" class="text-center py-4 text-muted">暂无标准文件归档</td></tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+                {% attachment_panel oem %}
             </div>
 
             <!-- 4. 关联项目展示 -->

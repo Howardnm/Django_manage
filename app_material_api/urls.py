@@ -9,7 +9,7 @@ router.register(r'categories', views.MetricCategoryViewSet)
 router.register(r'test-configs', views.TestConfigViewSet)
 router.register(r'materials', views.MaterialLibraryViewSet)
 router.register(r'data-points', views.MaterialDataPointViewSet)
-router.register(r'files', views.MaterialFileViewSet)
+router.register(r'files', views.AttachmentFileViewSet, basename='attachment')
 
 urlpatterns = [
     path('', include(router.urls)),

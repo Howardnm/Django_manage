@@ -44,7 +44,7 @@ async def get_material_and_formulas(grade_name: str):
     @sync_to_async
     def query():
         try:
-            material = MaterialLibrary.objects.select_related('category').prefetch_related('properties', 'additional_files').get(grade_name=grade_name)
+            material = MaterialLibrary.objects.select_related('category').prefetch_related('properties').get(grade_name=grade_name)
             formulas = LabFormula.objects.filter(project__material=material).prefetch_related('bom_lines', 'test_results')
             
             data = serialize_material(material)

@@ -718,10 +718,18 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 formula.description = form.cleaned_data.get('description', '')
                 formula.save()
 
-                old_reports = {
-                    t.test_config_id: t.file_report
-                    for t in formula.test_results.all() if t.file_report
-                }
+                # 从 Attachment 表获取旧测试报告
+                from django.contrib.contenttypes.models import ContentType
+                from app_attachment.models import Attachment
+                ct = ContentType.objects.get_for_model(FormulaTestResult)
+                old_reports = {}
+                for t in formula.test_results.all():
+                    att = Attachment.objects.filter(
+                        content_type=ct, object_id=t.pk,
+                        category='REPORT', is_deleted=False,
+                    ).first()
+                    if att:
+                        old_reports[t.test_config_id] = att.file
                 formula.bom_lines.all().delete()
                 formula.test_results.all().delete()
 
@@ -772,15 +780,21 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                         else:
                             value_text = ''
                     if value is not None or value_text:
-                        FormulaTestResult.objects.create(
+                        new_result = FormulaTestResult.objects.create(
                             formula=formula,
                             test_config=tc,
                             value=value,
                             value_text=value_text,
                             test_date=row['test_date'],
                             remark=row['remark'],
-                            file_report=old_reports.get(tc.pk),
                         )
+                        # 复制旧的测试报告附件到新记录
+                        if tc.pk in old_reports:
+                            Attachment.objects.create(
+                                content_type=ct, object_id=new_result.pk,
+                                category='REPORT', file=old_reports[tc.pk],
+                                display_name=f'测试报告_{new_result.pk}',
+                            )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
                 formula.calculate_cost()

@@ -151,9 +151,10 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                {% if mat.file_tds %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_tds' %}" target="_blank" class="text-azure"><i class="ti ti-file-text"></i></a>{% endif %}
-                                {% if mat.file_msds %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_msds' %}" target="_blank" class="text-red"><i class="ti ti-flask"></i></a>{% endif %}
-                                {% if mat.file_rohs %}<a href="{% url 'secure_download' 'app_material' 'materiallibrary' mat.pk 'file_rohs' %}" target="_blank" class="text-green"><i class="ti ti-leaf"></i></a>{% endif %}
+                                {% load attachment_tags %}
+                                {% attachment_url mat 'TDS' as tds_url %}{% if tds_url %}<a href="{{ tds_url }}" target="_blank" class="text-azure"><i class="ti ti-file-text"></i></a>{% endif %}
+                                {% attachment_url mat 'MSDS' as msds_url %}{% if msds_url %}<a href="{{ msds_url }}" target="_blank" class="text-red"><i class="ti ti-flask"></i></a>{% endif %}
+                                {% attachment_url mat 'RoHS' as rohs_url %}{% if rohs_url %}<a href="{{ rohs_url }}" target="_blank" class="text-green"><i class="ti ti-leaf"></i></a>{% endif %}
                             </div>
                         </td>
                         <td>

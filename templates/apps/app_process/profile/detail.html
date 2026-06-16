@@ -173,8 +173,9 @@
                             {% endfor %}
                         </div>
 
-                        {% if profile.screw_combination.drawing_file %}
-                            <a href="{% url 'secure_download' 'app_process' 'screwcombination' profile.screw_combination.pk 'drawing_file' %}" target="_blank" class="btn btn-ghost-orange w-100">
+                        {% load attachment_tags %}
+                        {% attachment_url profile.screw_combination 'DRAWING' as drawing_url %}{% if drawing_url %}
+                            <a href="{{ drawing_url }}" target="_blank" class="btn btn-ghost-orange w-100">
                                 <i class="ti ti-file-download me-2"></i>下载组合图纸
                             </a>
                         {% else %}

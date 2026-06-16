@@ -1,8 +1,8 @@
 from django import forms
 from django.forms import inlineformset_factory
 
-from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint, 
-                               TestConfig, MaterialFile, MaterialType, MaterialCharacteristic)
+from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint,
+                               TestConfig, MaterialType, MaterialCharacteristic)
 from common_utils.filters import TablerFormMixin
 
 
@@ -88,17 +88,6 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
 
 
 MaterialDataFormSet = inlineformset_factory(MaterialLibrary, MaterialDataPoint, form=MaterialDataPointForm, extra=0, can_delete=True)
-
-
-class MaterialFileForm(TablerFormMixin, forms.ModelForm):
-    class Meta:
-        model = MaterialFile
-        fields = ['file_type', 'file', 'version', 'description']
-        widgets = {
-            'file_type': forms.Select(attrs={'class': 'form-select'}),
-            'version': forms.NumberInput(attrs={'class': 'form-control'}),
-            'description': forms.Textarea(attrs={'rows': 2, 'placeholder': '版本变更说明...'}),
-        }
 
 
 class MaterialTypeForm(TablerFormMixin, forms.ModelForm):

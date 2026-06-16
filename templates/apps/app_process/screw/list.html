@@ -44,7 +44,9 @@
                 <tbody>
                 {% for screw in screws %}
                     <tr>
-                        <td class="fw-bold">{{ screw.name }}</td>
+                        <td class="fw-bold">
+                            <a href="{% url 'process_screw_detail' screw.pk %}" class="text-reset">{{ screw.name }}</a>
+                        </td>
                         <td>
                             {% if screw.combination_code %}
                                 <span class="badge bg-azure-lt">{{ screw.combination_code }}</span>
@@ -72,8 +74,9 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if screw.drawing_file %}
-                                <a href="{% url 'secure_download' 'app_process' 'screwcombination' screw.pk 'drawing_file' %}" target="_blank" class="text-blue">
+                            {% load attachment_tags %}
+                            {% attachment_url screw 'DRAWING' as drawing_url %}{% if drawing_url %}
+                                <a href="{{ drawing_url }}" target="_blank" class="text-blue">
                                     <i class="ti ti-file-download"></i> 下载
                                 </a>
                             {% else %}

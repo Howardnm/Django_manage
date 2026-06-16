@@ -112,14 +112,15 @@
                                 </td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        {% if material.file_tds %}
-                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_tds' %}" target="_blank" class="text-azure" title="TDS" data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
+                                        {% load attachment_tags %}
+                                        {% attachment_url material 'TDS' as tds_url %}{% if tds_url %}
+                                            <a href="{{ tds_url }}" target="_blank" class="text-azure" title="TDS" data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
                                         {% endif %}
-                                        {% if material.file_msds %}
-                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_msds' %}" target="_blank" class="text-red" title="MSDS" data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
+                                        {% attachment_url material 'MSDS' as msds_url %}{% if msds_url %}
+                                            <a href="{{ msds_url }}" target="_blank" class="text-red" title="MSDS" data-bs-toggle="tooltip"><i class="ti ti-flask"></i></a>
                                         {% endif %}
-                                        {% if material.file_rohs %}
-                                            <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_rohs' %}" target="_blank" class="text-green" title="RoHS" data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
+                                        {% attachment_url material 'RoHS' as rohs_url %}{% if rohs_url %}
+                                            <a href="{{ rohs_url }}" target="_blank" class="text-green" title="RoHS" data-bs-toggle="tooltip"><i class="ti ti-leaf"></i></a>
                                         {% endif %}
                                     </div>
                                 </td>

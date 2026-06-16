@@ -6,8 +6,7 @@ from app_material.models import MaterialType, TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
 from app_process.models import ProcessProfile
 from app_basic_research.models import ResearchProject
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size  # 引入文件大小验证器
+
 
 
 # 1. 实验配方主表
@@ -212,9 +211,6 @@ class FormulaTestResult(models.Model):
     # 【新增】测试日期
     test_date = models.DateField("测试日期", null=True, blank=True)
     remark = models.CharField("备注", max_length=50, blank=True)
-
-    # 【新增】测试报告文件
-    file_report = models.FileField("测试报告", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
 
     class Meta:
         verbose_name = "实验测试结果"

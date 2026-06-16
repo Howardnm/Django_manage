@@ -7,3 +7,24 @@ class AppBasicResearchConfig(AppConfig):
 
     def ready(self):
         import app_basic_research.utils.signals
+
+        # 注册附件配置
+        from app_attachment.registry import register_attachment
+        from app_attachment.configs import AttachmentConfig
+        from app_basic_research.models import ResearchProject
+        from app_basic_research.mixins import BasicResearchAccessMixin
+
+        register_attachment(AttachmentConfig(
+            parent_model=ResearchProject,
+            access_mixin=BasicResearchAccessMixin,
+            view_permission='app_basic_research.view_researchproject',
+            add_permission='app_basic_research.change_researchproject',
+            delete_permission='app_basic_research.change_researchproject',
+            categories=[
+                ('REPORT', '研究报告'),
+                ('DATA', '实验数据'),
+                ('LITERATURE', '参考文献'),
+                ('OTHER', '其他文件'),
+            ],
+            folder_id_resolver=lambda p: str(p.pk),
+        ))

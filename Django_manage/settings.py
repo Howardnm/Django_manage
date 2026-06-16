@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'django_filters',
     'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
     'axes', 
+    'app_attachment.apps.AppAttachmentConfig',  # 附件管理（须在业务app之前）
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
     'app_user.apps.AppUserConfig',

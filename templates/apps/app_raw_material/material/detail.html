@@ -87,29 +87,30 @@
                 <div class="card-header bg-red-lt">
                     <h3 class="card-title text-red"><i class="ti ti-file-download me-2"></i>文档资料</h3>
                 </div>
+{% load attachment_tags %}
                 <div class="list-group list-group-flush">
-                    {% if material.file_tds %}
-                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_tds' %}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                    {% attachment_url material 'TDS' as tds_url %}{% if tds_url %}
+                        <a href="{{ tds_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
                             <span class="avatar avatar-xs bg-azure-lt me-2">TDS</span>
                             TDS 物性表
                             <i class="ti ti-download ms-auto text-muted"></i>
                         </a>
                     {% endif %}
-                    {% if material.file_msds %}
-                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_msds' %}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                    {% attachment_url material 'MSDS' as msds_url %}{% if msds_url %}
+                        <a href="{{ msds_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
                             <span class="avatar avatar-xs bg-red-lt me-2">MSDS</span>
                             MSDS 报告
                             <i class="ti ti-download ms-auto text-muted"></i>
                         </a>
                     {% endif %}
-                    {% if material.file_rohs %}
-                        <a href="{% url 'secure_download' 'app_raw_material' 'rawmaterial' material.pk 'file_rohs' %}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
+                    {% attachment_url material 'RoHS' as rohs_url %}{% if rohs_url %}
+                        <a href="{{ rohs_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
                             <span class="avatar avatar-xs bg-green-lt me-2">RoHS</span>
                             RoHS 环保报告
                             <i class="ti ti-download ms-auto text-muted"></i>
                         </a>
                     {% endif %}
-                    {% if not material.file_tds and not material.file_msds and not material.file_rohs %}
+                    {% if not tds_url and not msds_url and not rohs_url %}
                         <div class="list-group-item text-muted text-center py-3">
                             <i class="ti ti-file-off fs-2 d-block mb-2 opacity-25"></i>
                             暂无文档
@@ -117,8 +118,11 @@
                     {% endif %}
                 </div>
             </div>
-            
-            <!-- 4. 使用说明 -->
+
+            <!-- 4. 附件管理 -->
+            {% attachment_panel material %}
+
+            <!-- 5. 使用说明 -->
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title"><i class="ti ti-notes me-2"></i>使用说明</h3>

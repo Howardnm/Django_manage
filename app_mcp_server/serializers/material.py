@@ -19,14 +19,22 @@ def serialize_material(material) -> Dict[str, Any]:
                 flattened_props[key] = val
 
         files = []
-        if hasattr(material, 'additional_files'):
-            for f in material.additional_files.all():
+        try:
+            from django.contrib.contenttypes.models import ContentType
+            from app_attachment.models import Attachment
+            ct = ContentType.objects.get_for_model(material)
+            atts = Attachment.objects.filter(
+                content_type=ct, object_id=material.pk, is_deleted=False
+            ).order_by('-uploaded_at')
+            for att in atts:
                 files.append({
-                    "name": f.name,
-                    "type": f.get_file_type_display(),
-                    "version": f.version,
-                    "uploaded_at": format_date(f.uploaded_at)
+                    "name": att.display_name,
+                    "type": att.category,
+                    "version": att.version,
+                    "uploaded_at": format_date(att.uploaded_at)
                 })
+        except Exception:
+            pass
 
         return {
             "id": material.id,

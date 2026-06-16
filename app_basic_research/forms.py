@@ -1,5 +1,5 @@
 from django import forms
-from .models import ResearchProject, ResearchProjectNode, ResearchProjectFile
+from .models import ResearchProject, ResearchProjectNode
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
 
 
@@ -28,12 +28,3 @@ class ResearchProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
         # 【修复】如果节点状态是 FAILED，则禁止修改状态，只允许修改备注
         if self.instance and self.instance.status == 'FAILED':
             self.fields['status'].disabled = True
-
-
-class ResearchProjectFileForm(TablerFormMixin, forms.ModelForm):
-    class Meta:
-        model = ResearchProjectFile
-        fields = ['file', 'name', 'description']
-        widgets = {
-            'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '文件描述...'}),
-        }

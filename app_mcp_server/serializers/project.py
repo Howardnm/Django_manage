@@ -24,7 +24,7 @@ def serialize_project_full(project) -> Dict[str, Any]:
     """Ultimate Project Serializer including Archive, Timeline and Files."""
     try:
         data = serialize_project(project)
-        
+
         repo = getattr(project, 'repository', None)
         if repo:
             data["business_info"] = {
@@ -35,7 +35,7 @@ def serialize_project_full(project) -> Dict[str, Any]:
                 "target_material": project.material.grade_name if project.material else "Not Selected",
                 "target_cost": float(repo.target_cost or 0)
             }
-        
+
         nodes = []
         for node in project.nodes.all().order_by('order'):
             nodes.append({
@@ -49,13 +49,22 @@ def serialize_project_full(project) -> Dict[str, Any]:
 
         files = []
         if repo:
-            for f in repo.files.all():
-                files.append({
-                    "name": f.name,
-                    "type": f.get_file_type_display() if hasattr(f, 'get_file_type_display') else "Other",
-                    "node_context": f.node.get_stage_display() if f.node else "General",
-                    "uploaded_at": format_date(f.uploaded_at)
-                })
+            try:
+                from django.contrib.contenttypes.models import ContentType
+                from app_attachment.models import Attachment
+                ct = ContentType.objects.get_for_model(repo)
+                atts = Attachment.objects.filter(
+                    content_type=ct, object_id=repo.pk, is_deleted=False,
+                ).order_by('-uploaded_at')
+                for att in atts:
+                    files.append({
+                        "name": att.display_name,
+                        "type": att.category,
+                        "version": att.version,
+                        "uploaded_at": format_date(att.uploaded_at)
+                    })
+            except Exception:
+                pass
         data["associated_files"] = files
 
         return data

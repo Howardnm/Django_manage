@@ -13,9 +13,7 @@ urlpatterns = [
     path('materials/add/', MaterialCreateView.as_view(), name='material_add'),
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='material_detail'),
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='material_edit'),
-    path('material/<int:material_id>/file/add/', MaterialFileUploadView.as_view(), name='material_file_add'),
-    path('material/file/<int:pk>/delete/', MaterialFileDeleteView.as_view(), name='material_file_delete'),
-    
+
     # 【新增】批量发布/下架
     path('materials/bulk-publish/', MaterialBulkPublishView.as_view(), name='material_bulk_publish'),
 

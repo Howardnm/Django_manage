@@ -8,8 +8,8 @@ from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.http import JsonResponse
 import json
 
-from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialFileForm
-from app_material.models.material import MaterialLibrary, MaterialDataPoint, MaterialFile
+from app_material.forms import MaterialForm, MaterialDataFormSet
+from app_material.models.material import MaterialLibrary, MaterialDataPoint
 from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult, LabFormula
 from app_material_api.integration.webhooks import send_material_webhook
@@ -199,7 +199,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
         return super().get_queryset().select_related(
             'category'
         ).prefetch_related(
-            'characteristics', 'scenarios', 'additional_files'
+            'characteristics', 'scenarios'
         )
 
     def get_context_data(self, **kwargs):
@@ -243,41 +243,6 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', [])
         })
         return context
-
-
-class MaterialFileUploadView(MaterialAccessMixin, CreateView):
-    """上传附件：需具备对应权限。"""
-    permission_required = 'app_material.add_materialfile'
-    model = MaterialFile
-    form_class = MaterialFileForm
-    template_name = 'apps/app_material/material/material_file_form.html'
-
-    def form_valid(self, form):
-        material = get_object_or_404(MaterialLibrary, pk=self.kwargs.get('material_id'))
-        form.instance.material = material
-        messages.success(self.request, "附件上传成功")
-        return super().form_valid(form)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['material'] = get_object_or_404(MaterialLibrary, pk=self.kwargs.get('material_id'))
-        context['page_title'] = '上传材料附件'
-        return context
-
-    def get_success_url(self):
-        return reverse('material_detail', kwargs={'pk': self.object.material.id})
-
-
-class MaterialFileDeleteView(MaterialAccessMixin, View):
-    """删除附件：需具备对应权限。"""
-    permission_required = 'app_material.delete_materialfile'
-
-    def post(self, request, pk):
-        file_obj = get_object_or_404(MaterialFile, pk=pk)
-        material_id = file_obj.material.id
-        file_obj.delete()
-        messages.success(request, "附件已删除")
-        return redirect('material_detail', pk=material_id)
 
 
 class MaterialBulkPublishView(MaterialAccessMixin, View):

@@ -12,6 +12,7 @@ urlpatterns = [
     # 螺杆组合
     path('screws/', ScrewCombinationListView.as_view(), name='process_screw_list'),
     path('screws/add/', ScrewCombinationCreateView.as_view(), name='process_screw_add'),
+    path('screws/<int:pk>/', ScrewCombinationDetailView.as_view(), name='process_screw_detail'),
     path('screws/<int:pk>/edit/', ScrewCombinationUpdateView.as_view(), name='process_screw_edit'),
 
     # 工艺方案

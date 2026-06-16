@@ -6,10 +6,10 @@ from django.views import View
 from django.views.generic import ListView, UpdateView, CreateView, DetailView
 from django.db.models import Q
 from django.contrib.auth import get_user_model
-from app_repository.forms import ProjectRepositoryForm, ProjectFileForm
+from app_repository.forms import ProjectRepositoryForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
-from app_repository.models import ProjectRepository, ProjectFile, Customer, OEM
+from app_repository.models import ProjectRepository, Customer, OEM
 from app_repository.mixins import RepositoryAccessMixin
 from app_material.models.material import ApplicationScenario, MaterialCharacteristic
 
@@ -48,7 +48,7 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
 
 
 class ProjectFileDetailView(RepositoryAccessMixin, DetailView):
-    """项目资料库详情：需有查看权限，拦截跨部门。"""
+    """项目资料库详情页 — 按项目节点分组展示附件"""
     permission_required = 'app_repository.view_projectrepository'
     model = ProjectRepository
     template_name = 'apps/app_repository/project_repo/project_file_detail.html'
@@ -56,96 +56,52 @@ class ProjectFileDetailView(RepositoryAccessMixin, DetailView):
 
     def get_object(self, queryset=None):
         repo = super().get_object(queryset)
-        self.check_object_permission(repo) # 拦截
+        self.check_object_permission(repo)
         return repo
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        files = self.object.files.all().select_related('node').order_by('node__order', '-uploaded_at')
-        
-        # 保持原有分组展示逻辑
-        grouped_list = []
-        node_map = {}
+        project = self.object.project
+
+        # 从 Attachment 表查询该 repo 的所有附件
+        from django.contrib.contenttypes.models import ContentType
+        from app_attachment.models import Attachment
+        ct = ContentType.objects.get_for_model(ProjectRepository)
+        attachments = Attachment.objects.filter(
+            content_type=ct, object_id=self.object.pk, is_deleted=False,
+        ).order_by('-uploaded_at')
+
+        # 按 group_key 分组（保持节点顺序）
+        nodes = list(project.nodes.all().order_by('order'))
+        node_map = {f"node:{n.pk}": n for n in nodes}
+        # 预初始化所有节点分组（空文件列表），保证卡片顺序 = 节点顺序
+        node_index = {n.pk: i for i, n in enumerate(nodes)}
+        grouped_files = [{'node': n, 'files': []} for n in nodes]
         general_files = []
-        for file in files:
-            if file.node:
-                if file.node.id not in node_map:
-                    node_map[file.node.id] = len(grouped_list)
-                    grouped_list.append({'node': file.node, 'files': []})
-                idx = node_map[file.node.id]
-                grouped_list[idx]['files'].append(file)
+
+        for att in attachments:
+            if att.group_key and att.group_key in node_map:
+                node = node_map[att.group_key]
+                idx = node_index[node.pk]
+                grouped_files[idx]['files'].append(att)
             else:
-                general_files.append(file)
-                
+                general_files.append(att)
+
+        # 过滤掉空分组（没有附件的节点不显示）
+        grouped_files = [g for g in grouped_files if g['files']]
+
+        # 使用项目模型已有的 current_active_node 方法
+        active_node = project.current_active_node
+        active_node_id = f"node:{active_node.pk}" if active_node else ''
+
         context.update({
-            'grouped_files': grouped_list,
+            'project': project,
+            'grouped_files': grouped_files,
             'general_files': general_files,
-            'project': self.object.project
+            'ct_id': ct.id,
+            'active_node_id': active_node_id,
         })
         return context
-
-
-class ProjectFileUploadView(RepositoryAccessMixin, CreateView):
-    """文件上传：需有 add_projectfile 权限，拦截跨部门操作。"""
-    permission_required = 'app_repository.add_projectfile'
-    model = ProjectFile
-    form_class = ProjectFileForm
-    template_name = 'apps/app_repository/project_repo/project_file_form.html'
-
-    def dispatch(self, request, *args, **kwargs):
-        repo_id = self.kwargs.get('repo_id')
-        self.repo = get_object_or_404(ProjectRepository, pk=repo_id)
-        # 检查是否对该档案有操作权
-        self.check_object_permission(self.repo)
-        return super().dispatch(request, *args, **kwargs)
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['repository'] = self.repo
-        return kwargs
-
-    def get_initial(self):
-        initial = super().get_initial()
-        node_id = self.request.GET.get('node_id')
-        if node_id: initial['node'] = node_id
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['repo'] = self.repo
-        context['page_title'] = '上传项目资料'
-        return context
-
-    def get_template_names(self):
-        if self.request.headers.get('HX-Request'):
-            return ['apps/app_repository/project_repo/modal_project_file_form.html']
-        return [self.template_name]
-
-    def form_valid(self, form):
-        form.instance.repository = self.repo
-        self.object = form.save()
-        if self.request.headers.get('HX-Request'):
-            return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
-        messages.success(self.request, "文件上传成功")
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('project_detail', kwargs={'pk': self.object.repository.project.id})
-
-
-class ProjectFileDeleteView(RepositoryAccessMixin, View):
-    """文件删除：拦截跨部门。"""
-    permission_required = 'app_repository.delete_projectfile'
-
-    def post(self, request, pk):
-        file_obj = get_object_or_404(ProjectFile, pk=pk)
-        # 校验权限
-        self.check_object_permission(file_obj.repository)
-        
-        file_obj.delete()
-        messages.success(request, "文件已删除")
-        next_url = request.META.get('HTTP_REFERER', reverse('project_detail', kwargs={'pk': file_obj.repository.project.id}))
-        return redirect(next_url)
 
 
 class RepoAutocompleteView(RepositoryAccessMixin, View):

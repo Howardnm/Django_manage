@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView, UpdateView
+from django.views.generic import ListView, CreateView, UpdateView, DetailView
 
 from app_process.models import ScrewCombination
 from app_process.forms import ScrewCombinationForm
@@ -71,3 +71,21 @@ class ScrewCombinationUpdateView(ProcessAccessMixin, UpdateView):
     def form_valid(self, form):
         messages.success(self.request, "螺杆组合已更新")
         return super().form_valid(form)
+
+
+class ScrewCombinationDetailView(ProcessAccessMixin, DetailView):
+    """螺杆组合详情页"""
+    permission_required = 'app_process.view_screwcombination'
+    model = ScrewCombination
+    template_name = 'apps/app_process/screw/detail.html'
+    context_object_name = 'screw'
+
+    enforce_dept_isolation = False
+
+    def get_queryset(self):
+        return super().get_queryset().prefetch_related('machines', 'suitable_materials')
+
+    def get_object(self, queryset=None):
+        obj = super().get_object(queryset)
+        self.check_object_permission(obj)
+        return obj

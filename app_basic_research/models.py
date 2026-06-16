@@ -3,8 +3,7 @@ from django.conf import settings
 from django.db import transaction
 from django.utils.functional import cached_property
 from django.utils import timezone
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size
+
 
 
 # 1. 预研项目阶段 (枚举)
@@ -195,24 +194,3 @@ class ResearchProjectNode(models.Model):
         if self.stage == ResearchStage.EXPERIMENT:
             self.project.add_iteration_node(ResearchStage.EXPERIMENT, self.order)
 
-
-# 4. 预研项目附件
-class ResearchProjectFile(models.Model):
-    project = models.ForeignKey(ResearchProject, on_delete=models.CASCADE, related_name='files')
-    file = models.FileField("附件", upload_to=upload_file_path, validators=[validate_file_size])
-    name = models.CharField("附件名称", max_length=100, blank=True, help_text="如果不填，默认使用文件名")
-    description = models.CharField("描述", max_length=200, blank=True)
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
-    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, verbose_name="上传人")
-
-    class Meta:
-        verbose_name = "预研项目附件"
-        ordering = ['-uploaded_at']
-
-    def __str__(self):
-        return self.name or self.file.name
-
-    def save(self, *args, **kwargs):
-        if not self.name and self.file:
-            self.name = self.file.name.split('/')[-1]
-        super().save(*args, **kwargs)

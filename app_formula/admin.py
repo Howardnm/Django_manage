@@ -12,7 +12,7 @@ class FormulaBOMInline(admin.TabularInline):
 class FormulaTestResultInline(admin.TabularInline):
     model = FormulaTestResult
     extra = 0
-    fields = ('test_config', 'value', 'value_text', 'test_date', 'remark', 'file_report')
+    fields = ('test_config', 'value', 'value_text', 'test_date', 'remark')
     ordering = ('test_config__category__order', 'test_config__order')
 
 # 3. 实验配方主表 Admin

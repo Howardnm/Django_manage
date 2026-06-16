@@ -66,38 +66,6 @@
                                         <div class="form-text text-muted">{{ form.combination_code.help_text }}</div>
                                     </div>
                                 </div>
-
-                                <!-- 文件上传美化版 -->
-                                <div class="mb-3">
-                                    <label class="form-label">
-                                        <i class="ti ti-photo text-blue me-1"></i>组合图纸
-                                    </label>
-
-                                    <input type="file" name="drawing_file" class="form-control {% if form.drawing_file.errors %}is-invalid{% endif %}">
-                                    {% if form.drawing_file.errors %}
-                                        <div class="invalid-feedback d-block">{{ form.drawing_file.errors.0 }}</div>
-                                    {% endif %}
-
-                                    {% if form.instance.drawing_file and not form.drawing_file.errors %}
-                                        <div class="d-flex justify-content-between align-items-center mt-2 p-2 bg-light rounded border">
-                                            <!-- 修改下载链接，使用 secure_download 路由 -->
-                                            <a href="{% url 'secure_download' 'app_process' 'screwcombination' form.instance.pk 'drawing_file' %}"
-                                               target="_blank"
-                                               class="text-truncate text-azure fw-bold small"
-                                               style="max-width: 70%;"
-                                               title="点击下载/预览">
-                                                <i class="ti ti-download me-1"></i> 已上传文件
-                                            </a>
-
-                                            <label class="form-check form-check-inline m-0" title="勾选并在保存后删除">
-                                                <input class="form-check-input" type="checkbox" name="drawing_file-clear">
-                                                <span class="form-check-label small text-danger">删除</span>
-                                            </label>
-                                        </div>
-                                    {% else %}
-                                        <div class="form-text text-muted">支持 PDF, PNG, JPG 格式</div>
-                                    {% endif %}
-                                </div>
                             </div>
                         </div>
 

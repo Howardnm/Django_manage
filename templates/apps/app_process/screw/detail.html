@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load attachment_tags %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">螺杆组合详情</div>
+            <h2 class="page-title">{{ screw.name }}</h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <div class="btn-list">
+                <a href="{% url 'process_screw_list' %}" class="btn btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>返回列表
+                </a>
+                <a href="{% url 'process_screw_edit' screw.pk %}" class="btn btn-primary">
+                    <i class="ti ti-edit me-1"></i>编辑
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards">
+    <!-- 左侧：基础信息 + 附件 -->
+    <div class="col-lg-5">
+        <!-- 1. 基础信息 -->
+        <div class="card mb-3">
+            <div class="card-header bg-blue-lt">
+                <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基础信息</h3>
+            </div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-5 text-muted">组合名称</dt>
+                    <dd class="col-7 fw-bold">{{ screw.name }}</dd>
+
+                    <dt class="col-5 text-muted">组合号</dt>
+                    <dd class="col-7">
+                        {% if screw.combination_code %}
+                            <span class="badge bg-azure-lt">{{ screw.combination_code }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </dd>
+
+                    <dt class="col-5 text-muted">创建时间</dt>
+                    <dd class="col-7 text-muted">{{ screw.created_at|date:"Y-m-d H:i" }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- 2. 适用机台 -->
+        <div class="card mb-3">
+            <div class="card-header bg-purple-lt">
+                <h3 class="card-title text-purple"><i class="ti ti-tool me-2"></i>适用机台</h3>
+            </div>
+            <div class="card-body">
+                {% if screw.machines.all %}
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for machine in screw.machines.all %}
+                            <span class="badge bg-purple-lt">
+                                {% if machine.machine_code %}[{{ machine.machine_code }}] {% endif %}
+                                {{ machine.brand }} - {{ machine.model_name }} (D{{ machine.screw_diameter|floatformat:0 }})
+                            </span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 3. 适用材料类型 -->
+        <div class="card mb-3">
+            <div class="card-header bg-green-lt">
+                <h3 class="card-title text-green"><i class="ti ti-cube me-2"></i>适用材料类型</h3>
+            </div>
+            <div class="card-body">
+                {% if screw.suitable_materials.all %}
+                    <div class="d-flex flex-wrap gap-1">
+                        {% for mat in screw.suitable_materials.all %}
+                            <span class="badge bg-green-lt">{{ mat.name }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <span class="text-muted">-</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 4. 组合描述 -->
+        {% if screw.description %}
+        <div class="card mb-3">
+            <div class="card-header">
+                <h3 class="card-title"><i class="ti ti-notes me-2"></i>组合描述</h3>
+            </div>
+            <div class="card-body">
+                {{ screw.description|linebreaks }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- 右侧：附件 -->
+    <div class="col-lg-7">
+        {% attachment_panel screw %}
+    </div>
+</div>
+{% endblock %}

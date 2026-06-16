@@ -1,7 +1,6 @@
 import os
 from django.db import models
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size
+
 from collections import defaultdict
 
 # ==========================================
@@ -108,9 +107,6 @@ class MaterialLibrary(models.Model):
     flammability = models.CharField("阻燃等级", max_length=20, blank=True,
                                     choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
     description = models.TextField("特性描述", blank=True)
-    file_tds = models.FileField("TDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
-    file_msds = models.FileField("MSDS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
-    file_rohs = models.FileField("RoHS", upload_to=upload_file_path, blank=True, null=True, validators=[validate_file_size])
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
 
     def __str__(self): return f"{self.grade_name}"
@@ -164,27 +160,3 @@ class MaterialDataPoint(models.Model):
         verbose_name = "性能数据"
         unique_together = ('material', 'test_config')
         ordering = ['test_config__category__order', 'test_config__order']
-
-# ==========================================
-# 8. 额外附件子表
-# ==========================================
-class MaterialFile(models.Model):
-    material = models.ForeignKey(MaterialLibrary, on_delete=models.CASCADE, related_name='additional_files')
-    name = models.CharField("文件名称", max_length=100, blank=True)
-    file = models.FileField(upload_to=upload_file_path, validators=[validate_file_size])
-    file_type = models.CharField(max_length=20, choices=[('UL', 'UL'), ('REACH', 'REACH'), ('COC', 'COC'), ('SPEC', 'SPEC')], default='OTHER')
-    description = models.TextField("备注", blank=True)
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-    version = models.PositiveIntegerField("版本号", default=1)
-
-    def save(self, *args, **kwargs):
-        is_new = self._state.adding
-        super().save(*args, **kwargs)
-        if is_new and self.file:
-            self.name = os.path.basename(self.file.name)
-            self.__class__.objects.filter(pk=self.pk).update(name=self.name)
-
-    def __str__(self): return f"{self.name} (V{self.version})"
-    class Meta:
-        verbose_name = "材料附件"
-        ordering = ['-uploaded_at']

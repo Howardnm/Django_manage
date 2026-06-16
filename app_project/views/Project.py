@@ -115,8 +115,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
         'manager', 'repository', 'repository__customer', 'repository__oem',
         'repository__salesperson', 'material', 'material__category',
     ).prefetch_related(
-        'nodes', 'repository__files', 'material__scenarios',
-        'material__additional_files'
+        'nodes', 'material__scenarios'
     )
 
     def get_object(self, queryset=None):
@@ -156,9 +155,14 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
         for node in nodes:
             node.form_count = node_form_counts.get(node.pk, 0)
 
+        # 附件上传所需的 ContentType ID
+        from app_repository.models import ProjectRepository
+        repo_ct_id = ContentType.objects.get_for_model(ProjectRepository).id if repo else None
+
         context.update({
             'nodes': nodes,
             'repo': repo,
+            'repo_ct_id': repo_ct_id,
             'material': project.material,
             'gantt_data_json': get_project_gantt_data(project),
             'project_form_count': project_form_count,

@@ -3,8 +3,7 @@ import uuid
 from django.db import models
 from django.conf import settings
 from app_project.models import Project, ProjectNode
-from common_utils.upload_file_path import upload_file_path
-from common_utils.validators import validate_file_size
+
 
 
 # ==========================================
@@ -47,28 +46,6 @@ class OEM(models.Model):
     class Meta:
         verbose_name = "主机厂"
         verbose_name_plural = "1. 主机厂名录"
-
-
-class OEMStandardFile(models.Model):
-    """主机厂标准文件 (如：Q/JL 材质规范)"""
-    oem = models.ForeignKey(OEM, on_delete=models.CASCADE, related_name='standard_files', verbose_name="所属主机厂")
-    name = models.CharField("文件名称", max_length=100, blank=True)
-    file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
-    file_type = models.CharField("文件类型", max_length=20, choices=[('MATERIAL', '材料标准'), ('TEST', '测试标准'), ('QUALITY', '质量协议'), ('OTHER', '其他标准')], default='MATERIAL')
-    description = models.TextField("备注/详细说明", blank=True)
-    uploader = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="上传人")
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
-    version = models.PositiveIntegerField("版本号", default=1)
-
-    def save(self, *args, **kwargs):
-        if not self.name and self.file:
-            self.name = os.path.basename(self.file.name)
-        super().save(*args, **kwargs)
-
-    def __str__(self): return self.name
-    class Meta:
-        verbose_name = "主机厂标准"
-        ordering = ['-uploaded_at']
 
 
 # ==========================================
@@ -124,27 +101,6 @@ class ProjectRepository(models.Model):
         verbose_name_plural = "3. 项目商务档案"
         ordering = ['-updated_at']
 
-
-class ProjectFile(models.Model):
-    repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='files', verbose_name="所属档案")
-    node = models.ForeignKey(ProjectNode, on_delete=models.SET_NULL, null=True, blank=True, related_name='files', verbose_name="关联节点")
-    name = models.CharField("文件名称", max_length=100, blank=True)
-    file = models.FileField("文件附件", upload_to=upload_file_path, validators=[validate_file_size])
-    file_type = models.CharField("文件类型", max_length=20, choices=[('DRAWING_2D', '2D图纸'), ('DRAWING_3D', '3D数模'), ('STANDARD', '技术标准'), ('REPORT', '检测/测试报告'), ('QUOTE', '报价/商务'), ('OTHER', '其他资料')], default='OTHER')
-    description = models.TextField("备注/详细说明", blank=True)
-    uploaded_at = models.DateTimeField("上传时间", auto_now_add=True)
-    version = models.PositiveIntegerField("版本号", default=1)
-
-    def save(self, *args, **kwargs):
-        if not self.name and self.file:
-            self.name = os.path.basename(self.file.name)
-        super().save(*args, **kwargs)
-
-    def __str__(self): return f"{self.name} (V{self.version})"
-    class Meta:
-        verbose_name = "项目文件"
-        verbose_name_plural = "项目文件库"
-        ordering = ['-uploaded_at']
 
 # 外部行为回流记录
 class ExternalMemberActivity(models.Model):
