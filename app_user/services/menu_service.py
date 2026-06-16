@@ -34,7 +34,7 @@ class MenuService:
         for mod in raw_modules:
             if not mod: continue # 跳过空的模块定义
             
-            # 执行 4D 权限准入检查
+            # 执行 5D 权限准入检查
             if user.is_superuser or user.user_type in mod['visible_to']:
                 processed_mod = cls._process_module(mod, current_url_name)
                 if processed_mod:

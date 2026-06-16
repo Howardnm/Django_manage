@@ -41,7 +41,14 @@ class IdentityConfig:
 
 class UnifiedAccessMixin(PermissionRequiredMixin):
     """
-    统一权限架构控制 Mixin (4D-Security-Logic)。
+    统一权限架构控制 Mixin (5D-Security-Logic)。
+
+    维度的优先级从高到低：
+        D1: Django 原生权限码 (permission_required)
+        D2: 用户等级阈值 (min_level_required)
+        D3: 角色类型白名单 (identity_required)
+        D4: 部门数据隔离 (enforce_dept_isolation)
+        D5: 工作组数据隔离 (enforce_group_isolation)
     """
     # 允许不定义原生权限码，此时仅要求登录
     permission_required = []

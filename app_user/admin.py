@@ -27,7 +27,7 @@ class MyUserAdmin(UserAdmin):
     list_display = ('username', 'email', 'user_type', 'user_level', 'department', 'get_groups', 'phone', 'is_staff')
     list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_active', 'department')
     
-    # 在详情页管理 4D 权限和公司归属
+    # 在详情页管理 5D 权限和公司归属
     fieldsets = UserAdmin.fieldsets + (
         ('权限层级配置 (L2/L3/L4)', {
             'fields': ('user_level', 'user_type', 'department'),
