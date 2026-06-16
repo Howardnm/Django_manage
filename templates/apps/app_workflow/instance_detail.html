@@ -172,15 +172,6 @@
 
 <div class="page-body">
     <div class="container-xl">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-
         <!-- ★ 关联业务对象 — 顶部突出展示 -->
         {% if related_object %}
         <div class="card mb-3">
@@ -243,9 +234,11 @@
                                 <button type="submit" name="action" value="REJECT" class="btn btn-danger">
                                     <i class="ti ti-x me-2"></i>驳回
                                 </button>
+                                {% if not is_project_node_workflow %}
                                 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#returnModal">
                                     <i class="ti ti-arrow-back-up me-2"></i>退回
                                 </button>
+                                {% endif %}
                             </div>
                         </div>
                     </div>
@@ -431,8 +424,8 @@
 </div>
 <script id="bpmn-xml-data" type="text/plain">{{ bpmn_xml|safe }}</script>
 {{ status_map|json_script:"status-map-data" }}
-<!-- 退回重审弹窗 -->
-{% if current_task %}
+<!-- 退回重审弹窗（项目节点审批流程不支持退回） -->
+{% if current_task and not is_project_node_workflow %}
 <div class="modal modal-blur fade" id="returnModal" tabindex="-1" role="dialog" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" role="document">
         <div class="modal-content">

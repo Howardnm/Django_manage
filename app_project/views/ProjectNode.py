@@ -74,13 +74,21 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
                         }
                     }
 
-                    instance = WorkflowService.start(
-                        definition=node.project.approval_workflow,
-                        started_by=request.user,
-                        related_object=node,
-                        context_data=context_data,
-                        callback_config=callback_config
-                    )
+                    # 启动审批流程（已有历史审批流程则沿用旧实例，保留历史审批记录）
+                    if node.workflow_instance_id:
+                        instance = WorkflowService.restart(
+                            instance=node.workflow_instance,
+                            started_by=request.user,
+                            context_data=context_data,
+                        )
+                    else:
+                        instance = WorkflowService.start(
+                            definition=node.project.approval_workflow,
+                            started_by=request.user,
+                            related_object=node,
+                            context_data=context_data,
+                            callback_config=callback_config
+                        )
                     # 将节点状态设为待审批，并关联流程实例
                     node.status = 'AWAITING_APPROVAL'
                     node.workflow_instance = instance

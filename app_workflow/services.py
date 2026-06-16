@@ -52,6 +52,47 @@ class WorkflowService:
 
         return instance
 
+    # ── 重启 ──────────────────────────────────────────────────
+
+    @staticmethod
+    def restart(instance: WorkflowInstance, started_by,
+                context_data: dict | None = None) -> WorkflowInstance:
+        """重新启动已结束的流程实例，保留历史审批记录。
+        适用于项目节点审批等场景：驳回后重新提交时沿用旧实例，
+        从而保留历史的审批意见记录。
+        """
+        if context_data is None:
+            context_data = {}
+
+        # 清除 _need_revision 标记（如有）
+        context_data.pop('_need_revision', None)
+
+        engine = WorkflowEngine(instance.definition)
+        workflow = engine.create_workflow(context_data)
+        workflow_data = engine.serialize(workflow)
+
+        with transaction.atomic():
+            # 重置实例状态
+            instance.status = 'RUNNING'
+            instance.context_data = context_data
+            instance.spiff_workflow_data = workflow_data
+            instance.completed_at = None
+            instance.canceled_by = None
+            instance.cancel_reason = ''
+            instance.save()
+
+            # 记录重新发起历史
+            ApprovalHistory.objects.create(
+                instance=instance,
+                approver=started_by,
+                action='START',
+                remark='重新提交审批',
+            )
+            WorkflowService.sync_tasks(instance, workflow, engine)
+            workflow_started.send(sender=WorkflowService, instance=instance)
+
+        return instance
+
     # ── 审批 ──────────────────────────────────────────────────
 
     @staticmethod

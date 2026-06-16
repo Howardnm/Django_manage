@@ -606,6 +606,9 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         related_display_name = related_object_router.get_display_name(related_object)
         related_object_url = related_object_router.resolve(related_object)
 
+        # 项目节点审批流程：节点状态型审批，不存在过程退回，隐藏退回按钮
+        is_project_node_workflow = (content_type_model == 'projectnode')
+
         status_map = self._build_status_map(instance)
         bpmn_xml = instance.definition.bpmn_xml
 
@@ -619,6 +622,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             'related_model_name': related_model_name,
             'related_object_url': related_object_url,
             'content_type_model': content_type_model,
+            'is_project_node_workflow': is_project_node_workflow,
             'status_map': status_map,
             'bpmn_xml': bpmn_xml,
         }
