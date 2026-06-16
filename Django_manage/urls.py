@@ -39,9 +39,6 @@ urlpatterns = [
 
     # MCP Server 接口
     path('mcp/', include('app_mcp_server.urls')),
-    
-    # 【修复】：重新挂载 Dify 同步与机器人路由
-    path('dify/', include('app_dify_sync.urls')),
 
     # 附件管理模块（统一上传/下载/删除）
     path('attachment/', include('app_attachment.urls')),
