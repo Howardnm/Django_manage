@@ -43,8 +43,8 @@ class MenuModule:
             "url_name": "form_template_list",
             "sub_items": [
                 {"name": "创建表单", "url_name": "form_create_wizard"},
-                {"name": "我的草稿", "url_name": "my_drafts"},
-                {"name": "我的提交记录", "url_name": "my_submissions"},
+                {"name": "我的表单草稿", "url_name": "my_drafts"},
+                {"name": "我的表单提交", "url_name": "my_submissions"},
                 {"name": "表单模板管理", "url_name": "form_template_list"},
             ]
         }
