@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_rd_review"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- 研发评审流程：部门经理审批 → 研发总监审批 → 并行[工艺复核 + 销售确认] -->
+  <bpmn:process id="rd_review_process" name="研发评审流程" isExecutable="true">
+
+    <bpmn:startEvent id="StartEvent" name="发起审批">
+      <bpmn:outgoing>Flow_to_dept_mgr</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="Task_dept_mgr" name="部门经理审批"
+        camunda:candidateGroups="dept_manager"
+        camunda:formStep="1" camunda:formStepLabel="初审">
+      <bpmn:incoming>Flow_to_dept_mgr</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_dir</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_director" name="研发总监审批"
+        camunda:assignee="rnd_dir"
+        camunda:formStep="2" camunda:formStepLabel="总监审核">
+      <bpmn:incoming>Flow_to_dir</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_gateway</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:parallelGateway id="Gateway_fork" name="并行分发">
+      <bpmn:incoming>Flow_to_gateway</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_process</bpmn:outgoing>
+      <bpmn:outgoing>Flow_to_sales</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:userTask id="Task_process" name="工艺复核"
+        camunda:candidateGroups="process_lead"
+        camunda:formStep="3" camunda:formStepLabel="并行审核">
+      <bpmn:incoming>Flow_to_process</bpmn:incoming>
+      <bpmn:outgoing>Flow_process_done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_sales" name="销售确认"
+        camunda:candidateGroups="sales_lead"
+        camunda:formStep="3" camunda:formStepLabel="并行审核">
+      <bpmn:incoming>Flow_to_sales</bpmn:incoming>
+      <bpmn:outgoing>Flow_sales_done</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:parallelGateway id="Gateway_join" name="并行汇聚">
+      <bpmn:incoming>Flow_process_done</bpmn:incoming>
+      <bpmn:incoming>Flow_sales_done</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_end</bpmn:outgoing>
+    </bpmn:parallelGateway>
+
+    <bpmn:endEvent id="EndEvent" name="审批完成">
+      <bpmn:incoming>Flow_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_to_dept_mgr" sourceRef="StartEvent" targetRef="Task_dept_mgr" />
+    <bpmn:sequenceFlow id="Flow_to_dir" sourceRef="Task_dept_mgr" targetRef="Task_director" />
+    <bpmn:sequenceFlow id="Flow_to_gateway" sourceRef="Task_director" targetRef="Gateway_fork" />
+    <bpmn:sequenceFlow id="Flow_to_process" sourceRef="Gateway_fork" targetRef="Task_process" />
+    <bpmn:sequenceFlow id="Flow_to_sales" sourceRef="Gateway_fork" targetRef="Task_sales" />
+    <bpmn:sequenceFlow id="Flow_process_done" sourceRef="Task_process" targetRef="Gateway_join" />
+    <bpmn:sequenceFlow id="Flow_sales_done" sourceRef="Task_sales" targetRef="Gateway_join" />
+    <bpmn:sequenceFlow id="Flow_to_end" sourceRef="Gateway_join" targetRef="EndEvent" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="rd_review_process">
+      <!-- Shapes -->
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent">
+        <dc:Bounds x="180" y="230" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_dept_mgr_di" bpmnElement="Task_dept_mgr">
+        <dc:Bounds x="280" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_director_di" bpmnElement="Task_director">
+        <dc:Bounds x="440" y="210" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_fork_di" bpmnElement="Gateway_fork">
+        <dc:Bounds x="600" y="225" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_process_di" bpmnElement="Task_process">
+        <dc:Bounds x="710" y="120" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_sales_di" bpmnElement="Task_sales">
+        <dc:Bounds x="710" y="300" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_join_di" bpmnElement="Gateway_join">
+        <dc:Bounds x="870" y="225" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent">
+        <dc:Bounds x="980" y="232" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <!-- Edges -->
+      <bpmndi:BPMNEdge id="Flow_to_dept_mgr_di" bpmnElement="Flow_to_dept_mgr">
+        <di:waypoint x="216" y="248" />
+        <di:waypoint x="280" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_dir_di" bpmnElement="Flow_to_dir">
+        <di:waypoint x="380" y="250" />
+        <di:waypoint x="440" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_gateway_di" bpmnElement="Flow_to_gateway">
+        <di:waypoint x="540" y="250" />
+        <di:waypoint x="600" y="250" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_process_di" bpmnElement="Flow_to_process">
+        <di:waypoint x="625" y="225" />
+        <di:waypoint x="710" y="160" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_sales_di" bpmnElement="Flow_to_sales">
+        <di:waypoint x="625" y="275" />
+        <di:waypoint x="710" y="340" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_process_done_di" bpmnElement="Flow_process_done">
+        <di:waypoint x="810" y="160" />
+        <di:waypoint x="895" y="225" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_sales_done_di" bpmnElement="Flow_sales_done">
+        <di:waypoint x="810" y="340" />
+        <di:waypoint x="895" y="275" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_end_di" bpmnElement="Flow_to_end">
+        <di:waypoint x="920" y="250" />
+        <di:waypoint x="980" y="250" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>

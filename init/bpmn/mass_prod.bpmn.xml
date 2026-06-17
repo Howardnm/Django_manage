@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+  id="Definitions_mass_prod"
+  targetNamespace="http://bpmn.io/schema/bpmn">
+
+  <!-- 量产放行流程：品质审核 → 生产确认 → 总监终审 -->
+  <bpmn:process id="mass_prod_process" name="量产放行流程" isExecutable="true">
+
+    <bpmn:startEvent id="StartEvent" name="发起放行申请">
+      <bpmn:outgoing>Flow_to_qa</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:userTask id="Task_qa_review" name="品质审核"
+        camunda:candidateGroups="qa_lead"
+        camunda:formStep="1" camunda:formStepLabel="品质确认">
+      <bpmn:incoming>Flow_to_qa</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_prod</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_prod_confirm" name="生产确认"
+        camunda:assignee="prod_mgr"
+        camunda:formStep="2" camunda:formStepLabel="生产评估">
+      <bpmn:incoming>Flow_to_prod</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_final</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:userTask id="Task_final_approve" name="总监终审"
+        camunda:assignee="rnd_dir"
+        camunda:formStep="3" camunda:formStepLabel="最终批准">
+      <bpmn:incoming>Flow_to_final</bpmn:incoming>
+      <bpmn:outgoing>Flow_to_end</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:endEvent id="EndEvent" name="放行完成">
+      <bpmn:incoming>Flow_to_end</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="Flow_to_qa" sourceRef="StartEvent" targetRef="Task_qa_review" />
+    <bpmn:sequenceFlow id="Flow_to_prod" sourceRef="Task_qa_review" targetRef="Task_prod_confirm" />
+    <bpmn:sequenceFlow id="Flow_to_final" sourceRef="Task_prod_confirm" targetRef="Task_final_approve" />
+    <bpmn:sequenceFlow id="Flow_to_end" sourceRef="Task_final_approve" targetRef="EndEvent" />
+
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="mass_prod_process">
+      <!-- Shapes — 从左到右水平排列 -->
+      <bpmndi:BPMNShape id="StartEvent_di" bpmnElement="StartEvent">
+        <dc:Bounds x="180" y="180" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_qa_review_di" bpmnElement="Task_qa_review">
+        <dc:Bounds x="280" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_prod_confirm_di" bpmnElement="Task_prod_confirm">
+        <dc:Bounds x="440" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_final_approve_di" bpmnElement="Task_final_approve">
+        <dc:Bounds x="600" y="160" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_di" bpmnElement="EndEvent">
+        <dc:Bounds x="760" y="182" width="36" height="36" />
+      </bpmndi:BPMNShape>
+      <!-- Edges -->
+      <bpmndi:BPMNEdge id="Flow_to_qa_di" bpmnElement="Flow_to_qa">
+        <di:waypoint x="216" y="198" />
+        <di:waypoint x="280" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_prod_di" bpmnElement="Flow_to_prod">
+        <di:waypoint x="380" y="200" />
+        <di:waypoint x="440" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_final_di" bpmnElement="Flow_to_final">
+        <di:waypoint x="540" y="200" />
+        <di:waypoint x="600" y="200" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_to_end_di" bpmnElement="Flow_to_end">
+        <di:waypoint x="700" y="200" />
+        <di:waypoint x="760" y="200" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+
+</bpmn:definitions>
