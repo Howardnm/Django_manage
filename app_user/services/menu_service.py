@@ -25,8 +25,8 @@ class MenuService:
             MenuModule.get_trial_production(),
             MenuModule.get_process(),
             MenuModule.get_raw_material(),
-            MenuModule.get_workflow(),
             MenuModule.get_form_management(),
+            MenuModule.get_workflow(),
             MenuModule.get_admin(),
         ]
 
