@@ -19,7 +19,7 @@ def trial_task_created_handler(sender, task, **kwargs):
         groups = ReviewGroup.objects.filter(
             name__in=task.candidate_groups, is_active=True)
         for group in groups:
-            recipients.update(group.user_set.all())
+            recipients.update(group.members.all())
 
     if not recipients:
         return

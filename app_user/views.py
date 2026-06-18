@@ -1,7 +1,10 @@
-# apps/app_user/views.py
+"""认证视图模块。处理登录、注册、个人资料、密码重置、验证码生成和浏览器验证。
+
+导出: CustomLoginView, RegisterView, ProfileView, PasswordResetView, captcha_view, verify_browser, send_email_code。"""
 import json
 from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView
+from django.views.decorators.http import require_GET
 from django.views.generic import CreateView, View, TemplateView, FormView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
@@ -10,14 +13,16 @@ from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.core.cache import cache
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, PasswordResetForm
 from .mixins import IdentityConfig
 from .utils import generate_captcha, send_verification_email, send_register_success_email
 
 User = get_user_model()
 
-# 1. 登录
 class CustomLoginView(LoginView):
+    """登录视图。校验用户为 INTERNAL_STAFF 角色，处理"记住我"和锁定消息。"""
     template_name = 'apps/app_user/login.html'
     authentication_form = UserLoginForm
     redirect_authenticated_user = True  # 如果已登录，直接跳走
@@ -27,6 +32,7 @@ class CustomLoginView(LoginView):
     # 如果 clean 方法抛出 ValidationError，form_valid 就不会被执行，而是执行 form_invalid
 
     def get_context_data(self, **kwargs):
+        """向模板注入锁定提示。Returns: 上下文字典。"""
         context = super().get_context_data(**kwargs)
         # 检查是否被锁定 (通过 URL 参数)
         if self.request.GET.get('locked'):
@@ -37,6 +43,7 @@ class CustomLoginView(LoginView):
         return context
 
     def form_valid(self, form):
+        """验证用户身份后执行 INTERNAL_STAFF 角色检查，处理 session 过期策略。Args: form: UserLoginForm。Returns: HttpResponse。"""
         # --- 核心拦截：只允许内部成员用户登录此管理系统 ---
         user = form.get_user()
         # 外部角色 (CUSTOMER, OEM) 禁止登录此后台管理系统
@@ -63,13 +70,16 @@ class CustomLoginView(LoginView):
 
 
 # 生成图形验证码视图
+@require_GET
 def captcha_view(request):
+    """生成 CAPTCHA 图片并将验证码存入 session。Returns: image/png 类型的 HttpResponse。"""
     image_data, code = generate_captcha()
     request.session['captcha_code'] = code
     return HttpResponse(image_data, content_type="image/png")
 
 # 获取客户端IP
 def get_client_ip(request):
+    """从请求中提取客户端 IP，优先取 X-Forwarded-For。Args: request: HttpRequest。Returns: IP 地址字符串。"""
     x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
     if x_forwarded_for:
         ip = x_forwarded_for.split(',')[0]
@@ -79,6 +89,7 @@ def get_client_ip(request):
 
 # 浏览器验证接口 (带后端轨迹和Nonce验证)
 def verify_browser(request):
+    """浏览器滑动验证端点。校验轨迹点数量、耗时、Y 轴变化和 X 轴单调性。Returns: JsonResponse。"""
     if request.method != 'POST':
         return JsonResponse({'status': 'error', 'message': '请求方法错误'}, status=405)
 
@@ -130,6 +141,7 @@ def verify_browser(request):
 
 # 发送邮箱验证码视图
 def send_email_code(request):
+    """发送邮箱验证码（注册/密码重置）。含图形验证码校验和频率限制。Returns: JsonResponse。"""
     # 检查是否允许注册 (是否有邀请码)
     # 注意：密码重置也可能用到这个接口，如果密码重置不需要邀请码限制，这里需要区分场景
     # 我们可以通过 request.GET.get('type') 来区分是注册还是重置
@@ -160,7 +172,13 @@ def send_email_code(request):
     cache_key_ip = f"email_code_limit_ip_{client_ip}"
     cache_key_email = f"email_code_limit_email_{email}"
 
-    if cache.get(cache_key_ip) or cache.get(cache_key_email):
+    # 使用原子操作 cache.add() 避免竞态条件：
+    # cache.add() 仅在 key 不存在时设置并返回 True，key 已存在时返回 False
+    if not cache.add(cache_key_ip, True, 60):
+        return JsonResponse({'status': 'error', 'msg': '发送过于频繁，请稍后再试'})
+    if not cache.add(cache_key_email, True, 60):
+        # 回滚刚才设置的 IP 缓存，避免 IP 被限但 email 未被限的不一致状态
+        cache.delete(cache_key_ip)
         return JsonResponse({'status': 'error', 'msg': '发送过于频繁，请稍后再试'})
 
     user_exists = User.objects.filter(email=email).exists()
@@ -170,9 +188,10 @@ def send_email_code(request):
         if user_exists:
             return JsonResponse({'status': 'error', 'msg': '该邮箱已被注册'})
     elif action_type == 'reset_password':
-        # 重置密码时，邮箱必须存在
+        # 密码重置不暴露邮箱是否已注册，统一返回成功提示
+        # 后续在 PasswordResetView.form_valid() 中再检查邮箱是否存在
         if not user_exists:
-            return JsonResponse({'status': 'error', 'msg': '该邮箱未注册'})
+            return JsonResponse({'status': 'success', 'msg': '如果该邮箱已注册，验证码已发送'})
 
     # 4. 发送验证码
     code, success, error_msg = send_verification_email(email)
@@ -180,9 +199,7 @@ def send_email_code(request):
     if not success:
         return JsonResponse({'status': 'error', 'msg': f'邮件发送失败: {error_msg}'})
 
-    # 设置缓存，限制频率 (60秒)
-    cache.set(cache_key_ip, True, 60)
-    cache.set(cache_key_email, True, 60)
+    # 频率限制已通过前面的 cache.add() 原子操作完成，无需再次 set
 
     # 使用不同的 session key 区分注册和重置
     if action_type == 'register':
@@ -197,6 +214,7 @@ def send_email_code(request):
 
 # 2. 注册
 class RegisterView(CreateView):
+    """用户注册视图。需有效的邀请码和邮箱验证码。"""
     template_name = 'apps/app_user/register.html'
     form_class = UserRegisterForm
     success_url = reverse_lazy('register_success')  # 注册成功跳到成功页
@@ -208,6 +226,7 @@ class RegisterView(CreateView):
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
+        """校验邮箱验证码，创建用户，清理 session 并发送欢迎邮件。Args: form: UserRegisterForm。Returns: HttpResponse。"""
         # 校验邮箱验证码
         email = form.cleaned_data.get('email')
         email_code = self.request.POST.get('email_code')
@@ -227,6 +246,12 @@ class RegisterView(CreateView):
         # 保存用户
         response = super().form_valid(form)
 
+        # 清理 session 中的注册验证信息
+        if 'register_email_code' in self.request.session:
+            del self.request.session['register_email_code']
+        if 'register_email' in self.request.session:
+            del self.request.session['register_email']
+
         # 发送注册成功邮件
         # self.object 是刚刚创建的 User 对象
         send_register_success_email(self.object, self.request)
@@ -236,18 +261,22 @@ class RegisterView(CreateView):
 
 # 注册成功页面
 class RegisterSuccessView(TemplateView):
+    """注册成功提示页。"""
     template_name = 'apps/app_user/register_success.html'
 
 
 # 3. 个人中心 (查看 + 修改)
 class ProfileView(LoginRequiredMixin, View):
+    """个人资料查看与编辑视图。"""
     template_name = 'apps/app_user/profile.html'
 
     def get(self, request):
+        """显示带当前用户数据的编辑表单。Returns: HttpResponse。"""
         user_form = UserUpdateForm(instance=request.user)
         return render(request, self.template_name, {'user_form': user_form})
 
     def post(self, request):
+        """保存个人资料更新。Returns: HttpResponse。"""
         user_form = UserUpdateForm(request.POST, instance=request.user)
 
         if user_form.is_valid():
@@ -259,11 +288,13 @@ class ProfileView(LoginRequiredMixin, View):
 
 # 4. 密码重置视图
 class PasswordResetView(FormView):
+    """密码重置视图。通过邮箱验证码 + 密码强度校验完成重置。"""
     template_name = 'apps/app_user/password_reset.html'
     form_class = PasswordResetForm
     success_url = reverse_lazy('login')
 
     def form_valid(self, form):
+        """校验验证码，验证密码强度，更新密码，清理 session。Args: form: PasswordResetForm。Returns: HttpResponse。Raises: ValidationError: 密码不符合 AUTH_PASSWORD_VALIDATORS 策略。"""
         email = form.cleaned_data.get('email')
         new_password = form.cleaned_data.get('new_password')
         email_code = self.request.POST.get('email_code')
@@ -284,6 +315,7 @@ class PasswordResetView(FormView):
         # 修改密码
         try:
             user = User.objects.get(email=email)
+            validate_password(new_password, user)
             user.set_password(new_password)
             user.save()
             messages.success(self.request, "密码重置成功，请使用新密码登录")
@@ -295,6 +327,10 @@ class PasswordResetView(FormView):
 
         except User.DoesNotExist:
             form.add_error('email', "该邮箱未注册用户")
+            return self.form_invalid(form)
+        except ValidationError as e:
+            for msg in e.messages:
+                form.add_error('new_password', msg)
             return self.form_invalid(form)
 
         return super().form_valid(form)

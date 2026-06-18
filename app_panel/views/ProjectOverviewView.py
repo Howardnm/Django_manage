@@ -21,6 +21,7 @@ class ProjectOverviewView(ProjectAccessMixin, View):
     def get(self, request):
         # 1. 获取经过权限过滤的基础查询集 (由 ProjectAccessMixin.get_queryset 提供)
         base_qs = Project.objects.all()
+        # get_permitted_queryset() 继承 ProjectAccessMixin 的部门+成员隔离
         projects_qs = self.get_permitted_queryset(base_qs)
 
         # 2. 应用面板过滤器

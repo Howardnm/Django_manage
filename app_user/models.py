@@ -1,15 +1,19 @@
+"""app_user 数据模型。定义 User、Department、WorkGroup、ReviewGroup、PermissionGroup。
+
+导出: PermissionGroup, Department, ReviewGroup, WorkGroup, User。"""
+
 import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser, Group as AuthGroup
 
 
 class PermissionGroup(AuthGroup):
-    """[L0] 权限角色组：分配各模块的增删改查权限码。"""
+    """[L3 权限容器] Django 原生权限组：管理各模块的增删改查权限码，在准入链最后被校验。"""
     class Meta:
         proxy = True
         app_label = 'app_user'
-        verbose_name = '[L0] 权限角色组'
-        verbose_name_plural = '[L0] 权限角色组'
+        verbose_name = '[L3 权限容器] 权限角色组'
+        verbose_name_plural = '[L3 权限容器] 权限角色组'
 
 
 class Department(models.Model):
@@ -23,6 +27,7 @@ class Department(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
+        """返回部门名称。"""
         return self.name
 
     class Meta:
@@ -58,6 +63,7 @@ class ReviewGroup(models.Model):
         ordering = ['name']
 
     def __str__(self):
+        """返回审核组名称。"""
         return self.name
 
 
@@ -87,6 +93,7 @@ class WorkGroup(models.Model):
         unique_together = [('name', 'department')]
 
     def __str__(self):
+        """返回 "[部门] 名称" 格式的字符串。"""
         return f"[{self.department.name}] {self.name}"
 
 
@@ -95,6 +102,7 @@ class User(AbstractUser):
     自定义用户模型，集成了研发、工艺、销售、采购、管理等核心业务角色。
     """
     class UserType(models.TextChoices):
+        """用户角色枚举，与 IdentityConfig 分组常量对应。"""
         ENGINEER = 'ENGINEER', '研发工程师'
         PROCESS_ENGINEER = 'PROCESS_ENGINEER', '工艺工程师'
         SALES = 'SALES', '业务员'
@@ -121,7 +129,7 @@ class User(AbstractUser):
 
     job_title = models.CharField("职称/职位", max_length=50, blank=True)
     phone = models.CharField("个人电话", max_length=20, blank=True)
-    email = models.EmailField("电子邮箱", blank=True)
+    email = models.EmailField("电子邮箱", blank=True)  # 未设置 unique=True：历史数据可能存在多用户共享邮箱的情况
     address = models.CharField("联系地址", max_length=255, blank=True)
     description = models.TextField("个人备注", blank=True)
 
@@ -130,25 +138,58 @@ class User(AbstractUser):
         verbose_name_plural = "用户"
 
     def __str__(self):
+        """返回 "[部门] 角色 - 用户名" 格式。"""
         dept_str = f"[{self.department.name}]" if self.department else ""
         return f"{dept_str} {self.get_user_type_display()} - {self.username}"
 
     # --- 快捷权限判断方法 (用于模板) ---
     @property
-    def is_engineer(self): return self.user_type == self.UserType.ENGINEER
+    def is_engineer(self):
+        """是否为研发工程师。"""
+        return self.user_type == self.UserType.ENGINEER
     @property
-    def is_process_engineer(self): return self.user_type == self.UserType.PROCESS_ENGINEER
+    def is_process_engineer(self):
+        """是否为工艺工程师。"""
+        return self.user_type == self.UserType.PROCESS_ENGINEER
     @property
-    def is_sales(self): return self.user_type == self.UserType.SALES
+    def can_use_compare_cart(self):
+        """配方对比购物车准入：仅研发工程师 + 管理员（RND_ONLY）"""
+        return self.is_engineer or self.user_type == self.UserType.ADMIN or self.is_superuser
     @property
-    def is_purchasing(self): return self.user_type == self.UserType.PURCHASING
+    def is_sales(self):
+        """是否为业务员。"""
+        return self.user_type == self.UserType.SALES
+
     @property
-    def is_external(self): return self.user_type in [self.UserType.CUSTOMER, self.UserType.OEM]
+    def is_purchasing(self):
+        """是否为采购专员。"""
+        return self.user_type == self.UserType.PURCHASING
+
     @property
-    def is_extrusion_operator(self): return self.user_type == self.UserType.EXTRUSION_OPERATOR
+    def is_external(self):
+        """是否为客户或 OEM 外部角色。"""
+        return self.user_type in [self.UserType.CUSTOMER, self.UserType.OEM]
     @property
-    def is_color_operator(self): return self.user_type == self.UserType.COLOR_OPERATOR
+    def is_extrusion_operator(self):
+        """是否为挤出操作员。"""
+        return self.user_type == self.UserType.EXTRUSION_OPERATOR
+
     @property
-    def is_injection_operator(self): return self.user_type == self.UserType.INJECTION_OPERATOR
+    def is_color_operator(self):
+        """是否为配色员。"""
+        return self.user_type == self.UserType.COLOR_OPERATOR
+
     @property
-    def is_testing_operator(self): return self.user_type == self.UserType.TESTING_OPERATOR
+    def is_injection_operator(self):
+        """是否为注塑操作员。"""
+        return self.user_type == self.UserType.INJECTION_OPERATOR
+
+    @property
+    def is_testing_operator(self):
+        """是否为测试员。"""
+        return self.user_type == self.UserType.TESTING_OPERATOR
+
+    @property
+    def is_admin(self):
+        """是否为系统管理员。"""
+        return self.user_type == self.UserType.ADMIN

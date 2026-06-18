@@ -349,7 +349,7 @@ def run(ctx: FakeContext) -> None:
 # ---------------------------------------------------------------------------
 def _get_or_create_operator(username, role, ctx):
     """获取或创建指定角色的操作员用户"""
-    user, created = User.objects.get_or_create(
+    user, created = User.objects.update_or_create(
         username=username,
         defaults={
             'user_type': role,
@@ -362,5 +362,5 @@ def _get_or_create_operator(username, role, ctx):
     )
     if created:
         user.set_password('Sunwill@123')
-        user.save()
+    user.save()
     return user

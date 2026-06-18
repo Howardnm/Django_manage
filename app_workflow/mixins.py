@@ -2,9 +2,7 @@ from app_user.mixins import UnifiedAccessMixin, IdentityConfig
 
 
 class WorkflowAccessMixin(UnifiedAccessMixin):
-    """审批流程模块 4D 权限控制"""
+    """审批流程模块权限管控（L1 内部全员准入 / L4 关闭部门隔离，审批跨部门协作）"""
 
     identity_required = IdentityConfig.INTERNAL_STAFF
-
-    # 审批流程跨部门协作，不启用部门隔离
     enforce_dept_isolation = False

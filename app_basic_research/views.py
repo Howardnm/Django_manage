@@ -84,9 +84,7 @@ class ResearchProjectUpdateView(BasicResearchAccessMixin, UpdateView):
     template_name = 'apps/app_basic_research/project_form.html'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj) # 安全校验
-        return obj
+        return self.get_object_or_deny()
 
     def get_success_url(self):
         return reverse('basic_research_detail', kwargs={'pk': self.object.pk})
@@ -107,9 +105,7 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
     )
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

@@ -20,15 +20,18 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
     Session Key: 'cart_formulas_v2' -> [id1, id2, ...] (V2版本，彻底隔离)
     Session Key: 'cart_materials_v2' -> [id1, id2, ...]
     Session Key: 'cart_raw_materials_v2' -> [id1, id2, ...] (新增：原材料)
+
+    准入：仅研发工程师 + 管理员（RND_ONLY）。
+    非研发用户不会在 header 中看到购物车组件，因此不会触发 AJAX 403。
     """
     permission_required = 'app_formula.view_labformula'
-    
+
     def get(self, request):
         """获取当前对比列表"""
         formula_ids = request.session.get('cart_formulas_v2', [])
         material_ids = request.session.get('cart_materials_v2', [])
         raw_material_ids = request.session.get('cart_raw_materials_v2', [])
-        
+
         formulas = LabFormula.objects.filter(pk__in=formula_ids).values('id', 'code', 'name')
         materials = MaterialLibrary.objects.filter(pk__in=material_ids).values('id', 'grade_name', 'manufacturer')
         raw_materials = RawMaterial.objects.filter(pk__in=raw_material_ids).values('id', 'name', 'model_name', 'supplier__name')
@@ -50,11 +53,11 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
         """加入/移除对比"""
         action = request.POST.get('action') # 'add', 'remove', 'clear', 'toggle', 'add_multiple'
         item_type = request.POST.get('type') # 'formula' or 'material' or 'raw_material'
-        
+
         # 【严格检查】必须指定 type，且必须合法
         if action != 'clear' and item_type not in ['formula', 'material', 'raw_material']:
             return JsonResponse({'status': 'error', 'message': 'Invalid type parameter'}, status=400)
-        
+
         # 使用 list() 创建副本，防止引用问题
         formula_ids = list(request.session.get('cart_formulas_v2', []))
         material_ids = list(request.session.get('cart_materials_v2', []))
@@ -185,8 +188,8 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
                 material_ids = self.request.session.get('cart_materials_v2', [])
                 raw_material_ids = self.request.session.get('cart_raw_materials_v2', [])
 
-        # 2. 获取对象 (prefetch_related 避免 N+1)
-        formulas = list(LabFormula.objects.filter(pk__in=formula_ids)
+        # 2. 获取对象 — 配方走 get_queryset() 确保 L4 部门隔离
+        formulas = list(self.get_queryset().filter(pk__in=formula_ids)
             .prefetch_related('bom_lines__raw_material__category',
                               'test_results__test_config__category')
             .order_by('created_at'))

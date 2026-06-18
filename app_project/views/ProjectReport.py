@@ -16,7 +16,10 @@ class ProjectReportExportView(ProjectAccessMixin, View):
     permission_required = 'app_project.view_project'
 
     def get(self, request, pk):
-        # 1. 获取项目对象并检查权限
+        # 1. 先鉴权（轻量查询），再获取完整数据
+        project = get_object_or_404(Project.objects.only('pk'), pk=pk)
+        self.check_object_permission(project)
+        # 鉴权通过后才加载关联数据
         project = get_object_or_404(Project.objects.select_related(
             'manager',
             'repository',
@@ -25,8 +28,6 @@ class ProjectReportExportView(ProjectAccessMixin, View):
             'material',
             'repository__salesperson'
         ).prefetch_related('nodes'), pk=pk)
-        
-        self.check_object_permission(project)
 
         # 2. 创建 Word 文档
         document = Document()

@@ -2,6 +2,7 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView, V
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.urls import reverse
+from django.core.exceptions import PermissionDenied
 from app_trial_production.mixins import (
     TrialProductionAccessMixin, ExtrusionTaskAccessMixin, RndAccessMixin,
 )
@@ -20,7 +21,10 @@ class ProductionOrderListView(TrialProductionAccessMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return ProductionOrder.objects.exclude(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.exclude(
             status__in=ProductionOrder.HIDDEN_STATUSES,
         ).select_related(
             'project', 'creator', 'process_profile',
@@ -35,7 +39,10 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
     context_object_name = 'order'
 
     def get_queryset(self):
-        return ProductionOrder.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.select_related(
             'project', 'project_node', 'process_profile',
             'process_profile__machine', 'process_profile__screw_combination',
             'creator', 'extruder_operator', 'workflow_instance',
@@ -177,14 +184,11 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
     form_class = ProductionOrderForm
     template_name = 'apps/app_trial_production/order/create.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        self.initiate_data = request.session.pop('trial_initiate_data', None)
-        return super().dispatch(request, *args, **kwargs)
-
     def get_initial(self):
         initial = super().get_initial()
-        if self.initiate_data:
-            initial['process_profile'] = self.initiate_data.get('process_profile_id')
+        initiate_data = self.request.session.get('trial_initiate_data')
+        if initiate_data:
+            initial['process_profile'] = initiate_data.get('process_profile_id')
         return initial
 
     def get_context_data(self, **kwargs):
@@ -193,13 +197,14 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
         context['test_specimen_molds'] = MoldType.objects.filter(
             status='AVAILABLE', mold_type='TEST_SPECIMEN',
         ).order_by('mold_code')
-        if self.initiate_data:
-            context['initiate_data'] = self.initiate_data
-            context['trial_code'] = self.initiate_data.get('trial_code', '')
+        initiate_data = self.request.session.get('trial_initiate_data')
+        if initiate_data:
+            context['initiate_data'] = initiate_data
+            context['trial_code'] = initiate_data.get('trial_code', '')
             from app_formula.models import LabFormula
             formulas = list(LabFormula.objects.filter(
-                code=self.initiate_data.get('trial_code', ''),
-                project_id=self.initiate_data.get('project_id'),
+                code=initiate_data.get('trial_code', ''),
+                project_id=initiate_data.get('project_id'),
             ).prefetch_related(
                 'bom_lines__raw_material__category',
             ).order_by('version'))
@@ -280,12 +285,16 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.creator = self.request.user
-        trial_code = self.request.POST.get('trial_code') or (self.initiate_data or {}).get('trial_code', '')
-        project_id = self.request.POST.get('project_id') or (self.initiate_data or {}).get('project_id')
-        project_node_id = self.request.POST.get('project_node_id') or (self.initiate_data or {}).get('project_node_id')
+        initiate_data = self.request.session.get('trial_initiate_data') or {}
+        trial_code = self.request.POST.get('trial_code') or initiate_data.get('trial_code', '')
+        project_id = self.request.POST.get('project_id') or initiate_data.get('project_id')
+        project_node_id = self.request.POST.get('project_node_id') or initiate_data.get('project_node_id')
         if trial_code:
             form.instance.trial_code = trial_code
         if project_id:
+            from app_project.models import Project
+            project = get_object_or_404(Project, pk=project_id)
+            RndAccessMixin.check_project_ownership(project, self.request.user)
             form.instance.project_id = project_id
         if project_node_id:
             form.instance.project_node_id = project_node_id
@@ -364,6 +373,7 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                                 specimen_quantity=qty,
                             )
 
+        self.request.session.pop('trial_initiate_data', None)
         messages.success(self.request, f'生产工单 {self.object.code} 创建成功')
         return redirect('trial_production_order_detail', pk=self.object.pk)
 
@@ -410,9 +420,10 @@ class ProductionOrderStartWorkflowView(RndAccessMixin, View):
             messages.warning(request, '当前状态不可发起审批')
             return redirect('trial_production_order_detail', pk=order.pk)
 
-        if order.project and not RndAccessMixin.check_project_ownership(order.project, request.user):
-            messages.error(request, '无权操作该项目的排产单')
-            return redirect('trial_production_order_detail', pk=order.pk)
+        if order.project:
+            RndAccessMixin.check_project_ownership(order.project, request.user)
+        elif order.creator_id != request.user.pk:
+            raise PermissionDenied("您不是该工单的创建者")
 
         from app_trial_production.models import TrialProductionConfig
         from app_trial_production.services import TrialProductionService
@@ -436,6 +447,11 @@ class ProductionOrderCompleteExtrusionView(ExtrusionTaskAccessMixin, View):
         if order.status != 'EXTRUDING':
             messages.warning(request, '当前状态不可完成挤出')
             return redirect('trial_production_order_detail', pk=order.pk)
+
+        # 验证操作员归属：仅分配的挤出操作员或技术核心/管理员可完成
+        if not request.user.is_superuser and order.extruder_operator_id:
+            if order.extruder_operator_id != request.user.pk:
+                raise PermissionDenied("您不是该工单分配的挤出操作员")
 
         has_color = order.formula_details.filter(needs_color_matching=True).exists()
         if has_color:
@@ -461,9 +477,7 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
         if project_id:
             from app_project.models import Project
             project = get_object_or_404(Project, pk=project_id)
-            if not RndAccessMixin.check_project_ownership(project, request.user):
-                messages.error(request, '您不是该项目的负责人或成员，无法创建排产单')
-                return redirect(request.META.get('HTTP_REFERER', '/'))
+            RndAccessMixin.check_project_ownership(project, request.user)
 
         from app_formula.models import LabFormula
         formulas = LabFormula.objects.filter(

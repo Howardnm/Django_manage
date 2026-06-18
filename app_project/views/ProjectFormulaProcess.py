@@ -21,9 +21,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
     )
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def _fetch_formulas(self, project, material):
         project_formulas = LabFormula.objects.filter(

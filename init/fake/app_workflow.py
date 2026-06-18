@@ -66,7 +66,7 @@ def run(ctx: FakeContext) -> None:
     # 2. 创建 BPMN assignee 用户（对接到 camunda:assignee）
     # =====================================================================
     def get_or_create_assignee(username, role, first_name):
-        user, created = User.objects.get_or_create(
+        user, created = User.objects.update_or_create(
             username=username,
             defaults={
                 'user_type': role,
@@ -74,12 +74,12 @@ def run(ctx: FakeContext) -> None:
                 'user_level': 12,
                 'first_name': first_name,
                 'email': f'{username}@sunwill.com.cn',
-                'is_staff': True,
+                'is_staff': False,
             },
         )
         if created:
             user.set_password('Sunwill@123')
-            user.save()
+        user.save()
         if user not in ctx.all_internal:
             ctx.all_internal.append(user)
         return user

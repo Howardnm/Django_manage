@@ -7,16 +7,12 @@ class TrialProductionAccessMixin(UnifiedAccessMixin):
     user_link_fields = ['creator', 'extruder_operator', 'assigned_operator',
                         'assigned_to', 'recorded_by', 'filled_by']
     identity_required = IdentityConfig.INTERNAL_STAFF
-    enforce_dept_isolation = True
-    permission_required = []
 
     def get_queryset(self):
         qs = super().get_queryset()
         if qs is None:
             return None
         user = self.request.user
-        if user.is_superuser:
-            return qs
 
         # 生产操作员按任务分配字段放宽数据可见范围
         if user.user_type in [
@@ -38,6 +34,7 @@ class TrialProductionAccessMixin(UnifiedAccessMixin):
                 from django.db.models import Q
                 qs = qs.filter(
                     Q(**{f"{field}": user}) |
+                    # isnull=True: 允许操作员看到尚未分配具体操作员的工单，以便主动认领
                     Q(**{f"{field}__isnull": True})
                 )
         return qs
@@ -84,9 +81,12 @@ class RndAccessMixin(TrialProductionAccessMixin):
 
     @staticmethod
     def check_project_ownership(project, user):
-        """验证用户是否属于该项目（负责人或成员）"""
+        """验证用户是否属于该项目（负责人或成员），无权时抛出 PermissionDenied"""
         if user.is_superuser:
-            return True
+            return
         if project.manager_id == user.pk:
-            return True
-        return project.members.filter(user=user).exists()
+            return
+        if project.members.filter(user=user).exists():
+            return
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied("您不是该项目的负责人或成员，无权操作此项目")

@@ -17,6 +17,8 @@ class HomeView(PanelAccessMixin, View):
     系统首页：展示全系统数据概况。
     - 准入：内部全员 (INTERNAL_STAFF)。
     """
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
+
     def get(self, request):
         context = {}
         today = timezone.now()

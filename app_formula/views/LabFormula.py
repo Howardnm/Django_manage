@@ -6,6 +6,7 @@ from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.db import transaction
 from django.shortcuts import redirect, get_object_or_404
+from django.core.exceptions import PermissionDenied
 from django.db.models import Subquery, OuterRef, DecimalField, Q
 
 from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
@@ -215,9 +216,7 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
     context_object_name = 'formula'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj) # 拦截跨部门访问
-        return obj
+        return self.get_object_or_deny()
 
     def get_queryset(self):
         return super().get_queryset().select_related(
@@ -246,23 +245,19 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
     form_class = LabFormulaForm
     template_name = 'apps/app_formula/form.html'
 
-    def dispatch(self, request, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
+        """鉴权通过后，校验项目材料是否已关联"""
         session_data = request.session.get('formula_prepare', {})
         project_id = session_data.get('project_id')
         if project_id:
-            try:
-                from app_project.models import Project
-                project = Project.objects.only('name', 'material').get(pk=project_id)
-            except Project.DoesNotExist:
-                pass
-            else:
-                if not project.material:
-                    from django.contrib import messages
-                    from django.shortcuts import redirect
-                    from django.urls import reverse
-                    messages.error(request, f'项目"{project.name}"尚未关联成品材料，请先在项目详情中关联材料后再创建配方。')
-                    return redirect(reverse('project_detail', kwargs={'pk': project_id}))
-        return super().dispatch(request, *args, **kwargs)
+            from app_project.models import Project
+            project = get_object_or_404(Project.objects.only('name', 'material'), pk=project_id)
+            if not project.material:
+                from django.contrib import messages
+                from django.urls import reverse
+                messages.error(request, f'项目"{project.name}"尚未关联成品材料，请先在项目详情中关联材料后再创建配方。')
+                return redirect(reverse('project_detail', kwargs={'pk': project_id}))
+        return super().get(request, *args, **kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
@@ -285,35 +280,50 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         context['enable_multi_column'] = True
         session_data = self._get_session_data()
         project_node_id = session_data.get('project_node_id')
+        project_id = session_data.get('project_id')
+
+        # 验证用户对项目的访问权限，同时缓存项目对象以复用
+        project = None
+        if project_id:
+            from app_project.models import Project
+            from app_trial_production.mixins import RndAccessMixin
+            try:
+                project = Project.objects.select_related('manager').only(
+                    'name', 'manager_id', 'manager__department'
+                ).get(pk=project_id)
+                RndAccessMixin.check_project_ownership(project, self.request.user)
+            except (Project.DoesNotExist, PermissionDenied):
+                project = None
+
         # 获取项目节点阶段，用于控制 is_mature 勾选
-        if project_node_id:
+        if project_node_id and project:
             try:
                 from app_project.models import ProjectNode
-                node = ProjectNode.objects.only('stage').get(pk=project_node_id)
+                node = ProjectNode.objects.only('stage', 'round', 'project__name', 'project_id').get(
+                    pk=project_node_id, project=project
+                )
                 context['project_node_stage'] = node.stage
                 context['can_be_mature'] = node.can_be_mature
+                context['project_node_display'] = str(node)
             except ProjectNode.DoesNotExist:
                 context['project_node_stage'] = None
-        else:
-            context['project_node_stage'] = None
-        # 锁定显示：项目名 & 节点名
-        project_id = session_data.get('project_id')
-        if project_id:
-            try:
-                from app_project.models import Project
-                context['project_name'] = Project.objects.only('name').get(pk=project_id).name
-            except Project.DoesNotExist:
-                context['project_name'] = None
-        else:
-            context['project_name'] = None
-        if project_node_id:
-            try:
-                from app_project.models import ProjectNode
-                context['project_node_display'] = str(ProjectNode.objects.only('project__name', 'stage', 'round').get(pk=project_node_id))
-            except ProjectNode.DoesNotExist:
                 context['project_node_display'] = None
         else:
+            context['project_node_stage'] = None
             context['project_node_display'] = None
+            # 清除失效的 session 数据
+            if project_node_id and not project:
+                session_data.pop('project_node_id', None)
+                self.request.session['formula_prepare'] = session_data
+
+        # 锁定显示：项目名
+        if project:
+            context['project_name'] = project.name
+        else:
+            context['project_name'] = None
+            if project_id:
+                session_data.pop('project_id', None)
+                self.request.session['formula_prepare'] = session_data
         if self.request.POST:
             context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
             context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
@@ -536,9 +546,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
     template_name = 'apps/app_formula/form.html'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -847,16 +855,16 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
     template_name = 'apps/app_formula/form.html'
 
     def get_object(self, queryset=None):
-        # 获取原始配方对象
-        original_formula = super().get_object(queryset)
-        self.check_object_permission(original_formula) # 只能复制自己部门的
-        return original_formula
+        return self.get_object_or_deny()
 
     # 重新实现为 CreateView 逻辑
-    def dispatch(self, request, *args, **kwargs):
-        self.original_formula = self.get_object()
-        return super().dispatch(request, *args, **kwargs)
-        
+    @property
+    def original_formula(self):
+        """鉴权后懒加载原配方对象"""
+        if not hasattr(self, '_original_formula'):
+            self._original_formula = self.get_object()
+        return self._original_formula
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '复制配方'
@@ -909,6 +917,152 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
             'is_mature': False,
         })
         return initial
+
+    @staticmethod
+    def _column_has_data(col_idx, bom_rows, test_rows, post_data):
+        """检查变体列 col_idx 是否有任何非空数据"""
+        for row in bom_rows:
+            pct = post_data.get(f"bom-{row['form_idx']}-percentage_col{col_idx}", '').strip()
+            if pct:
+                return True
+        for row in test_rows:
+            for suffix in ('value', 'value_text', 'value_select'):
+                val = post_data.get(f"test-{row['form_idx']}-{suffix}_col{col_idx}", '').strip()
+                if val:
+                    return True
+        return False
+
+    def _create_formula_variants(self, form, bom_formset, test_formset):
+        """多列批量创建配方，返回 created_formulas 列表"""
+        num_columns = int(self.request.POST.get('num_columns', 1))
+        project = form.cleaned_data.get('project')
+        project_node = form.cleaned_data.get('project_node')
+
+        bom_rows = []
+        for i, bom_form in enumerate(bom_formset):
+            if (not bom_form.cleaned_data) or bom_form.cleaned_data.get('DELETE'):
+                continue
+            bom_rows.append({
+                'feeding_port': bom_form.cleaned_data['feeding_port'],
+                'weighing_scale': bom_form.cleaned_data['weighing_scale'],
+                'raw_material': bom_form.cleaned_data['raw_material'],
+                'is_tail': bom_form.cleaned_data.get('is_tail', False),
+                'is_pre_mix': bom_form.cleaned_data.get('is_pre_mix', False),
+                'pre_mix_order': bom_form.cleaned_data.get('pre_mix_order', 0),
+                'pre_mix_time': bom_form.cleaned_data.get('pre_mix_time', 0),
+                'form_idx': i,
+            })
+
+        test_rows = []
+        for j, test_form in enumerate(test_formset):
+            if (not test_form.cleaned_data) or test_form.cleaned_data.get('DELETE'):
+                continue
+            test_rows.append({
+                'test_config': test_form.cleaned_data['test_config'],
+                'test_date': test_form.cleaned_data.get('test_date'),
+                'remark': test_form.cleaned_data.get('remark', ''),
+                'form_idx': j,
+            })
+
+        post_data = self.request.POST
+        created = []
+        # 生成批次共享实验单号
+        from django.utils import timezone
+        today_str = timezone.now().strftime('%Y%m%d')
+        prefix = f"L{today_str}"
+        last_formula = LabFormula.objects.filter(code__startswith=prefix).order_by('code').last()
+        if last_formula:
+            try:
+                last_seq = int(last_formula.code.split('-')[-1])
+                new_seq = last_seq + 1
+            except (ValueError, IndexError):
+                new_seq = 1
+        else:
+            new_seq = 1
+        shared_code = f"{prefix}-{new_seq:02d}"
+        with transaction.atomic():
+            versions = list(range(1, num_columns + 1))
+
+            for col_idx in range(num_columns):
+                if col_idx > 0 and not self._column_has_data(col_idx, bom_rows, test_rows, post_data):
+                    break
+
+                formula = LabFormula(
+                    name=form.cleaned_data['name'],
+                    material_type=form.cleaned_data['material_type'],
+                    process=form.cleaned_data.get('process'),
+                    project=project,
+                    project_node=project_node,
+                    cost_actual=form.cleaned_data.get('cost_actual'),
+                    is_mature=form.cleaned_data.get('is_mature', False),
+                    description=form.cleaned_data.get('description', ''),
+                    creator=self.request.user,
+                    version=versions[col_idx],
+                    code=shared_code,
+                )
+                formula.save()
+
+                for row in bom_rows:
+                    if col_idx == 0:
+                        percentage = bom_formset.forms[row['form_idx']].cleaned_data['percentage']
+                    else:
+                        pct_str = post_data.get(f"bom-{row['form_idx']}-percentage_col{col_idx}", '')
+                        try:
+                            percentage = Decimal(pct_str) if pct_str else Decimal('0')
+                        except (InvalidOperation, ValueError):
+                            percentage = Decimal('0')
+                    if percentage == 0:
+                        continue
+                    FormulaBOM.objects.create(
+                        formula=formula,
+                        feeding_port=row['feeding_port'],
+                        weighing_scale=row['weighing_scale'],
+                        raw_material=row['raw_material'],
+                        percentage=percentage,
+                        is_tail=row['is_tail'],
+                        is_pre_mix=row['is_pre_mix'],
+                        pre_mix_order=row['pre_mix_order'],
+                        pre_mix_time=row['pre_mix_time'],
+                    )
+
+                for row in test_rows:
+                    test_config = row['test_config']
+                    if col_idx == 0:
+                        tf = test_formset.forms[row['form_idx']]
+                        value = tf.cleaned_data.get('value')
+                        value_text = tf.cleaned_data.get('value_text', '')
+                        value_select = tf.cleaned_data.get('value_select', '')
+                        if test_config.data_type == 'SELECT':
+                            value_text = value_select or value_text
+                    else:
+                        val_str = post_data.get(f"test-{row['form_idx']}-value_col{col_idx}", '')
+                        text_str = post_data.get(f"test-{row['form_idx']}-value_text_col{col_idx}", '')
+                        select_str = post_data.get(f"test-{row['form_idx']}-value_select_col{col_idx}", '')
+                        try:
+                            value = Decimal(val_str) if val_str else None
+                        except (InvalidOperation, ValueError):
+                            value = None
+                        if test_config.data_type == 'SELECT':
+                            value_text = select_str or text_str
+                        elif test_config.data_type == 'TEXT':
+                            value_text = text_str
+                        else:
+                            value_text = ''
+                    if value is not None or value_text:
+                        FormulaTestResult.objects.create(
+                            formula=formula,
+                            test_config=test_config,
+                            value=value,
+                            value_text=value_text,
+                            test_date=row['test_date'],
+                            remark=row['remark'],
+                        )
+
+                formula.research_projects.set(form.cleaned_data.get('research_projects', []))
+                formula.calculate_cost()
+                created.append(formula)
+
+        return created
 
     def form_invalid(self, form):
         messages.error(self.request, _build_formula_error_message(form))

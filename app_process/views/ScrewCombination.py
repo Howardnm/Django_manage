@@ -86,6 +86,4 @@ class ScrewCombinationDetailView(ProcessAccessMixin, DetailView):
         return super().get_queryset().prefetch_related('machines', 'suitable_materials')
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()

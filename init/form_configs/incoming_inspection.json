@@ -1,0 +1,134 @@
+{
+  "name": "来料检验单",
+  "group": "质检",
+  "description": "原材料来料检验记录（单步骤表单，无审批流程，独立提交使用）",
+  "workflow_name": null,
+  "form_option": {
+    "form": {
+      "labelPosition": "top",
+      "labelWidth": "120px"
+    },
+    "submitBtn": { "show": false },
+    "resetBtn": { "show": false }
+  },
+  "form_config": [
+    {
+      "type": "input",
+      "field": "title",
+      "title": "检验标题",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "如：2026年6月第一批PP原料来料检验"
+      },
+      "validate": [
+        { "required": true, "message": "请输入检验标题", "trigger": "blur", "mode": "required" }
+      ]
+    },
+    {
+      "type": "input",
+      "field": "supplier_name",
+      "title": "供应商",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "请输入供应商名称"
+      }
+    },
+    {
+      "type": "input",
+      "field": "material_batch",
+      "title": "原料批号",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "如：LOT-20260601-001"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "content",
+      "title": "检验内容",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "rows": 4,
+        "placeholder": "请描述检验项目、方法和判定标准"
+      }
+    },
+    {
+      "type": "input",
+      "field": "inspector",
+      "title": "检验员",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "请输入检验员姓名"
+      }
+    },
+    {
+      "type": "datePicker",
+      "field": "inspect_date",
+      "title": "检验日期",
+      "_fc_drag_tag": "datePicker",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "type": "date",
+        "format": "yyyy-MM-dd",
+        "valueFormat": "yyyy-MM-dd",
+        "placeholder": "请选择检验日期"
+      }
+    },
+    {
+      "type": "select",
+      "field": "result",
+      "title": "检验结果",
+      "_fc_drag_tag": "select",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "请选择检验结果",
+        "clearable": true
+      },
+      "options": [
+        { "value": "pass", "label": "合格" },
+        { "value": "conditional", "label": "有条件接收" },
+        { "value": "fail", "label": "不合格" }
+      ]
+    }
+  ]
+}

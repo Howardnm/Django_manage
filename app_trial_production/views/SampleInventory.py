@@ -8,16 +8,20 @@ from app_trial_production.models import SampleInventory
 
 
 class SampleInventoryListView(TrialProductionAccessMixin, ListView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = SampleInventory
     template_name = 'apps/app_trial_production/sample/inventory_list.html'
     context_object_name = 'samples'
     paginate_by = 20
 
     def get_queryset(self):
-        status_filter = self.request.GET.get('status', '')
-        qs = SampleInventory.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        qs = qs.select_related(
             'production_order', 'sample_split', 'sample_split__formula',
         )
+        status_filter = self.request.GET.get('status', '')
         if status_filter:
             qs = qs.filter(status=status_filter)
         else:
@@ -32,6 +36,7 @@ class SampleInventoryListView(TrialProductionAccessMixin, ListView):
 
 
 class SampleInventoryShipView(TrialProductionAccessMixin, UpdateView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = SampleInventory
     fields = ['customer_name', 'tracking_number']
     template_name = 'apps/app_trial_production/sample/ship.html'

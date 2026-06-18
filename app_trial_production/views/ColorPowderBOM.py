@@ -3,7 +3,8 @@ from itertools import groupby
 from django.views.generic import ListView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from app_trial_production.mixins import ColorTaskAccessMixin
+from django.core.exceptions import PermissionDenied
+from app_trial_production.mixins import ColorTaskAccessMixin, RndAccessMixin
 from app_trial_production.models import ProductionOrder
 from app_project.models import ProjectStage
 from app_formula.models import LabFormula, ColorPowderBOM, ColorPowderBOMEntry
@@ -17,7 +18,10 @@ class ColorPowderBOMListView(ColorTaskAccessMixin, ListView):
     context_object_name = 'orders'
 
     def get_queryset(self):
-        return ProductionOrder.objects.filter(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.filter(
             formula_details__needs_color_matching=True,
             status__in=ProductionOrder.POST_EXTRUSION_STATUSES,
         ).select_related(
@@ -31,12 +35,16 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
 
     STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
 
-    def dispatch(self, request, *args, **kwargs):
-        self.production_order = get_object_or_404(
-            ProductionOrder.objects.select_related('project', 'project__material'),
-            pk=kwargs['order_pk'],
-        )
-        return super().dispatch(request, *args, **kwargs)
+    def _resolve_order(self):
+        """鉴权后懒加载工单 + 项目归属校验"""
+        if not hasattr(self, '_order'):
+            self._order = get_object_or_404(
+                ProductionOrder.objects.select_related('project', 'project__material'),
+                pk=self.kwargs['order_pk'])
+            if self._order.project:
+                RndAccessMixin.check_project_ownership(
+                    self._order.project, self.request.user)
+        return self._order
 
     def _fetch_formulas(self, project, material):
         project_formulas = LabFormula.objects.filter(
@@ -113,7 +121,7 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
         return columns, cpbom_matrix
 
     def get(self, request, *args, **kwargs):
-        project = self.production_order.project
+        project = self._resolve_order().project
         material = project.material if project else None
 
         all_formulas = self._fetch_formulas(project, material)
@@ -223,7 +231,7 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
                 entry_formset = ColorPowderBOMEntryFormSet(instance=bom, prefix='entries')
 
         context = {
-            'production_order': self.production_order,
+            'production_order': self._resolve_order(),
             'project': project,
             'material': material,
             'stage_round_items': stage_round_items,
@@ -248,6 +256,11 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
         formula_id = request.POST.get('formula_id')
         selected_formula = get_object_or_404(LabFormula, pk=formula_id)
 
+        # 验证配方属于当前工单的项目
+        if (self._resolve_order().project and
+            selected_formula.project_id != self._resolve_order().project_id):
+            raise PermissionDenied("配方不属于当前工单的项目")
+
         bom, _ = ColorPowderBOM.objects.get_or_create(formula=selected_formula)
         bom_form = ColorPowderBOMForm(request.POST, instance=bom)
         entry_formset = ColorPowderBOMEntryFormSet(request.POST, instance=bom, prefix='entries')
@@ -264,7 +277,7 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
             )
 
         # POST 失败时重建 context
-        project = self.production_order.project
+        project = self._resolve_order().project
         material = project.material if project else None
         all_formulas = self._fetch_formulas(project, material)
         all_stage_formulas = [f for f in all_formulas if f.project_node]
@@ -281,7 +294,7 @@ class ColorPowderBOMFillView(ColorTaskAccessMixin, View):
             })
 
         return render(request, self.template_name, {
-            'production_order': self.production_order,
+            'production_order': self._resolve_order(),
             'project': project,
             'material': material,
             'stage_round_items': [],

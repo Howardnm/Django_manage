@@ -26,10 +26,10 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
     def get_object(self, queryset=None):
         project_id = self.kwargs.get('project_id')
         project = get_object_or_404(Project, pk=project_id)
-        
-        # 获取或创建档案
-        repo, created = ProjectRepository.objects.get_or_create(project=project)
-        
+
+        # 仅获取已有档案，不自动创建。避免在权限校验前生成孤立数据库记录。
+        repo = get_object_or_404(ProjectRepository, project=project)
+
         # 核心安全校验：拦截跨部门编辑
         self.check_object_permission(repo)
         return repo
@@ -55,9 +55,7 @@ class ProjectFileDetailView(RepositoryAccessMixin, DetailView):
     context_object_name = 'repo'
 
     def get_object(self, queryset=None):
-        repo = super().get_object(queryset)
-        self.check_object_permission(repo)
-        return repo
+        return self.get_object_or_deny()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

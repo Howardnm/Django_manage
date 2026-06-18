@@ -10,7 +10,10 @@ class TrialDashboardView(DashboardAccessMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = ProductionOrder.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        qs = qs.select_related(
             'project', 'creator', 'process_profile',
         ).prefetch_related('formula_details__formula')
         status_filter = self.request.GET.get('status', '')

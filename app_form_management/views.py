@@ -24,6 +24,8 @@ from .filters import FormTemplateFilter, MyDraftsFilter, MySubmissionsFilter
 # ==========================================
 
 class FormTemplateListView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formtemplate'
+
     def get(self, request):
         qs = FormTemplate.objects.all().select_related('created_by', 'workflow')
         filter_set = FormTemplateFilter(request.GET, queryset=qs)
@@ -38,6 +40,8 @@ class FormTemplateListView(FormManagementAccessMixin, View):
 
 
 class FormTemplateCreateView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.add_formtemplate'
+
     def get(self, request):
         workflows = WorkflowDefinition.objects.filter(is_active=True)
         return render(request, 'apps/app_form_management/template_create.html', {
@@ -48,8 +52,6 @@ class FormTemplateCreateView(FormManagementAccessMixin, View):
         })
 
     def post(self, request):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可创建表单模板。'}, status=403)
 
         try:
             data = json.loads(request.body)
@@ -73,11 +75,9 @@ class FormTemplateCreateView(FormManagementAccessMixin, View):
 
 
 class FormTemplateUpdateView(FormManagementAccessMixin, View):
-    def get(self, request, pk):
-        if not request.user.is_superuser:
-            messages.error(request, '仅超级管理员可编辑表单模板。')
-            return redirect('form_template_list')
+    permission_required = 'app_form_management.change_formtemplate'
 
+    def get(self, request, pk):
         template = get_object_or_404(FormTemplate, pk=pk)
         workflows = WorkflowDefinition.objects.filter(is_active=True)
         return render(request, 'apps/app_form_management/template_create.html', {
@@ -88,8 +88,6 @@ class FormTemplateUpdateView(FormManagementAccessMixin, View):
         })
 
     def post(self, request, pk):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可编辑表单模板。'}, status=403)
 
         template = get_object_or_404(FormTemplate, pk=pk)
         try:
@@ -112,10 +110,9 @@ class FormTemplateUpdateView(FormManagementAccessMixin, View):
 
 
 class FormTemplateBasicInfoUpdateView(FormManagementAccessMixin, View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可修改表单基本信息。'}, status=403)
+    permission_required = 'app_form_management.change_formtemplate'
 
+    def post(self, request, pk):
         template = get_object_or_404(FormTemplate, pk=pk)
         try:
             data = json.loads(request.body)
@@ -134,16 +131,17 @@ class FormTemplateBasicInfoUpdateView(FormManagementAccessMixin, View):
 
 
 class FormTemplateDeleteView(FormManagementAccessMixin, View):
-    def post(self, request, pk):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可删除表单模板。'}, status=403)
+    permission_required = 'app_form_management.delete_formtemplate'
 
+    def post(self, request, pk):
         template = get_object_or_404(FormTemplate, pk=pk)
         template.delete()
         return JsonResponse({'status': 'success'})
 
 
 class FormTemplateDetailView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formtemplate'
+
     def get(self, request, pk):
         template = get_object_or_404(FormTemplate, pk=pk)
         return render(request, 'apps/app_form_management/template_detail.html', {
@@ -166,8 +164,24 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             target_model = get_target(target_alias)
             if target_model is None:
                 raise Http404
-            return get_object_or_404(target_model, pk=object_id)
+            obj = get_object_or_404(target_model, pk=object_id)
+            self._check_target_access(obj)
+            return obj
         return None
+
+    def _check_target_access(self, obj):
+        """验证用户对目标对象的访问权限"""
+        from app_project.models import Project, ProjectNode
+        if isinstance(obj, Project):
+            if self.request.user.is_superuser:
+                return
+            if obj.manager_id == self.request.user.pk:
+                return
+            if obj.members.filter(user=self.request.user).exists():
+                return
+            raise PermissionDenied("您无权访问该目标项目")
+        elif isinstance(obj, ProjectNode):
+            self._check_target_access(obj.project)
 
     def _get_target_display(self, target):
         """Build a human-readable label for the target object."""
@@ -304,8 +318,10 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     existing_instance.context_data = ctx
                     existing_instance.save()
                     WorkflowService.sync_tasks(existing_instance, workflow, engine)
+                except PermissionDenied:
+                    raise
                 except Exception:
-                    pass
+                    pass  # 流程重建失败不阻塞表单提交
             elif not existing_instance:
                 # 首次提交：启动新流程
                 try:
@@ -317,6 +333,8 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     )
                     submission.workflow_instance = instance
                     submission.save(update_fields=['workflow_instance'])
+                except PermissionDenied:
+                    raise
                 except Exception:
                     pass  # 流程启动失败不阻塞表单提交
 
@@ -324,11 +342,14 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
 
 
 class FormSubmissionDetailView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formsubmission'
+
     def get(self, request, pk):
         submission = get_object_or_404(
             FormSubmission.objects.select_related('template', 'submitted_by', 'workflow_instance__definition'),
             pk=pk
         )
+        self.check_object_permission(submission)
         template = submission.template
 
         # 解析关联业务对象
@@ -355,13 +376,12 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         is_workflow_completed = False
 
         if submission.workflow_instance_id:
-            from app_workflow.views import WorkflowInstanceDetailView
+            from app_workflow.views import build_workflow_status_map
             from app_workflow.models import ApprovalHistory, WorkflowTask
             wi = submission.workflow_instance
-            detail_view = WorkflowInstanceDetailView()
             workflow_data = {
                 'instance': wi,
-                'status_map': detail_view._build_status_map(wi),
+                'status_map': build_workflow_status_map(wi),
                 'bpmn_xml': wi.definition.bpmn_xml,
                 'history': list(ApprovalHistory.objects.filter(instance=wi).select_related('approver', 'task').order_by('timestamp')),
             }
@@ -479,13 +499,12 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
 
 
 class EntitySearchView(FormManagementAccessMixin, View):
-    permission_required = 'app_form_management.view_formtemplate'
+    permission_required = 'app_form_management.view_formsubmission'
 
     def get(self, request):
         alias = request.GET.get('alias', '')
         search = request.GET.get('search', '')
-        pk = request.GET.get('pk', '')
-        results = search_entities(alias, search, pk)
+        results = search_entities(alias, search, user=request.user)
         return JsonResponse({'results': results})
 
 
@@ -494,6 +513,8 @@ class EntitySearchView(FormManagementAccessMixin, View):
 # ==========================================
 
 class MyDraftsView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formsubmission'
+
     def get(self, request):
         qs = FormSubmission.objects.filter(
             submitted_by=request.user,
@@ -529,6 +550,8 @@ class MyDraftsView(FormManagementAccessMixin, View):
 
 
 class MySubmissionsView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.view_formsubmission'
+
     def get(self, request):
         qs = FormSubmission.objects.filter(
             submitted_by=request.user,
@@ -564,6 +587,8 @@ class MySubmissionsView(FormManagementAccessMixin, View):
 
 
 class FormSubmissionDeleteView(FormManagementAccessMixin, View):
+    permission_required = 'app_form_management.delete_formsubmission'
+
     def post(self, request, pk):
         submission = get_object_or_404(FormSubmission, pk=pk)
         try:

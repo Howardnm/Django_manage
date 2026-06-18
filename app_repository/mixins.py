@@ -15,65 +15,76 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
 
     def get_queryset(self):
         """
-        实现"业务部"与"研发部"的双重部门隔离并集。
-        自动探测模型是否支持该过滤逻辑。
+        逻辑 = (L4/L5 部门/工作组隔离结果) AND 在此基础上叠加双重负责制过滤。
+        自动探测模型是否支持 salesperson 字段，不支持则直接返回基类结果。
         """
         user = self.request.user
-        
-        # 1. 获取模型
-        if hasattr(self, 'model') and self.model:
-            model = self.model
-        elif hasattr(self, 'queryset') and self.queryset is not None:
-            model = self.queryset.model
-        else:
-            return super().get_queryset()
+        qs = super().get_queryset()  # 先获取基类 L4/L5 隔离后的查询集
 
-        # 2. 核心探测：如果模型不包含 salesperson 字段，则跳过自定义的复杂隔离逻辑
-        # 转而使用基类的默认逻辑或直接返回全集
-        fields = [f.name for f in model._meta.get_fields()]
-        if 'salesperson' not in fields:
-            # 这种情况通常是 Customer 或 OEM 公司名录，属于公共资源
-            return model.objects.all()
+        if qs is None:
+            return None
 
         if user.is_superuser:
-            return model.objects.all()
+            return qs
 
-        # 3. 执行 ProjectRepository 专属的"双重负责"隔离
+        # 探测模型是否包含 salesperson 字段，以决定是否执行双重负责制过滤
+        if not hasattr(qs.model, 'salesperson'):
+            # 没有 salesperson 字段的模型（如 Customer、OEM 公司名录），
+            # 直接返回基类的 L4/L5 结果，不额外过滤
+            return qs
+
+        # 双重负责制：业务部（salesperson 所属部门）OR 研发部（project.manager 所属部门）
         if self.enforce_dept_isolation:
             if user.department:
-                return model.objects.filter(
-                    Q(salesperson__department=user.department) | 
+                return qs.filter(
+                    Q(salesperson__department=user.department) |
                     Q(project__manager__department=user.department)
                 ).distinct()
             else:
-                return model.objects.filter(
-                    Q(salesperson=user) | 
+                return qs.filter(
+                    Q(salesperson=user) |
                     Q(project__manager=user)
                 ).distinct()
-        
-        return model.objects.all()
+
+        return qs
 
     def check_object_permission(self, obj):
-        """对象级细分控制：同样增加字段探测逻辑"""
+        """
+        对象级检查：
+        逻辑 = 基类标准化检查 OR 双重负责制穿透
+        """
         user = self.request.user
-        if user.is_superuser: return True
-
-        # 如果是 Customer 或 OEM 对象，不进行"负责人"校验（因为公司级对象没有单一负责人）
-        if not hasattr(obj, 'salesperson'):
+        if user.is_superuser:
             return True
 
-        # 针对 ProjectRepository 的校验
-        is_sales_dept = user.department and getattr(obj.salesperson, 'department', None) == user.department
+        # 1. 调用基类的标准化检查（owner 等价 + L4/L5 部门/工作组）
+        try:
+            return super().check_object_permission(obj)
+        except PermissionDenied:
+            pass  # 基类不通过，尝试双重负责制备选
+
+        # 2. 备选：双重负责制穿透检查
+        if not hasattr(obj, 'salesperson'):
+            # 没有 salesperson 字段的对象，无法走双重负责制逻辑，直接拒绝
+            raise
+
+        is_sales_dept = (
+            user.department
+            and getattr(obj.salesperson, 'department', None) == user.department
+        )
         is_sales_owner = (obj.salesperson == user)
 
         project = getattr(obj, 'project', None)
         if project:
-            is_rnd_dept = user.department and getattr(project.manager, 'department', None) == user.department
+            is_rnd_dept = (
+                user.department
+                and getattr(project.manager, 'department', None) == user.department
+            )
             is_rnd_owner = (project.manager == user)
         else:
             is_rnd_dept = is_rnd_owner = False
 
         if not (is_sales_owner or is_sales_dept or is_rnd_owner or is_rnd_dept):
             raise PermissionDenied("您的账号无权操作该档案（跨部门保护中）")
-        
+
         return True

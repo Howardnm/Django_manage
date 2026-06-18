@@ -102,6 +102,9 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
     def get_queryset(self):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related('properties__test_config')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
 class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
     """创建：需 add_rawmaterial 权限，主要供采购/技术经理使用"""
     permission_required = 'app_raw_material.add_rawmaterial'
@@ -146,10 +149,13 @@ class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
     def get_object(self, queryset=None):
         return super().get_object(queryset)
 
-    def dispatch(self, request, *args, **kwargs):
-        self.original_material = self.get_object()
-        return super().dispatch(request, *args, **kwargs)
-        
+    @property
+    def original_material(self):
+        """鉴权后懒加载原材料对象"""
+        if not hasattr(self, '_original_material'):
+            self._original_material = self.get_object()
+        return self._original_material
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '复制原材料'

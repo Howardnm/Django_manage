@@ -1,3 +1,4 @@
+from django.db import models
 from app_project.models import Project, ProjectNode
 
 
@@ -70,14 +71,24 @@ def get_module_choices():
     return [(alias, cfg.label) for alias, cfg in _TARGET_REGISTRY.items()]
 
 
-def search_entities(alias, search='', pk=''):
+def search_entities(alias, search='', pk='', user=None):
     cfg = _TARGET_REGISTRY.get(alias)
     if cfg is None:
         return []
     if pk:
         try:
             obj = cfg.model.objects.get(pk=int(pk))
+            # 若传入 user，校验其对该实体的访问权限
+            if user and not user.is_superuser and hasattr(obj, 'manager_id'):
+                if obj.manager_id != user.pk and not obj.members.filter(user=user).exists():
+                    return []
             return [{'id': obj.pk, 'text': cfg.display(obj)}]
         except (cfg.model.DoesNotExist, ValueError):
             return []
-    return [{'id': obj.pk, 'text': cfg.display(obj)} for obj in cfg.search(search)]
+    qs = cfg.search(search)
+    # 项目搜索时按用户权限过滤
+    if user and not user.is_superuser and alias == 'project':
+        qs = qs.filter(
+            models.Q(manager=user) | models.Q(members__user=user)
+        ).distinct()
+    return [{'id': obj.pk, 'text': cfg.display(obj)} for obj in qs]

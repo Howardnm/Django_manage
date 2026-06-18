@@ -1,0 +1,111 @@
+{
+  "name": "异常处理表单",
+  "group": "质检",
+  "description": "异常事件处理审批 — 描述异常 → 原因分析 → 总监裁决",
+  "workflow_name": "异常审批流程",
+  "form_option": {
+    "form": {
+      "labelPosition": "top",
+      "labelWidth": "120px"
+    },
+    "submitBtn": { "show": false },
+    "resetBtn": { "show": false }
+  },
+  "form_config": [
+    {
+      "type": "select",
+      "field": "exception_type",
+      "title": "异常类型",
+      "_fc_drag_tag": "select",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "stepLabel": "描述异常",
+        "stepDesc": "提交人描述异常情况",
+        "placeholder": "请选择异常类型",
+        "clearable": true
+      },
+      "options": [
+        { "value": "quality", "label": "品质异常" },
+        { "value": "process", "label": "工艺异常" },
+        { "value": "equipment", "label": "设备故障" },
+        { "value": "material", "label": "原材料异常" },
+        { "value": "other", "label": "其他" }
+      ]
+    },
+    {
+      "type": "textarea",
+      "field": "exception_desc",
+      "title": "异常描述",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "rows": 4,
+        "placeholder": "请详细描述异常现象、发生时间、影响范围"
+      },
+      "validate": [
+        { "required": true, "message": "请描述异常情况", "trigger": "blur", "mode": "required" }
+      ]
+    },
+    {
+      "type": "textarea",
+      "field": "root_cause",
+      "title": "原因分析",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "stepLabel": "责任判定",
+        "stepDesc": "部门负责人分析根本原因并判定责任归属",
+        "rows": 4,
+        "placeholder": "请分析异常的根本原因（人/机/料/法/环）"
+      }
+    },
+    {
+      "type": "input",
+      "field": "responsible_party",
+      "title": "责任归属",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "placeholder": "如：研发部 / 工艺部 / 供应链 / 设备厂商"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "decision",
+      "title": "处理意见",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 3,
+        "stepLabel": "最终裁决",
+        "stepDesc": "研发总监最终裁决处理方案",
+        "rows": 4,
+        "placeholder": "请输入最终处理意见和预防措施"
+      }
+    }
+  ]
+}

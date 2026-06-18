@@ -11,6 +11,7 @@ from .mixins import NotificationAccessMixin
 # 1. 标记已读
 class MarkAsReadView(NotificationAccessMixin, View):
     """将单条通知标记为已读，然后智能重定向。Mixin 已确保 recipient 隔离。"""
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
 
     def get(self, request, pk):
         notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
@@ -29,6 +30,8 @@ class MarkAsReadView(NotificationAccessMixin, View):
 # 2. 全部标记已读
 class MarkAllAsReadView(NotificationAccessMixin, View):
     """需具备 view_notification 权限（或维持现状，仅限本人）"""
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
+
     def get(self, request, *args, **kwargs):
         # 这里的 get_queryset 已经由 Mixin 自动实现了 recipient 隔离
         Notification.objects.filter(recipient=request.user, unread=True).update(unread=False)
@@ -39,6 +42,7 @@ class MarkAllAsReadView(NotificationAccessMixin, View):
 # 3. 通知列表
 class NotificationListView(NotificationAccessMixin, ListView):
     """通知中心列表页"""
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = Notification
     template_name = 'apps/app_notification/list.html'
     context_object_name = 'notifications'

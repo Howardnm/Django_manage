@@ -38,6 +38,7 @@ class UserPerformanceListView(PanelAccessMixin, View):
             workload_q = f'{member_rel}__workload_share'
             factor_q = f'{member_rel}__project__grade__factor'
 
+            # 看板统计显示全局活跃用户列表，有意不做部门隔离
             user_stats = User.objects.filter(is_active=True).annotate(
                 effective_score=Coalesce(Sum(
                     ExpressionWrapper(

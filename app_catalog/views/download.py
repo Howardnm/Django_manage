@@ -1,3 +1,5 @@
+"""外部客户文件下载模块。使用独立的 member_token session 认证体系，不依赖 UnifiedAccessMixin。"""
+
 from django.views import View
 from django.shortcuts import get_object_or_404, redirect
 from django.http import Http404, StreamingHttpResponse
@@ -9,6 +11,11 @@ class MaterialDownloadView(View):
     """
     中转下载视图：作为代理向主系统请求文件流。
     采用对象模块化 Service 进行通信和行为回传。
+
+    访问策略：
+    - 面向外部客户/会员，通过 session 中的 member_token 进行准入控制（非 Django 用户体系）。
+    - 内部员工下载应通过其他内部视图（不走此接口）。
+    - 此 pattern 是故意的设计选择：客户无需创建 Django User 账号，通过主系统凭证建立会话即可下载。
     """
     def get(self, request, pk, file_type):
         # 1. 查找产品，确保已发布

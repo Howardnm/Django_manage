@@ -4,14 +4,18 @@ from django.contrib import messages
 from django.urls import reverse
 from app_trial_production.mixins import TrialProductionAccessMixin
 from app_trial_production.models import TrialProductionConfig
+from app_user.mixins import IdentityConfig
 
 
 class TrialConfigView(TrialProductionAccessMixin, UpdateView):
     model = TrialProductionConfig
     fields = ['workflow_definition']
     template_name = 'apps/app_trial_production/config/form.html'
+    identity_required = IdentityConfig.RND_ONLY
+    permission_required = 'app_trial_production.change_trialproductionconfig'
 
     def get_object(self, queryset=None):
+        """全局配置单例，不使用 get_object_or_deny / get_object_or_404"""
         return TrialProductionConfig.get()
 
     def form_valid(self, form):

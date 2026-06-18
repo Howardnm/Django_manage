@@ -23,7 +23,7 @@ class FormulaChartCompareView(FormulaAccessMixin, TemplateView):
             context['message'] = "请先从配方列表页选择要对比的配方。"
             return context
 
-        formulas = LabFormula.objects.filter(pk__in=formula_ids)
+        formulas = self.get_queryset().filter(pk__in=formula_ids)
         context['formulas'] = formulas
         
         bom_lines = FormulaBOM.objects.filter(formula__in=formulas).select_related('raw_material', 'raw_material__category').distinct()
@@ -62,7 +62,7 @@ class FormulaChartDataAPI(FormulaAccessMixin, TemplateView):
         except (json.JSONDecodeError, ValueError):
             return JsonResponse({'error': 'Y轴参数格式错误'}, status=400)
 
-        formulas = LabFormula.objects.filter(pk__in=formula_ids).prefetch_related('bom_lines', 'test_results')
+        formulas = self.get_queryset().filter(pk__in=formula_ids).prefetch_related('bom_lines', 'test_results')
         
         series_data = []
         y_axis_configs = []

@@ -90,10 +90,7 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
     template_name = 'apps/app_project/project_form.html'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        # 核心修复：更正方法名
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_success_url(self):
         return reverse('project_detail', kwargs={'pk': self.object.pk})
@@ -119,10 +116,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
     )
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        # 核心修复：保持方法名一致
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -176,6 +170,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 # ==========================================
 class ProjectConfigView(ProjectAccessMixin, View):
     """项目全局配置：设置默认审批流程等。仅超级管理员可访问。"""
+    permission_required = 'app_project.change_projectconfig'
 
     def get(self, request):
         if not request.user.is_superuser:

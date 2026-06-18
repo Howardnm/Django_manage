@@ -3,6 +3,7 @@ from django.urls import reverse_lazy
 from app_trial_production.mixins import TrialProductionAccessMixin
 from app_trial_production.models import MoldType
 from app_trial_production.forms import MoldTypeForm
+from app_user.mixins import IdentityConfig
 
 
 class MoldTypeListView(TrialProductionAccessMixin, ListView):
@@ -17,6 +18,8 @@ class MoldTypeCreateView(TrialProductionAccessMixin, CreateView):
     form_class = MoldTypeForm
     template_name = 'apps/app_trial_production/mold/form.html'
     success_url = reverse_lazy('trial_mold_type_list')
+    identity_required = IdentityConfig.TECH_CORE
+    permission_required = 'app_trial_production.add_moldtype'
 
 
 class MoldTypeUpdateView(TrialProductionAccessMixin, UpdateView):
@@ -24,3 +27,5 @@ class MoldTypeUpdateView(TrialProductionAccessMixin, UpdateView):
     form_class = MoldTypeForm
     template_name = 'apps/app_trial_production/mold/form.html'
     success_url = reverse_lazy('trial_mold_type_list')
+    identity_required = IdentityConfig.TECH_CORE
+    permission_required = 'app_trial_production.change_moldtype'

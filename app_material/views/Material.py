@@ -248,6 +248,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
 class MaterialBulkPublishView(MaterialAccessMixin, View):
     """批量发布：需具备编辑权限。"""
     permission_required = 'app_material.change_materiallibrary'
+    model = MaterialLibrary
 
     def post(self, request):
         try:
@@ -257,9 +258,10 @@ class MaterialBulkPublishView(MaterialAccessMixin, View):
                 return JsonResponse({'status': 'error', 'message': '参数错误'}, status=400)
 
             is_published = (action == 'publish')
+            qs = self.get_queryset()
             with transaction.atomic():
-                updated_count = MaterialLibrary.objects.filter(pk__in=ids).update(is_published=is_published)
-                for obj in MaterialLibrary.objects.filter(pk__in=ids):
+                updated_count = qs.filter(pk__in=ids).update(is_published=is_published)
+                for obj in qs.filter(pk__in=ids):
                     send_material_webhook('material_updated', obj)
 
             return JsonResponse({'status': 'success', 'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'})

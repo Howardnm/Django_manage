@@ -1,3 +1,8 @@
+"""Django Admin 配置。注册 User、Department、ReviewGroup、WorkGroup、PermissionGroup 的管理界面。
+
+导出: PermissionGroupAdmin, DepartmentAdmin, MyUserAdmin, ReviewGroupAdmin, WorkGroupAdmin。
+"""
+
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
@@ -8,11 +13,13 @@ admin.site.unregister(Group)
 
 @admin.register(PermissionGroup)
 class PermissionGroupAdmin(GroupAdmin):
+    """PermissionGroup（auth.Group 代理）的 Admin 配置。"""
     pass
 
 
 @admin.register(Department)
 class DepartmentAdmin(admin.ModelAdmin):
+    """Department 的 Admin 配置：列表显示 name/code/description/created_at，支持搜索和排序。"""
     list_display = ('name', 'code', 'description', 'created_at')
     search_fields = ('name', 'code')
     ordering = ('name',)
@@ -20,17 +27,23 @@ class DepartmentAdmin(admin.ModelAdmin):
 
 @admin.register(User)
 class MyUserAdmin(UserAdmin):
-    """
-    自定义用户 Admin，支持新字段展示与编辑。
-    """
-    # 核心修正：移除 list_display 中不存在的 company 字段，增加公司归属字段
-    list_display = ('username', 'email', 'user_type', 'user_level', 'department', 'get_groups', 'phone', 'is_staff')
+    """自定义 User Admin。展示 L1~L5 五层权限字段，按权限模型分层组织 fieldsets。"""
+    # L1 角色 / L2 等级 / L3 权限组 / L4 部门 / L5 工作组
+    list_display = (
+        'username', 'email',
+        'user_type',           # L1: 角色白名单
+        'user_level',          # L2: 用户等级
+        'get_groups',          # L3: Django 权限组（权限码容器）
+        'department',          # L4: 部门数据隔离
+        'get_work_groups',     # L5: 工作组数据隔离
+        'phone', 'is_staff',
+    )
     list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_active', 'department')
     
     # 在详情页管理 5D 权限和公司归属
     fieldsets = UserAdmin.fieldsets + (
-        ('权限层级配置 (L2/L3/L4)', {
-            'fields': ('user_level', 'user_type', 'department'),
+        ('权限层级配置 (L1 角色 / L2 等级 / L4 部门)', {
+            'fields': ('user_type', 'user_level', 'department'),
         }),
         ('业务归属 (External)', {
             'fields': ('associated_customer', 'associated_oem', 'member_token'),
@@ -51,16 +64,26 @@ class MyUserAdmin(UserAdmin):
     ordering = ('username',)
     readonly_fields = ('member_token',) # 令牌设为只读，由系统自动维护
 
-    @admin.display(description='用户组')
+    @admin.display(description='[L3] 权限组')
     def get_groups(self, obj):
+        """返回用户所属权限组的逗号分隔列表。Returns: 组名字符串或 '—'。"""
         groups = obj.groups.all()
         if not groups:
             return '—'
         return ', '.join(g.name for g in groups)
 
+    @admin.display(description='[L5] 工作组')
+    def get_work_groups(self, obj):
+        """返回用户所属工作组的逗号分隔列表。Returns: 工作组名字符串或 '—'。"""
+        wgs = obj.work_groups.filter(is_active=True)
+        if not wgs:
+            return '—'
+        return ', '.join(wg.name for wg in wgs)
+
 
 @admin.register(ReviewGroup)
 class ReviewGroupAdmin(admin.ModelAdmin):
+    """ReviewGroup 的 Admin 配置。"""
     list_display = ('name', 'department', 'is_active', 'member_count', 'created_at', 'updated_at')
     list_filter = ('is_active', 'department')
     search_fields = ('name', 'description')
@@ -77,11 +100,13 @@ class ReviewGroupAdmin(admin.ModelAdmin):
 
     @admin.display(description='成员数')
     def member_count(self, obj):
+        """返回审核组成员数。Returns: 整数。"""
         return obj.members.count()
 
 
 @admin.register(WorkGroup)
 class WorkGroupAdmin(admin.ModelAdmin):
+    """WorkGroup 的 Admin 配置。"""
     list_display = ('name', 'department', 'is_active', 'member_count', 'created_at', 'updated_at')
     list_filter = ('is_active', 'department')
     search_fields = ('name', 'description')
@@ -94,4 +119,5 @@ class WorkGroupAdmin(admin.ModelAdmin):
 
     @admin.display(description='成员数')
     def member_count(self, obj):
+        """返回工作组成员数。Returns: 整数。"""
         return obj.members.count()

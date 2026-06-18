@@ -2,6 +2,7 @@ from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect
 from django.core.cache import cache
 from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin
 from ..models import CatalogProduct, CatalogCategory, VisitorLog, MirrorScenario, MirrorCharacteristic
 from ..services.material_api import client
 from ..services.feedback_service import FeedbackService
@@ -9,9 +10,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class CatalogListView(ListView):
+class CatalogListView(LoginRequiredMixin, ListView):
     """
     手册产品列表：展示已发布的材料镜像。
+
+    访问策略：
+    - 内部管理页面，要求 Django 用户登录（LoginRequiredMixin）。
+    - 外部客户通过独立的会员专区访问，不走此视图。
     """
     model = CatalogProduct
     template_name = 'apps/app_catalog/product_list.html'
@@ -85,11 +90,15 @@ class CatalogListView(ListView):
         return sorted(result, key=lambda x: x['name'])
 
 
-class CatalogDetailView(DetailView):
+class CatalogDetailView(LoginRequiredMixin, DetailView):
     """
     产品详情：
     - 基础信息：从本地镜像获取。
     - 实时性能/文件：从主系统 API 实时抓取。
+
+    访问策略：
+    - 内部管理页面，要求 Django 用户登录（LoginRequiredMixin）。
+    - 详情页的 member_token 仅用于行为日志归属，不充当准入凭证。
     """
     model = CatalogProduct
     template_name = 'apps/app_catalog/product_detail.html'

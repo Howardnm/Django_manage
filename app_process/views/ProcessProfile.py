@@ -53,9 +53,7 @@ class ProcessProfileDetailView(ProcessAccessMixin, DetailView):
     context_object_name = 'profile'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_queryset(self):
         return super().get_queryset().select_related('machine', 'screw_combination', 'creator')
@@ -90,14 +88,15 @@ class ProcessProfileDuplicateView(ProcessAccessMixin, UpdateView):
     template_name = 'apps/app_process/profile/form.html'
 
     def get_object(self, queryset=None):
-        original = super().get_object(queryset)
-        self.check_object_permission(original)
-        return original
+        return self.get_object_or_deny()
 
-    def dispatch(self, request, *args, **kwargs):
-        self.original_profile = self.get_object()
-        return super().dispatch(request, *args, **kwargs)
-        
+    @property
+    def original_profile(self):
+        """鉴权后懒加载原工艺方案"""
+        if not hasattr(self, '_original_profile'):
+            self._original_profile = self.get_object()
+        return self._original_profile
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '复制工艺方案'
@@ -153,9 +152,7 @@ class ProcessProfileUpdateView(ProcessAccessMixin, UpdateView):
     template_name = 'apps/app_process/profile/form.html'
 
     def get_object(self, queryset=None):
-        obj = super().get_object(queryset)
-        self.check_object_permission(obj)
-        return obj
+        return self.get_object_or_deny()
 
     def get_success_url(self):
         return reverse('process_profile_detail', kwargs={'pk': self.object.pk})

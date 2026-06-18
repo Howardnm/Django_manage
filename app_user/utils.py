@@ -1,3 +1,6 @@
+"""认证工具模块。CAPTCHA 生成、邮箱验证码发送和注册通知。
+
+导出: generate_captcha, send_verification_email, send_register_success_email。"""
 import random
 import string
 import os
@@ -12,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # 生成验证码图片
 def generate_captcha():
+    """生成 4 位字母数字 + 噪点的 CAPTCHA PNG 图片。Returns: (PNG bytes, 验证码字符串) 元组。"""
     # 定义图片大小
     width, height = 120, 40
     # 创建图片对象
@@ -49,6 +53,7 @@ def generate_captcha():
 
 # 发送邮箱验证码
 def send_verification_email(email):
+    """生成 6 位数字验证码并发送邮件。DEBUG 模式仅打印到控制台。Args: email: 目标邮箱地址。Returns: (code, success_bool, error_msg_or_None) 元组。"""
     code = ''.join(random.choices(string.digits, k=6))
     subject = '【项目管理系统】验证码'
     message = f'您的验证码是：{code}，有效期5分钟。请勿将验证码泄露给他人。'
@@ -70,6 +75,7 @@ def send_verification_email(email):
 
 # 发送注册成功邮件
 def send_register_success_email(user, request):
+    """发送注册成功通知邮件，含系统登录链接。Args: user: User 实例。request: 用于构建绝对 URL 的 HttpRequest。"""
     subject = '【项目管理系统】注册成功通知'
     
     # 构建登录链接 (尝试获取完整的 URL)

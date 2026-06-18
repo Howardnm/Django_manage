@@ -3,6 +3,7 @@ from django.views import View
 from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
@@ -14,7 +15,7 @@ from .utils import related_object_router
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
 from .exceptions import (TaskNotFoundError, CancelNotAllowedError, InvalidActionError,
-                         ReturnNotAllowedError)
+                         ReturnNotAllowedError, WorkflowError)
 from lxml import etree
 import json
 
@@ -110,9 +111,6 @@ class WorkflowSaveView(WorkflowAccessMixin, View):
     permission_required = 'app_workflow.change_workflowdefinition'
 
     def post(self, request):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可编辑流程定义。'}, status=403)
-
         data = json.loads(request.body)
         pk = data.get('pk')
         name = data.get('name')
@@ -140,9 +138,6 @@ class WorkflowDefinitionDeleteView(WorkflowAccessMixin, View):
     permission_required = 'app_workflow.delete_workflowdefinition'
 
     def post(self, request, pk):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可删除流程定义。'}, status=403)
-
         definition = get_object_or_404(WorkflowDefinition, pk=pk)
         if definition.instances.filter(status='RUNNING').exists():
             return JsonResponse({'status': 'error', 'message': '该流程尚有运行中的实例，无法删除。'})
@@ -155,9 +150,6 @@ class WorkflowToggleActiveView(WorkflowAccessMixin, View):
     permission_required = 'app_workflow.change_workflowdefinition'
 
     def post(self, request, pk):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可切换流程启用状态。'}, status=403)
-
         definition = get_object_or_404(WorkflowDefinition, pk=pk)
         definition.is_active = not definition.is_active
         definition.save()
@@ -426,158 +418,166 @@ class TaskReturnView(WorkflowAccessMixin, View):
         return JsonResponse({'status': 'success'})
 
 
+def build_workflow_status_map(instance):
+    """构建 BPMN 节点状态映射表, 供前端 bpmn-js 查看器叠加状态与备注
+
+    模块级工具函数，供 WorkflowInstanceDetailView 和外部视图复用。
+    """
+    STATUS_LABEL = {
+        'completed': '已通过', 'rejected': '已驳回', 'running': '进行中',
+        'canceled': '已取消', 'pending': '待处理', 'returned': '已退回',
+    }
+    bpmn_xml = instance.definition.bpmn_xml
+    nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
+
+    # 1. 解析 camunda 指派信息
+    camunda_assignments = WorkflowEngine.parse_camunda_assignments(bpmn_xml)
+
+    # 2. 预加载 DB 数据
+    db_tasks = {
+        t.spiff_task_id: t
+        for t in WorkflowTask.objects.filter(instance=instance).select_related('assigned_to').prefetch_related('candidate_users')
+    }
+    history_by_task = {}
+    for h in ApprovalHistory.objects.filter(instance=instance, task__isnull=False).select_related('task', 'approver').order_by('-timestamp'):
+        history_by_task.setdefault(h.task.spiff_task_id, []).append(h)
+
+    group_member_map = {}
+    all_group_names = set()
+    for task in db_tasks.values():
+        if task.candidate_groups:
+            all_group_names.update(task.candidate_groups)
+    if all_group_names:
+        for rg in ReviewGroup.objects.filter(name__in=all_group_names).prefetch_related('members'):
+            group_member_map[rg.name] = [u.username for u in rg.members.all()[:3]]
+
+    # 3. 从 BPMN XML 解析 userTask 的 name 属性（优先于 DB 中 task_name）
+    try:
+        root = etree.fromstring(bpmn_xml.encode('utf-8'))
+    except Exception:
+        root = None
+    bpmn_task_names = {}
+    if root is not None:
+        for ut in root.xpath('//bpmn:userTask', namespaces=nsmap):
+            tid = ut.get('id')
+            tname = ut.get('name')
+            if tid and tname:
+                bpmn_task_names[tid] = tname
+
+    # 4. 构建任务节点状态映射
+    status_map = {}
+    all_bpmn_ids = set(camunda_assignments.keys()) | set(db_tasks.keys())
+    for bpmn_id in all_bpmn_ids:
+        entry = {}
+        camunda_info = camunda_assignments.get(bpmn_id, {})
+        task = db_tasks.get(bpmn_id)
+        history_items = history_by_task.get(bpmn_id, [])
+
+        if task:
+            entry['status'] = task.status.lower()
+            entry['task_name'] = bpmn_task_names.get(bpmn_id) or task.task_name
+            if task.completed_at:
+                entry['completed_at'] = task.completed_at.strftime('%Y-%m-%d %H:%M')
+            if task.assigned_to:
+                entry['assigned_to_name'] = task.assigned_to.username
+            if not task.assigned_to:
+                entry['candidate_usernames'] = [u.username for u in task.candidate_users.all()]
+                entry['candidate_groups'] = task.candidate_groups
+                if task.candidate_groups:
+                    entry['candidate_group_members'] = {
+                        gn: group_member_map.get(gn, []) for gn in task.candidate_groups
+                    }
+        else:
+            entry['status'] = 'pending'
+
+        if camunda_info.get('assignee'):
+            entry['assignee_label'] = camunda_info['assignee']
+        elif camunda_info.get('candidate_users'):
+            entry['assignee_label'] = '候选人: ' + ', '.join(camunda_info['candidate_users'])
+
+        if history_items:
+            latest = history_items[0]
+            entry['approver_name'] = latest.approver.username
+            entry['remark'] = latest.remark
+            entry['action'] = latest.action
+
+        # 状态判定逻辑收归后端
+        has_active = bool(
+            entry.get('assigned_to_name') or
+            entry.get('candidate_usernames') or
+            entry.get('candidate_groups')
+        )
+        status = entry['status']
+        if status == 'pending' and has_active:
+            entry['display_status'] = 'running'
+        else:
+            entry['display_status'] = status
+        entry['status_label'] = STATUS_LABEL[entry['display_status']]
+
+        status_map[bpmn_id] = entry
+
+    # 5. 解析网关元素并判定颜色状态
+    if root is None:
+        return status_map
+
+    flows = {}
+    for sf in root.xpath('//bpmn:sequenceFlow', namespaces=nsmap):
+        src, tgt = sf.get('sourceRef'), sf.get('targetRef')
+        if src and tgt:
+            flows.setdefault(src, []).append(tgt)
+
+    task_statuses = {bid: status_map[bid]['display_status'] for bid in all_bpmn_ids}
+
+    for tag in ['bpmn:parallelGateway', 'bpmn:exclusiveGateway',
+                 'bpmn:inclusiveGateway', 'bpmn:eventBasedGateway']:
+        for gw in root.xpath(f'//{tag}', namespaces=nsmap):
+            gw_id = gw.get('id')
+            if not gw_id or gw_id in status_map:
+                continue
+
+            # BFS 查找下游 UserTask 的状态
+            downstream_statuses = []
+            visited = set()
+            queue = [gw_id]
+            while queue and len(visited) < 50:
+                cur = queue.pop(0)
+                if cur in visited:
+                    continue
+                visited.add(cur)
+                for nxt in flows.get(cur, []):
+                    if nxt in task_statuses:
+                        downstream_statuses.append(task_statuses[nxt])
+                    elif nxt not in visited:
+                        queue.append(nxt)
+
+            if not downstream_statuses:
+                gw_status = 'pending'
+            elif all(s == 'completed' for s in downstream_statuses):
+                gw_status = 'completed'
+            elif any(s == 'running' for s in downstream_statuses):
+                gw_status = 'running'
+            elif any(s == 'rejected' for s in downstream_statuses):
+                gw_status = 'rejected'
+            else:
+                gw_status = 'pending'
+
+            status_map[gw_id] = {
+                'status': gw_status,
+                'display_status': gw_status,
+                'status_label': STATUS_LABEL[gw_status],
+                'task_name': gw.get('name') or gw_id,
+                'is_gateway': True,
+            }
+
+    return status_map
+
+
 class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
     permission_required = 'app_workflow.view_workflowinstance'
 
     def _build_status_map(self, instance):
-        """构建 BPMN 节点状态映射表, 供前端 bpmn-js 查看器叠加状态与备注"""
-        STATUS_LABEL = {
-            'completed': '已通过', 'rejected': '已驳回', 'running': '进行中',
-            'canceled': '已取消', 'pending': '待处理', 'returned': '已退回',
-        }
-        bpmn_xml = instance.definition.bpmn_xml
-        nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
-
-        # 1. 解析 camunda 指派信息
-        camunda_assignments = WorkflowEngine.parse_camunda_assignments(bpmn_xml)
-
-        # 2. 预加载 DB 数据
-        db_tasks = {
-            t.spiff_task_id: t
-            for t in WorkflowTask.objects.filter(instance=instance).select_related('assigned_to').prefetch_related('candidate_users')
-        }
-        history_by_task = {}
-        for h in ApprovalHistory.objects.filter(instance=instance, task__isnull=False).select_related('task', 'approver').order_by('-timestamp'):
-            history_by_task.setdefault(h.task.spiff_task_id, []).append(h)
-
-        group_member_map = {}
-        all_group_names = set()
-        for task in db_tasks.values():
-            if task.candidate_groups:
-                all_group_names.update(task.candidate_groups)
-        if all_group_names:
-            for rg in ReviewGroup.objects.filter(name__in=all_group_names).prefetch_related('members'):
-                group_member_map[rg.name] = [u.username for u in rg.members.all()[:3]]
-
-        # 3. 从 BPMN XML 解析 userTask 的 name 属性（优先于 DB 中 task_name）
-        try:
-            root = etree.fromstring(bpmn_xml.encode('utf-8'))
-        except Exception:
-            root = None
-        bpmn_task_names = {}
-        if root is not None:
-            for ut in root.xpath('//bpmn:userTask', namespaces=nsmap):
-                tid = ut.get('id')
-                tname = ut.get('name')
-                if tid and tname:
-                    bpmn_task_names[tid] = tname
-
-        # 4. 构建任务节点状态映射
-        status_map = {}
-        all_bpmn_ids = set(camunda_assignments.keys()) | set(db_tasks.keys())
-        for bpmn_id in all_bpmn_ids:
-            entry = {}
-            camunda_info = camunda_assignments.get(bpmn_id, {})
-            task = db_tasks.get(bpmn_id)
-            history_items = history_by_task.get(bpmn_id, [])
-
-            if task:
-                entry['status'] = task.status.lower()
-                entry['task_name'] = bpmn_task_names.get(bpmn_id) or task.task_name
-                if task.completed_at:
-                    entry['completed_at'] = task.completed_at.strftime('%Y-%m-%d %H:%M')
-                if task.assigned_to:
-                    entry['assigned_to_name'] = task.assigned_to.username
-                if not task.assigned_to:
-                    entry['candidate_usernames'] = [u.username for u in task.candidate_users.all()]
-                    entry['candidate_groups'] = task.candidate_groups
-                    if task.candidate_groups:
-                        entry['candidate_group_members'] = {
-                            gn: group_member_map.get(gn, []) for gn in task.candidate_groups
-                        }
-            else:
-                entry['status'] = 'pending'
-
-            if camunda_info.get('assignee'):
-                entry['assignee_label'] = camunda_info['assignee']
-            elif camunda_info.get('candidate_users'):
-                entry['assignee_label'] = '候选人: ' + ', '.join(camunda_info['candidate_users'])
-
-            if history_items:
-                latest = history_items[0]
-                entry['approver_name'] = latest.approver.username
-                entry['remark'] = latest.remark
-                entry['action'] = latest.action
-
-            # ── 状态判定逻辑收归后端 ──
-            has_active = bool(
-                entry.get('assigned_to_name') or
-                entry.get('candidate_usernames') or
-                entry.get('candidate_groups')
-            )
-            status = entry['status']
-            if status == 'pending' and has_active:
-                entry['display_status'] = 'running'
-            else:
-                entry['display_status'] = status
-            entry['status_label'] = STATUS_LABEL[entry['display_status']]
-
-            status_map[bpmn_id] = entry
-
-        # 5. 解析网关元素并判定颜色状态
-        if root is None:
-            return status_map
-
-        flows = {}
-        for sf in root.xpath('//bpmn:sequenceFlow', namespaces=nsmap):
-            src, tgt = sf.get('sourceRef'), sf.get('targetRef')
-            if src and tgt:
-                flows.setdefault(src, []).append(tgt)
-
-        task_statuses = {bid: status_map[bid]['display_status'] for bid in all_bpmn_ids}
-
-        for tag in ['bpmn:parallelGateway', 'bpmn:exclusiveGateway',
-                     'bpmn:inclusiveGateway', 'bpmn:eventBasedGateway']:
-            for gw in root.xpath(f'//{tag}', namespaces=nsmap):
-                gw_id = gw.get('id')
-                if not gw_id or gw_id in status_map:
-                    continue
-
-                # BFS 查找下游 UserTask 的状态
-                downstream_statuses = []
-                visited = set()
-                queue = [gw_id]
-                while queue and len(visited) < 50:
-                    cur = queue.pop(0)
-                    if cur in visited:
-                        continue
-                    visited.add(cur)
-                    for nxt in flows.get(cur, []):
-                        if nxt in task_statuses:
-                            downstream_statuses.append(task_statuses[nxt])
-                        elif nxt not in visited:
-                            queue.append(nxt)
-
-                if not downstream_statuses:
-                    gw_status = 'pending'
-                elif all(s == 'completed' for s in downstream_statuses):
-                    gw_status = 'completed'
-                elif any(s == 'running' for s in downstream_statuses):
-                    gw_status = 'running'
-                elif any(s == 'rejected' for s in downstream_statuses):
-                    gw_status = 'rejected'
-                else:
-                    gw_status = 'pending'
-
-                status_map[gw_id] = {
-                    'status': gw_status,
-                    'display_status': gw_status,
-                    'status_label': STATUS_LABEL[gw_status],
-                    'task_name': gw.get('name') or gw_id,
-                    'is_gateway': True,
-                }
-
-        return status_map
+        """兼容旧调用方，委托给模块级工具函数"""
+        return build_workflow_status_map(instance)
 
     def get_context_data(self, **kwargs):
         pk = self.kwargs['pk']
@@ -636,8 +636,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         current_task = context.get('current_task')
 
         if not current_task:
-            messages.error(request, "您没有权限处理此任务或任务已处理。")
-            return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
+            return self.handle_no_permission(message="您没有权限处理此任务或任务已处理。")
 
         action = request.POST.get('action')
         remark = request.POST.get('remark', '').strip()
@@ -664,7 +663,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             messages.success(request, f"任务已成功{'通过' if action == 'APPROVE' else '驳回'}。")
         except TaskNotFoundError as e:
             messages.error(request, f"任务处理失败: {e}")
-        except Exception as e:
+        except WorkflowError as e:
             messages.error(request, f"流程执行错误: {e}")
 
         return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
@@ -681,8 +680,8 @@ class WorkflowCancelView(WorkflowAccessMixin, View):
     def post(self, request, pk):
         instance = get_object_or_404(WorkflowInstance, pk=pk)
 
-        if instance.started_by != request.user and not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅发起人或管理员可取消流程。'}, status=403)
+        if instance.started_by != request.user:
+            raise PermissionDenied('仅发起人可取消流程。')
 
         reason = request.POST.get('reason', '').strip()
 

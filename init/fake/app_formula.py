@@ -9,6 +9,7 @@ app_formula 伪数据生成器
   - 多版本配方：v2~v4，BOM 和测试结果基于上一版本微调
 """
 
+import re
 import random
 from decimal import Decimal
 from django.db import transaction
@@ -27,7 +28,6 @@ def run(ctx: FakeContext) -> None:
 
     feeding_ports = ['1_MAIN', '2_SIDE_1', '3_SIDE_2', '4_LIQUID']
     weighing_scales = ['A', 'B', 'C', 'D', 'E']
-    today_str = timezone.now().strftime('%Y%m%d')
 
     formulas = []
     for i in range(COUNT_FORMULAS):
@@ -37,10 +37,17 @@ def run(ctx: FakeContext) -> None:
         ))
         p_node = pick_one(p_nodes) if p_nodes else None
 
-        # 自动生成 code
-        code_prefix = f"L{today_str}"
-        last = LabFormula.objects.filter(code__startswith=code_prefix).order_by('code').last()
-        seq = (int(last.code.split('-')[-1]) + 1) if last else 1
+        # 生成唯一 code：Python 端取最大数字后缀，规避字符串排序 bug
+        code_prefix = f"L{timezone.now().strftime('%Y%m%d')}"
+        existing_codes = LabFormula.objects.filter(
+            code__startswith=code_prefix,
+        ).values_list('code', flat=True)
+        max_seq = 0
+        for c in existing_codes:
+            m = re.search(r'-(\d+)$', c)
+            if m:
+                max_seq = max(max_seq, int(m.group(1)))
+        seq = max_seq + 1
         code = f"{code_prefix}-{seq:02d}"
 
         f = LabFormula.objects.create(
@@ -101,13 +108,21 @@ def run(ctx: FakeContext) -> None:
     # --- 多版本配方 ---
     for f in pick(formulas, 5):
         for v in range(2, random.randint(2, 4)):
-            f2 = LabFormula.objects.create(
-                code=f.code, name=f"{f.name} v{v}",
-                material_type=f.material_type, process=f.process,
-                project=f.project, project_node=f.project_node,
-                version=v, creator=f.creator,
-                cost_predicted=f.cost_predicted, description=f.description,
+            f2, created = LabFormula.objects.get_or_create(
+                code=f.code, version=v,
+                defaults={
+                    'name': f"{f.name} v{v}",
+                    'material_type': f.material_type,
+                    'process': f.process,
+                    'project': f.project,
+                    'project_node': f.project_node,
+                    'creator': f.creator,
+                    'cost_predicted': f.cost_predicted,
+                    'description': f.description,
+                },
             )
+            if not created:
+                continue
             for b in f.bom_lines.all():
                 FormulaBOM.objects.create(
                     formula=f2, feeding_port=b.feeding_port,

@@ -24,8 +24,14 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
 
         page = request.GET.get('page')
         if page is not None:
-            page = int(page)
-            page_size = int(request.GET.get('page_size', 10))
+            try:
+                page = int(page)
+                page_size = int(request.GET.get('page_size', 10))
+            except (ValueError, TypeError):
+                page = 1
+                page_size = 10
+            if page < 1:
+                page = 1
             total = qs.count()
             offset = (page - 1) * page_size
             results = []

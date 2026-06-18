@@ -1,0 +1,157 @@
+{
+  "name": "研发评审表单",
+  "group": "研发",
+  "description": "研发项目立项审批 — 部门经理初审 → 总监审核 → 并行审核（工艺复核 + 销售确认）",
+  "workflow_name": "研发评审流程",
+  "form_option": {
+    "form": {
+      "labelPosition": "top",
+      "labelWidth": "120px"
+    },
+    "submitBtn": { "show": false },
+    "resetBtn": { "show": false }
+  },
+  "form_config": [
+    {
+      "type": "input",
+      "field": "project_name",
+      "title": "项目名称",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "stepLabel": "初审",
+        "stepDesc": "填写项目基本信息，提交部门经理审批",
+        "placeholder": "请输入项目名称"
+      },
+      "validate": [
+        { "required": true, "message": "请输入项目名称", "trigger": "blur", "mode": "required" }
+      ]
+    },
+    {
+      "type": "textarea",
+      "field": "plan_desc",
+      "title": "实验方案描述",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "rows": 4,
+        "placeholder": "请描述实验方案、目标物性指标和预期工艺路线"
+      }
+    },
+    {
+      "type": "select",
+      "field": "priority",
+      "title": "优先级",
+      "_fc_drag_tag": "select",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "请选择优先级",
+        "clearable": true
+      },
+      "options": [
+        { "value": "high", "label": "高" },
+        { "value": "medium", "label": "中" },
+        { "value": "low", "label": "低" }
+      ]
+    },
+    {
+      "type": "textarea",
+      "field": "tech_feasibility",
+      "title": "技术可行性评估",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "stepLabel": "总监审核",
+        "stepDesc": "研发总监评估技术方案可行性",
+        "rows": 4,
+        "placeholder": "请评估技术方案可行性，包括材料选型、工艺路线、设备匹配等"
+      }
+    },
+    {
+      "type": "input",
+      "field": "resource_needs",
+      "title": "资源需求（人/机/料）",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "placeholder": "如：3人 / 双螺杆挤出机 / PP+30%GF"
+      }
+    },
+    {
+      "type": "input",
+      "field": "estimated_days",
+      "title": "预计研发周期（天）",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "type": "number",
+        "min": 1,
+        "placeholder": "请输入预计天数"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "process_feasibility",
+      "title": "工艺可行性",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 3,
+        "stepLabel": "并行审核",
+        "stepDesc": "工艺复核 + 销售确认（并行进行，填写各自审核意见）",
+        "rows": 3,
+        "placeholder": "请评估工艺可行性，包括挤出温度、螺杆组合、模具匹配等"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "market_assessment",
+      "title": "市场前景评估",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 3,
+        "rows": 3,
+        "placeholder": "请评估市场前景、客户需求量和竞品情况"
+      }
+    }
+  ]
+}

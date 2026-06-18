@@ -34,8 +34,9 @@ def run(ctx: FakeContext) -> None:
     ctx.depts = depts
 
     # --- 用户创建辅助函数 ---
-    def create_user(username, role, dept=None, level=1, customer=None, oem=None):
-        user, created = User.objects.get_or_create(
+    def create_user(username, role, dept=None, level=1, customer=None, oem=None,
+                    is_staff=False):
+        user, created = User.objects.update_or_create(
             username=username,
             defaults={
                 'user_type': role,
@@ -46,16 +47,16 @@ def run(ctx: FakeContext) -> None:
                 'first_name': fake.name(),
                 'email': f"{username}@sunwill.com.cn",
                 'phone': fake.phone_number(),
-                'is_staff': role not in ['CUSTOMER', 'OEM'],
+                'is_staff': is_staff,
             },
         )
         if created:
             user.set_password('Sunwill@123')
-            user.save()
+        user.save()
         return user
 
-    # --- 管理员 ---
-    admin = create_user("admin", "ADMIN", depts['RND'], 15)
+    # --- 管理员（仅此用户可登录后台） ---
+    admin = create_user("admin", "ADMIN", depts['RND'], 15, is_staff=True)
     ctx.admin = admin
 
     # --- 研发工程师 ---

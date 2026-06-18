@@ -1,0 +1,125 @@
+{
+  "name": "量产放行表单",
+  "group": "生产",
+  "description": "产品量产放行审批 — 品质确认 → 生产评估 → 总监终审",
+  "workflow_name": "量产放行流程",
+  "form_option": {
+    "form": {
+      "labelPosition": "top",
+      "labelWidth": "120px"
+    },
+    "submitBtn": { "show": false },
+    "resetBtn": { "show": false }
+  },
+  "form_config": [
+    {
+      "type": "input",
+      "field": "product_name",
+      "title": "产品名称",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "stepLabel": "品质确认",
+        "stepDesc": "品质主管审核检测报告",
+        "placeholder": "请输入产品名称"
+      },
+      "validate": [
+        { "required": true, "message": "请输入产品名称", "trigger": "blur", "mode": "required" }
+      ]
+    },
+    {
+      "type": "input",
+      "field": "test_report_no",
+      "title": "检测报告编号",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "如：TR-20260601-001"
+      }
+    },
+    {
+      "type": "select",
+      "field": "qa_result",
+      "title": "品质结论",
+      "_fc_drag_tag": "select",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 1,
+        "placeholder": "请选择品质结论",
+        "clearable": true
+      },
+      "options": [
+        { "value": "pass", "label": "合格" },
+        { "value": "conditional", "label": "有条件通过" },
+        { "value": "fail", "label": "不合格" }
+      ]
+    },
+    {
+      "type": "input",
+      "field": "capacity_assessment",
+      "title": "产能评估（吨/月）",
+      "_fc_drag_tag": "input",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "stepLabel": "生产评估",
+        "stepDesc": "生产经理评估产能和物料情况",
+        "type": "number",
+        "min": 0,
+        "placeholder": "请输入月产能（吨）"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "material_status",
+      "title": "原材料库存情况",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 2,
+        "rows": 3,
+        "placeholder": "请描述关键原材料的库存量、采购周期和供应风险"
+      }
+    },
+    {
+      "type": "textarea",
+      "field": "release_opinion",
+      "title": "放行意见",
+      "_fc_drag_tag": "textarea",
+      "display": true,
+      "hidden": false,
+      "_fc_store": {
+        "props_keys": ["step", "stepLabel", "stepDesc"]
+      },
+      "props": {
+        "step": 3,
+        "stepLabel": "最终批准",
+        "stepDesc": "研发总监最终批准",
+        "rows": 4,
+        "placeholder": "请输入最终放行意见，明确是否同意量产"
+      }
+    }
+  ]
+}

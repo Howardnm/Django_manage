@@ -1,3 +1,5 @@
+"""app_user URL 路由。登录、注册、个人资料、密码重置、验证码、浏览器验证端点。"""
+
 from django.urls import path
 from django.contrib.auth.views import LogoutView
 from .views import CustomLoginView, RegisterView, ProfileView, captcha_view, send_email_code, RegisterSuccessView, PasswordResetView, verify_browser

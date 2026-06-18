@@ -7,23 +7,31 @@ from app_trial_production.models import TestingOrder, TrialTestResult
 
 
 class TestingOrderListView(TestingTaskAccessMixin, ListView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = TestingOrder
     template_name = 'apps/app_trial_production/testing/list.html'
     context_object_name = 'testing_orders'
     paginate_by = 20
 
     def get_queryset(self):
-        return TestingOrder.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.select_related(
             'production_order', 'assigned_to',
         ).prefetch_related('test_items', 'specimens').order_by('-created_at')
 
 class TestingOrderDetailView(TestingTaskAccessMixin, DetailView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = TestingOrder
     template_name = 'apps/app_trial_production/testing/detail.html'
     context_object_name = 'testing_order'
 
     def get_queryset(self):
-        return TestingOrder.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.select_related(
             'production_order__project', 'production_order__project_node',
             'assigned_to',
         ).prefetch_related(
@@ -64,6 +72,7 @@ class TestingOrderDetailView(TestingTaskAccessMixin, DetailView):
 
 
 class TestingOrderFillResultsView(TestingTaskAccessMixin, UpdateView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = TestingOrder
     fields = []
     template_name = 'apps/app_trial_production/testing/fill_results.html'
@@ -116,6 +125,7 @@ class TestingOrderFillResultsView(TestingTaskAccessMixin, UpdateView):
 
 
 class TestingOrderWriteBackView(TestingTaskAccessMixin, UpdateView):
+    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
     model = TestingOrder
     fields = []
 

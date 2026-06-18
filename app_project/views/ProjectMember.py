@@ -68,10 +68,10 @@ class ProjectMemberDeleteView(ProjectAccessMixin, View):
     permission_required = 'app_project.change_project'
 
     def post(self, request, pk):
-        member = get_object_or_404(ProjectMember, pk=pk)
-        project_id = member.project.id
+        member = get_object_or_404(ProjectMember.objects.select_related('project'), pk=pk)
         self.check_object_permission(member.project)
-        
+        project_id = member.project.id
+
         member.delete()
         messages.success(request, "成员已从项目组移除")
         return redirect(reverse('project_detail', kwargs={'pk': project_id}))

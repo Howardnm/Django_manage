@@ -1,3 +1,8 @@
+"""菜单模块定义。为每个业务区域提供静态菜单配置。
+
+导出: MenuModule。
+"""
+
 from app_user.mixins import IdentityConfig
 
 class MenuModule:
@@ -5,6 +10,7 @@ class MenuModule:
 
     @staticmethod
     def get_dashboard():
+        """返回看板工作台菜单定义。"""
         return {
             "name": "看板工作台",
             "icon": "ti-smart-home",
@@ -21,6 +27,7 @@ class MenuModule:
 
     @staticmethod
     def get_project():
+        """返回项目管理中心菜单定义。"""
         return {
             "name": "项目管理中心",
             "icon": "ti-subtask",
@@ -35,7 +42,7 @@ class MenuModule:
 
     @staticmethod
     def get_form_management():
-        """表单管理中心"""
+        """返回表单管理中心菜单定义。"""
         return {
             "name": "表单管理中心",
             "icon": "ti-forms",
@@ -51,7 +58,7 @@ class MenuModule:
 
     @staticmethod
     def get_workflow():
-        """工作流审批中心"""
+        """返回流程审批中心菜单定义。"""
         return {
             "name": "流程审批中心",
             "icon": "ti-git-pull-request",
@@ -67,6 +74,7 @@ class MenuModule:
 
     @staticmethod
     def get_repository():
+        """返回客户档案中心菜单定义。"""
         return {
             "name": "客户档案中心",
             "icon": "ti-archive",
@@ -81,6 +89,7 @@ class MenuModule:
 
     @staticmethod
     def get_basic_research():
+        """返回基础预研中心菜单定义。"""
         return {
             "name": "基础预研中心",
             "icon": "ti-flask",
@@ -93,6 +102,7 @@ class MenuModule:
 
     @staticmethod
     def get_material():
+        """返回材料成品库菜单定义。"""
         return {
             "name": "材料成品库",
             "icon": "ti-database",
@@ -109,6 +119,7 @@ class MenuModule:
 
     @staticmethod
     def get_formula():
+        """返回实验配方库菜单定义。"""
         return {
             "name": "实验配方库",
             "icon": "ti-test-pipe",
@@ -121,6 +132,7 @@ class MenuModule:
 
     @staticmethod
     def get_process():
+        """返回生产工艺库菜单定义。"""
         return {
             "name": "生产工艺库",
             "icon": "ti-settings-automation",
@@ -135,6 +147,7 @@ class MenuModule:
 
     @staticmethod
     def get_raw_material():
+        """返回原材料/供应商菜单定义。"""
         return {
             "name": "原材料/供应商",
             "icon": "ti-packages",
@@ -149,7 +162,7 @@ class MenuModule:
 
     @staticmethod
     def get_trial_production():
-        """试验排产中心"""
+        """返回试验排产中心菜单定义。"""
         return {
             "name": "试验排产中心",
             "icon": "ti-building-factory",
@@ -169,11 +182,14 @@ class MenuModule:
 
     @staticmethod
     def get_admin():
+        """返回系统管理设置菜单定义。"""
         return {
             "name": "系统管理设置",
             "icon": "ti-settings",
+            # visible_to 限制为管理员角色；非 ADMIN 的超级用户通过 menu_service.py 中的
+            # is_superuser 显式检查绕过此限制
             "visible_to": [IdentityConfig.R_ADMIN],
-            "url_name": "project_score_rule_list",
+            "url_name": "project_config",
             "sub_items": [
                 {"name": "项目全局配置", "url_name": "project_config"},
                 {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"},

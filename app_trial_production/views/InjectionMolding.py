@@ -2,7 +2,8 @@ from django.views.generic import ListView, DetailView, CreateView, UpdateView
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.urls import reverse
-from app_trial_production.mixins import InjectionTaskAccessMixin
+from django.core.exceptions import PermissionDenied
+from app_trial_production.mixins import InjectionTaskAccessMixin, RndAccessMixin
 from app_trial_production.models import (
     InjectionMoldingOrder, MoldRequirement, SpecimenInventory, ProductionOrder, MoldType,
     TestingOrder,
@@ -20,7 +21,10 @@ class InjectionMoldingOrderListView(InjectionTaskAccessMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        return InjectionMoldingOrder.objects.select_related(
+        qs = super().get_queryset()
+        if qs is None:
+            return self.model.objects.all()
+        return qs.select_related(
             'production_order', 'assigned_operator',
         ).prefetch_related('mold_requirements__mold').order_by('-created_at')
 
@@ -30,31 +34,36 @@ class InjectionMoldingOrderCreateView(InjectionTaskAccessMixin, CreateView):
     form_class = InjectionMoldingOrderForm
     template_name = 'apps/app_trial_production/injection/form.html'
 
-    def dispatch(self, request, *args, **kwargs):
-        self.production_order = get_object_or_404(ProductionOrder, pk=kwargs.get('order_pk'))
-        return super().dispatch(request, *args, **kwargs)
+    def _resolve_order(self):
+        """鉴权后懒加载工单 + 项目归属校验"""
+        if not hasattr(self, '_order'):
+            self._order = get_object_or_404(ProductionOrder, pk=self.kwargs.get('order_pk'))
+            if self._order.project:
+                RndAccessMixin.check_project_ownership(
+                    self._order.project, self.request.user)
+        return self._order
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['mold_types'] = MoldType.objects.filter(status='AVAILABLE').order_by('mold_code')
-        context['production_order'] = self.production_order
+        context['production_order'] = self._resolve_order()
         from app_formula.models import LabFormula
         context['formulas'] = LabFormula.objects.filter(
-            code=self.production_order.trial_code,
-            project=self.production_order.project,
+            code=self._resolve_order().trial_code,
+            project=self._resolve_order().project,
         ).order_by('version')
         return context
 
     def form_valid(self, form):
-        form.instance.production_order = self.production_order
+        form.instance.production_order = self._resolve_order()
         self.object = form.save()
 
         mold_count = int(self.request.POST.get('mold_count', 0))
         if mold_count > 0:
             from app_formula.models import LabFormula
             formulas = list(LabFormula.objects.filter(
-                code=self.production_order.trial_code,
-                project=self.production_order.project,
+                code=self._resolve_order().trial_code,
+                project=self._resolve_order().project,
             ).order_by('version'))
 
             for i in range(mold_count):
