@@ -55,7 +55,7 @@
      {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY}
 
   3. 自定义角色并集（L1）:
-     {"name": "配色任务", "url_name": "trial_color_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP]}
+     {"name": "配色任务", "url_name": "color_center:list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP]}
 
   4. 等级门槛（L2）:
      {"name": "项目评分规则", "url_name": "project_score_rule_list", "min_level": 15}

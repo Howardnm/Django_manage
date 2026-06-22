@@ -2,7 +2,7 @@ import logging
 from django.db import transaction
 from django.utils import timezone
 
-from .state_machine import StateMachine
+from common_utils.state_machine import StateMachine
 
 logger = logging.getLogger(__name__)
 

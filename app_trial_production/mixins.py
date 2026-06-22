@@ -43,21 +43,6 @@ class ExtrusionTaskAccessMixin(TrialProductionAccessMixin):
     identity_required = IdentityConfig.EXTRUSION_TEAM
 
 
-class ColorTaskAccessMixin(TrialProductionAccessMixin):
-    """配色任务 — 仅配色员 + 技术核心 + 管理员"""
-    identity_required = IdentityConfig.COLOR_TEAM
-
-
-class InjectionTaskAccessMixin(TrialProductionAccessMixin):
-    """注塑任务 — 仅注塑操作员 + 技术核心 + 管理员"""
-    identity_required = IdentityConfig.INJECTION_TEAM
-
-
-class TestingTaskAccessMixin(TrialProductionAccessMixin):
-    """测试任务 — 仅测试员 + 技术核心 + 管理员"""
-    identity_required = IdentityConfig.TESTING_TEAM
-
-
 class DashboardAccessMixin(TrialProductionAccessMixin):
     """排产总览 — 仅研发人员 + 管理员"""
     identity_required = IdentityConfig.RND_ONLY
