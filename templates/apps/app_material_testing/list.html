@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}测试工单{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                        <li class="breadcrumb-item active">测试工单</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">测试工单列表</h2>
+            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap datatable">
+            <thead>
+                <tr>
+                    <th>排产单</th>
+                    <th>实验单号</th>
+                    <th>测试项目数</th>
+                    <th>测试员</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for obj in testing_tasks %}
+                <tr>
+                    <td class="fw-bold">{{ obj.production_order.code }}</td>
+                    <td>{{ obj.production_order.trial_code|default:"-" }}</td>
+                    <td>{{ obj.test_item_count }}</td>
+                    <td>{{ obj.assigned_to.realname|default:"-" }}</td>
+                    <td><span class="badge {{ obj.status_css_class }}">{{ obj.get_status_display }}</span></td>
+                    <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
+                    <td>
+                        <a href="{% url 'material_testing:detail' obj.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7" class="text-center py-4 text-muted">暂无测试工单</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+</div>
+{% endblock %}

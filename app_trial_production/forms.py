@@ -1,21 +1,16 @@
 from django import forms
+from common_utils.filters import TablerFormMixin
 from .models import (
-    ProductionOrder, MoldType, ExtrusionRecord,
-    ProductionOutput, SampleSplit, SampleInventory,
-    InjectionMoldingOrder, MoldRequirement, SpecimenInventory,
-    TestingOrder, TrialTestResult,
+    ProductionOrder, ExtrusionTask,
+    SampleInventory,
 )
-from app_raw_material.models import RawMaterial
-from app_formula.models import ColorPowderBOM, ColorPowderBOMEntry
 
 
-class ProductionOrderForm(forms.ModelForm):
+class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
     """创建生产工单表单"""
     class Meta:
         model = ProductionOrder
-        fields = [
-            'quantity_planned', 'process_profile', 'remark',
-        ]
+        fields = ['quantity_planned', 'process_profile', 'remark']
         widgets = {
             'quantity_planned': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'process_profile': forms.Select(attrs={'class': 'form-select'}),
@@ -23,7 +18,7 @@ class ProductionOrderForm(forms.ModelForm):
         }
 
 
-class ProductionOrderUpdateForm(forms.ModelForm):
+class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
     """编辑生产工单"""
     class Meta:
         model = ProductionOrder
@@ -33,38 +28,40 @@ class ProductionOrderUpdateForm(forms.ModelForm):
         }
 
 
-class ExtrusionRecordForm(forms.ModelForm):
+# ---- 挤出任务 ----
+
+class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
     """挤出生产记录表单"""
     class Meta:
-        model = ExtrusionRecord
-        exclude = ['production_order', 'recorded_by', 'created_at']
-        widgets = {
-            # 温度
-            'temp_zone_1': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_2': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_3': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_4': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_5': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_6': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_7': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_8': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_9': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_10': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_11': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_zone_12': forms.NumberInput(attrs={'class': 'form-control'}),
-            'temp_head': forms.NumberInput(attrs={'class': 'form-control'}),
+        model = ExtrusionTask
+        fields = [
+            # 温度参数
+            'temp_zone_1', 'temp_zone_2', 'temp_zone_3', 'temp_zone_4',
+            'temp_zone_5', 'temp_zone_6', 'temp_zone_7', 'temp_zone_8',
+            'temp_zone_9', 'temp_zone_10', 'temp_zone_11', 'temp_zone_12',
+            'temp_head',
             # 主机参数
+            'screw_speed', 'torque', 'current', 'melt_pressure', 'melt_temp', 'vacuum',
+            # 喂料参数
+            'main_feeder_speed', 'side_feeder_speed', 'liquid_pump_speed',
+            # 后处理参数
+            'throughput', 'cooling_method', 'strand_count', 'water_temp',
+            'water_bath_length', 'air_knife_pressure', 'pelletizing_speed', 'screen_mesh',
+            # 产出与备注
+            'total_output', 'remark',
+        ]
+        widgets = {
+            **{f: forms.NumberInput(attrs={'class': 'form-control'})
+               for f in ExtrusionTask.TEMP_FIELDS},
             'screw_speed': forms.NumberInput(attrs={'class': 'form-control'}),
             'torque': forms.NumberInput(attrs={'class': 'form-control'}),
             'current': forms.NumberInput(attrs={'class': 'form-control'}),
             'melt_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
             'melt_temp': forms.NumberInput(attrs={'class': 'form-control'}),
             'vacuum': forms.NumberInput(attrs={'class': 'form-control'}),
-            # 喂料
             'main_feeder_speed': forms.NumberInput(attrs={'class': 'form-control'}),
             'side_feeder_speed': forms.NumberInput(attrs={'class': 'form-control'}),
             'liquid_pump_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            # 产能与后处理
             'throughput': forms.NumberInput(attrs={'class': 'form-control'}),
             'cooling_method': forms.Select(attrs={'class': 'form-select'}),
             'strand_count': forms.NumberInput(attrs={'class': 'form-control'}),
@@ -73,206 +70,58 @@ class ExtrusionRecordForm(forms.ModelForm):
             'air_knife_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
             'pelletizing_speed': forms.NumberInput(attrs={'class': 'form-control'}),
             'screen_mesh': forms.TextInput(attrs={'class': 'form-control'}),
-            # 备注
+            'total_output': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
 
-class ProductionOutputForm(forms.ModelForm):
-    """生产产出表单"""
-    class Meta:
-        model = ProductionOutput
-        fields = ['remark']
-        widgets = {
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-        }
+# 注塑/模具表单已迁移至 app_mold_injection.forms
+# 色粉 BOM 表单已迁移至 app_color_center.forms
+# 测试结果表单已迁移至 app_material_testing.forms
+
+# ---- 样品库存 ----
+
+class PelletSplitForm(forms.Form):
+    """颗粒分拨表单（非 ModelForm，由 Service 层处理入库）"""
+    formula = forms.ModelChoiceField(
+        queryset=None, required=False,
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
+    sub_type = forms.ChoiceField(
+        choices=[('FINISHED', '颗粒成品'), ('FOR_INJECTION', '待打样颗粒')],
+        widget=forms.Select(attrs={'class': 'form-select'}))
+    quantity = forms.DecimalField(
+        max_digits=10, decimal_places=2,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}))
+    packaging_desc = forms.CharField(
+        required=False, max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control'}))
+    storage_location = forms.CharField(
+        required=False, max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control'}))
 
 
-class SampleSplitForm(forms.ModelForm):
-    """样品分拨表单"""
-    class Meta:
-        model = SampleSplit
-        fields = ['formula', 'destination', 'quantity', 'packaging_desc', 'customer_destination']
-        widgets = {
-            'formula': forms.Select(attrs={'class': 'form-select form-select-sm'}),
-            'quantity': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'packaging_desc': forms.TextInput(attrs={'class': 'form-control'}),
-            'customer_destination': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'destination': forms.Select(attrs={'class': 'form-select'}),
-        }
-
-
-SampleSplitFormSet = forms.inlineformset_factory(
-    ProductionOrder, SampleSplit,
-    form=SampleSplitForm,
-    extra=3, can_delete=True
+PelletSplitFormSet = forms.formset_factory(
+    PelletSplitForm, extra=4, can_delete=True
 )
 
 
-class MoldTypeForm(forms.ModelForm):
+class SapEntryForm(TablerFormMixin, forms.ModelForm):
+    """SAP 入库表单"""
     class Meta:
-        model = MoldType
-        fields = ['name', 'mold_code', 'mold_type', 'standard', 'specimen_description',
-                  'cavity_count', 'status', 'description']
+        model = SampleInventory
+        fields = ['sap_material_code', 'sap_batch_number',
+                  'sap_warehouse_date', 'sap_storage_location']
         widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'mold_code': forms.TextInput(attrs={'class': 'form-control'}),
-            'mold_type': forms.Select(attrs={'class': 'form-select'}),
-            'standard': forms.Select(attrs={'class': 'form-select'}),
-            'specimen_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'cavity_count': forms.NumberInput(attrs={'class': 'form-control'}),
-            'status': forms.Select(attrs={'class': 'form-select'}),
-            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control'}),
+            'sap_batch_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'sap_warehouse_date': forms.DateInput(attrs={
+                'class': 'form-control', 'type': 'date'}),
+            'sap_storage_location': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
-class MoldRequirementForm(forms.ModelForm):
-    """模具需求明细"""
-    class Meta:
-        model = MoldRequirement
-        fields = ['mold', 'formula', 'specimen_quantity']
-
-
-MoldRequirementFormSet = forms.inlineformset_factory(
-    InjectionMoldingOrder, MoldRequirement,
-    form=MoldRequirementForm,
-    extra=3, can_delete=True
-)
-
-
-class InjectionMoldingOrderForm(forms.ModelForm):
-    """注塑工单表单"""
-    class Meta:
-        model = InjectionMoldingOrder
-        fields = ['sample_split', 'sample_inventory',
-                  'injection_params_note', 'assigned_operator']
-        widgets = {
-            'injection_params_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-        }
-
-
-class InjectionMoldingCompleteForm(forms.ModelForm):
-    """注塑完成表单"""
-    class Meta:
-        model = InjectionMoldingOrder
-        fields = ['status', 'remark']
-        widgets = {
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-        }
-
-
-class SpecimenInventoryForm(forms.ModelForm):
-    """样条产出记录"""
-    class Meta:
-        model = SpecimenInventory
-        fields = ['mold', 'quantity_produced', 'quantity_qualified',
-                  'storage_location', 'batch_label']
-
-
-SpecimenInventoryFormSet = forms.inlineformset_factory(
-    InjectionMoldingOrder, SpecimenInventory,
-    form=SpecimenInventoryForm,
-    extra=0, can_delete=False
-)
-
-
-class TestingOrderForm(forms.ModelForm):
-    """测试工单表单"""
-    class Meta:
-        model = TestingOrder
-        fields = ['test_items', 'specimens', 'assigned_to']
-        widgets = {
-            'test_items': forms.SelectMultiple(attrs={'class': 'form-select'}),
-            'specimens': forms.SelectMultiple(attrs={'class': 'form-select'}),
-        }
-
-
-class TrialTestResultForm(forms.ModelForm):
-    """测试结果填写"""
-    class Meta:
-        model = TrialTestResult
-        fields = ['value', 'value_text', 'test_date', 'remark']
-        widgets = {
-            'value': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.001'}),
-            'value_text': forms.TextInput(attrs={'class': 'form-control'}),
-            'test_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-            'remark': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-
-
-class ColorPowderBOMForm(forms.ModelForm):
-    """色粉配比主表"""
-    class Meta:
-        model = ColorPowderBOM
-        fields = ['remark']
-        widgets = {
-            'remark': forms.Textarea(attrs={
-                'class': 'form-control', 'rows': 2,
-            }),
-        }
-
-
-class ColorPowderBOMEntryForm(forms.ModelForm):
-    """色粉配比明细"""
-    class Meta:
-        model = ColorPowderBOMEntry
-        fields = ['feeding_port', 'raw_material', 'percentage',
-                  'is_pre_mix', 'pre_mix_order', 'pre_mix_time',
-                  'weighing_scale']
-        widgets = {
-            'raw_material': forms.Select(attrs={
-                'class': 'form-select remote-search',
-                'data-model': 'raw_material',
-            }),
-            'percentage': forms.NumberInput(attrs={
-                'class': 'form-control', 'step': '0.001',
-            }),
-            'feeding_port': forms.Select(attrs={
-                'class': 'form-select form-select-search',
-            }),
-            'weighing_scale': forms.Select(attrs={
-                'class': 'form-select form-select-search',
-            }),
-            'is_pre_mix': forms.CheckboxInput(attrs={
-                'class': 'form-check-input',
-            }),
-            'pre_mix_order': forms.NumberInput(attrs={
-                'class': 'form-control',
-            }),
-            'pre_mix_time': forms.NumberInput(attrs={
-                'class': 'form-control',
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # 色粉场景下的默认值
-        self.fields['weighing_scale'].initial = 'D'
-        self.fields['is_pre_mix'].initial = True
-        # 限制 queryset 为已选中的项，避免渲染大量 option（配合 TomSelect remote-search）
-        if self.instance and self.instance.pk:
-            self.fields['raw_material'].queryset = RawMaterial.objects.filter(
-                pk=self.instance.raw_material_id
-            )
-            # POST 时：如果用户通过远程搜索改了原料，需把新值也纳入 queryset 以通过验证
-            if self.data:
-                raw_id = self.data.get(self.add_prefix('raw_material'))
-                if raw_id and str(raw_id) != str(self.instance.raw_material_id):
-                    self.fields['raw_material'].queryset = (
-                        self.fields['raw_material'].queryset | RawMaterial.objects.filter(pk=raw_id)
-                    )
-        elif self.data:
-            raw_id = self.data.get(self.add_prefix('raw_material'))
-            if raw_id:
-                self.fields['raw_material'].queryset = RawMaterial.objects.filter(pk=raw_id)
-            else:
-                self.fields['raw_material'].queryset = RawMaterial.objects.none()
-        else:
-            self.fields['raw_material'].queryset = RawMaterial.objects.none()
-
-
-ColorPowderBOMEntryFormSet = forms.inlineformset_factory(
-    ColorPowderBOM, ColorPowderBOMEntry,
-    form=ColorPowderBOMEntryForm,
-    extra=5, can_delete=True
-)
+class SapEntryFormForSpecimen(forms.Form):
+    """样条样品的 SAP 入库表单（样条不涉及 SAP 物料号，仅记录位置）"""
+    sap_storage_location = forms.CharField(
+        required=False, max_length=50, label="SAP库位",
+        widget=forms.TextInput(attrs={'class': 'form-control'}))

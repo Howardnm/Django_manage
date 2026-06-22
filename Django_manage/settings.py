@@ -60,6 +60,9 @@ INSTALLED_APPS = [
     'app_workflow.apps.AppWorkflowConfig',             # 工作流模块
     'app_form_management.apps.AppFormManagementConfig',  # 表单管理模块
     'app_trial_production.apps.AppTrialProductionConfig',  # 试验排产模块
+    'app_color_center.apps.AppColorCenterConfig',  # 配色中心
+    'app_material_testing.apps.AppMaterialTestingConfig',  # 材料测试中心
+    'app_mold_injection.apps.AppMoldInjectionConfig',  # 模具注塑中心
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
     'app_sap_services.apps.AppSapServicesConfig',     # SAP RFC 服务

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}编辑工单 - {{ order.code }}{% endblock %}
+{% block title %}编辑工单 - {{ object.code }}{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -9,8 +9,8 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_production_order_list' %}">工单列表</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'trial_production_order_detail' object.pk %}">{{ object.code }}</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">工单列表</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' object.pk %}">{{ object.code }}</a></li>
                         <li class="breadcrumb-item active">编辑</li>
                     </ol>
                 </nav>
@@ -32,27 +32,31 @@
                     {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                     {% endif %}
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">计划产量(kg)</label>
-                            {{ form.quantity_planned }}
+                    <div class="datagrid mb-3">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">实验单号</div>
+                            <div class="datagrid-content fw-bold">{{ object.trial_code }}</div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">实际产量(kg)</label>
-                            {{ form.quantity_actual }}
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">计划产量</div>
+                            <div class="datagrid-content">{{ object.quantity_planned }} kg</div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">工艺方案</label>
-                            {{ form.process_profile }}
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">工艺方案</div>
+                            <div class="datagrid-content">{{ object.process_profile.name|default:"-" }}</div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">挤出操作员</label>
-                            {{ form.extruder_operator }}
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">挤出操作员</div>
+                            <div class="datagrid-content">{{ object.extruder_operator.realname|default:"-" }}</div>
                         </div>
-                        <div class="col-12 mb-3">
-                            <label class="form-label">备注</label>
-                            {{ form.remark }}
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">状态</div>
+                            <div class="datagrid-content"><span class="badge {{ object.status_css_class }}">{{ object.status_label }}</span></div>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        {{ form.remark }}
                     </div>
                 </div>
             </div>
@@ -107,7 +111,7 @@
                     <button type="submit" class="btn btn-primary w-100">
                         <i class="ti ti-check me-1"></i>保存修改
                     </button>
-                    <a href="{% url 'trial_production_order_detail' object.pk %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
+                    <a href="{% url 'trial_order_detail' object.pk %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
                 </div>
             </div>
         </div>

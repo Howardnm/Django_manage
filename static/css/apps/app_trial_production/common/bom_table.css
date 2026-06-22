@@ -1,0 +1,33 @@
+/* BOM 配料表通用样式 */
+.bom-table th, .bom-table td {
+    padding: 4px 8px;
+    font-size: 13px;
+    vertical-align: middle;
+}
+.bom-table thead th {
+    text-align: center;
+}
+.bom-table .pct-cell {
+    text-align: right;
+}
+.bom-table .row-title {
+    width: 1%;
+    white-space: nowrap;
+}
+.qty-input {
+    width: 80px;
+}
+.test-masonry {
+    column-count: 3;
+    column-gap: 1rem;
+}
+.test-masonry .test-masonry-item {
+    break-inside: avoid;
+    margin-bottom: 1rem;
+}
+@media (max-width: 992px) {
+    .test-masonry { column-count: 2; }
+}
+@media (max-width: 576px) {
+    .test-masonry { column-count: 1; }
+}

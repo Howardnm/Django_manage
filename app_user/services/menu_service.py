@@ -70,7 +70,9 @@ class MenuService:
         if not user.is_authenticated:
             return []
 
-        current_url_name = request.resolver_match.url_name if request.resolver_match else ""
+        # 使用 view_name 而非 url_name，以支持命名空间 URL（如 color_center:list）
+        # url_name 对命名空间 URL 只返回短名（如 "list"），view_name 返回完整限定名
+        current_url_name = request.resolver_match.view_name if request.resolver_match else ""
 
         # 按照业务逻辑顺序组装模块（顺序决定侧边栏显示顺序）
         raw_modules = [
@@ -81,6 +83,9 @@ class MenuService:
             MenuModule.get_material(),
             MenuModule.get_formula(),
             MenuModule.get_trial_production(),
+            MenuModule.get_color_center(),
+            MenuModule.get_mold_injection(),
+            MenuModule.get_material_testing(),
             MenuModule.get_process(),
             MenuModule.get_raw_material(),
             MenuModule.get_form_management(),

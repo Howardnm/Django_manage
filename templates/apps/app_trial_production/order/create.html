@@ -1,55 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}创建生产工单{% endblock %}
 
 {% block extra_css %}
-<style>
-    .bom-table th, .bom-table td {
-        padding: 4px 8px;
-        font-size: 13px;
-        vertical-align: middle;
-    }
-    .bom-table thead th {
-        text-align: center;
-    }
-    .bom-table .pct-cell {
-        text-align: right;
-    }
-    .bom-table .row-title {
-        width: 1%;
-        white-space: nowrap;
-    }
-    .mold-matrix th, .mold-matrix td {
-        padding: 6px 10px;
-        vertical-align: middle;
-    }
-    .mold-matrix thead th {
-        text-align: center;
-    }
-    .mold-matrix .form-control,
-    .mold-matrix .form-select {
-        padding: 2px 6px;
-        font-size: 13px;
-        min-height: 30px;
-    }
-    .qty-input {
-        width: 80px;
-    }
-    .test-masonry {
-        column-count: 3;
-        column-gap: 1rem;
-    }
-    .test-masonry .test-masonry-item {
-        break-inside: avoid;
-        margin-bottom: 1rem;
-    }
-    @media (max-width: 992px) {
-        .test-masonry { column-count: 2; }
-    }
-    @media (max-width: 576px) {
-        .test-masonry { column-count: 1; }
-    }
-</style>
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/bom_table.css' %}">
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/mold_matrix.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -59,7 +15,7 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_production_order_list' %}">工单列表</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">工单列表</a></li>
                         <li class="breadcrumb-item active">创建工单</li>
                     </ol>
                 </nav>
@@ -427,113 +383,10 @@
     </tr>
 </script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const tbody = document.getElementById('mold-matrix-body');
-    const template = document.getElementById('mold-row-template').innerHTML;
-    const moldCountInput = document.getElementById('mold_count');
+{{ bom_data|json_script:"bom-data" }}
+{% endblock %}
 
-    function updateMoldCount() {
-        const rows = tbody.querySelectorAll('.mold-row');
-        moldCountInput.value = rows.length;
-        rows.forEach(function(row, idx) {
-            row.setAttribute('data-row', idx);
-            row.querySelectorAll('[name]').forEach(function(el) {
-                el.name = el.name.replace(/^(mold|qty)_\d+/, '$1_' + idx);
-            });
-        });
-    }
-
-    document.getElementById('add-mold-row').addEventListener('click', function () {
-        const count = tbody.querySelectorAll('.mold-row').length;
-        const newRow = template.replace(/__ROW_/g, count);
-        tbody.insertAdjacentHTML('beforeend', newRow);
-        updateMoldCount();
-    });
-
-    tbody.addEventListener('click', function (e) {
-        const btn = e.target.closest('.remove-mold-row');
-        if (!btn) return;
-        const row = btn.closest('.mold-row');
-        const rows = tbody.querySelectorAll('.mold-row');
-        if (rows.length <= 1) return;
-        row.remove();
-        updateMoldCount();
-    });
-
-    // ---- BOM 配料表动态计算 ----
-    const bomData = {{ bom_data_json|safe }};
-    const qtyInputs = document.querySelectorAll('.planned-qty');
-    const totalDisplay = document.getElementById('total-planned-qty');
-    const totalField = document.getElementById('id_quantity_planned');
-    const feedingTotalFoot = document.getElementById('feeding-total-foot');
-
-    function recalcFeeding() {
-        let grandTotal = 0;
-        const formulaQtys = {};
-
-        qtyInputs.forEach(function(input) {
-            const pk = input.getAttribute('data-formula-pk');
-            const qty = parseFloat(input.value) || 0;
-            formulaQtys[pk] = qty;
-            grandTotal += qty;
-        });
-
-        totalDisplay.textContent = grandTotal.toFixed(1);
-        totalField.value = grandTotal.toFixed(1);
-
-        // 计算每行每列的配料量
-        const formulaColumnTotals = {};
-        bomData.formulas.forEach(function(f) {
-            formulaColumnTotals[f.pk] = 0;
-        });
-        let grandFeedingTotal = 0;
-
-        document.querySelectorAll('.feeding-row').forEach(function(row) {
-            const rowIdx = parseInt(row.getAttribute('data-row'));
-            const rowData = bomData.rows[rowIdx];
-            let rowSum = 0;
-
-            // 每个配方版本的配料量
-            row.querySelectorAll('.feeding-qty-cell').forEach(function(cell) {
-                const formulaPk = cell.getAttribute('data-formula-pk');
-                const pct = parseFloat(rowData.percentages[formulaPk]) || 0;
-                const qty = formulaQtys[formulaPk] || 0;
-                const val = qty * pct / 100;
-                cell.textContent = val > 0 ? val.toFixed(3) : '-';
-                rowSum += val;
-                formulaColumnTotals[formulaPk] += val;
-            });
-
-            // 行合计
-            const rowTotalEl = row.querySelector('.feeding-row-total');
-            if (rowTotalEl) {
-                rowTotalEl.textContent = rowSum > 0 ? rowSum.toFixed(3) : '-';
-            }
-            grandFeedingTotal += rowSum;
-        });
-
-        // 列合计
-        bomData.formulas.forEach(function(f) {
-            const el = document.querySelector('.feeding-formula-total[data-formula-pk="' + f.pk + '"]');
-            if (el) {
-                el.textContent = formulaColumnTotals[f.pk] > 0 ? formulaColumnTotals[f.pk].toFixed(3) : '0';
-            }
-        });
-        document.getElementById('feeding-grand-total').textContent = grandFeedingTotal > 0 ? grandFeedingTotal.toFixed(3) : '0';
-
-        if (grandFeedingTotal > 0) {
-            feedingTotalFoot.style.display = '';
-        } else {
-            feedingTotalFoot.style.display = 'none';
-        }
-    }
-
-    qtyInputs.forEach(function(input) {
-        input.addEventListener('input', recalcFeeding);
-    });
-
-    recalcFeeding();
-});
-</script>
+{% block extra_js %}
+<script src="{% static 'js/apps/app_trial_production/common/mold_matrix.js' %}"></script>
+<script src="{% static 'js/apps/app_trial_production/order/create.js' %}"></script>
 {% endblock %}

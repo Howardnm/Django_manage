@@ -1,0 +1,19 @@
+/* 注塑模具矩阵通用样式 —— 供 injection/form.html 与 order/create.html 共用 */
+.mold-matrix th, .mold-matrix td {
+    padding: 6px 10px;
+    vertical-align: middle;
+    text-align: center;
+}
+.mold-matrix thead th {
+    text-align: center;
+}
+.mold-matrix .form-control,
+.mold-matrix .form-select {
+    padding: 2px 6px;
+    font-size: 13px;
+    min-height: 30px;
+}
+.qty-input {
+    width: 80px;
+    text-align: center;
+}

@@ -1,0 +1,29 @@
+/* ── testing/detail.html ── */
+.result-table th, .result-table td {
+    padding: 4px 8px;
+    font-size: 13px;
+    vertical-align: middle;
+}
+.result-table .test-info {
+    text-align: left;
+    width: 1%;
+    white-space: nowrap;
+}
+
+/* ── testing/fill_results.html ── */
+.result-input {
+    width: 100%;
+    min-width: 80px;
+}
+.matrix-table th, .matrix-table td {
+    padding: 6px 8px;
+    font-size: 13px;
+    vertical-align: middle;
+    text-align: center;
+}
+.matrix-table .test-info {
+    text-align: left;
+}
+.formula-col {
+    width: 120px;
+}

@@ -46,8 +46,10 @@ class ScrewCombination(models.Model):
         ordering = ['combination_code', '-created_at']
 
 
-# 2. 工艺参数包 (Process Profile)
-class ProcessProfile(models.Model):
+# 2. 挤出工艺参数抽象基类 — 由工艺app统一管理，ProcessProfile 和 ExtrusionTask 共享字段结构
+class AbstractExtrusionParams(models.Model):
+    """挤出工艺参数抽象基类 — 定义挤出生产中的全部可记录参数"""
+
     COOLING_CHOICES = [
         ('WATER_STRAND', '水冷拉条 (Water Strand)'),
         ('WATER_RING', '水环热切 (Water Ring)'),
@@ -56,15 +58,7 @@ class ProcessProfile(models.Model):
         ('AIR_FACE', '风冷热切 (Air Face)'),
     ]
 
-    name = models.CharField("工艺方案名称", max_length=100, help_text="如：PA66+30GF 标准挤出工艺")
-    process_type_name = models.CharField("工艺类型", max_length=50, default="双螺杆挤出", help_text="如：双螺杆挤出、其他")
-    material_types = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="process_profiles")
-    machine = models.ForeignKey(MachineModel, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="适用机台")
-
-    # 【新增】负责人关联
-    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="创建人", null=True, blank=True)
-
-    # --- A. 温度控制 ---
+    # ── A. 温度控制 (13 个区段) ──
     temp_zone_1 = models.IntegerField("一区温度 (℃)", default=0, help_text="下料口")
     temp_zone_2 = models.IntegerField("二区温度 (℃)", default=0)
     temp_zone_3 = models.IntegerField("三区温度 (℃)", default=0)
@@ -78,8 +72,8 @@ class ProcessProfile(models.Model):
     temp_zone_11 = models.IntegerField("十一区温度 (℃)", default=0)
     temp_zone_12 = models.IntegerField("十二区温度 (℃)", default=0)
     temp_head = models.IntegerField("机头温度 (℃)", default=0)
-    
-    # --- B. 主机运行参数 ---
+
+    # ── B. 主机运行参数 ──
     screw_speed = models.IntegerField("螺杆转速 (rpm)", default=0)
     torque = models.FloatField("主机扭矩 (%)", default=0, help_text="负载百分比")
     current = models.FloatField("主机电流 (A)", default=0, null=True, blank=True)
@@ -87,12 +81,12 @@ class ProcessProfile(models.Model):
     melt_temp = models.IntegerField("熔体实测温度 (℃)", default=0, help_text="手测或传感器读数")
     vacuum = models.FloatField("真空度 (MPa)", default=-0.08)
 
-    # --- C. 喂料系统 ---
+    # ── C. 喂料系统 ──
     main_feeder_speed = models.FloatField("主喂料转速 (rpm/Hz)", default=0)
     side_feeder_speed = models.FloatField("侧喂料转速 (rpm/Hz)", default=0, help_text="玻纤/填料")
     liquid_pump_speed = models.FloatField("液体泵注速度", default=0, null=True, blank=True)
-    
-    # --- D. 产能与后处理 ---
+
+    # ── D. 产能与后处理 ──
     throughput = models.FloatField("总产量 (kg/h)", default=0)
     cooling_method = models.CharField("切粒方式", max_length=20, choices=COOLING_CHOICES, default='WATER_STRAND')
     strand_count = models.IntegerField("料条根数", default=0, help_text="机头出料孔数")
@@ -100,9 +94,39 @@ class ProcessProfile(models.Model):
     water_bath_length = models.FloatField("过水长度 (m)", default=0, help_text="料条在水中的长度")
     air_knife_pressure = models.FloatField("风刀压力 (MPa)", default=0, null=True, blank=True, help_text="吹干风力")
     pelletizing_speed = models.FloatField("切粒机转速 (rpm/Hz)", default=0)
+    screen_mesh = models.CharField("过滤网目数", max_length=50, blank=True, help_text="如：80/100")
+
+    class Meta:
+        abstract = True
+
+    # ── 便捷字段列表（统一定义，避免子类重复维护）──
+    TEMP_FIELDS = [
+        'temp_zone_1', 'temp_zone_2', 'temp_zone_3', 'temp_zone_4',
+        'temp_zone_5', 'temp_zone_6', 'temp_zone_7', 'temp_zone_8',
+        'temp_zone_9', 'temp_zone_10', 'temp_zone_11', 'temp_zone_12',
+        'temp_head',
+    ]
+    PARAM_FIELDS = [
+        'screw_speed', 'torque', 'current', 'melt_pressure', 'melt_temp', 'vacuum',
+        'main_feeder_speed', 'side_feeder_speed', 'liquid_pump_speed',
+        'throughput', 'cooling_method', 'strand_count', 'water_temp',
+        'water_bath_length', 'air_knife_pressure', 'pelletizing_speed', 'screen_mesh',
+    ]
+    ALL_PARAM_FIELDS = TEMP_FIELDS + PARAM_FIELDS
+
+
+# 3. 工艺参数包 (Process Profile)
+class ProcessProfile(AbstractExtrusionParams):
+
+    name = models.CharField("工艺方案名称", max_length=100, help_text="如：PA66+30GF 标准挤出工艺")
+    process_type_name = models.CharField("工艺类型", max_length=50, default="双螺杆挤出", help_text="如：双螺杆挤出、其他")
+    material_types = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料类型", related_name="process_profiles")
+    machine = models.ForeignKey(MachineModel, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="适用机台")
+
+    # 【新增】负责人关联
+    creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="创建人", null=True, blank=True)
 
     # --- E. 其他 ---
-    screen_mesh = models.CharField("过滤网目数", max_length=50, blank=True, help_text="如：80/100")
     screw_combination = models.ForeignKey(ScrewCombination, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="螺杆组合")
     qc_check_points = models.TextField("QC检查/更换要点", blank=True, help_text="如：每2小时检查真空口是否堵塞，每班次更换过滤网")
     description = models.TextField("工艺备注", blank=True)

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+
+{% block title %}颗粒分拨 - {{ production_order.code }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">排产工单</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' production_order.pk %}">{{ production_order.code }}</a></li>
+                    <li class="breadcrumb-item active">颗粒分拨</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">挤出后颗粒分拨</h2>
+        <div class="text-muted">将挤出产出分拨为颗粒成品和待打样颗粒，分拨后自动入样品库。</div>
+    </div>
+</div>
+
+<div class="container-xl">
+    <form method="post">
+        {% csrf_token %}
+        {{ formset.management_form }}
+        <div class="row row-cards">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">分拨明细</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table card-table table-vcenter">
+                                <thead>
+                                    <tr>
+                                        <th>配方版本</th>
+                                        <th>类型</th>
+                                        <th>数量(kg)</th>
+                                        <th>包装说明</th>
+                                        <th>存放位置</th>
+                                        <th>删除</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for form in formset %}
+                                    <tr>
+                                        <td>{{ form.formula }}</td>
+                                        <td>{{ form.sub_type }}</td>
+                                        <td>{{ form.quantity }}</td>
+                                        <td>{{ form.packaging_desc }}</td>
+                                        <td>{{ form.storage_location }}</td>
+                                        <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">工单信息</h3></div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">实验单号</div>
+                                <div class="datagrid-content fw-bold">{{ production_order.trial_code }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">实际产量</div>
+                                <div class="datagrid-content">{{ production_order.quantity_actual|default:"-" }} kg</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-body d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-check me-1"></i> 提交分拨
+                        </button>
+                        <a href="{% url 'trial_order_detail' production_order.pk %}" class="btn btn-outline-secondary">返回工单</a>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-body text-muted small">
+                        <i class="ti ti-info-circle me-1"></i>
+                        <strong>颗粒成品</strong>：满足交付标准，可直接SAP入库。<br>
+                        <strong>待打样颗粒</strong>：供注塑任务取样使用。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}排产工作台{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/extrusion_board.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                        <li class="breadcrumb-item active">排产工作台</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">排产工作台</h2>
+        </div>
+    </div>
+</div>
+
+{# 统计卡片 #}
+<div class="row row-cards mt-2 mb-4">
+    <div class="col-sm-6 col-lg-4">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-yellow text-white avatar">
+                            <i class="ti ti-inbox"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">待排产</div>
+                        <div class="h2 mb-0">{{ pending_orders|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-blue text-white avatar">
+                            <i class="ti ti-calendar-check"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">已排期</div>
+                        <div class="h2 mb-0">{{ scheduled_orders|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-sm-6 col-lg-4">
+        <div class="card card-sm">
+            <div class="card-body">
+                <div class="row align-items-center">
+                    <div class="col-auto">
+                        <span class="bg-azure text-white avatar">
+                            <i class="ti ti-player-play"></i>
+                        </span>
+                    </div>
+                    <div class="col">
+                        <div class="font-weight-medium">生产中</div>
+                        <div class="h2 mb-0">{{ in_progress_orders|length }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+    {% csrf_token %}
+
+    {# ========== 待排产工单 ========== #}
+    <div class="card mb-4">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
+            </h3>
+            <span class="text-muted small ms-auto">
+                <i class="ti ti-grip-vertical me-1"></i>可拖拽工单至日历 / 选择时间点击"领取"排期
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover table-vcenter card-table mb-0">
+                <thead>
+                    <tr>
+                        <th>工单号</th>
+                        <th>实验单号</th>
+                        <th>关联项目</th>
+                        <th>配方版本</th>
+                        <th class="text-end">计划产量</th>
+                        <th>工艺方案</th>
+                        <th>创建时间</th>
+                        <th style="width:280px;">排期操作</th>
+                    </tr>
+                </thead>
+                <tbody id="pending-pool">
+                    <tr id="pending-loading">
+                        <td colspan="8" class="text-center text-muted py-4">
+                            <span class="spinner-border spinner-border-sm me-2"></span>加载中...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {# ========== 排产日历 ========== #}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-calendar me-2 text-blue"></i>排产日历
+            </h3>
+        </div>
+        <div class="card-body p-2">
+            <div id="extrusion-calendar"></div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    window.SCHEDULE_URL = "{% url 'trial_extrusion_schedule' %}";
+    window.EVENTS_URL = "{% url 'trial_extrusion_board_events' %}";
+    window.PENDING_URL = "{% url 'trial_extrusion_board_pending' %}";
+    window.DEFAULT_SCHEDULE_TIME = "{{ default_schedule_time }}";
+    window.UNSCHEDULE_URL_PREFIX = "/trial-production/extrusion-board/";
+    window.UNSCHEDULE_URL_SUFFIX = "/unschedule/";
+    window.CSRF_TOKEN = "{{ csrf_token }}";
+</script>
+<script src="{% static 'fullcalendar-6.1.21/package/index.global.min.js' %}"></script>
+<script src="{% static 'fullcalendar-6.1.21/package/zh-cn.global.min.js' %}"></script>
+<script src="{% static 'js/apps/app_trial_production/extrusion/board.js' %}"></script>
+{% endblock %}

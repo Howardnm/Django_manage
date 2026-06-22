@@ -207,7 +207,7 @@
                             <a href="{% url 'formula_detail' selected_formula.pk %}" class="btn btn-outline-primary btn-sm" target="_blank">
                                 <i class="ti ti-external-link me-1"></i> 打开详情
                             </a>
-                            <form method="post" action="{% url 'trial_production_order_initiate' %}" class="d-inline">
+                            <form method="post" action="{% url 'trial_order_initiate' %}" class="d-inline">
                                 {% csrf_token %}
                                 <input type="hidden" name="trial_code" value="{{ selected_formula.code }}">
                                 <input type="hidden" name="project_id" value="{{ project.pk }}">

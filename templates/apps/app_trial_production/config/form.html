@@ -6,7 +6,14 @@
 <div class="page-header d-print-none">
     <div class="row align-items-center">
         <div class="col">
-            <div class="page-pretitle">试验排产中心</div>
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                        <li class="breadcrumb-item active">排产配置</li>
+                    </ol>
+                </nav>
+            </div>
             <h2 class="page-title">排产流程审核配置</h2>
         </div>
     </div>

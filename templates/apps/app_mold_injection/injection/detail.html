@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}注塑任务 #{{ injection_task.pk }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row g-2 align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'mold_injection:task_list' %}">注塑任务</a></li>
+                        <li class="breadcrumb-item active">#{{ injection_task.pk }}</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">
+                注塑任务 #{{ injection_task.pk }}
+                <span class="badge {{ injection_task.status_css_class }} ms-2">{{ injection_task.get_status_display }}</span>
+            </h2>
+        </div>
+        <div class="col-auto ms-auto">
+            <div class="btn-list">
+                {% if show_start_btn %}
+                <form method="post" action="{% url 'mold_injection:task_start' pk=injection_task.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">
+                        <i class="ti ti-player-play me-1"></i>开始注塑
+                    </button>
+                </form>
+                {% endif %}
+                {% if show_complete_btn %}
+                <a href="{% url 'mold_injection:task_complete' pk=injection_task.pk %}" class="btn btn-success">
+                    <i class="ti ti-check me-1"></i>完成注塑
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-3">
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">基本信息</h3>
+            </div>
+            <div class="card-body">
+                <div class="datagrid">
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">来源渠道</div>
+                        <div class="datagrid-content">
+                            <span class="badge bg-{{ source_css_class }}-lt">{{ injection_task.get_source_display }}</span>
+                        </div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">关联排产单</div>
+                        <div class="datagrid-content">
+                            {% if injection_task.production_order %}
+                            <a href="{% url 'trial_order_detail' injection_task.production_order.pk %}">{{ injection_task.production_order.code }}</a>
+                            {% else %}
+                            <span class="text-muted">独立注塑</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if injection_task.sample_inventory %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">物料来源(样品库)</div>
+                        <div class="datagrid-content">
+                            <a href="{% url 'trial_sample_detail' injection_task.sample_inventory.pk %}">
+                                {{ injection_task.sample_inventory.trial_code }} - {{ injection_task.sample_inventory.quantity }}kg
+                            </a>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% if injection_task.source_project %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">关联项目(渠道B)</div>
+                        <div class="datagrid-content">{{ injection_task.source_project.name }}</div>
+                    </div>
+                    {% endif %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">操作员</div>
+                        <div class="datagrid-content">{{ injection_task.operator.realname|default:"-" }}</div>
+                    </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">创建时间</div>
+                        <div class="datagrid-content">{{ injection_task.created_at|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    {% if injection_task.started_at %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">开始时间</div>
+                        <div class="datagrid-content">{{ injection_task.started_at|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    {% endif %}
+                    {% if injection_task.completed_at %}
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">完成时间</div>
+                        <div class="datagrid-content">{{ injection_task.completed_at|date:"Y-m-d H:i" }}</div>
+                    </div>
+                    {% endif %}
+                </div>
+                {% if injection_task.injection_params_note %}
+                <div class="mt-3">
+                    <div class="text-muted small">注塑工艺备注</div>
+                    <div>{{ injection_task.injection_params_note|linebreaks }}</div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">模具需求</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>模具</th>
+                            <th>对应配方</th>
+                            <th>标准</th>
+                            <th>穴数</th>
+                            <th>计划数量</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for req in injection_task.mold_requirements.all %}
+                        <tr>
+                            <td>{{ req.mold.name }} <span class="text-muted">[{{ req.mold.mold_code }}] x{{ req.mold.cavity_count }}穴 {{ req.mold.standard }}</span></td>
+                            <td>
+                                {% if req.formula %}
+                                <span class="badge bg-azure-lt">v{{ req.formula.version }}</span> {{ req.formula.name|truncatechars:20 }}
+                                {% else %}
+                                <span class="text-muted">通用</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ req.mold.standard }}</td>
+                            <td>{{ req.mold.cavity_count }}</td>
+                            <td class="fw-bold">{{ req.specimen_quantity }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="5" class="text-center py-3 text-muted">暂无模具需求</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        {% if has_output_specimens %}
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">样条产出</h3>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter">
+                    <thead>
+                        <tr>
+                            <th>模具</th>
+                            <th>样条数量</th>
+                            <th>合格数量</th>
+                            <th>状态</th>
+                            <th>位置/批次</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sp in injection_task.output_specimens.all %}
+                        <tr>
+                            <td>{{ sp.mold.name|default:"-" }}</td>
+                            <td>{{ sp.specimen_count|default:"-" }}</td>
+                            <td class="fw-bold">{{ sp.specimen_qualified|default:"-" }}</td>
+                            <td><span class="badge {{ sp.status_css_class }}">{{ sp.get_status_display }}</span></td>
+                            <td>{{ sp.storage_location|default:"-" }} / {{ sp.batch_label|default:"-" }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

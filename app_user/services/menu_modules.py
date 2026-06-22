@@ -52,10 +52,10 @@
      {"name": "项目列表", "url_name": "project_list"}
 
   2. 限制特定角色（L1）:
-     {"name": "排产总览", "url_name": "trial_production_dashboard", "visible_to": IdentityConfig.RND_ONLY}
+     {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY}
 
   3. 自定义角色并集（L1）:
-     {"name": "配色任务", "url_name": "trial_color_matching_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP]}
+     {"name": "配色任务", "url_name": "trial_color_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP]}
 
   4. 等级门槛（L2）:
      {"name": "项目评分规则", "url_name": "project_score_rule_list", "min_level": 15}
@@ -292,37 +292,64 @@ class MenuModule:
 
     @staticmethod
     def get_trial_production():
-        """返回试验排产中心菜单定义。
+        """返回试验排产中心菜单定义（精简版：仅保留挤出核心功能）。
 
-        模块级: TECH_CORE + 四位操作员 + 采购（对齐 TrialProductionAccessMixin 并集）
-              Sales 在模块级排除（无排产业务职能）。
-        子项: 差异最大——排产总览/配置限 RND，
-              配色/注塑/测试任务限 TECH_CORE + 对应操作员，
-              挤出/样品/模具继承模块级权限。
+        模块级: TECH_CORE + 挤出操作员 + 采购。
+        配色/注塑/测试已拆分至独立菜单模块。
         """
         return {
             "name": "试验排产中心",
             "icon": "ti-building-factory",
             "visible_to": IdentityConfig.TECH_CORE + [
-                IdentityConfig.R_EXTRUSION_OP, IdentityConfig.R_COLOR_OP,
-                IdentityConfig.R_INJECTION_OP, IdentityConfig.R_TESTING_OP,
-                IdentityConfig.R_PURCHASING,
+                IdentityConfig.R_EXTRUSION_OP, IdentityConfig.R_PURCHASING,
             ],
-            "url_name": "trial_production_dashboard",
+            "url_name": "trial_dashboard",
             "sub_items": [
-                # 对齐 DashboardAccessMixin.identity_required
-                {"name": "排产总览", "url_name": "trial_production_dashboard", "visible_to": IdentityConfig.RND_ONLY},
-                {"name": "挤出任务", "url_name": "trial_production_order_list"},
-                # 对齐 ColorTaskAccessMixin
-                {"name": "配色任务", "url_name": "trial_color_matching_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP]},
-                # 对齐 InjectionTaskAccessMixin
-                {"name": "注塑任务", "url_name": "trial_injection_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_INJECTION_OP]},
-                # 对齐 TestingTaskAccessMixin
-                {"name": "测试任务", "url_name": "trial_testing_list", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_TESTING_OP]},
-                {"name": "样品库存", "url_name": "trial_sample_inventory"},
-                {"name": "模具台账", "url_name": "trial_mold_type_list"},
-                # 对齐 TrialConfigView（L1 RND_ONLY + L3 配置编辑权限）
-                {"name": "排产配置", "url_name": "trial_production_config", "visible_to": IdentityConfig.RND_ONLY, "permissions": ["app_trial_production.change_trialproductionconfig"]},
+                {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY},
+                {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_EXTRUSION_OP]},
+                {"name": "挤出任务", "url_name": "trial_order_list"},
+                {"name": "样品库存", "url_name": "trial_sample_list"},
+                {"name": "排产配置", "url_name": "trial_config", "visible_to": IdentityConfig.RND_ONLY, "permissions": ["app_trial_production.change_trialproductionconfig"]},
+            ]
+        }
+
+    @staticmethod
+    def get_color_center():
+        """配色中心菜单"""
+        return {
+            "name": "配色中心",
+            "icon": "ti-palette",
+            "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP],
+            "url_name": "color_center:list",
+            "sub_items": [
+                {"name": "配色任务", "url_name": "color_center:list"},
+            ]
+        }
+
+    @staticmethod
+    def get_mold_injection():
+        """模具注塑中心菜单"""
+        return {
+            "name": "模具注塑中心",
+            "icon": "ti-template",
+            "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_INJECTION_OP],
+            "url_name": "mold_injection:task_list",
+            "sub_items": [
+                {"name": "注塑任务", "url_name": "mold_injection:task_list"},
+                {"name": "模具台账", "url_name": "mold_injection:mold_list"},
+            ]
+        }
+
+    @staticmethod
+    def get_material_testing():
+        """材料测试中心菜单"""
+        return {
+            "name": "材料测试中心",
+            "icon": "ti-test-pipe",
+            "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_TESTING_OP],
+            "url_name": "material_testing:list",
+            "sub_items": [
+                {"name": "测试任务", "url_name": "material_testing:list"},
             ]
         }
 

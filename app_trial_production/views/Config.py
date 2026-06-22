@@ -1,5 +1,4 @@
 from django.views.generic import UpdateView
-from django.shortcuts import redirect
 from django.contrib import messages
 from django.urls import reverse
 from app_trial_production.mixins import TrialProductionAccessMixin
@@ -8,6 +7,7 @@ from app_user.mixins import IdentityConfig
 
 
 class TrialConfigView(TrialProductionAccessMixin, UpdateView):
+    """排产全局配置视图"""
     model = TrialProductionConfig
     fields = ['workflow_definition']
     template_name = 'apps/app_trial_production/config/form.html'
@@ -15,7 +15,6 @@ class TrialConfigView(TrialProductionAccessMixin, UpdateView):
     permission_required = 'app_trial_production.change_trialproductionconfig'
 
     def get_object(self, queryset=None):
-        """全局配置单例，不使用 get_object_or_deny / get_object_or_404"""
         return TrialProductionConfig.get()
 
     def form_valid(self, form):
@@ -23,4 +22,4 @@ class TrialConfigView(TrialProductionAccessMixin, UpdateView):
         return super().form_valid(form)
 
     def get_success_url(self):
-        return reverse('trial_production_config')
+        return reverse('trial_config')

@@ -134,8 +134,8 @@ class FakeContext:
     # === 试生产（新增） ===
     production_orders: list = field(default_factory=list)     # ProductionOrder
     mold_types: list = field(default_factory=list)            # MoldType
-    injection_orders: list = field(default_factory=list)      # InjectionMoldingOrder
-    testing_orders: list = field(default_factory=list)        # TestingOrder
+    injection_orders: list = field(default_factory=list)      # InjectionTask
+    testing_orders: list = field(default_factory=list)        # TestingTask
 
     @classmethod
     def load_seed_data(cls):
@@ -191,8 +191,8 @@ def print_summary(ctx: FakeContext) -> None:
     from app_catalog.models.member import CatalogMember
     from app_notification.models import Notification
     from app_trial_production.models import (
-        ProductionOrder, MoldType, ExtrusionRecord, SampleSplit,
-        InjectionMoldingOrder, SpecimenInventory, TestingOrder, TrialTestResult,
+        ProductionOrder, MoldType, ExtrusionTask, ColorMatchingTask,
+        InjectionTask, TestingTask, TrialTestResult, SampleInventory,
     )
 
     User = get_user_model()
@@ -221,11 +221,11 @@ def print_summary(ctx: FakeContext) -> None:
         ("FormulaTestResult", FormulaTestResult.objects.count()),
         ("MoldType", MoldType.objects.count()),
         ("ProductionOrder", ProductionOrder.objects.count()),
-        ("ExtrusionRecord", ExtrusionRecord.objects.count()),
-        ("SampleSplit", SampleSplit.objects.count()),
-        ("InjectionMoldingOrder", InjectionMoldingOrder.objects.count()),
-        ("SpecimenInventory", SpecimenInventory.objects.count()),
-        ("TestingOrder", TestingOrder.objects.count()),
+        ("ExtrusionTask", ExtrusionTask.objects.count()),
+        ("ColorMatchingTask", ColorMatchingTask.objects.count()),
+        ("InjectionTask", InjectionTask.objects.count()),
+        ("SampleInventory", SampleInventory.objects.count()),
+        ("TestingTask", TestingTask.objects.count()),
         ("TrialTestResult", TrialTestResult.objects.count()),
         ("FormTemplate", FormTemplate.objects.count()),
         ("FormSubmission", FormSubmission.objects.count()),

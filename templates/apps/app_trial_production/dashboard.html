@@ -6,7 +6,13 @@
 <div class="page-header d-print-none">
     <div class="row align-items-center">
         <div class="col">
-            <div class="page-pretitle">试验排产</div>
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item active">试验排产</li>
+                    </ol>
+                </nav>
+            </div>
             <h2 class="page-title">排产总览</h2>
         </div>
     </div>
@@ -130,7 +136,7 @@
                             {% endfor %}
                         </select>
                         {% if status_filter %}
-                        <a href="{% url 'trial_production_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{% url 'trial_dashboard' %}" class="btn btn-sm btn-outline-secondary">
                             <i class="ti ti-x"></i> 清除
                         </a>
                         {% endif %}
@@ -160,13 +166,13 @@
                             <td>{{ order.trial_code|default:"-" }}</td>
                             <td>{{ order.project.name|default:"-" }}</td>
                             <td>{{ order.process_profile.name|default:"-" }}</td>
-                            <td>{{ order.formula_details.count }}</td>
+                            <td>{{ order.formula_count }}</td>
                             <td>{{ order.quantity_planned }}</td>
                             <td><span class="badge {{ order.status_css_class }}">{{ order.get_status_display }}</span></td>
                             <td>{{ order.creator.realname|default:order.creator.username }}</td>
                             <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
                             <td>
-                                <a href="{% url 'trial_production_order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                                <a href="{% url 'trial_order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
                             </td>
                         </tr>
                         {% empty %}

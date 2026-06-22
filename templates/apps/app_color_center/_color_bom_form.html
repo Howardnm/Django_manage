@@ -1,0 +1,106 @@
+<form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="formula_id" value="{{ selected_formula.pk }}">
+    <div class="card mb-3">
+        <div class="card-header bg-orange-lt">
+            <h3 class="card-title text-orange mb-0">
+                <i class="ti ti-palette me-2"></i>色粉配比BOM
+            </h3>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
+                <thead>
+                <tr>
+                    <th scope="col" style="width: 100px;">喂料口</th>
+                    <th scope="col" style="width: 100px;">原材料类型</th>
+                    <th scope="col" style="width: 200px;">颜料/色粉</th>
+                    <th scope="col" style="width: 110px;">比例(份) <span class="fw-bold small">kg/100kg</span></th>
+                    <th scope="col" style="width: 60px;">共混</th>
+                    <th scope="col" style="width: 70px;">共混顺序</th>
+                    <th scope="col" style="width: 80px;">共混时间(s)</th>
+                    <th scope="col" style="width: 70px;">分秤</th>
+                    <th scope="col" style="width: 50px;">删除</th>
+                </tr>
+                </thead>
+                <tbody id="entries-formset">
+                    {{ entry_formset.management_form }}
+                    {% for entry_form in entry_formset %}
+                    <tr>
+                        {{ entry_form.id }}
+                        <td>{{ entry_form.feeding_port }}</td>
+                        <td>
+                            {% if entry_form.instance.raw_material_id %}
+                                <span class="badge bg-blue-lt">{{ entry_form.instance.raw_material.category.name }}</span>
+                            {% else %}
+                                <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ entry_form.raw_material }}
+                            {% if entry_form.raw_material.errors %}
+                            <div class="invalid-feedback d-block">{{ entry_form.raw_material.errors.0 }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {{ entry_form.percentage }}
+                            {% if entry_form.percentage.errors %}
+                            <div class="invalid-feedback d-block">{{ entry_form.percentage.errors.0 }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ entry_form.is_pre_mix }}</td>
+                        <td>{{ entry_form.pre_mix_order }}</td>
+                        <td>{{ entry_form.pre_mix_time }}</td>
+                        <td>{{ entry_form.weighing_scale }}</td>
+                        <td>
+                            {% if entry_formset.can_delete %}
+                            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon delete-row-btn" title="删除此行" aria-label="删除此行">
+                                <i class="ti ti-trash"></i>
+                            </button>
+                            <div style="display:none;">{{ entry_form.DELETE }}</div>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer">
+            <button type="button" class="btn btn-ghost-orange" id="add-entry-row">
+                <i class="ti ti-plus me-1"></i>新增一行
+            </button>
+        </div>
+    </div>
+    <div class="card mb-3">
+        <div class="card-header"><h3 class="card-title">备注</h3></div>
+        <div class="card-body">{{ bom_form.remark }}</div>
+    </div>
+    <div class="card mb-3">
+        <div class="card-body">
+            <button type="submit" class="btn btn-primary w-100">
+                <i class="ti ti-check me-1"></i>保存色粉BOM
+            </button>
+        </div>
+    </div>
+</form>
+
+<script type="text/template" id="entries-empty-form">
+    <tr>
+        {{ entry_formset.empty_form.id }}
+        <td>{{ entry_formset.empty_form.feeding_port }}</td>
+        <td><span class="text-muted">-</span></td>
+        <td>{{ entry_formset.empty_form.raw_material }}</td>
+        <td>{{ entry_formset.empty_form.percentage }}</td>
+        <td>{{ entry_formset.empty_form.is_pre_mix }}</td>
+        <td>{{ entry_formset.empty_form.pre_mix_order }}</td>
+        <td>{{ entry_formset.empty_form.pre_mix_time }}</td>
+        <td>{{ entry_formset.empty_form.weighing_scale }}</td>
+        <td>
+            {% if entry_formset.can_delete %}
+            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon delete-row-btn" title="删除此行" aria-label="删除此行">
+                <i class="ti ti-trash"></i>
+            </button>
+            <div style="display:none;">{{ entry_formset.empty_form.DELETE }}</div>
+            {% endif %}
+        </td>
+    </tr>
+</script>

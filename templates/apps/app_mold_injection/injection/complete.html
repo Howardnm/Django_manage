@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}完成注塑 - #{{ injection_task.pk }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'mold_injection:task_list' %}">注塑任务</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'mold_injection:task_detail' injection_task.pk %}">#{{ injection_task.pk }}</a></li>
+                        <li class="breadcrumb-item active">完成注塑</li>
+                    </ol>
+                </nav>
+            </div>
+            <h2 class="page-title">完成注塑生产</h2>
+        </div>
+    </div>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+    <div class="row row-cards mt-3">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header bg-green-lt">
+                    <h3 class="card-title text-green"><i class="ti ti-clipboard-check me-2"></i>样条产出记录</h3>
+                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" id="add-specimen-row">
+                        <i class="ti ti-plus"></i> 添加样条
+                    </button>
+                </div>
+                <div class="card-body">
+                    <div id="specimen-rows">
+                        {# JS 动态添加 #}
+                    </div>
+                    <input type="hidden" name="specimen_count" id="specimen_count" value="0">
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">备注</h3>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        {{ form.remark }}
+                    </div>
+                </div>
+            </div>
+            <div class="card mt-3">
+                <div class="card-body">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-check me-1"></i>完成注塑
+                    </button>
+                    <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-link link-secondary w-100 mt-2">取消</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</form>
+
+{# 样条行模板 #}
+<script type="text/template" id="specimen-row-template">
+  <div class="row g-2 mb-2 specimen-row align-items-end">
+    <div class="col-md-3">
+      <label class="form-label">模具</label>
+      <select name="specimen_mold_{IDX}" class="form-select">
+        {% for req in injection_task.mold_requirements.all %}
+        <option value="{{ req.mold.pk }}">{{ req.mold.name }} [{{ req.mold.mold_code }}]</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">产出数量</label>
+      <input type="number" name="specimen_qty_{IDX}" class="form-control" value="0" min="0">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">合格数量</label>
+      <input type="number" name="specimen_qualified_{IDX}" class="form-control" value="0" min="0">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">存放位置</label>
+      <input type="text" name="specimen_location_{IDX}" class="form-control" placeholder="样条柜-">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label">批次标签</label>
+      <input type="text" name="specimen_batch_{IDX}" class="form-control">
+    </div>
+    <div class="col-md-1">
+      <button type="button" class="btn btn-outline-danger btn-sm remove-specimen-row">
+        <i class="ti ti-trash"></i>
+      </button>
+    </div>
+  </div>
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apps/app_trial_production/injection/complete.js' %}"></script>
+{% endblock %}

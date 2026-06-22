@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+
+{% block title %}SAP入库 - {{ sample }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">样品库存</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_detail' sample.pk %}">{{ sample }}</a></li>
+                    <li class="breadcrumb-item active">SAP入库</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">SAP 入库操作</h2>
+    </div>
+</div>
+
+<div class="container-xl">
+    <form method="post">
+        {% csrf_token %}
+        <div class="row row-cards">
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">样品信息</h3></div>
+                    <div class="card-body">
+                        <div class="datagrid">
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">样品类型</div>
+                                <div class="datagrid-content">{{ sample.get_type_display }} - {{ sample.get_sub_type_display }}</div>
+                            </div>
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">实验单号</div>
+                                <div class="datagrid-content">{{ sample.trial_code }}</div>
+                            </div>
+                            {% if sample.is_pellet %}
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">数量(kg)</div>
+                                <div class="datagrid-content fw-bold">{{ sample.quantity }}</div>
+                            </div>
+                            {% endif %}
+                            {% if sample.is_specimen %}
+                            <div class="datagrid-item">
+                                <div class="datagrid-title">样条数量</div>
+                                <div class="datagrid-content fw-bold">{{ sample.specimen_count }}</div>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mt-3">
+                    <div class="card-header"><h3 class="card-title">SAP 入库信息</h3></div>
+                    <div class="card-body">
+                        {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<small class="form-hint">{{ field.help_text }}</small>{% endif %}
+                            {% for error in field.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-body d-grid gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-package me-1"></i> 确认入库
+                        </button>
+                        <a href="{% url 'trial_sample_detail' sample.pk %}" class="btn btn-outline-secondary">取消</a>
+                    </div>
+                </div>
+                <div class="card mt-3">
+                    <div class="card-body text-muted small">
+                        <i class="ti ti-info-circle me-1"></i>
+                        SAP入库后，样品状态将变更为"已入SAP仓库"，表示样品已流出实验房。
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

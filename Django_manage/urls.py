@@ -37,6 +37,15 @@ urlpatterns = [
     # 试验排产模块
     path('trial-production/', include('app_trial_production.urls')),
 
+    # 配色中心
+    path('color-center/', include('app_color_center.urls')),
+
+    # 材料测试中心
+    path('material-testing/', include('app_material_testing.urls')),
+
+    # 模具注塑中心
+    path('mold-injection/', include('app_mold_injection.urls')),
+
     # MCP Server 接口
     path('mcp/', include('app_mcp_server.urls')),
 

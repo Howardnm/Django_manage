@@ -1,14 +1,22 @@
 {% extends "base.html" %}
 {% load project_extras %}
 
-{% block title %}生产工单列表{% endblock %}
+{% block title %}挤出任务{% endblock %}
 
 {% block content %}
+<div class="page-pretitle">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">试制管理</a></li>
+            <li class="breadcrumb-item active">挤出任务</li>
+        </ol>
+    </nav>
+</div>
 <div class="page-header d-print-none">
     <div class="row align-items-center">
         <div class="col">
-            <h2 class="page-title">生产工单列表</h2>
-            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
+            <h2 class="page-title">挤出任务</h2>
+            <div class="text-muted mt-1">生产中的工单，共 {{ page_obj.paginator.count }} 条</div>
         </div>
     </div>
 </div>
@@ -38,7 +46,7 @@
                     <td>{{ order.trial_code|default:"-" }}</td>
                     <td>{{ order.project.name|default:"-" }}</td>
                     <td>{{ order.process_profile.name|default:"-" }}</td>
-                    <td>{{ order.formula_details.count }}</td>
+                    <td>{{ order.formula_count }}</td>
                     <td>{{ order.quantity_planned }}</td>
                     <td>
                         {% for fd in order.formula_details.all %}
@@ -53,7 +61,7 @@
                     <td>{{ order.creator.realname|default:order.creator.username }}</td>
                     <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
                     <td>
-                        <a href="{% url 'trial_production_order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
+                        <a href="{% url 'trial_order_detail' order.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
                     </td>
                 </tr>
                 {% empty %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}配色任务 — {{ production_order.code }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="page-pretitle">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">排产工单</a></li>
+          <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' production_order.pk %}">{{ production_order.code }}</a></li>
+          <li class="breadcrumb-item active">配色任务</li>
+        </ol>
+      </nav>
+    </div>
+    <h2 class="page-title">
+      配色任务
+      {% if color_task %}
+      <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
+      {% endif %}
+    </h2>
+  </div>
+</div>
+
+<div class="container-xl">
+  <div class="row row-cards">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">任务信息</h3></div>
+        <div class="card-body">
+          {% if color_task %}
+          <div class="datagrid">
+            <div class="datagrid-item">
+              <div class="datagrid-title">状态</div>
+              <div class="datagrid-content">
+                <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
+              </div>
+            </div>
+            <div class="datagrid-item">
+              <div class="datagrid-title">操作员</div>
+              <div class="datagrid-content">{{ color_task.operator|default:"未分配" }}</div>
+            </div>
+            {% if color_task.started_at %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">开始时间</div>
+              <div class="datagrid-content">{{ color_task.started_at }}</div>
+            </div>
+            {% endif %}
+            {% if color_task.completed_at %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">完成时间</div>
+              <div class="datagrid-content">{{ color_task.completed_at }}</div>
+            </div>
+            {% endif %}
+          </div>
+          {% else %}
+          <p class="text-muted">无需配色</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      {% if color_task and color_task.status == 'PENDING' %}
+      <div class="card">
+        <div class="card-body d-grid gap-2">
+          <form method="post" action="{% url 'color_center:start' order_pk=production_order.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-primary w-100">
+              <i class="ti ti-player-play"></i> 开始配色
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if color_task and color_task.status == 'IN_PROGRESS' %}
+      <div class="card">
+        <div class="card-body d-grid gap-2">
+          <a href="{% url 'color_center:fill' order_pk=production_order.pk %}" class="btn btn-azure">
+            <i class="ti ti-pencil"></i> 填写色粉BOM
+          </a>
+          <form method="post" action="{% url 'color_center:complete' order_pk=production_order.pk %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-success w-100">
+              <i class="ti ti-check"></i> 完成配色
+            </button>
+          </form>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if color_task and color_task.remark %}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">备注</h3></div>
+        <div class="card-body">{{ color_task.remark }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

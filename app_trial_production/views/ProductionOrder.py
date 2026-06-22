@@ -1,20 +1,24 @@
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, View
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
-from django.urls import reverse
 from django.core.exceptions import PermissionDenied
+from django.db.models import Count
+import logging
 from app_trial_production.mixins import (
     TrialProductionAccessMixin, ExtrusionTaskAccessMixin, RndAccessMixin,
 )
-from app_user.models import User
-from app_user.mixins import IdentityConfig
-from app_trial_production.models import ProductionOrder, MoldRequirement, InjectionMoldingOrder, MoldType, ProductionOrderFormulaDetail
+from app_trial_production.models import ProductionOrder
+from app_mold_injection.models import MoldType
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm,
 )
+from app_trial_production.services import ProductionOrderService
+
+logger = logging.getLogger(__name__)
 
 
 class ProductionOrderListView(TrialProductionAccessMixin, ListView):
+    """挤出任务列表 — 仅显示生产中的工单"""
     model = ProductionOrder
     template_name = 'apps/app_trial_production/order/list.html'
     context_object_name = 'orders'
@@ -24,19 +28,25 @@ class ProductionOrderListView(TrialProductionAccessMixin, ListView):
         qs = super().get_queryset()
         if qs is None:
             return self.model.objects.all()
-        return qs.exclude(
-            status__in=ProductionOrder.HIDDEN_STATUSES,
+        return qs.filter(
+            status='EXTRUDING',
         ).select_related(
             'project', 'creator', 'process_profile',
         ).prefetch_related(
             'formula_details__formula',
+        ).annotate(
+            formula_count=Count('formula_details'),
         ).order_by('-created_at')
 
 
 class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
+    """排产工单详情"""
     model = ProductionOrder
     template_name = 'apps/app_trial_production/order/detail.html'
     context_object_name = 'order'
+
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -47,27 +57,26 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             'process_profile__machine', 'process_profile__screw_combination',
             'creator', 'extruder_operator', 'workflow_instance',
         ).prefetch_related(
-            'sample_splits',
-            'injection_order__mold_requirements__mold',
-            'injection_order__mold_requirements__formula',
+            'formula_details__formula',
+            'sample_inventories',
         )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         order = self.object
-        user = self.request.user
-        user_groups = set(user.review_groups.filter(is_active=True).values_list('name', flat=True))
-        context['show_rnd_bom'] = not ('配色部门' in user_groups)
 
-        context['extrusion_statuses'] = ProductionOrder.EXTRUSION_READY_STATUSES
-        context['post_extrusion_statuses'] = ProductionOrder.POST_EXTRUSION_STATUSES
+        # 子任务状态
+        ext = getattr(order, 'extrusion_task', None)
+        color = getattr(order, 'color_task', None)
+        injection = getattr(order, 'injection_task', None)
+        context['extrusion_task'] = ext
+        context['color_task'] = color
+        context['injection_task'] = injection
 
-        can_complete = order.status == 'EXTRUDING' and (
-            user.user_type == User.UserType.EXTRUSION_OPERATOR
-            or user.user_type in IdentityConfig.TECH_CORE
-        )
-        context['can_complete_extrusion'] = can_complete
+        # 测试任务
+        context['testing_tasks'] = order.testing_tasks.all()
 
+        # 配方信息
         from app_formula.models import LabFormula
         formulas = list(LabFormula.objects.filter(
             code=order.trial_code, project=order.project,
@@ -83,7 +92,10 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         context['formula_pairs'] = [(f, details_map.get(f.pk)) for f in formulas]
         context['has_any_color_matching'] = any(
             fd.needs_color_matching for fd in details_map.values())
-        context['merged_bom_rows'], formula_totals_map, context['bom_grand_total'] = self._build_merged_bom(formulas, details_map)
+
+        # BOM 合并展示
+        context['merged_bom_rows'], formula_totals_map, context['bom_grand_total'] = \
+            self._build_merged_bom(formulas, details_map)
         context['bom_formula_columns'] = [
             {
                 'version': f.version,
@@ -95,16 +107,30 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             for f, _ in context['formula_pairs']
         ]
 
-        # 模具需求矩阵数据
-        if order.injection_order:
+        # 模具需求矩阵
+        if injection:
             context['mold_matrix'] = self._build_mold_matrix(
-                order.injection_order.mold_requirements.all(), formulas)
+                injection.mold_requirements.all(), formulas)
+
+        # 样品库存汇总
+        from app_trial_production.services import SampleInventoryService
+        context['pellet_summary'] = SampleInventoryService.get_pellet_summary(order.trial_code)
+        context['specimen_summary'] = SampleInventoryService.get_specimen_summary(order.trial_code)
+
+        # 操作权限
+        from app_user.models import User
+        from app_user.mixins import IdentityConfig
+        user = self.request.user
+        context['can_start_extrusion'] = order.can_start_extrusion and (
+            user.user_type == User.UserType.EXTRUSION_OPERATOR
+            or user.user_type in IdentityConfig.TECH_CORE
+        )
 
         return context
 
     @staticmethod
     def _build_mold_matrix(mold_requirements, formulas):
-        """构建模具×配方矩阵，预计算所有模板需要的值"""
+        """构建模具×配方矩阵"""
         mold_map = {}
         for mr in mold_requirements:
             mold = mr.mold
@@ -134,6 +160,7 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
 
     @staticmethod
     def _build_merged_bom(formulas, details_map=None):
+        """合并多配方BOM为多列展示"""
         if not formulas:
             return [], {}, 0
         details_map = details_map or {}
@@ -158,9 +185,7 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
                 formula_totals[f.pk] += feeding_qty
                 row_total += feeding_qty
                 pct_columns.append({
-                    'version': f.version,
-                    'value': pct,
-                    'formula_pk': f.pk,
+                    'version': f.version, 'value': pct, 'formula_pk': f.pk,
                     'feeding_qty': feeding_qty if planned_qty > 0 else 0,
                 })
             grand_total += row_total
@@ -180,6 +205,7 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
 
 
 class ProductionOrderCreateView(RndAccessMixin, CreateView):
+    """创建排产工单"""
     model = ProductionOrder
     form_class = ProductionOrderForm
     template_name = 'apps/app_trial_production/order/create.html'
@@ -194,9 +220,6 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['mold_types'] = MoldType.objects.filter(status='AVAILABLE').order_by('mold_code')
-        context['test_specimen_molds'] = MoldType.objects.filter(
-            status='AVAILABLE', mold_type='TEST_SPECIMEN',
-        ).order_by('mold_code')
         initiate_data = self.request.session.get('trial_initiate_data')
         if initiate_data:
             context['initiate_data'] = initiate_data
@@ -205,34 +228,36 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
             formulas = list(LabFormula.objects.filter(
                 code=initiate_data.get('trial_code', ''),
                 project_id=initiate_data.get('project_id'),
-            ).prefetch_related(
-                'bom_lines__raw_material__category',
-            ).order_by('version'))
+            ).prefetch_related('bom_lines__raw_material__category').order_by('version'))
             context['trial_formulas'] = formulas
+
+            # 测试样条模具（预填充注塑矩阵）
+            context['test_specimen_molds'] = MoldType.objects.filter(
+                status='AVAILABLE', mold_type='TEST_SPECIMEN',
+            ).order_by('mold_code')
+
+            # BOM 合并展示 + JS 计算数据
             context['merged_bom_rows'] = self._build_merged_bom(formulas)
-            context['bom_data_json'] = self._build_bom_data_json(formulas)
+            context['bom_data'] = self._build_bom_data(formulas)
 
-        # 测试项目按 MetricCategory 分组
-        from app_material.models import TestConfig, MetricCategory
-        categories = MetricCategory.objects.all().order_by('order')
-        grouped_tests = []
-        for cat in categories:
-            items = TestConfig.objects.filter(category=cat).order_by('order')
-            if items.exists():
-                grouped_tests.append({'category': cat, 'items': items})
-        context['grouped_test_items'] = grouped_tests
-
+        # 测试项目分组
+        from app_material.models import TestConfig
+        tests = TestConfig.objects.select_related('category').order_by('category__order', 'order')
+        grouped = {}
+        for t in tests:
+            if t.category not in grouped:
+                grouped[t.category] = {'category': t.category, 'items': []}
+            grouped[t.category]['items'].append(t)
+        context['grouped_test_items'] = list(grouped.values())
         return context
 
-    def _build_merged_bom(self, formulas):
-        """将同实验单号下多个配方的BOM合并为多列比例展示结构"""
+    @staticmethod
+    def _build_merged_bom(formulas):
+        """将同实验单号下多个配方的BOM合并为多列比例展示结构（创建页简化版）"""
         if not formulas:
             return []
-
-        # 以第一个配方的BOM行顺序为基准
         base_formula = formulas[0]
         rows = []
-
         for base_line in base_formula.bom_lines.all():
             raw_id = base_line.raw_material_id
             pct_columns = []
@@ -243,7 +268,6 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                         pct = bl.percentage
                         break
                 pct_columns.append({'version': f.version, 'value': pct, 'formula_pk': f.pk})
-
             rows.append({
                 'feeding_port': base_line.get_feeding_port_display(),
                 'raw_material': base_line.raw_material,
@@ -254,15 +278,13 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 'is_tail': base_line.is_tail,
                 'pct_columns': pct_columns,
             })
-
         return rows
 
-    def _build_bom_data_json(self, formulas):
-        """构建供前端JS动态计算配料表的JSON数据"""
-        import json
+    @staticmethod
+    def _build_bom_data(formulas):
+        """构建供前端JS动态计算配料表的Python字典（由模板 json_script 序列化）"""
         if not formulas:
-            return '{}'
-
+            return {'formulas': [], 'rows': []}
         rows = []
         base_formula = formulas[0]
         for base_line in base_formula.bom_lines.all():
@@ -276,38 +298,29 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                         break
                 percentages[str(f.pk)] = pct
             rows.append({'percentages': percentages})
-
-        data = {
+        return {
             'formulas': [{'pk': str(f.pk), 'version': f.version} for f in formulas],
             'rows': rows,
         }
-        return json.dumps(data, ensure_ascii=False)
 
     def form_valid(self, form):
-        form.instance.creator = self.request.user
         initiate_data = self.request.session.get('trial_initiate_data') or {}
         trial_code = self.request.POST.get('trial_code') or initiate_data.get('trial_code', '')
         project_id = self.request.POST.get('project_id') or initiate_data.get('project_id')
         project_node_id = self.request.POST.get('project_node_id') or initiate_data.get('project_node_id')
-        if trial_code:
-            form.instance.trial_code = trial_code
+
         if project_id:
             from app_project.models import Project
             project = get_object_or_404(Project, pk=project_id)
             RndAccessMixin.check_project_ownership(project, self.request.user)
-            form.instance.project_id = project_id
-        if project_node_id:
-            form.instance.project_node_id = project_node_id
 
-        self.object = form.save()
-
-        # 保存每个配方的计划产量和配色需求
+        # 构建配方明细
         from app_formula.models import LabFormula
         formulas = list(LabFormula.objects.filter(
-            code=self.object.trial_code, project=self.object.project,
+            code=trial_code, project_id=project_id,
         ).order_by('version'))
 
-        total_qty = 0
+        formula_details = []
         for f in formulas:
             qty_str = self.request.POST.get(f'planned_qty_{f.pk}', '0')
             try:
@@ -315,70 +328,57 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
             except (ValueError, TypeError):
                 qty = 0
             needs_cm = self.request.POST.get(f'needs_color_{f.pk}') == 'on'
-            ProductionOrderFormulaDetail.objects.create(
-                production_order=self.object,
-                formula=f,
-                planned_quantity=qty,
-                needs_color_matching=needs_cm,
-            )
-            total_qty += qty
+            formula_details.append({
+                'formula_id': f.pk,
+                'planned_quantity': qty,
+                'needs_color_matching': needs_cm,
+            })
 
-        # 更新工单总计划产量
-        if total_qty > 0:
-            self.object.quantity_planned = total_qty
-            self.object.save(update_fields=['quantity_planned'])
-
-        # 自动创建测试工单
-        test_item_ids = self.request.POST.getlist('test_items')
-        if test_item_ids:
-            assigned_to_id = self.request.POST.get('assigned_to') or None
-            from app_trial_production.models import TestingOrder
-            TestingOrder.objects.create(
-                production_order=self.object,
-                status='PENDING',
-                assigned_to_id=assigned_to_id,
-            ).test_items.set(test_item_ids)
-
-        # 处理模具 × 配方矩阵数据
+        # 构建模具矩阵
+        mold_matrix = []
         mold_count = int(self.request.POST.get('mold_count', 0))
-        if mold_count > 0:
-            has_any_mold = any(
-                self.request.POST.get(f'mold_{i}') for i in range(mold_count)
-            )
-            if has_any_mold:
-                injection_order = InjectionMoldingOrder.objects.create(
-                    production_order=self.object,
-                    status='PENDING',
-                )
-                for i in range(mold_count):
-                    mold_id = self.request.POST.get(f'mold_{i}')
-                    if not mold_id:
-                        continue
-                    try:
-                        mold = MoldType.objects.get(pk=int(mold_id))
-                    except (MoldType.DoesNotExist, ValueError):
-                        continue
+        for i in range(mold_count):
+            mold_id = self.request.POST.get(f'mold_{i}')
+            if not mold_id:
+                continue
+            formula_quantities = {}
+            for formula in formulas:
+                qty_val = self.request.POST.get(f'qty_{i}_{formula.pk}', '0')
+                try:
+                    qty = int(qty_val)
+                except (ValueError, TypeError):
+                    qty = 0
+                if qty > 0:
+                    formula_quantities[str(formula.pk)] = qty
+            if formula_quantities:
+                mold_matrix.append({
+                    'mold_id': int(mold_id),
+                    'formula_quantities': formula_quantities,
+                })
 
-                    for formula in formulas:
-                        qty_val = self.request.POST.get(f'qty_{i}_{formula.pk}', '0')
-                        try:
-                            qty = int(qty_val)
-                        except (ValueError, TypeError):
-                            qty = 0
-                        if qty > 0:
-                            MoldRequirement.objects.create(
-                                injection_order=injection_order,
-                                mold=mold,
-                                formula=formula,
-                                specimen_quantity=qty,
-                            )
+        # 测试项目
+        test_item_ids = self.request.POST.getlist('test_items') or None
+
+        # 委托 Service 创建
+        self.object = ProductionOrderService.create_order(
+            user=self.request.user,
+            trial_code=trial_code,
+            project_id=project_id,
+            project_node_id=project_node_id,
+            process_profile_id=form.instance.process_profile_id,
+            formula_details=formula_details,
+            test_item_ids=test_item_ids,
+            mold_matrix=mold_matrix,
+            remark=form.cleaned_data.get('remark', ''),
+        )
 
         self.request.session.pop('trial_initiate_data', None)
         messages.success(self.request, f'生产工单 {self.object.code} 创建成功')
-        return redirect('trial_production_order_detail', pk=self.object.pk)
+        return redirect('trial_order_detail', pk=self.object.pk)
 
 
 class ProductionOrderUpdateView(ExtrusionTaskAccessMixin, UpdateView):
+    """编辑排产工单"""
     model = ProductionOrder
     form_class = ProductionOrderUpdateForm
     template_name = 'apps/app_trial_production/order/edit.html'
@@ -391,8 +391,6 @@ class ProductionOrderUpdateView(ExtrusionTaskAccessMixin, UpdateView):
 
     def form_valid(self, form):
         self.object = form.save()
-
-        # 更新每个配方的计划产量和配色需求
         for fd in self.object.formula_details.all():
             qty_str = self.request.POST.get(f'planned_qty_{fd.formula_id}', '')
             if qty_str:
@@ -403,22 +401,18 @@ class ProductionOrderUpdateView(ExtrusionTaskAccessMixin, UpdateView):
             fd.needs_color_matching = self.request.POST.get(
                 f'needs_color_{fd.formula_id}') == 'on'
             fd.save(update_fields=['planned_quantity', 'needs_color_matching'])
-
         messages.success(self.request, '工单更新成功')
-        return redirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('trial_production_order_detail', kwargs={'pk': self.object.pk})
+        return redirect('trial_order_detail', pk=self.object.pk)
 
 
 class ProductionOrderStartWorkflowView(RndAccessMixin, View):
-    """DRAFT状态的工单 → 发起审批流程 (仅研发人员)"""
+    """DRAFT → 发起审批流程（仅研发人员）"""
 
     def post(self, request, pk):
         order = get_object_or_404(ProductionOrder, pk=pk)
         if not order.can_start_workflow:
             messages.warning(request, '当前状态不可发起审批')
-            return redirect('trial_production_order_detail', pk=order.pk)
+            return redirect('trial_order_detail', pk=order.pk)
 
         if order.project:
             RndAccessMixin.check_project_ownership(order.project, request.user)
@@ -426,54 +420,30 @@ class ProductionOrderStartWorkflowView(RndAccessMixin, View):
             raise PermissionDenied("您不是该工单的创建者")
 
         from app_trial_production.models import TrialProductionConfig
-        from app_trial_production.services import TrialProductionService
-
         config = TrialProductionConfig.get()
         if not config.workflow_definition:
             messages.error(request, '未配置审批流程，请先在排产配置中设置')
-            return redirect('trial_production_order_detail', pk=order.pk)
+            return redirect('trial_order_detail', pk=order.pk)
 
-        TrialProductionService.start_workflow(
-            order, config.workflow_definition, request.user)
-        messages.success(request, '审批流程已启动')
-        return redirect('trial_production_order_detail', pk=order.pk)
-
-
-class ProductionOrderCompleteExtrusionView(ExtrusionTaskAccessMixin, View):
-    """完成挤出 → EXTRUDING 流转到 COLOR_POST (仅挤出操作员和技术核心)"""
-
-    def post(self, request, pk):
-        order = get_object_or_404(ProductionOrder, pk=pk)
-        if order.status != 'EXTRUDING':
-            messages.warning(request, '当前状态不可完成挤出')
-            return redirect('trial_production_order_detail', pk=order.pk)
-
-        # 验证操作员归属：仅分配的挤出操作员或技术核心/管理员可完成
-        if not request.user.is_superuser and order.extruder_operator_id:
-            if order.extruder_operator_id != request.user.pk:
-                raise PermissionDenied("您不是该工单分配的挤出操作员")
-
-        has_color = order.formula_details.filter(needs_color_matching=True).exists()
-        if has_color:
-            order.status = 'COLOR_POST'
-            msg = '挤出完成，工单已流转至配色阶段'
-        else:
-            order.status = 'SAMPLE_SPLITTING'
-            msg = '挤出完成，无需配色，工单已流转至样品分拨阶段'
-        order.save(update_fields=['status', 'updated_at'])
-        messages.success(request, msg)
-        return redirect('trial_production_order_detail', pk=order.pk)
+        try:
+            ProductionOrderService.start_workflow(order, config.workflow_definition, request.user)
+            messages.success(request, '审批流程已启动')
+        except Exception:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception(f"Workflow start failed for order {order.code}")
+            messages.error(request, '启动审批流程时发生错误，请稍后重试')
+        return redirect('trial_order_detail', pk=order.pk)
 
 
 class ProductionOrderInitiateView(RndAccessMixin, View):
-    """从配方过程页点击'试验排产'按钮，传入实验单号创建工单 (仅研发人员)"""
+    """从配方过程页点击'试验排产'按钮"""
 
     def post(self, request):
         trial_code = request.POST.get('trial_code')
         project_id = request.POST.get('project_id')
         project_node_id = request.POST.get('project_node_id')
 
-        # 验证项目归属：只允许项目负责人或项目成员发起排产
         if project_id:
             from app_project.models import Project
             project = get_object_or_404(Project, pk=project_id)
@@ -499,4 +469,37 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
             'process_profile_id': first.process_id,
             'material_type_id': first.material_type_id,
         }
-        return redirect('trial_production_order_create')
+        return redirect('trial_order_create')
+
+
+class ProductionOrderDeleteView(TrialProductionAccessMixin, View):
+    """删除草稿工单 — 仅创建人或超级用户可操作"""
+
+    def post(self, request, pk):
+        order = get_object_or_404(ProductionOrder, pk=pk)
+
+        if order.status != ProductionOrder.Status.DRAFT:
+            messages.error(request, '只有草稿状态的工单才能删除')
+            return redirect('trial_order_detail', pk=order.pk)
+
+        if not (request.user.is_superuser or order.creator_id == request.user.pk):
+            raise PermissionDenied('您不是该工单的创建者，无权删除')
+
+        order_code = order.code
+        order.delete()
+        messages.success(request, f'草稿工单 {order_code} 已删除')
+        return redirect('trial_order_list')
+
+
+class ProductionOrderStartExtrusionView(RndAccessMixin, View):
+    """开始挤出 — 创建 ExtrusionTask + ColorMatchingTask，跳转挤出详情"""
+
+    def post(self, request, pk):
+        order = get_object_or_404(ProductionOrder, pk=pk, status='ACCEPTED')
+        try:
+            ProductionOrderService.start_extrusion(order, request.user)
+            messages.success(request, f'工单 {order.code} 已开始挤出生产')
+        except Exception:
+            logger.exception(f"Failed to start extrusion for order {order.pk}")
+            messages.error(request, '开始挤出失败，请稍后重试')
+        return redirect('trial_extrusion_detail', order_pk=pk)

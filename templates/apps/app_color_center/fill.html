@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% load static project_extras %}
+
+{% block title %}色粉配比BOM - {{ production_order.code }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_color_center/color.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">色粉配比BOM</div>
+            <h2 class="page-title">{{ project.name }}</h2>
+            <div class="text-muted mt-1">
+                实验单号: {{ production_order.trial_code }}
+            </div>
+        </div>
+        <div class="col-auto ms-auto">
+            <div class="btn-list">
+                <a href="{% url 'color_center:list' %}" class="btn btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i> 返回配色任务
+                </a>
+                {% if stage_round_items %}
+                <a href="?compare=1" class="btn btn-outline-purple">
+                    <i class="ti ti-columns me-1"></i> 全局配方对比
+                </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- RND 轮次 tab bar -->
+<div class="card mb-3">
+    <div class="card-body p-0">
+        <ul class="nav nav-tabs nav-tabs-alt px-3 pt-2" role="tablist">
+            {% for item in stage_round_items %}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link {% if not global_compare and active_stage == item.stage and active_round == item.round %}active{% endif %}"
+                   href="?stage={{ item.stage }}&round={{ item.round }}{% if compare_mode %}&compare=1{% endif %}">
+                    <i class="ti ti-flask me-1"></i>
+                    {{ item.stage_display }} 第{{ item.round }}轮
+                    <span class="badge {% if not global_compare and active_stage == item.stage and active_round == item.round %}bg-white text-primary{% else %}bg-primary-lt{% endif %} ms-1">{{ item.formulas|length }}</span>
+                </a>
+            </li>
+            {% endfor %}
+            {% if global_compare %}
+            <li class="nav-item" role="presentation">
+                <span class="nav-link active">
+                    <i class="ti ti-columns me-1"></i>
+                    全部阶段对比
+                    <span class="badge bg-white text-primary ms-1">{{ total_formula_count }}</span>
+                </span>
+            </li>
+            {% endif %}
+            {% if not stage_round_items %}
+            <li class="nav-item">
+                <span class="nav-link disabled">
+                    <i class="ti ti-flask me-1"></i>暂无配方数据
+                </span>
+            </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<div class="row row-cards">
+    {% if not compare_mode %}
+    {% include 'apps/app_color_center/_formula_sidebar.html' %}
+    {% endif %}
+
+    <!-- 右侧：配方详情 / 对比视图 -->
+    <div class="{% if compare_mode %}col-lg-12{% else %}col-lg-9{% endif %}">
+        {% if compare_mode and cpbom_columns %}
+            {% include 'apps/app_color_center/_color_bom_compare.html' %}
+        {% elif selected_formula %}
+            <!-- 单配方详情 -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-fill">
+                            <h4 class="mb-1">{{ selected_formula.code }} {{ selected_formula.name }} <small class="text-muted">v{{ selected_formula.version }}</small></h4>
+                            <div class="text-muted small">
+                                <i class="ti ti-user me-1"></i>{{ selected_formula.creator.username }}
+                                <span class="mx-2">|</span>
+                                <i class="ti ti-calendar me-1"></i>{{ selected_formula.created_at|date:"Y-m-d" }}
+                                <span class="mx-2">|</span>
+                                <span class="badge bg-purple-lt">{{ selected_formula.material_type.name }}</span>
+                                {% if selected_formula.is_mature %}
+                                <span class="badge bg-green-lt ms-1">成熟配方</span>
+                                {% endif %}
+                                {% if selected_formula.project_id != project.pk %}
+                                <span class="badge bg-yellow-lt ms-1">
+                                    <i class="ti ti-building me-1"></i>来源: {{ selected_formula.project.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="btn-list">
+                            <a href="{% url 'formula_detail' selected_formula.pk %}" class="btn btn-outline-primary btn-sm" target="_blank">
+                                <i class="ti ti-external-link me-1"></i> 打开详情
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 色粉BOM -->
+            {% if readonly %}
+            <div class="card mb-3">
+                <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-orange mb-0">
+                        <i class="ti ti-palette me-2"></i>色粉配比BOM
+                        <span class="badge bg-green-lt ms-1">已填写</span>
+                        {% if selected_formula.color_powder_bom.cost %}
+                        <span class="badge bg-yellow-lt ms-1">¥{{ selected_formula.color_powder_bom.cost }}/kg</span>
+                        {% endif %}
+                    </h3>
+                    <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ selected_formula.pk }}&edit=1" class="btn btn-sm btn-outline-orange">
+                        <i class="ti ti-edit me-1"></i>修改
+                    </a>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table compact-table">
+                        <thead>
+                        <tr>
+                            <th>喂料口</th>
+                            <th>原材料类型</th>
+                            <th>颜料/色粉</th>
+                            <th>比例(份) <span class="fw-bold small">kg/100kg</span></th>
+                            <th>共混信息</th>
+                            <th>分秤</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for entry in bom_entries %}
+                        <tr>
+                            <td><span class="badge bg-secondary-lt">{{ entry.get_feeding_port_display }}</span></td>
+                            <td><span class="badge bg-blue-lt">{{ entry.raw_material.category.name }}</span></td>
+                            <td class="fw-bold">
+                                <a href="{% url 'raw_material_detail' entry.raw_material.pk %}" target="_blank" class="text-reset">
+                                    {{ entry.raw_material.name }}
+                                </a>
+                                <span class="text-muted small">({{ entry.raw_material.model_name }})</span>
+                            </td>
+                            <td class="fs-3">{{ entry.percentage|smart_decimal }}</td>
+                            <td>
+                                {% if entry.is_pre_mix %}
+                                    <span class="badge bg-purple-lt">{{ entry.pre_mix_order }}. 共混({{ entry.pre_mix_time }}s)</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td>
+                                {% if entry.weighing_scale %}
+                                    <span class="badge bg-azure-lt">{{ entry.get_weighing_scale_display }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if selected_formula.color_powder_bom.remark %}
+                <div class="card-footer text-muted small">
+                    <i class="ti ti-notes me-1"></i>备注: {{ selected_formula.color_powder_bom.remark }}
+                </div>
+                {% endif %}
+            </div>
+            {% else %}
+            {% include 'apps/app_color_center/_color_bom_form.html' %}
+            {% endif %}
+
+        {% else %}
+            <div class="card">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="ti ti-flask-off fs-1 d-block mb-3"></i>
+                    <p class="mb-0">暂无配方数据</p>
+                    <p class="text-muted small">请前往项目详情页面，通过研发阶段节点的"新增配方"按钮创建。</p>
+                    <a href="{% url 'project_detail' project.pk %}" class="btn btn-primary mt-3">
+                        <i class="ti ti-arrow-left me-1"></i> 返回项目详情
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>var MATERIAL_API_URL = "{% url 'material_api_search' %}";</script>
+<script src="{% static 'js/apps/app_color_center/bom.js' %}"></script>
+{% endblock %}

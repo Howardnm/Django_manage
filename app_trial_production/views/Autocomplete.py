@@ -18,7 +18,6 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
         if model_name == 'formula':
             from app_formula.models import LabFormula
             qs = LabFormula.objects.filter(name__icontains=query)
-            # 按可访问的项目过滤配方
             if not request.user.is_superuser and request.user.department:
                 qs = qs.filter(project__manager__department=request.user.department)
             qs = qs.values('id', 'name')[:20]
@@ -27,7 +26,6 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
         elif model_name == 'project':
             from app_project.models import Project
             qs = Project.objects.filter(name__icontains=query)
-            # 按部门或成员身份过滤项目
             if not request.user.is_superuser:
                 qs = qs.filter(
                     Q(manager=request.user) | Q(members__user=request.user)
@@ -38,7 +36,6 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
         elif model_name == 'process_profile':
             from app_process.models import ProcessProfile
             qs = ProcessProfile.objects.filter(name__icontains=query)
-            # 按部门隔离：非超管且有所属部门的用户只能看到本部门或未指定负责人的工艺方案
             if not request.user.is_superuser:
                 if request.user.department:
                     qs = qs.filter(
@@ -54,15 +51,31 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
             results = [{'id': obj['id'], 'text': obj['name']} for obj in qs]
 
         elif model_name == 'mold':
-            from app_trial_production.models import MoldType
-            qs = MoldType.objects.filter(name__icontains=query)
-            # 仅展示可用状态的模具
-            qs = qs.filter(status='AVAILABLE').values('id', 'mold_code', 'name')[:20]
+            from app_mold_injection.models import MoldType
+            qs = MoldType.objects.filter(
+                name__icontains=query, status='AVAILABLE'
+            ).values('id', 'mold_code', 'name')[:20]
             results = [{'id': obj['id'], 'text': f"[{obj['mold_code']}] {obj['name']}"} for obj in qs]
 
         elif model_name == 'test_config':
             from app_material.models import TestConfig
-            qs = TestConfig.objects.filter(name__icontains=query).values('id', 'name')[:20]
+            qs = TestConfig.objects.filter(
+                name__icontains=query
+            ).values('id', 'name')[:20]
             results = [{'id': obj['id'], 'text': obj['name']} for obj in qs]
+
+        elif model_name == 'sample_pellet':
+            # 待打样颗粒列表（供注塑取料 autocomplete）
+            from app_trial_production.models import SampleInventory
+            qs = SampleInventory.objects.filter(
+                type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
+            ).filter(
+                Q(trial_code__icontains=query) |
+                Q(formula__name__icontains=query)
+            ).select_related('formula')[:20]
+            results = [
+                {'id': obj.pk, 'text': f"[{obj.trial_code}] {obj.formula.name if obj.formula else ''} ({obj.quantity}kg)"}
+                for obj in qs
+            ]
 
         return JsonResponse({'results': results})

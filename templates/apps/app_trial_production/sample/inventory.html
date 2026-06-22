@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+
+{% block title %}样品库存{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                    <li class="breadcrumb-item active">样品库存</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">样品库存</h2>
+    </div>
+</div>
+
+<div class="container-xl">
+    {# Tab 切换 #}
+    <ul class="nav nav-tabs mb-3">
+        {% for value, label in tab_choices %}
+        <li class="nav-item">
+            <a class="nav-link {% if active_tab == value %}active{% endif %}"
+               href="?tab={{ value }}{% if current_status %}&status={{ current_status }}{% endif %}">
+                {{ label }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+
+    {# 状态过滤 #}
+    <div class="mb-3">
+        <a href="?tab={{ active_tab }}" class="btn btn-sm {% if not current_status %}btn-primary{% else %}btn-outline-secondary{% endif %}">全部</a>
+        {% for value, label in status_choices %}
+        <a href="?tab={{ active_tab }}&status={{ value }}" class="btn btn-sm {% if current_status == value %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
+        {% endfor %}
+    </div>
+
+    {# 待打样颗粒入口（仅颗粒 Tab 显示） #}
+    {% if active_tab == 'PELLET' and available_for_injection %}
+    <div class="card mb-3 border-azure">
+        <div class="card-header bg-azure-lt">
+            <h3 class="card-title"><i class="ti ti-arrow-big-right me-2"></i>待打样颗粒（可供注塑取料）</h3>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter mb-0">
+                    <thead><tr><th>实验单号</th><th>配方</th><th>数量(kg)</th><th>位置</th><th>操作</th></tr></thead>
+                    <tbody>
+                        {% for s in available_for_injection %}
+                        <tr>
+                            <td class="fw-bold">{{ s.trial_code }}</td>
+                            <td>{{ s.formula.name|default:"-" }} v{{ s.formula.version|default:"-" }}</td>
+                            <td>{{ s.quantity }}</td>
+                            <td>{{ s.storage_location|default:"-" }}</td>
+                            <td><a href="{% url 'trial_sample_detail' s.pk %}" class="btn btn-sm btn-outline-primary">详情</a></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {# 按试验单号分组展示 #}
+    {% for group in grouped_samples %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">
+                {{ group.trial_code }}
+                {% if group.production_order %}
+                <a href="{% url 'trial_order_detail' group.production_order.pk %}" class="ms-2 btn btn-sm btn-outline-secondary">
+                    <i class="ti ti-link"></i> {{ group.production_order.code }}
+                </a>
+                {% endif %}
+            </h3>
+            <span class="badge bg-secondary-lt ms-auto">{{ group.items|length }} 条</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter mb-0">
+                <thead>
+                    <tr>
+                        <th>类型</th>
+                        <th>子类型</th>
+                        <th>配方</th>
+                        {% if active_tab == 'PELLET' %}<th>数量(kg)</th>{% endif %}
+                        {% if active_tab == 'SPECIMEN' %}<th>样条数</th><th>合格数</th><th>模具</th>{% endif %}
+                        <th>状态</th>
+                        <th>位置</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in group.items %}
+                    <tr>
+                        <td><span class="badge bg-{% if s.type == 'PELLET' %}green{% else %}yellow{% endif %}-lt">{{ s.get_type_display }}</span></td>
+                        <td>{{ s.get_sub_type_display }}</td>
+                        <td>{{ s.formula.name|default:"-" }}{% if s.formula %} v{{ s.formula.version }}{% endif %}</td>
+                        {% if active_tab == 'PELLET' %}
+                        <td class="fw-bold">{{ s.quantity|default:"-" }}</td>
+                        {% endif %}
+                        {% if active_tab == 'SPECIMEN' %}
+                        <td>{{ s.specimen_count|default:"-" }}</td>
+                        <td class="fw-bold">{{ s.specimen_qualified|default:"-" }}</td>
+                        <td>{{ s.mold.name|default:"-" }}</td>
+                        {% endif %}
+                        <td><span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span></td>
+                        <td>{{ s.storage_location|default:"-" }}</td>
+                        <td>
+                            <a href="{% url 'trial_sample_detail' s.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
+                            {% if s.can_sap_entry %}
+                            <a href="{% url 'trial_sample_sap_entry' s.pk %}" class="btn btn-sm btn-outline-success">SAP入库</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% empty %}
+    <div class="card">
+        <div class="card-body text-center py-5 text-muted">
+            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

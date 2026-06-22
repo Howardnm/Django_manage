@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+
+{% block title %}样品详情 — {{ sample }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+  <div class="container-xl">
+    <div class="page-pretitle">
+      <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+          <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">样品库存</a></li>
+          <li class="breadcrumb-item active">{{ sample }}</li>
+        </ol>
+      </nav>
+    </div>
+    <h2 class="page-title">
+      样品详情
+      <span class="badge {{ sample.status_css_class }}">{{ sample.get_status_display }}</span>
+    </h2>
+  </div>
+</div>
+
+<div class="container-xl">
+  <div class="row row-cards">
+    <div class="col-lg-8">
+      <div class="card">
+        <div class="card-header">
+          <h3 class="card-title">基本信息</h3>
+        </div>
+        <div class="card-body">
+          <div class="datagrid">
+            <div class="datagrid-item">
+              <div class="datagrid-title">样品类型</div>
+              <div class="datagrid-content">{{ sample.get_type_display }}</div>
+            </div>
+            <div class="datagrid-item">
+              <div class="datagrid-title">子类型</div>
+              <div class="datagrid-content">{{ sample.get_sub_type_display }}</div>
+            </div>
+            <div class="datagrid-item">
+              <div class="datagrid-title">实验单号</div>
+              <div class="datagrid-content">{{ sample.trial_code }}</div>
+            </div>
+            {% if sample.formula %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">配方版本</div>
+              <div class="datagrid-content">{{ sample.formula.name }} v{{ sample.formula.version }}</div>
+            </div>
+            {% endif %}
+            {% if sample.production_order %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">关联工单</div>
+              <div class="datagrid-content">
+                <a href="{% url 'trial_order_detail' sample.production_order.pk %}">{{ sample.production_order.code }}</a>
+              </div>
+            </div>
+            {% endif %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">库存状态</div>
+              <div class="datagrid-content">
+                <span class="badge {{ sample.status_css_class }}">{{ sample.get_status_display }}</span>
+              </div>
+            </div>
+            {% if sample.storage_location %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">存放位置</div>
+              <div class="datagrid-content">{{ sample.storage_location }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      {% if sample.is_pellet %}
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">颗粒信息</h3></div>
+        <div class="card-body">
+          <div class="datagrid">
+            <div class="datagrid-item">
+              <div class="datagrid-title">数量(kg)</div>
+              <div class="datagrid-content">{{ sample.quantity|default:"-" }}</div>
+            </div>
+            {% if sample.packaging_desc %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">包装说明</div>
+              <div class="datagrid-content">{{ sample.packaging_desc }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if sample.is_specimen %}
+      <div class="card mt-3">
+        <div class="card-header"><h3 class="card-title">样条信息</h3></div>
+        <div class="card-body">
+          <div class="datagrid">
+            <div class="datagrid-item">
+              <div class="datagrid-title">样条数量</div>
+              <div class="datagrid-content">{{ sample.specimen_count|default:"-" }}</div>
+            </div>
+            <div class="datagrid-item">
+              <div class="datagrid-title">合格数量</div>
+              <div class="datagrid-content">{{ sample.specimen_qualified|default:"-" }}</div>
+            </div>
+            {% if sample.mold %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">对应模具</div>
+              <div class="datagrid-content">{{ sample.mold }}</div>
+            </div>
+            {% endif %}
+            {% if sample.batch_label %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">批次标签</div>
+              <div class="datagrid-content">{{ sample.batch_label }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+      {% if sample.status == 'SAP_STORED' %}
+      <div class="card">
+        <div class="card-header"><h3 class="card-title">SAP入库信息</h3></div>
+        <div class="card-body">
+          <div class="datagrid">
+            {% if sample.sap_material_code %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">SAP物料号</div>
+              <div class="datagrid-content">{{ sample.sap_material_code }}</div>
+            </div>
+            {% endif %}
+            {% if sample.sap_batch_number %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">SAP批次号</div>
+              <div class="datagrid-content">{{ sample.sap_batch_number }}</div>
+            </div>
+            {% endif %}
+            {% if sample.sap_warehouse_date %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">入库日期</div>
+              <div class="datagrid-content">{{ sample.sap_warehouse_date }}</div>
+            </div>
+            {% endif %}
+            {% if sample.sap_storage_location %}
+            <div class="datagrid-item">
+              <div class="datagrid-title">SAP库位</div>
+              <div class="datagrid-content">{{ sample.sap_storage_location }}</div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {% if can_sap_entry %}
+      <div class="card">
+        <div class="card-body">
+          <a href="{% url 'trial_sample_sap_entry' sample.pk %}" class="btn btn-primary w-100">
+            <i class="ti ti-package"></i> SAP入库
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
