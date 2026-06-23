@@ -52,7 +52,7 @@
                 {% if order.status == 'ACCEPTED' and can_start_extrusion %}
                 <form method="post" action="{% url 'trial_order_start_extrusion' order.pk %}" class="d-inline">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-outline-azure">
+                    <button type="submit" class="btn btn-blue">
                         <i class="ti ti-player-play me-1"></i>开始挤出
                     </button>
                 </form>
