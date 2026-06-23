@@ -6,6 +6,7 @@ from app_trial_production.mixins import TrialProductionAccessMixin
 
 class TrialAutocompleteView(TrialProductionAccessMixin, View):
     """TomSelect 自动补全 API — 按部门/项目归属过滤搜索结果"""
+    enforce_dept_isolation = False
 
     def get(self, request):
         query = request.GET.get('q', '').strip()
@@ -26,6 +27,25 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
         elif model_name == 'project':
             from app_project.models import Project
             qs = Project.objects.filter(name__icontains=query)
+            if not request.user.is_superuser:
+                qs = qs.filter(
+                    Q(manager=request.user) | Q(members__user=request.user)
+                ).distinct()
+            qs = qs.values('id', 'name')[:20]
+            results = [{'id': obj['id'], 'text': obj['name']} for obj in qs]
+
+        elif model_name == 'project_pending':
+            # 仅返回有待排产工单的项目（挤出排产工作台专用）
+            from app_project.models import Project
+            from app_trial_production.models import ProductionOrder
+            pending_project_ids = ProductionOrder.objects.filter(
+                status='ACCEPTED',
+                extrusion_scheduled_date__isnull=True,
+            ).values_list('project_id', flat=True).distinct()
+            qs = Project.objects.filter(
+                pk__in=pending_project_ids,
+                name__icontains=query,
+            )
             if not request.user.is_superuser:
                 qs = qs.filter(
                     Q(manager=request.user) | Q(members__user=request.user)

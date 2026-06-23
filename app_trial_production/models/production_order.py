@@ -67,7 +67,8 @@ class ProductionOrder(models.Model):
 
     @property
     def can_start_extrusion(self):
-        return self.status == self.Status.ACCEPTED
+        """已排产（有挤出计划时间）的已接单工单才能开始挤出"""
+        return self.status == self.Status.ACCEPTED and self.extrusion_scheduled_date is not None
 
     @property
     def is_extrusion_done(self):

@@ -1,12 +1,14 @@
 import logging
+from collections import OrderedDict
 
 from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum, Count
-from collections import OrderedDict
+
 from app_trial_production.mixins import SampleInventoryAccessMixin
 from app_trial_production.models import SampleInventory
+from app_trial_production.filters import SampleInventoryFilter
 from app_trial_production.forms import SapEntryForm
 from app_trial_production.services import SampleInventoryService
 
@@ -26,17 +28,18 @@ class SampleInventoryListView(SampleInventoryAccessMixin, ListView):
     def get_queryset(self):
         qs = super().get_queryset()
         if qs is None:
-            return self.model.objects.all()
+            qs = self.model.objects.all()
 
-        # Tab 过滤
+        # Tab → type 映射（视图级路由，不属用户筛选）
         active_tab = self.request.GET.get('tab', 'PELLET')
         qs = qs.filter(type=active_tab)
 
-        # 状态过滤
-        status = self.request.GET.get('status', '')
-        if status:
-            qs = qs.filter(status=status)
-        else:
+        # 用户筛选：复用 SampleInventoryFilter
+        self.filter = SampleInventoryFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+
+        # 默认排除已消耗（未指定 status 时生效）
+        if not self.request.GET.get('status'):
             qs = qs.exclude(status='CONSUMED')
 
         return qs.select_related(
@@ -47,6 +50,7 @@ class SampleInventoryListView(SampleInventoryAccessMixin, ListView):
         context = super().get_context_data(**kwargs)
 
         active_tab = self.request.GET.get('tab', 'PELLET')
+        context['filter'] = getattr(self, 'filter', None)
         context['active_tab'] = active_tab
         context['tab_choices'] = SampleInventory.Type.choices
         context['status_choices'] = SampleInventory.Status.choices

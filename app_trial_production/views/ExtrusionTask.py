@@ -1,7 +1,7 @@
 import logging
 
 from django.views.generic import DetailView, View
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect, get_object_or_404, render
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
@@ -22,7 +22,7 @@ class ExtrusionTaskDetailView(ExtrusionTaskAccessMixin, DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         if qs is None:
-            return self.model.objects.all()
+            qs = self.model.objects.all()
         return qs.select_related(
             'production_order', 'production_order__project',
             'production_order__process_profile',
@@ -98,7 +98,6 @@ class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
                 if pp_val:
                     form.initial[field] = pp_val
 
-        from django.shortcuts import render
         return render(request, self.template_name, {
             'task': task,
             'form': form,
@@ -118,7 +117,6 @@ class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
                 messages.error(request, '系统错误，请稍后重试')
             return redirect('trial_extrusion_detail', order_pk=order_pk)
 
-        from django.shortcuts import render
         return render(request, self.template_name, {
             'task': task,
             'form': form,

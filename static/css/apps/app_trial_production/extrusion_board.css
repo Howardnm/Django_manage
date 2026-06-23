@@ -55,7 +55,7 @@
 .fc .fc-daygrid-day-frame { min-height: 90px; display: flex; flex-direction: column; }
 .fc .fc-daygrid-day-events { flex: 1; }
 .fc .fc-daygrid-day-bottom { margin-top: auto; }
-.fc .fc-daygrid-day-number { font-size: 12px; font-weight: 500; padding: 6px 8px; color: var(--tblr-muted); }
+.fc .fc-daygrid-day-number { font-size: 12px; font-weight: 500; padding: 6px 8px; color: var(--tblr-black); }
 .fc .fc-day-today .fc-daygrid-day-number { color: var(--tblr-primary); font-weight: 700; }
 .fc .fc-daygrid-more-link { font-size: 11px; font-weight: 500; color: var(--tblr-primary); }
 .fc .fc-daygrid-day:hover { background: rgba(var(--tblr-primary-rgb), 0.02); }

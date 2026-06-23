@@ -24,7 +24,7 @@
     </div>
 </div>
 
-{# 统计卡片 #}
+{# 统计卡片 — 懒加载 #}
 <div class="row row-cards mt-2 mb-4">
     <div class="col-sm-6 col-lg-4">
         <div class="card card-sm">
@@ -37,7 +37,7 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">待排产</div>
-                        <div class="h2 mb-0">{{ pending_orders|length }}</div>
+                        <div class="h2 mb-0" id="stat-pending-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -54,7 +54,7 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">已排期</div>
-                        <div class="h2 mb-0">{{ scheduled_orders|length }}</div>
+                        <div class="h2 mb-0" id="stat-scheduled-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -71,7 +71,7 @@
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">生产中</div>
-                        <div class="h2 mb-0">{{ in_progress_orders|length }}</div>
+                        <div class="h2 mb-0" id="stat-in-progress-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -81,38 +81,19 @@
 
     {% csrf_token %}
 
-    {# ========== 待排产工单 ========== #}
-    <div class="card mb-4">
-        <div class="card-header">
-            <h3 class="card-title">
-                <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
-            </h3>
-            <span class="text-muted small ms-auto">
-                <i class="ti ti-grip-vertical me-1"></i>可拖拽工单至日历 / 选择时间点击"领取"排期
-            </span>
-        </div>
-        <div class="table-responsive">
-            <table class="table table-hover table-vcenter card-table mb-0">
-                <thead>
-                    <tr>
-                        <th>工单号</th>
-                        <th>实验单号</th>
-                        <th>关联项目</th>
-                        <th>配方版本</th>
-                        <th class="text-end">计划产量</th>
-                        <th>工艺方案</th>
-                        <th>创建时间</th>
-                        <th style="width:280px;">排期操作</th>
-                    </tr>
-                </thead>
-                <tbody id="pending-pool">
-                    <tr id="pending-loading">
-                        <td colspan="8" class="text-center text-muted py-4">
-                            <span class="spinner-border spinner-border-sm me-2"></span>加载中...
-                        </td>
-                    </tr>
-                </tbody>
-            </table>
+    {# ========== 待排产工单（HTMX 懒加载，复用 FilterSet + Paginator 标准组件） ========== #}
+    <div hx-get="{% url 'trial_extrusion_board_pending_card' %}"
+         hx-trigger="load"
+         hx-swap="outerHTML">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
+                </h3>
+            </div>
+            <div class="card-body text-center py-5 text-muted">
+                <span class="spinner-border spinner-border-sm me-2"></span>加载中...
+            </div>
         </div>
     </div>
 
@@ -134,8 +115,8 @@
 <script>
     window.SCHEDULE_URL = "{% url 'trial_extrusion_schedule' %}";
     window.EVENTS_URL = "{% url 'trial_extrusion_board_events' %}";
-    window.PENDING_URL = "{% url 'trial_extrusion_board_pending' %}";
-    window.DEFAULT_SCHEDULE_TIME = "{{ default_schedule_time }}";
+    window.STATS_URL = "{% url 'trial_extrusion_board_stats' %}";
+    window.CARD_REFRESH_URL = "{% url 'trial_extrusion_board_pending_card' %}";
     window.UNSCHEDULE_URL_PREFIX = "/trial-production/extrusion-board/";
     window.UNSCHEDULE_URL_SUFFIX = "/unschedule/";
     window.CSRF_TOKEN = "{{ csrf_token }}";

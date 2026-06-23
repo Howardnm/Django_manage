@@ -2,6 +2,7 @@ from django.views.generic import ListView
 from django.db.models import Count, Q
 from app_trial_production.mixins import DashboardAccessMixin
 from app_trial_production.models import ProductionOrder
+from app_trial_production.filters import ProductionOrderFilter
 
 
 class TrialDashboardView(DashboardAccessMixin, ListView):
@@ -14,23 +15,26 @@ class TrialDashboardView(DashboardAccessMixin, ListView):
     def get_queryset(self):
         qs = super().get_queryset()
         if qs is None:
-            return self.model.objects.all()
+            qs = self.model.objects.all()
         qs = qs.select_related(
             'project', 'creator', 'process_profile',
         ).prefetch_related('formula_details__formula').annotate(
             formula_count=Count('formula_details'),
         )
-        status_filter = self.request.GET.get('status', '')
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        return qs.order_by('-created_at')
+        self.filter = ProductionOrderFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+        # 仅在未指定排序时使用默认排序，否则 filter.OrderingFilter 已处理
+        if not self.request.GET.get('sort'):
+            qs = qs.order_by('-created_at')
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['filter'] = self.filter
 
-        status_filter = self.request.GET.get('status', '')
-        context['status_filter'] = status_filter
-        context['status_choices'] = ProductionOrder.Status.choices
+        # 当前排序状态（供模板 sort_toggle 使用）
+        sort_list = self.request.GET.getlist('sort')
+        context['current_sort'] = sort_list[0] if sort_list else ''
 
         # 单次聚合查询替代4个独立COUNT
         agg = ProductionOrder.objects.aggregate(

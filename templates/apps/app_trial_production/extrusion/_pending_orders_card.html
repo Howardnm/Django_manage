@@ -1,0 +1,91 @@
+{% load project_extras %}
+{% url 'trial_extrusion_board_pending_card' as card_url %}
+
+<div class="card mb-4" id="pending-orders-card">
+    {# ── Header ── #}
+    <div class="card-header">
+        <h3 class="card-title">
+            <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
+        </h3>
+        <span class="text-muted small ms-auto">
+            <i class="ti ti-grip-vertical me-1"></i>可拖拽工单至日历 / 选择时间点击"领取"排期
+        </span>
+    </div>
+
+    {# ── Filter bar — 复用公共筛选器模板 ── #}
+    {% include 'apps/list_modules/tools_search_filter.html' with hx_url=card_url hx_target='#pending-orders-card' %}
+
+    {# ── Table ── #}
+    <div class="table-responsive">
+        <table class="table table-hover table-vcenter card-table mb-0">
+            <thead>
+                <tr>
+                    <th>工单号</th>
+                    <th>实验单号</th>
+                    <th>关联项目</th>
+                    <th>配方数量</th>
+                    <th class="text-end">计划产量</th>
+                    <th>工艺方案</th>
+                    <th>创建时间</th>
+                    <th style="width:280px;">排期操作</th>
+                </tr>
+            </thead>
+            <tbody id="pending-pool">
+                {% for order in orders %}
+                <tr id="pending-row-{{ order.pk }}" class="pending-drag-row"
+                    data-event-id="{{ order.pk }}" data-event-title="{{ order.code }}">
+                    <td>
+                        <i class="ti ti-grip-vertical text-muted me-1 pending-drag-handle"></i>
+                        <a href="{% url 'trial_order_detail' order.pk %}" class="fw-bold">{{ order.code }}</a>
+                    </td>
+                    <td class="text-muted">{{ order.trial_code|default:"" }}</td>
+                    <td>
+                        {% if order.project %}
+                            <span class="text-muted">{{ order.project.name|truncatechars:20 }}</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if order.formula_count %}
+                            <span class="badge bg-azure-lt">{{ order.formula_count }} 个</span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end fw-bold">{{ order.quantity_planned }} kg</td>
+                    <td>
+                        {% if order.process_profile %}
+                            <span class="badge bg-green-lt" style="font-size:10px;">
+                                <i class="ti ti-settings me-1"></i>{{ order.process_profile.name|truncatechars:12 }}
+                            </span>
+                        {% else %}
+                            <span class="text-muted">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-muted small">{{ order.created_at|date:"m-d H:i" }}</td>
+                    <td>
+                        <div class="d-flex align-items-center gap-2">
+                            <input type="datetime-local" class="form-control form-control-sm schedule-date-input"
+                                   style="width:175px;" value="{{ default_schedule_time }}">
+                            <button type="button" class="btn btn-sm btn-primary btn-schedule-order"
+                                    data-order-pk="{{ order.pk }}" data-order-code="{{ order.code }}">
+                                <i class="ti ti-calendar-check me-1"></i>领取
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="pending-empty">
+                    <td colspan="8" class="text-center py-4 text-muted">
+                        <i class="ti ti-check fs-1 d-block mb-2"></i>暂无待排产工单
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ── Paginator — 复用公共分页模板 ── #}
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj hx_url=card_url hx_target='#pending-orders-card' %}
+</div>

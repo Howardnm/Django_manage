@@ -107,34 +107,7 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    if (window.TomSelect) {
-        document.querySelectorAll('.remote-search').forEach(function (el) {
-            var modelType = el.getAttribute('data-model');
-            new TomSelect(el, {
-                valueField: 'value',
-                labelField: 'text',
-                searchField: 'text',
-                load: function (query, callback) {
-                    var url = "{% url 'material_api_search' %}" + "?model=" + modelType + "&q=" + encodeURIComponent(query);
-                    fetch(url)
-                        .then(response => response.json())
-                        .then(json => callback(json))
-                        .catch(() => callback());
-                },
-                copyClassesToDropdown: false,
-                dropdownParent: 'body',
-                create: false,
-                placeholder: '请输入关键词搜索...',
-                preload: 'focus',
-                render: {
-                    option: (data, escape) => `<div>${escape(data.text)}</div>`,
-                    item: (data, escape) => `<div>${escape(data.text)}</div>`,
-                    no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>',
-                    loading: (data, escape) => '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'
-                }
-            });
-        });
-    }
+    initRemoteTomSelectAll(document, {apiUrl: "{% url 'material_api_search' %}"});
 });
 </script>
 {% endblock %}

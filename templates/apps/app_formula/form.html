@@ -495,35 +495,11 @@
             if (window.TomSelect) {
                 document.querySelectorAll('.remote-search').forEach(function (el) {
                     var modelType = el.getAttribute('data-model');
-                    // 分流搜索 URL
-                    var searchUrl = "{% url 'material_api_search' %}";
+                    var apiUrl = "{% url 'material_api_search' %}";
                     if (['customer', 'oem', 'salesperson'].includes(modelType)) {
-                        searchUrl = "{% url 'repo_api_search' %}";
+                        apiUrl = "{% url 'repo_api_search' %}";
                     }
-
-                    new TomSelect(el, {
-                        valueField: 'value',
-                        labelField: 'text',
-                        searchField: 'text',
-                        load: function (query, callback) {
-                            var url = searchUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
-                            fetch(url)
-                                .then(response => response.json())
-                                .then(json => callback(json))
-                                .catch(() => callback());
-                        },
-                        copyClassesToDropdown: false,
-                        dropdownParent: 'body',
-                        create: false,
-                        placeholder: '请输入关键词搜索...',
-                        preload: 'focus',
-                        render: {
-                            option: (data, escape) => `<div>${escape(data.text)}</div>`,
-                            item: (data, escape) => `<div>${escape(data.text)}</div>`,
-                            no_results: (data, escape) => '<div class="no-results p-2 text-muted small">无匹配结果</div>',
-                            loading: (data, escape) => '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'
-                        }
-                    });
+                    initRemoteTomSelect(el, {apiUrl: apiUrl});
                 });
             }
 
@@ -681,30 +657,11 @@
 
                         newRowElement.querySelectorAll('.remote-search').forEach(function(el) {
                             var modelType = el.getAttribute('data-model');
-                            var searchUrl = "{% url 'material_api_search' %}";
+                            var apiUrl = "{% url 'material_api_search' %}";
                             if (['customer', 'oem', 'salesperson'].includes(modelType)) {
-                                searchUrl = "{% url 'repo_api_search' %}";
+                                apiUrl = "{% url 'repo_api_search' %}";
                             }
-                            new TomSelect(el, {
-                                valueField: 'value',
-                                labelField: 'text',
-                                searchField: 'text',
-                                load: function (query, callback) {
-                                    var url = searchUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
-                                    fetch(url)
-                                        .then(function(response) { return response.json(); })
-                                        .then(function(json) { callback(json); })
-                                        .catch(function() { callback(); });
-                                },
-                                copyClassesToDropdown: false,
-                                dropdownParent: 'body',
-                                create: false,
-                                preload: 'focus',
-                                render: {
-                                    option: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; },
-                                    item: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; }
-                                }
-                            });
+                            initRemoteTomSelect(el, {apiUrl: apiUrl});
                         });
                     }
                 });

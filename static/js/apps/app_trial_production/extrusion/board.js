@@ -25,7 +25,7 @@ document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
     var calendarEl = document.getElementById('extrusion-calendar');
-    var pendingPool = document.getElementById('pending-pool');
+    var pendingPool = null;  // HTMX 卡片加载后由 htmx:afterSettle 赋值
 
     // ===== 常量 =====
     var DEFAULT_DURATION_MS = 60 * 60 * 1000; // 默认排产时长 1 小时
@@ -53,74 +53,68 @@ document.addEventListener('DOMContentLoaded', function () {
                String(dateObj.getMinutes()).padStart(2, '0');
     }
 
-    // ===== 检查待排产池是否为空 =====
-    function checkPendingPoolEmpty() {
-        var remaining = pendingPool.querySelectorAll('tr[id^="pending-row-"]');
-        if (remaining.length === 0) {
-            pendingPool.innerHTML =
-                '<tr id="pending-empty"><td colspan="8" class="text-center text-muted py-4">' +
-                '<i class="ti ti-check fs-1 d-block mb-2"></i>暂无待排产工单</td></tr>';
+    // ===== HTMX 卡片刷新 =====
+    function refreshPendingCard() {
+        if (typeof htmx !== 'undefined') {
+            htmx.ajax('GET', window.CARD_REFRESH_URL, {
+                target: '#pending-orders-card',
+                swap: 'outerHTML',
+            });
         }
     }
 
-    // ===== 动态加载待排产工单 =====
-    function fetchPendingOrders() {
-        return fetch(window.PENDING_URL)
+    // ===== 懒加载统计指标 =====
+    function fetchStats() {
+        fetch(window.STATS_URL)
             .then(function (r) { return r.json(); })
-            .then(function (orders) {
-                pendingPool.innerHTML = '';
-                if (orders.length === 0) {
-                    checkPendingPoolEmpty();
-                } else {
-                    orders.forEach(function (o) { renderPendingRow(o); });
-                }
-                return orders;
+            .then(function (data) {
+                document.getElementById('stat-pending-count').textContent = data.pending_count;
+                document.getElementById('stat-scheduled-count').textContent = data.scheduled_count;
+                document.getElementById('stat-in-progress-count').textContent = data.in_progress_count;
+            })
+            .catch(function () {
+                // 请求失败时保持占位符 —
             });
     }
 
-    function renderPendingRow(order) {
-        // 移除空占位
-        var emptyRow = document.getElementById('pending-empty');
-        if (emptyRow) emptyRow.remove();
+    // ===== TomSelect 远程搜索配置（复用通用函数 initRemoteTomSelect） =====
+    var PENDING_TS_OPTS = {
+        apiUrl: '/trial-production/api/search/',
+        valueField: 'id',
+        responseKey: 'results',
+    };
 
-        var formulaTags = (order.formula_versions || []).map(function (v) {
-            return '<span class="badge bg-azure-lt me-1" style="font-size:10px;">' + v + '</span>';
-        }).join('');
+    // ===== HTMX 事件：卡片替换前先销毁旧 TomSelect（清除 body 中的 .ts-dropdown 残留） =====
+    document.addEventListener('htmx:beforeSwap', function (e) {
+        destroyTomSelectAll(e.target);
+    });
 
-        var tr = document.createElement('tr');
-        tr.id = 'pending-row-' + order.order_pk;
-        tr.className = 'pending-drag-row';
-        tr.setAttribute('data-event-id', order.order_pk);
-        tr.setAttribute('data-event-title', order.code);
-        tr.innerHTML =
-            '<td>' +
-                '<i class="ti ti-grip-vertical text-muted me-1 pending-drag-handle"></i>' +
-                '<a href="/trial-production/orders/' + order.order_pk + '/" class="fw-bold">' + order.code + '</a>' +
-            '</td>' +
-            '<td class="text-muted">' + (order.trial_code || '') + '</td>' +
-            '<td><span class="text-muted">' + (order.project_name ? order.project_name.substring(0, 20) : '-') + '</span></td>' +
-            '<td>' + (formulaTags || '<span class="text-muted">-</span>') + '</td>' +
-            '<td class="text-end fw-bold">' + (order.quantity || '0') + ' kg</td>' +
-            '<td>' + (order.process_profile_name
-                ? '<span class="badge bg-green-lt" style="font-size:10px;"><i class="ti ti-settings me-1"></i>' + order.process_profile_name.substring(0, 12) + '</span>'
-                : '<span class="text-muted">-</span>') + '</td>' +
-            '<td class="text-muted small">' + (order.created_at || '') + '</td>' +
-            '<td>' +
-                '<div class="d-flex align-items-center gap-2">' +
-                    '<input type="datetime-local" class="form-control form-control-sm schedule-date-input" style="width:175px;" value="' + (window.DEFAULT_SCHEDULE_TIME || '') + '">' +
-                    '<button type="button" class="btn btn-sm btn-primary btn-schedule-order" data-order-pk="' + order.order_pk + '" data-order-code="' + order.code + '">' +
-                        '<i class="ti ti-calendar-check me-1"></i>领取' +
-                    '</button>' +
-                '</div>' +
-            '</td>';
-        pendingPool.appendChild(tr);
-    }
+    // ===== HTMX 事件：卡片加载/刷新后初始化 TomSelect + Draggable =====
+    document.addEventListener('htmx:afterSettle', function () {
+        var card = document.getElementById('pending-orders-card');
+        if (!card) return;
 
-    function removePendingRow(orderPk) {
-        var row = document.getElementById('pending-row-' + orderPk);
-        if (row) row.remove();
-        checkPendingPoolEmpty();
-    }
+        // TomSelect 初始化
+        initRemoteTomSelectAll(card, PENDING_TS_OPTS);
+
+        // Draggable 重建
+        var newPool = document.getElementById('pending-pool');
+        if (newPool && newPool !== pendingPool) {
+            if (draggable) draggable.destroy();
+            pendingPool = newPool;
+            draggable = new FullCalendar.Draggable(pendingPool, {
+                itemSelector: '.pending-drag-row',
+                eventData: function (eventEl) {
+                    return {
+                        id: eventEl.dataset.eventId,
+                        title: eventEl.dataset.eventTitle,
+                        create: true,
+                        duration: '01:00:00',
+                    };
+                }
+            });
+        }
+    });
 
     // ===== 发送排期请求（共用：start 必传，end 可选） =====
     function scheduleOrder(orderPk, startStr, endStr) {
@@ -163,7 +157,6 @@ document.addEventListener('DOMContentLoaded', function () {
         initialView: 'timeGridWeek',
         locale: 'zh-cn',
         firstDay: 0,
-        height: 1350,                          // 固定高度，超出滚轮滚动
         scrollTime: '08:00:00',               // 初始滚动到 8:00
         headerToolbar: {
             left: 'prev,next today',
@@ -184,6 +177,12 @@ document.addEventListener('DOMContentLoaded', function () {
         slotLabelInterval: '01:00:00',
         allDaySlot: true,
         nowIndicator: true,
+
+        // 视图切换时动态设置高度：周/日视图固定 1350px（超出滚轮），月/日程自适应
+        viewDidMount: function (arg) {
+            var isTimeGrid = arg.view.type === 'timeGridWeek' || arg.view.type === 'timeGridDay';
+            arg.view.calendar.setOption('height', isTimeGrid ? 1350 : 'auto');
+        },
 
         // 拖拽开关
         editable: true,
@@ -226,6 +225,8 @@ document.addEventListener('DOMContentLoaded', function () {
                             'data-formula-count="' + formulaCount + '" ' +
                             'data-needs-color="' + (props.needs_color ? '1' : '0') + '" ' +
                             'data-project-name="' + (props.project_name || '') + '" ' +
+                            'data-process-profile="' + (props.process_profile_name || '') + '" ' +
+                            'data-created-at="' + (props.created_at || '') + '" ' +
                             'data-stage-node="' + (props.stage_node || '') + '">' +
                         '<span class="fc-ev-code fw-semibold">' + arg.event.title + '</span>' +
                         (props.quantity
@@ -286,7 +287,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     info.event.remove();
                     calendar.refetchEvents();
                     if (draggedEl) draggedEl.remove();
-                    checkPendingPoolEmpty();
+                    refreshPendingCard();
+                    fetchStats();
 
                     showToast((data.code || orderTitle) + ' 已排期', 'success');
                 })
@@ -307,6 +309,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // ===== 拖拽到待排产池 → 取消排期 =====
         eventDragStop: function (info) {
+            if (!pendingPool) return;
             var pendingCard = pendingPool.closest('.card');
             if (!pendingCard) return;
 
@@ -326,8 +329,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }).then(function (data) {
                     if (data.success) {
                         info.event.remove();
-                        renderPendingRow(data);
-                        checkPendingPoolEmpty();
+                        refreshPendingCard();
+                        fetchStats();
                         showToast(data.code + ' 已取消排期', 'success');
                     }
                 }).catch(function () {
@@ -347,15 +350,19 @@ document.addEventListener('DOMContentLoaded', function () {
             var needsColor = card.dataset.needsColor === '1';
             var projectName = card.dataset.projectName || '-';
             var stageNode = card.dataset.stageNode || '-';
+            var processProfile = card.dataset.processProfile || '-';
+            var createdAt = card.dataset.createdAt || '-';
 
             var html =
                 '<div class="fw-bold pb-1 mb-1 border-bottom">' + info.event.title + '</div>' +
-                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">实验单号</span><span class="badge bg-blue-lt">' + trialCode + '</span></div>' +
-                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">计划产量</span><span class="badge bg-green-lt">' + quantity + ' kg</span></div>' +
-                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配方版本</span><span class="badge bg-purple-lt">' + formulaCount + ' 个</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">实验单号</span><span class="fw-bold">' + trialCode + '</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">计划产量</span><span class="badge bg-purple-lt">' + quantity + ' kg</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配方数量</span><span class="badge bg-blue-lt">' + formulaCount + ' 个</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配色需求</span><span class="badge bg-orange-lt">' + (needsColor ? '需配色' : '无需配色') + '</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">工艺方案</span><span class="badge bg-green-lt">' + processProfile + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">关联项目</span><span class="fw-bold">' + projectName + '</span></div>' +
-                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">项目阶段</span><span class="badge bg-azure-lt">' + stageNode + '</span></div>';
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">项目阶段</span><span class="badge bg-blue-lt">' + stageNode + '</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">创建时间</span><span class="fw-bold">' + createdAt + '</span></div>';
 
             popover.innerHTML = html;
             popover.classList.add('active');
@@ -368,8 +375,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
     calendar.render();
 
-    // ===== 加载待排产工单 =====
-    fetchPendingOrders();
+    // ===== 懒加载统计指标 + 待排产工单卡片 =====
+    fetchStats();
 
     // ===== 悬浮弹窗 DOM =====
     var popover = document.createElement('div');
@@ -377,25 +384,38 @@ document.addEventListener('DOMContentLoaded', function () {
     popover.className = 'fc-event-popover card p-2';
     document.body.appendChild(popover);
 
-    // 鼠标移动时弹窗左上角跟随鼠标
+    // 鼠标移动时弹窗自适应位置，避免被视口边缘遮挡
     calendarEl.addEventListener('mousemove', function (e) {
         if (!popover.classList.contains('active')) return;
-        popover.style.left = (e.clientX + 12) + 'px';
-        popover.style.top = (e.clientY + 12) + 'px';
+
+        var gap = 12;
+        var edgePad = 8;
+        var pw = popover.offsetWidth;
+        var ph = popover.offsetHeight;
+        var vw = window.innerWidth;
+        var vh = window.innerHeight;
+
+        // 默认右下跟随，超出视口时翻转到左/上方
+        var left = e.clientX + gap;
+        var top = e.clientY + gap;
+
+        if (left + pw > vw - edgePad) {
+            left = e.clientX - pw - gap;        // 翻转到光标左侧
+        }
+        if (top + ph > vh - edgePad) {
+            top = e.clientY - ph - gap;         // 翻转到光标上方
+        }
+
+        // 确保不超出左/上边界
+        left = Math.max(edgePad, left);
+        top = Math.max(edgePad, top);
+
+        popover.style.left = left + 'px';
+        popover.style.top = top + 'px';
     });
 
-    // ===== 外部拖拽：将待排产池的行变为可拖拽源 =====
-    var draggable = new FullCalendar.Draggable(pendingPool, {
-        itemSelector: '.pending-drag-row',
-        eventData: function (eventEl) {
-            return {
-                id: eventEl.dataset.eventId,
-                title: eventEl.dataset.eventTitle,
-                create: true,
-                duration: '01:00:00',
-            };
-        }
-    });
+    // ===== 外部拖拽：待排产池行 → 日历（HTMX 卡片加载后由 htmx:afterSettle 初始化） =====
+    var draggable = null;
 
     // ===== 领取排期 / 取消排期 按钮代理 =====
     document.addEventListener('click', function (e) {
@@ -423,7 +443,8 @@ document.addEventListener('DOMContentLoaded', function () {
             scheduleOrder(orderPk, datetimeValue)
                 .then(function (data) {
                     calendar.refetchEvents();
-                    removePendingRow(orderPk);
+                    refreshPendingCard();
+                    fetchStats();
                     showToast((data.code || orderCode) + ' 已排期', 'success');
                 })
                 .catch(function (err) {
@@ -454,8 +475,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.success) {
                     var event = calendar.getEventById(String(orderPk));
                     if (event) event.remove();
-                    renderPendingRow(data);
-                    checkPendingPoolEmpty();
+                    refreshPendingCard();
+                    fetchStats();
                     showToast(data.code + ' 已取消排期', 'success');
                 }
             }).catch(function (err) {

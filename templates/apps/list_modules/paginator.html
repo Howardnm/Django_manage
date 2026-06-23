@@ -1,7 +1,15 @@
-<!-- 【改动2】新增分页条 (Tabler 风格) -->
+<!-- 分页条（Tabler 风格）— 支持可选 HTMX 增强 -->
 {% load project_extras %}
 {% if page_obj.has_other_pages %}
+    {% if hx_url %}
+    <div class="card-footer d-flex align-items-center"
+         hx-boost="true"
+         hx-get="{{ hx_url }}"
+         hx-target="{{ hx_target|default:'#pending-orders-card' }}"
+         hx-swap="outerHTML">
+    {% else %}
     <div class="card-footer d-flex align-items-center">
+    {% endif %}
         <p class="m-0 text-muted">
             显示 <span>{{ page_obj.start_index }}</span> 到 <span>{{ page_obj.end_index }}</span> 条，
             共 <span>{{ page_obj.paginator.count }}</span> 条
@@ -10,7 +18,6 @@
 
             <!-- 上一页 -->
             <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                <!-- 【修改点 1】使用 url_replace -->
                 <a class="page-link" href="{% if page_obj.has_previous %}?{% url_replace page=page_obj.previous_page_number %}{% else %}#{% endif %}">
                     <i class="ti ti-chevron-left"></i>
                     上一页
@@ -22,14 +29,12 @@
                 {% if page_obj.number == i %}
                     <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                 {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
-                    <!-- 【修改点 2】使用 url_replace -->
                     <li class="page-item"><a class="page-link" href="?{% url_replace page=i %}">{{ i }}</a></li>
                 {% endif %}
             {% endfor %}
 
             <!-- 下一页 -->
             <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                <!-- 【修改点 3】使用 url_replace -->
                 <a class="page-link" href="{% if page_obj.has_next %}?{% url_replace page=page_obj.next_page_number %}{% else %}#{% endif %}">
                     下一页
                     <i class="ti ti-chevron-right"></i>

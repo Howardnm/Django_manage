@@ -1,15 +1,16 @@
 <div class="card-body border-bottom py-3">
-    <!-- Action 指向当前 URL (为空即可)，Method GET -->
-    <form method="GET" class="d-flex flex-wrap align-items-center gap-2">
+    <form method="GET"
+          {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
+          class="d-flex flex-wrap align-items-center gap-2">
 
         {% for field in filter.form %}
-            <!-- 1. 隐藏字段直接渲染 (如 sort, page 等) -->
+            {# ── 1. 隐藏字段：直接渲染（如 sort、page）──── #}
             {% if field.is_hidden %}
                 {{ field }}
 
-            <!-- 2. 搜索框：特殊处理，带放大镜图标 -->
+            {# ── 2. 搜索框：input-icon + search 图标 ──── #}
             {% elif field.name == 'q' %}
-                <div class="d-inline-block">
+                <div class="d-inline-block" style="min-width: 300px;">
                     <div class="input-icon">
                         <span class="input-icon-addon">
                             <i class="ti ti-search"></i>
@@ -18,7 +19,7 @@
                     </div>
                 </div>
 
-            <!-- 3. 日期筛选：特殊处理，带日历图标 -->
+            {# ── 3. 日期范围：input-icon + calendar 图标 ──── #}
             {% elif field.name == 'start_date' or field.name == 'end_date' %}
                 <div class="d-inline-block" style="max-width: 160px;">
                     <div class="input-icon">
@@ -29,34 +30,34 @@
                     </div>
                 </div>
 
-            <!-- 4. 性能指标范围筛选 (Min/Max) -->
+            {# ── 4. 数值范围（_min / _max）：紧凑 input-group ──── #}
             {% elif '_min' in field.name or '_max' in field.name %}
-                <div class="d-inline-block" style="max-width: 100px;">
+                <div class="d-inline-block" style="max-width: 120px;">
                     <div class="input-group input-group-sm">
                         {{ field }}
                     </div>
                 </div>
 
-            <!-- 5. 其他字段 (各种下拉筛选框)：自动渲染 -->
+            {# ── 5. 其他字段（下拉筛选框）── #}
+            {# 将 widget 的 style（如 width: 150px）透传到外层容器， #}
+            {# 确保 TomSelect 控件宽度不随选中内容伸缩。               #}
+            {# 无 style 的原生 select 则自然撑开。                    #}
             {% else %}
-                <div class="d-inline-block">
+                <div class="d-inline-block" style="{{ field.field.widget.attrs.style }}">
                     {{ field }}
                 </div>
             {% endif %}
         {% endfor %}
 
+        {# ── 操作按钮（靠右）── #}
         <div class="ms-auto">
-            <!-- 查询按钮 -->
-            <button type="submit" class="btn btn-primary btn-icon" aria-label="Search" title="点击查询" data-bs-toggle="tooltip">
+            <button type="submit" class="btn btn-primary btn-icon" aria-label="查询" title="点击查询" data-bs-toggle="tooltip">
                 <i class="ti ti-search"></i>
             </button>
-
-            <!-- 重置按钮 -->
-            <!-- 逻辑优化：只要 URL 里有任何 GET 参数 (request.GET)，就显示重置按钮 -->
             {% if request.GET %}
-                <!-- href="{{ request.path }}" 表示当前页面的纯路径 (不带问号后面的参数) -->
-                <!-- 这样无论你在哪个 App (项目、材料、客户)，它都能正确重置回当前列表的初始状态 -->
-                <a href="{{ request.path }}" class="btn btn-ghost-danger ms-2" title="清除所有筛选与排序" data-bs-toggle="tooltip">
+                <a href="{% if hx_url %}{{ hx_url }}{% else %}{{ request.path }}{% endif %}"
+                   {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
+                   class="btn btn-ghost-danger ms-2" title="清除所有筛选与排序" data-bs-toggle="tooltip">
                     重置
                 </a>
             {% endif %}

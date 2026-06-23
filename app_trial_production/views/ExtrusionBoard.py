@@ -1,32 +1,20 @@
 import logging
 from datetime import datetime, timedelta
 
-from django.views.generic import TemplateView, View
+from django.views.generic import TemplateView, View, ListView
 from django.shortcuts import get_object_or_404
+from django.db.models import Count, Q
 from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.utils import timezone
 
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
 from app_trial_production.models import ProductionOrder
+from app_trial_production.filters import PendingOrderFilter
 from app_trial_production.services import ProductionOrderService
+from app_trial_production.utils.extrusion import is_all_day_event
 
 logger = logging.getLogger(__name__)
-
-
-def _is_all_day(start_dt, end_dt):
-    """约定：开始和结束时间均为本地 0 时 → 全天事件"""
-    if end_dt is None:
-        return False
-    # 转换为本地时区后再判断小时（UTC 16:00 = 本地 00:00）
-    if start_dt.tzinfo is not None:
-        local_tz = timezone.get_current_timezone()
-        start_dt = start_dt.astimezone(local_tz)
-        end_dt = end_dt.astimezone(local_tz)
-    return (
-        start_dt.hour == 0 and start_dt.minute == 0 and start_dt.second == 0 and
-        end_dt.hour == 0 and end_dt.minute == 0 and end_dt.second == 0
-    )
 
 
 class ExtrusionBoardView(ExtrusionTaskAccessMixin, TemplateView):
@@ -37,36 +25,7 @@ class ExtrusionBoardView(ExtrusionTaskAccessMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        # 待排产池：已接单但未开始挤出的工单（无排期时间）
-        context['pending_orders'] = ProductionOrder.objects.filter(
-            status='ACCEPTED',
-            extrusion_scheduled_date__isnull=True,
-        ).select_related(
-            'project', 'creator', 'process_profile',
-        ).prefetch_related(
-            'formula_details__formula',
-        ).order_by('-created_at')
-
-        # 已排期但未开始：有 scheduled_date 且 status=ACCEPTED
-        context['scheduled_orders'] = ProductionOrder.objects.filter(
-            status='ACCEPTED',
-            extrusion_scheduled_date__isnull=False,
-        ).select_related(
-            'project', 'creator',
-        ).prefetch_related(
-            'formula_details__formula',
-        ).order_by('extrusion_scheduled_date')
-
-        # 生产中：status=EXTRUDING
-        context['in_progress_orders'] = ProductionOrder.objects.filter(
-            status='EXTRUDING',
-        ).select_related(
-            'project', 'extrusion_task__operator', 'color_task',
-        ).prefetch_related(
-            'formula_details__formula',
-        ).order_by('-extrusion_task__started_at')
-
-        # 默认排产时间
+        # 默认排产时间（统计指标改为前端懒加载）
         now = timezone.now()
         default_dt = now.replace(hour=8, minute=0, second=0, microsecond=0)
         context['default_schedule_time'] = default_dt.strftime('%Y-%m-%dT%H:%M')
@@ -86,25 +45,23 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
             status__in=['ACCEPTED', 'EXTRUDING', 'INJECTION_MOLDING', 'TESTING'],
             extrusion_scheduled_date__isnull=False,
         ).select_related(
-            'project', 'extrusion_task',
+            'project', 'extrusion_task', 'process_profile',
         ).prefetch_related(
             'formula_details__formula',
         )
 
-        # FullCalendar 传来 ISO 8601 格式，解析为 datetime 过滤
-        if start_str:
+        # FullCalendar 传来 ISO 8601 格式，使用时间区间重叠判断
+        # 逻辑：事件开始 ≤ 范围结束 AND (事件结束 ≥ 范围开始 OR 无结束时间)
+        if start_str and end_str:
             try:
-                start_str_clean = start_str.replace('Z', '+00:00')
-                start_dt = datetime.fromisoformat(start_str_clean)
-                qs = qs.filter(extrusion_scheduled_date__gte=start_dt)
-            except (ValueError, TypeError):
-                pass
-
-        if end_str:
-            try:
-                end_str_clean = end_str.replace('Z', '+00:00')
-                end_dt = datetime.fromisoformat(end_str_clean)
-                qs = qs.filter(extrusion_scheduled_date__lte=end_dt)
+                start_dt = datetime.fromisoformat(start_str.replace('Z', '+00:00'))
+                end_dt = datetime.fromisoformat(end_str.replace('Z', '+00:00'))
+                qs = qs.filter(
+                    extrusion_scheduled_date__lte=end_dt,
+                ).filter(
+                    Q(extrusion_scheduled_end__gte=start_dt) |
+                    Q(extrusion_scheduled_end__isnull=True),
+                )
             except (ValueError, TypeError):
                 pass
 
@@ -121,7 +78,7 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
             start_dt = order.extrusion_scheduled_date
             end_dt = order.extrusion_scheduled_end or start_dt
 
-            is_all_day = _is_all_day(start_dt, end_dt)
+            is_all_day = is_all_day_event(start_dt, end_dt)
             if is_all_day:
                 # 转为本地时区取日期（UTC 16:00 = 本地次日 00:00）
                 local_tz = timezone.get_current_timezone()
@@ -151,6 +108,8 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
                 'extendedProps': {
                     'trial_code': order.trial_code,
                     'project_name': order.project.name if order.project else '',
+                    'process_profile_name': order.process_profile.name if order.process_profile else '',
+                    'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
                     'quantity': str(order.quantity_planned),
                     'formula_count': len(formula_versions),
                     'needs_color': has_color,
@@ -204,7 +163,7 @@ class ExtrusionScheduleApiView(ExtrusionTaskAccessMixin, View):
                 has_color = True
 
         end_dt = order.extrusion_scheduled_end or order.extrusion_scheduled_date
-        is_all_day = _is_all_day(order.extrusion_scheduled_date, end_dt)
+        is_all_day = is_all_day_event(order.extrusion_scheduled_date, end_dt)
 
         return JsonResponse({
             'success': True,
@@ -264,35 +223,66 @@ class ExtrusionUnscheduleApiView(ExtrusionTaskAccessMixin, View):
         })
 
 
-class PendingOrdersApiView(ExtrusionTaskAccessMixin, View):
-    """GET: 待排产工单列表 API"""
+class ExtrusionStatsApiView(ExtrusionTaskAccessMixin, View):
+    """GET: 排产工作台顶部统计指标 API — 待排产/已排期/生产中 数量"""
     enforce_dept_isolation = False
 
     def get(self, request):
-        orders = ProductionOrder.objects.filter(
+        pending_count = ProductionOrder.objects.filter(
+            status='ACCEPTED',
+            extrusion_scheduled_date__isnull=True,
+        ).count()
+
+        scheduled_count = ProductionOrder.objects.filter(
+            status='ACCEPTED',
+            extrusion_scheduled_date__isnull=False,
+        ).count()
+
+        in_progress_count = ProductionOrder.objects.filter(
+            status='EXTRUDING',
+        ).count()
+
+        return JsonResponse({
+            'pending_count': pending_count,
+            'scheduled_count': scheduled_count,
+            'in_progress_count': in_progress_count,
+        })
+
+
+class PendingOrdersCardView(ExtrusionTaskAccessMixin, ListView):
+    """待排产工单卡片（HTMX 片段）— 复用 FilterSet + ListView.paginate_by"""
+    model = ProductionOrder
+    template_name = 'apps/app_trial_production/extrusion/_pending_orders_card.html'
+    context_object_name = 'orders'
+    paginate_by = 10
+    enforce_dept_isolation = False
+
+    def get_queryset(self):
+        # Step 1: 权限过滤后的基查询
+        qs = super().get_queryset()
+        if qs is None:
+            qs = self.model.objects.all()
+
+        # Step 2: 基过滤 + 优化关联查询
+        qs = qs.filter(
             status='ACCEPTED',
             extrusion_scheduled_date__isnull=True,
         ).select_related(
             'project', 'process_profile',
-        ).prefetch_related(
-            'formula_details__formula',
-        ).order_by('-created_at')
+        ).annotate(
+            formula_count=Count('formula_details'),
+        )
 
-        data = []
-        for order in orders:
-            formula_versions = [
-                f'v{fd.formula.version}'
-                for fd in order.formula_details.all()
-            ]
-            data.append({
-                'order_pk': order.pk,
-                'code': order.code,
-                'trial_code': order.trial_code,
-                'quantity': str(order.quantity_planned),
-                'project_name': order.project.name if order.project else '',
-                'process_profile_name': order.process_profile.name if order.process_profile else '',
-                'formula_versions': formula_versions,
-                'created_at': order.created_at.strftime('%m-%d %H:%M'),
-            })
+        # Step 3: 实例化 Filter（在 select_related/prefetch_related 之后）
+        self.filter = PendingOrderFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs.order_by('-created_at')
+        return qs
 
-        return JsonResponse(data, safe=False)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filter
+
+        now = timezone.now()
+        default_dt = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        context['default_schedule_time'] = default_dt.strftime('%Y-%m-%dT%H:%M')
+        return context

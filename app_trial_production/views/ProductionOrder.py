@@ -1,9 +1,11 @@
+import logging
+
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Count
-import logging
+
 from app_trial_production.mixins import (
     TrialProductionAccessMixin, ExtrusionTaskAccessMixin, RndAccessMixin,
 )
@@ -51,7 +53,7 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
     def get_queryset(self):
         qs = super().get_queryset()
         if qs is None:
-            return self.model.objects.all()
+            qs = self.model.objects.all()
         return qs.select_related(
             'project', 'project_node', 'process_profile',
             'process_profile__machine', 'process_profile__screw_combination',
@@ -383,6 +385,9 @@ class ProductionOrderUpdateView(ExtrusionTaskAccessMixin, UpdateView):
     form_class = ProductionOrderUpdateForm
     template_name = 'apps/app_trial_production/order/edit.html'
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['formula_details'] = self.object.formula_details.select_related(
@@ -429,8 +434,6 @@ class ProductionOrderStartWorkflowView(RndAccessMixin, View):
             ProductionOrderService.start_workflow(order, config.workflow_definition, request.user)
             messages.success(request, '审批流程已启动')
         except Exception:
-            import logging
-            logger = logging.getLogger(__name__)
             logger.exception(f"Workflow start failed for order {order.code}")
             messages.error(request, '启动审批流程时发生错误，请稍后重试')
         return redirect('trial_order_detail', pk=order.pk)

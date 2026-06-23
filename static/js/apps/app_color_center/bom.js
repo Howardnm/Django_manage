@@ -1,40 +1,10 @@
 /* color_bom.js — 色粉配比BOM页面脚本 */
 
-/* ---- TomSelect 远程搜索初始化 ---- */
-function initRemoteSearch(el) {
-    if (!window.TomSelect) return;
-    var modelType = el.getAttribute('data-model');
-    var materialApiUrl = window.MATERIAL_API_URL || '';
-    new TomSelect(el, {
-        valueField: 'value',
-        labelField: 'text',
-        searchField: 'text',
-        load: function(query, callback) {
-            var url = materialApiUrl + "?model=" + modelType + "&q=" + encodeURIComponent(query);
-            fetch(url)
-                .then(function(r) { return r.json(); })
-                .then(function(json) { callback(json); })
-                .catch(function() { callback(); });
-        },
-        copyClassesToDropdown: false,
-        dropdownParent: 'body',
-        create: false,
-        placeholder: '请输入关键词搜索...',
-        preload: 'focus',
-        render: {
-            option: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; },
-            item: function(data, escape) { return '<div>' + escape(data.text) + '</div>'; },
-            no_results: function() { return '<div class="no-results p-2 text-muted small">无匹配结果</div>'; },
-            loading: function() { return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>'; }
-        }
-    });
-}
+var BOM_TS_API_URL = window.MATERIAL_API_URL || '';
 
 function initColorBom() {
-    /* 初始化远程搜索控件 */
-    document.querySelectorAll('.remote-search').forEach(function(el) {
-        initRemoteSearch(el);
-    });
+    /* 初始化远程搜索控件 — 复用通用函数 tomselect_remote.js（base.html 已加载） */
+    initRemoteTomSelectAll(document, {apiUrl: BOM_TS_API_URL});
 
     /* ---- Formset 动态新增行 ---- */
     var addBtn = document.getElementById('add-entry-row');
@@ -52,9 +22,7 @@ function initColorBom() {
                 totalForms.value = count + 1;
 
                 var newRowEl = container.lastElementChild;
-                newRowEl.querySelectorAll('.remote-search').forEach(function(el) {
-                    initRemoteSearch(el);
-                });
+                initRemoteTomSelectAll(newRowEl, {apiUrl: BOM_TS_API_URL});
             });
         }
     }

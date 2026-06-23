@@ -9,7 +9,8 @@ from .views.Dashboard import TrialDashboardView
 from .views.ExtrusionBoard import (
     ExtrusionBoardView, ExtrusionScheduleApiView,
     ExtrusionStartApiView, ExtrusionUnscheduleApiView,
-    ExtrusionEventsApiView, PendingOrdersApiView,
+    ExtrusionEventsApiView, ExtrusionStatsApiView,
+    PendingOrdersCardView,
 )
 from .views.ExtrusionTask import (
     ExtrusionTaskDetailView, ExtrusionTaskStartView,
@@ -42,7 +43,8 @@ urlpatterns = [
     # Extrusion Board (排产工作台)
     path('extrusion-board/', ExtrusionBoardView.as_view(), name='trial_extrusion_board'),
     path('extrusion-board/events/', ExtrusionEventsApiView.as_view(), name='trial_extrusion_board_events'),
-    path('extrusion-board/pending/', PendingOrdersApiView.as_view(), name='trial_extrusion_board_pending'),
+    path('extrusion-board/pending-card/', PendingOrdersCardView.as_view(), name='trial_extrusion_board_pending_card'),
+    path('extrusion-board/stats/', ExtrusionStatsApiView.as_view(), name='trial_extrusion_board_stats'),
     path('extrusion-board/schedule/', ExtrusionScheduleApiView.as_view(), name='trial_extrusion_schedule'),
     path('extrusion-board/<int:order_pk>/start/', ExtrusionStartApiView.as_view(), name='trial_extrusion_board_start'),
     path('extrusion-board/<int:order_pk>/unschedule/', ExtrusionUnscheduleApiView.as_view(), name='trial_extrusion_board_unschedule'),

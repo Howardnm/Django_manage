@@ -262,49 +262,8 @@
         }
 
         document.addEventListener('DOMContentLoaded', function() {
-            // TomSelect 初始化 for remote-search
-            var remoteSelects = document.querySelectorAll('.remote-search');
-            if (window.TomSelect) {
-                remoteSelects.forEach(function (el) {
-                    var modelType = el.getAttribute('data-model');
-                    new TomSelect(el, {
-                        valueField: 'value',
-                        labelField: 'text',
-                        searchField: 'text',
-                        load: function (query, callback) {
-                            // 使用一个通用的 API 搜索 URL，这里需要定义 raw_material_api_search
-                            var url = "{% url 'raw_material_api_search' %}?model=" + modelType + "&q=" + encodeURIComponent(query);
-                            fetch(url)
-                                .then(response => response.json())
-                                .then(json => {
-                                    callback(json);
-                                })
-                                .catch(() => {
-                                    callback();
-                                });
-                        },
-                        copyClassesToDropdown: false,
-                        dropdownParent: 'body',
-                        create: false,
-                        placeholder: '请输入关键词搜索...',
-                        preload: 'focus',
-                        render: {
-                            option: function (data, escape) {
-                                return '<div>' + escape(data.text) + '</div>';
-                            },
-                            item: function (data, escape) {
-                                return '<div>' + escape(data.text) + '</div>';
-                            },
-                            no_results: function (data, escape) {
-                                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                            },
-                            loading: function (data, escape) {
-                                return '<div class="spinner-border spinner-border-sm text-muted m-2"></div>';
-                            }
-                        }
-                    });
-                });
-            }
+            // TomSelect 远程搜索 — 复用通用函数 tomselect_remote.js
+            initRemoteTomSelectAll(document, {apiUrl: "{% url 'raw_material_api_search' %}"});
 
             // FormSet 动态添加行逻辑
             const addBtn = document.getElementById('add-property');
