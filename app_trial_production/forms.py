@@ -10,10 +10,12 @@ class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
     """创建生产工单表单"""
     class Meta:
         model = ProductionOrder
-        fields = ['quantity_planned', 'process_profile', 'remark']
+        fields = ['quantity_planned', 'process_profile', 'packaging_desc', 'storage_location', 'remark']
         widgets = {
             'quantity_planned': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'process_profile': forms.Select(attrs={'class': 'form-select'}),
+            'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
+            'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
@@ -47,8 +49,8 @@ class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
             # 后处理参数
             'throughput', 'cooling_method', 'strand_count', 'water_temp',
             'water_bath_length', 'air_knife_pressure', 'pelletizing_speed', 'screen_mesh',
-            # 产出与备注
-            'total_output', 'remark',
+            # 备注
+            'remark',
         ]
         widgets = {
             **{f: forms.NumberInput(attrs={'class': 'form-control'})
@@ -70,7 +72,6 @@ class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
             'air_knife_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
             'pelletizing_speed': forms.NumberInput(attrs={'class': 'form-control'}),
             'screen_mesh': forms.TextInput(attrs={'class': 'form-control'}),
-            'total_output': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
@@ -81,23 +82,24 @@ class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
 
 # ---- 样品库存 ----
 
+class VersionModelChoiceField(forms.ModelChoiceField):
+    """配方版本选择 — 下拉仅显示版本号"""
+
+    def label_from_instance(self, obj):
+        return f'v{obj.version}'
+
+
 class PelletSplitForm(forms.Form):
     """颗粒分拨表单（非 ModelForm，由 Service 层处理入库）"""
-    formula = forms.ModelChoiceField(
+    formula = VersionModelChoiceField(
         queryset=None, required=False,
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'}))
+        widget=forms.Select(attrs={'class': 'form-select'}))
     sub_type = forms.ChoiceField(
         choices=[('FINISHED', '颗粒成品'), ('FOR_INJECTION', '待打样颗粒')],
         widget=forms.Select(attrs={'class': 'form-select'}))
     quantity = forms.DecimalField(
-        max_digits=10, decimal_places=2,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}))
-    packaging_desc = forms.CharField(
-        required=False, max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'}))
-    storage_location = forms.CharField(
-        required=False, max_length=100,
-        widget=forms.TextInput(attrs={'class': 'form-control'}))
+        max_digits=10, decimal_places=2, required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': '0.00'}))
 
 
 PelletSplitFormSet = forms.formset_factory(

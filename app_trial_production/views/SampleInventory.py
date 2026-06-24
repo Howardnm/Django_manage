@@ -4,7 +4,7 @@ from collections import OrderedDict
 from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Sum, Count
+from django.db.models import Count
 
 from app_trial_production.mixins import SampleInventoryAccessMixin
 from app_trial_production.models import SampleInventory
@@ -122,68 +122,4 @@ class SapEntryView(SampleInventoryAccessMixin, View):
 
         return render(request, self.template_name, {
             'sample': sample, 'form': form,
-        })
-
-
-class PelletSplitView(SampleInventoryAccessMixin, View):
-    """挤出后颗粒分拨"""
-    template_name = 'apps/app_trial_production/pellet/split.html'
-
-    def _resolve_order(self):
-        if not hasattr(self, '_order'):
-            from app_trial_production.models import ProductionOrder
-            self._order = get_object_or_404(ProductionOrder, pk=self.kwargs['order_pk'])
-        return self._order
-
-    def _get_formulas(self):
-        from app_formula.models import LabFormula
-        order = self._resolve_order()
-        return LabFormula.objects.filter(
-            code=order.trial_code, project=order.project,
-        ).order_by('version')
-
-    def get(self, request, order_pk):
-        from app_trial_production.forms import PelletSplitFormSet
-        order = self._resolve_order()
-        formulas = self._get_formulas()
-
-        formset = PelletSplitFormSet()
-        for form in formset.forms:
-            form.fields['formula'].queryset = formulas
-
-        return render(request, self.template_name, {
-            'production_order': order,
-            'formset': formset,
-            'formulas': formulas,
-        })
-
-    def post(self, request, order_pk):
-        from app_trial_production.forms import PelletSplitFormSet
-        order = self._resolve_order()
-        formulas = self._get_formulas()
-
-        formset = PelletSplitFormSet(request.POST)
-        for form in formset.forms:
-            form.fields['formula'].queryset = formulas
-
-        if formset.is_valid():
-            splits = []
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                    splits.append({
-                        'formula_id': form.cleaned_data.get('formula').pk if form.cleaned_data.get('formula') else None,
-                        'sub_type': form.cleaned_data['sub_type'],
-                        'quantity': form.cleaned_data['quantity'],
-                        'packaging_desc': form.cleaned_data.get('packaging_desc', ''),
-                        'storage_location': form.cleaned_data.get('storage_location', ''),
-                    })
-
-            SampleInventoryService.create_pellet_batch(order, splits)
-            messages.success(request, f'已创建 {len(splits)} 条颗粒样品入库记录')
-            return redirect('trial_order_detail', pk=order_pk)
-
-        return render(request, self.template_name, {
-            'production_order': order,
-            'formset': formset,
-            'formulas': formulas,
         })

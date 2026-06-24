@@ -39,8 +39,6 @@ class ExtrusionTaskService:
             if field in params:
                 setattr(task, field, params[field])
 
-        if 'total_output' in params:
-            task.total_output = params['total_output']
         if 'remark' in params:
             task.remark = params['remark']
 
@@ -49,26 +47,12 @@ class ExtrusionTaskService:
 
     @staticmethod
     @transaction.atomic
-    def complete_task(task, user, total_output=None):
+    def complete_task(task, user):
         """
         完成挤出任务 → 调用并行屏障检查。
-
-        Args:
-            task: ExtrusionTask 实例
-            user: 操作员
-            total_output: 总产出(kg)
+        实际产量由后续颗粒分拨汇总得出，不在此处写入。
         """
-        if total_output is not None:
-            task.total_output = total_output
-
-        # 同步更新工单实际产量
-        if task.total_output:
-            order = task.production_order
-            order.quantity_actual = task.total_output
-            order.save(update_fields=['quantity_actual', 'updated_at'])
-
         StateMachine.transition(task, 'COMPLETED', user)
 
-        # 检查并行屏障（挤出+配色均完成 → 推进工单）
         from .order_service import ProductionOrderService
         ProductionOrderService.check_and_advance(task.production_order)

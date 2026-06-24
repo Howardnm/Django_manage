@@ -16,9 +16,6 @@ class ExtrusionTask(AbstractExtrusionParams):
     # 操作员
     operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="挤出操作员", related_name='extrusion_tasks')
 
-    # ---- 产出统计 ----
-    total_output = models.DecimalField("总产出(kg)", max_digits=10, decimal_places=2, null=True, blank=True)
-
     # ---- 状态与时间 ----
     status = models.CharField("任务状态", max_length=20, choices=Status.choices, default=Status.PENDING)
     remark = models.TextField("备注", blank=True)

@@ -9,7 +9,7 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">排产工单</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产工单</a></li>
                         <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' task.production_order.pk %}">{{ task.production_order.code }}</a></li>
                         <li class="breadcrumb-item active">挤出任务</li>
                     </ol>
@@ -37,7 +37,6 @@
                 </a>
                 <form method="post" action="{% url 'trial_extrusion_complete' task.production_order.pk %}" class="d-inline">
                     {% csrf_token %}
-                    <input type="hidden" name="total_output" value="{{ task.total_output|default:'' }}">
                     <button type="submit" class="btn btn-success">
                         <i class="ti ti-check me-1"></i>完成挤出
                     </button>
@@ -85,10 +84,6 @@
                     <dd class="col-7">{{ task.completed_at|date:"Y-m-d H:i" }}</dd>
                     {% endif %}
 
-                    {% if task.total_output %}
-                    <dt class="col-5 text-muted">总产出</dt>
-                    <dd class="col-7"><span class="fw-bold">{{ task.total_output }} kg</span></dd>
-                    {% endif %}
                 </dl>
             </div>
         </div>

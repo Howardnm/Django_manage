@@ -4,7 +4,7 @@ from django.db.models import Q
 
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_project.models import Project
-from .models import ProductionOrder, SampleInventory
+from .models import ProductionOrder, ExtrusionTask, SampleInventory
 
 
 class ProductionOrderFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
@@ -93,6 +93,46 @@ class PendingOrderFilter(TablerFilterMixin, django_filters.FilterSet):
             Q(code__icontains=value) |
             Q(trial_code__icontains=value) |
             Q(project__name__icontains=value)
+        )
+
+
+class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
+    """挤出任务筛选器"""
+
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    status = django_filters.ChoiceFilter(
+        choices=ExtrusionTask.Status.choices,
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-search',
+            'placeholder': '任务状态',
+            'style': 'width: 150px;',
+        }),
+    )
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('created_at', 'created_at'),
+            ('status', 'status'),
+        ),
+        widget=forms.HiddenInput,
+    )
+
+    class Meta:
+        model = ExtrusionTask
+        fields = ['q', 'status', 'start_date', 'end_date']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'q' in self.filters:
+            self.filters['q'].field.widget.attrs['placeholder'] = '检索工单号 / 实验单号'
+
+    def filter_search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(production_order__code__icontains=value) |
+            Q(production_order__trial_code__icontains=value)
         )
 
 

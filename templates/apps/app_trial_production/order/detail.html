@@ -14,7 +14,7 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">工单列表</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">工单列表</a></li>
                         <li class="breadcrumb-item active">{{ order.code }}</li>
                     </ol>
                 </nav>
@@ -64,13 +64,13 @@
                 </a>
                 {% endif %}
 
-                {% if order.status == 'EXTRUDING' and extrusion_task.status == 'COMPLETED' %}
+                {% if extrusion_task and extrusion_task.status == 'COMPLETED' and not has_pellet_splits %}
                 <a href="{% url 'trial_pellet_split' order.pk %}" class="btn btn-outline-cyan">
                     <i class="ti ti-arrows-split me-1"></i>颗粒分拨
                 </a>
                 {% endif %}
 
-                {% if order.status == 'INJECTION_MOLDING' %}
+                {% if order.status == 'INJECTION_MOLDING' and not injection_task %}
                 <a href="{% url 'mold_injection:task_create' order_pk=order.pk %}" class="btn btn-outline-blue">
                     <i class="ti ti-plus me-1"></i>创建注塑任务
                 </a>
@@ -81,69 +81,212 @@
 </div>
 
 <div class="row row-cards mt-3">
+    <!-- 基本信息 -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">基本信息</h3>
+                <h3 class="card-title">
+                    <i class="ti ti-info-circle me-2 text-blue"></i>基本信息
+                </h3>
             </div>
-            <div class="card-body">
-                <div class="datagrid">
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">实验单号</div>
-                        <div class="datagrid-content fw-bold">{{ order.trial_code }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">配方数量</div>
-                        <div class="datagrid-content">{{ formulas|length }} 个版本</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">关联项目</div>
-                        <div class="datagrid-content">{{ order.project.name|default:"-" }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">关联节点</div>
-                        <div class="datagrid-content">{{ order.project_node.name|default:"-" }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">创建人</div>
-                        <div class="datagrid-content">{{ order.creator.realname|default:order.creator.username }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">创建时间</div>
-                        <div class="datagrid-content">{{ order.created_at|date:"Y-m-d H:i" }}</div>
-                    </div>
-                </div>
+            <div class="card-body p-0">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted" style="width: 120px;">
+                                <i class="ti ti-hash me-1"></i>工单号
+                            </td>
+                            <td class="fw-bold">{{ order.code }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-flask me-1"></i>实验单号
+                            </td>
+                            <td>
+                                <span class="fw-bold">{{ order.trial_code }}</span>
+                                <span class="text-muted small ms-2">({{ formulas|length }} 个配方版本)</span>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-building-factory me-1"></i>关联项目
+                            </td>
+                            <td>
+                                {% if order.project %}
+                                <span class="fw-bold">{{ order.project.name }}</span>
+                                {% if order.project.material %}
+                                <span class="badge bg-azure-lt ms-2">{{ order.project.material.name }}</span>
+                                {% endif %}
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if order.project_node %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-git-branch me-1"></i>项目节点
+                            </td>
+                            <td>
+                                <span class="badge bg-purple-lt">{{ order.project_node.get_stage_display }}</span>
+                                {% if order.project_node.round %}<span class="small ms-1">Round {{ order.project_node.round }}</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-user me-1"></i>创建人
+                            </td>
+                            <td>{{ order.creator.realname|default:order.creator.username }}</td>
+                        </tr>
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-calendar me-1"></i>创建时间
+                            </td>
+                            <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% if order.updated_at != order.created_at %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-clock-edit me-1"></i>更新时间
+                            </td>
+                            <td>{{ order.updated_at|date:"Y-m-d H:i" }}</td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
 
+    <!-- 生产信息 -->
     <div class="col-lg-6">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">生产信息</h3>
+                <h3 class="card-title">
+                    <i class="ti ti-settings me-2 text-green"></i>生产信息
+                </h3>
             </div>
-            <div class="card-body">
-                <div class="datagrid">
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">计划产量</div>
-                        <div class="datagrid-content fw-bold">{{ order.quantity_planned }} kg</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">实际产量</div>
-                        <div class="datagrid-content">{{ order.quantity_actual|default:"-" }} kg</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">工艺方案</div>
-                        <div class="datagrid-content">{{ order.process_profile.name|default:"-" }}</div>
-                    </div>
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">挤出操作员</div>
-                        <div class="datagrid-content">{{ order.extruder_operator.realname|default:"-" }}</div>
-                    </div>
-                </div>
-                {% if order.remark %}
-                <div class="mt-3"><div class="text-muted small">备注</div><div>{{ order.remark|linebreaks }}</div></div>
-                {% endif %}
+            <div class="card-body p-0">
+                <table class="table table-vcenter card-table">
+                    <tbody>
+                        <tr>
+                            <td class="text-muted" style="width: 120px;">
+                                <i class="ti ti-ruler me-1"></i>计划产量
+                            </td>
+                            <td>
+                                <span class="fw-bold fs-4">{{ order.quantity_planned }}</span>
+                                <span class="text-muted small"> kg</span>
+                            </td>
+                        </tr>
+                        {% if order.quantity_actual %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-scale me-1"></i>实际产量
+                            </td>
+                            <td>
+                                <span class="fw-bold fs-4 text-green">{{ order.quantity_actual }}</span>
+                                <span class="text-muted small"> kg</span>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-cpu me-1"></i>工艺方案
+                            </td>
+                            <td>
+                                {% if order.process_profile %}
+                                <div class="fw-bold">{{ order.process_profile.name }}</div>
+                                <div class="text-muted small mt-1">
+                                    {% if order.process_profile.machine %}
+                                    <span class="badge bg-blue-lt me-1">
+                                        <i class="ti ti-tool me-1"></i>{{ order.process_profile.machine.name|default:order.process_profile.machine }}
+                                    </span>
+                                    {% endif %}
+                                    {% if order.process_profile.screw_combination %}
+                                    <span class="badge bg-azure-lt">
+                                        <i class="ti ti-spiral me-1"></i>{{ order.process_profile.screw_combination.name|default:order.process_profile.screw_combination }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                {% else %}
+                                <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% if order.extrusion_scheduled_date %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-calendar-event me-1"></i>挤出排产
+                            </td>
+                            <td>
+                                <span class="fw-bold">{{ order.extrusion_scheduled_date|date:"m-d H:i" }}</span>
+                                {% if order.extrusion_scheduled_end %}
+                                <i class="ti ti-arrow-right mx-1 text-muted"></i>
+                                <span class="fw-bold">{{ order.extrusion_scheduled_end|date:"m-d H:i" }}</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-user-cog me-1"></i>挤出操作员
+                            </td>
+                            <td>{{ order.extruder_operator.realname|default:"-" }}</td>
+                        </tr>
+                        {% if order.packaging_desc %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-package me-1"></i>包装说明
+                            </td>
+                            <td>{{ order.packaging_desc }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.storage_location %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-map-pin me-1"></i>存放位置
+                            </td>
+                            <td>{{ order.storage_location }}</td>
+                        </tr>
+                        {% endif %}
+                        {% if order.approved_by %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-checkbox me-1"></i>审批人
+                            </td>
+                            <td>
+                                {{ order.approved_by.realname|default:order.approved_by.username }}
+                                {% if order.approved_at %}
+                                <span class="text-muted small ms-2">
+                                    <i class="ti ti-clock me-1"></i>{{ order.approved_at|date:"m-d H:i" }}
+                                </span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if order.completed_at %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-check me-1"></i>完成时间
+                            </td>
+                            <td>
+                                <span class="badge bg-green-lt">{{ order.completed_at|date:"Y-m-d H:i" }}</span>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if order.remark %}
+                        <tr>
+                            <td class="text-muted align-top">
+                                <i class="ti ti-notes me-1"></i>备注
+                            </td>
+                            <td>
+                                <div class="text-muted">{{ order.remark|linebreaks }}</div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -246,7 +389,7 @@
 {% endif %}
 
 <!-- 样品库存汇总 -->
-{% if pellet_summary.finished.count or pellet_summary.for_injection.count or specimen_summary.for_testing.count %}
+{% if pellet_summary.finished.count or pellet_summary.for_injection.count or specimen_summary.for_testing.count or formula_split_summaries %}
 <div class="row mt-3">
     <div class="col-12">
         <div class="card">
@@ -255,7 +398,7 @@
                 <a href="{% url 'trial_sample_list' %}?trial_code={{ order.trial_code }}" class="btn btn-sm btn-outline-secondary">查看全部</a>
             </div>
             <div class="card-body">
-                <div class="row g-3">
+                <div class="row g-3 mb-3">
                     <div class="col-md-3">
                         <div class="card card-sm bg-green-lt">
                             <div class="card-body py-2 text-center">
@@ -289,6 +432,48 @@
                         </div>
                     </div>
                 </div>
+
+                {% if formula_split_summaries %}
+                <div class="table-responsive">
+                    <table class="table table-vcenter card-table">
+                        <thead>
+                            <tr>
+                                <th>配方</th>
+                                <th class="text-end">计划 (kg)</th>
+                                <th class="text-end" style="width: 100px">颗粒成品</th>
+                                <th class="text-end" style="width: 100px">待打样</th>
+                                <th class="text-end" style="width: 100px">合计</th>
+                                <th>进度</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for fs in formula_split_summaries %}
+                            <tr>
+                                <td>
+                                    <span class="badge bg-azure-lt me-1">v{{ fs.formula.version }}</span>
+                                    <span class="small">{{ fs.formula.name|truncatechars:24 }}</span>
+                                </td>
+                                <td class="text-end fw-bold">{{ fs.planned_qty|floatformat:1 }}</td>
+                                <td class="text-end text-green">{{ fs.finished_qty|floatformat:1 }}</td>
+                                <td class="text-end text-orange">{{ fs.for_injection_qty|floatformat:1 }}</td>
+                                <td class="text-end fw-bold">{{ fs.total_split|floatformat:1 }}</td>
+                                <td>
+                                    {% if fs.planned_qty > 0 %}
+                                    <div class="d-flex align-items-center gap-2">
+                                        <div class="progress progress-sm flex-grow-1" style="height: 4px;">
+                                            <div class="progress-bar {% if fs.total_split > fs.planned_qty %}bg-danger{% else %}bg-primary{% endif %}"
+                                                 style="width: {% widthratio fs.total_split|floatformat:1 fs.planned_qty|floatformat:1 100 %}%"></div>
+                                        </div>
+                                        <span class="small text-muted" style="min-width: 45px;">{% widthratio fs.total_split|floatformat:1 fs.planned_qty|floatformat:1 100 %}%</span>
+                                    </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>

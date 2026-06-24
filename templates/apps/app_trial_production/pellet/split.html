@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}颗粒分拨 - {{ production_order.code }}{% endblock %}
 
@@ -8,91 +9,239 @@
         <div class="page-pretitle">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">排产工单</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产工单</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' production_order.pk %}">{{ production_order.code }}</a></li>
                     <li class="breadcrumb-item active">颗粒分拨</li>
                 </ol>
             </nav>
         </div>
-        <h2 class="page-title">挤出后颗粒分拨</h2>
-        <div class="text-muted">将挤出产出分拨为颗粒成品和待打样颗粒，分拨后自动入样品库。</div>
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <h2 class="page-title mb-1">
+                    <i class="ti ti-arrows-split me-2 text-cyan"></i>挤出后颗粒分拨
+                </h2>
+                <div class="text-muted">
+                    将挤出产出分拨为 <span class="badge bg-green-lt">颗粒成品</span>（可 SAP 入库）与
+                    <span class="badge bg-orange-lt">待打样颗粒</span>（供注塑取样），提交后自动入样品库
+                </div>
+            </div>
+            <div class="col-auto">
+                <span class="text-muted small">工单</span>
+                <div class="fw-bold">{{ production_order.code }}</div>
+            </div>
+        </div>
     </div>
 </div>
 
 <div class="container-xl">
-    <form method="post">
+    <form method="post" id="pellet-split-form">
         {% csrf_token %}
         {{ formset.management_form }}
-        <div class="row row-cards">
-            <div class="col-lg-8">
-                <div class="card">
-                    <div class="card-header">
-                        <h3 class="card-title">分拨明细</h3>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table card-table table-vcenter">
-                                <thead>
-                                    <tr>
-                                        <th>配方版本</th>
-                                        <th>类型</th>
-                                        <th>数量(kg)</th>
-                                        <th>包装说明</th>
-                                        <th>存放位置</th>
-                                        <th>删除</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for form in formset %}
-                                    <tr>
-                                        <td>{{ form.formula }}</td>
-                                        <td>{{ form.sub_type }}</td>
-                                        <td>{{ form.quantity }}</td>
-                                        <td>{{ form.packaging_desc }}</td>
-                                        <td>{{ form.storage_location }}</td>
-                                        <td>{% if form.DELETE %}{{ form.DELETE }}{% endif %}</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
+
+        <!-- 统计卡片 -->
+        <div class="row g-3 mb-3 mt-3">
+            <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <span class="avatar bg-cyan-lt me-3">
+                            <i class="ti ti-scale text-cyan fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">实际产出</div>
+                            <div class="fw-bold fs-3">
+                                {{ production_order.quantity_actual|default:"-" }}
+                                <span class="text-muted  fw-normal">kg</span>
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
-
-            <div class="col-lg-4">
-                <div class="card">
-                    <div class="card-header"><h3 class="card-title">工单信息</h3></div>
-                    <div class="card-body">
-                        <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">实验单号</div>
-                                <div class="datagrid-content fw-bold">{{ production_order.trial_code }}</div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">实际产量</div>
-                                <div class="datagrid-content">{{ production_order.quantity_actual|default:"-" }} kg</div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <span class="avatar bg-blue-lt me-3">
+                            <i class="ti ti-flask text-blue fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">配方版本</div>
+                            <div class="fw-bold fs-3">
+                                {{ formulas|length }}
+                                <span class="text-muted  fw-normal">个</span>
                             </div>
                         </div>
                     </div>
                 </div>
-                <div class="card mt-3">
-                    <div class="card-body d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="ti ti-check me-1"></i> 提交分拨
-                        </button>
-                        <a href="{% url 'trial_order_detail' production_order.pk %}" class="btn btn-outline-secondary">返回工单</a>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <span class="avatar bg-green-lt me-3">
+                            <i class="ti ti-package text-green fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">颗粒成品批次</div>
+                            <div class="fw-bold fs-3" id="stat-finished-count">0</div>
+                        </div>
                     </div>
                 </div>
+            </div>
+            <div class="col-sm-6 col-lg-3">
+                <div class="card card-sm">
+                    <div class="card-body d-flex align-items-center">
+                        <span class="avatar bg-orange-lt me-3">
+                            <i class="ti ti-packages text-orange fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="text-muted small">待打样批次</div>
+                            <div class="fw-bold fs-3" id="stat-injection-count">0</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- 分拨表单 -->
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h3 class="card-title">
+                            <i class="ti ti-list-details me-2"></i>分拨明细
+                        </h3>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btn-add-row">
+                            <i class="ti ti-plus me-1"></i>添加一行
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter" id="split-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 120px">配方版本</th>
+                                    <th style="width: 110px">分拨类型</th>
+                                    <th>数量 (kg)</th>
+                                    <th style="width: 50px"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for form in formset %}
+                                <tr class="split-row{% if form.DELETE.value %} d-none{% endif %}">
+                                    <td>
+                                        <span class="badge bg-azure-lt ">v{{ form.row_label.version }}</span>
+                                        {{ form.formula.as_hidden }}
+                                    </td>
+                                    <td>
+                                        <span class="badge {{ form.row_label.type_css }} ">{{ form.row_label.type_label }}</span>
+                                        {{ form.sub_type.as_hidden }}
+                                    </td>
+                                    <td>
+                                        {{ form.quantity }}
+                                        {% if form.quantity.errors %}
+                                        <div class="text-danger small mt-1">{{ form.quantity.errors|join:", " }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="d-none">{{ form.DELETE }}</span>
+                                        <button type="button" class="btn btn-sm btn-icon btn-ghost-danger btn-remove-row" title="删除此行">
+                                            <i class="ti ti-x"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 侧边栏 -->
+            <div class="col-lg-4">
+                <!-- 分拨进度 -->
+                <div class="card mb-3" id="allocation-tracker-card">
+                    <div class="card-header d-flex align-items-center">
+                        <h3 class="card-title">
+                            <i class="ti ti-chart-pie me-2"></i>分拨进度
+                        </h3>
+                        <span class="badge ms-auto" id="tracker-status">待填写</span>
+                    </div>
+                    <div class="card-body" id="allocation-tracker-body">
+                        {% for fs in formula_summaries %}
+                        <div class="mb-3" data-formula-pk="{{ fs.formula.pk }}">
+                            <div class="d-flex align-items-center mb-1">
+                                <span class="badge bg-azure-lt me-2">v{{ fs.formula.version }}</span>
+                                <span class="text-truncate small">{{ fs.formula.name|truncatechars:18 }}</span>
+                                <span class="ms-auto fw-bold formula-current" id="formula-current-{{ fs.formula.pk }}">0.0</span>
+                                <span class="text-muted small"> / {{ fs.planned_qty|floatformat:1 }} kg</span>
+                            </div>
+                            <div class="progress progress-sm" style="height: 6px;">
+                                <div class="progress-bar bg-primary" id="formula-bar-{{ fs.formula.pk }}"
+                                     style="width: 0%"
+                                     data-planned="{{ fs.planned_qty|floatformat:1 }}"
+                                     data-existing="{{ fs.total_split|floatformat:1 }}"
+                                     role="progressbar"
+                                     aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            {% if fs.total_split > 0 %}
+                            <div class="text-muted small mt-1">已有 {{ fs.total_split|floatformat:1 }} kg 已入库</div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- 超标预警 -->
+                <div class="alert alert-danger d-none mb-3" id="overplan-warning" role="alert">
+                    <div class="d-flex align-items-center">
+                        <i class="ti ti-alert-triangle me-2 fs-2"></i>
+                        <div>
+                            <div class="fw-bold">超出计划产量</div>
+                            <div class="small" id="overplan-detail"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作区 -->
+                <div class="card">
+                    <div class="card-body d-grid gap-2">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="ti ti-check me-1"></i>提交分拨
+                        </button>
+                        <a href="{% url 'trial_order_detail' production_order.pk %}" class="btn btn-outline-secondary">
+                            <i class="ti ti-arrow-left me-1"></i>返回工单
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 提示 -->
                 <div class="card mt-3">
                     <div class="card-body text-muted small">
-                        <i class="ti ti-info-circle me-1"></i>
-                        <strong>颗粒成品</strong>：满足交付标准，可直接SAP入库。<br>
-                        <strong>待打样颗粒</strong>：供注塑任务取样使用。
+                        <div class="fw-bold mb-2"><i class="ti ti-info-circle me-1"></i>分拨说明</div>
+                        <ul class="list-unstyled mb-0">
+                            <li class="mb-1"><span class="badge bg-green me-1"></span> <strong>颗粒成品</strong> — 满足交付标准，后续可执行 SAP 入库</li>
+                            <li><span class="badge bg-orange me-1"></span> <strong>待打样颗粒</strong> — 供注塑任务取样，消耗后状态自动变更为"已消耗"</li>
+                        </ul>
                     </div>
                 </div>
             </div>
         </div>
     </form>
 </div>
+
+<!-- 空行模板 (JS 动态添加用) -->
+<template id="empty-row-template">
+    <tr class="split-row">
+        <td>{{ formset.empty_form.formula }}</td>
+        <td>{{ formset.empty_form.sub_type }}</td>
+        <td>{{ formset.empty_form.quantity }}</td>
+        <td class="text-center">
+            <span class="d-none">{{ formset.empty_form.DELETE }}</span>
+            <button type="button" class="btn btn-sm btn-icon btn-ghost-danger btn-remove-row" title="删除此行">
+                <i class="ti ti-x"></i>
+            </button>
+        </td>
+    </tr>
+</template>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apps/app_trial_production/pellet/split.js' %}"></script>
 {% endblock %}

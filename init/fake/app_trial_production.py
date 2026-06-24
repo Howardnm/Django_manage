@@ -210,7 +210,6 @@ def run(ctx: FakeContext) -> None:
                 extrusion_task.water_temp = random.randint(20, 35)
                 extrusion_task.pelletizing_speed = round(random.uniform(50, 200), 1)
                 extrusion_task.recorded_by = extruder_op
-                extrusion_task.total_output = po.quantity_actual or rand_decimal(8, 50, 1)
                 extrusion_task.save()
 
             # 配色任务

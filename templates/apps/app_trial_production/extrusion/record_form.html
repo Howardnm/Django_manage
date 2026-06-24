@@ -24,7 +24,7 @@
                 <div class="page-pretitle">
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">排产工单</a></li>
+                            <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产工单</a></li>
                             <li class="breadcrumb-item"><a href="{% url 'trial_order_detail' production_order.pk %}">{{ production_order.code }}</a></li>
                             <li class="breadcrumb-item"><a href="{% url 'trial_extrusion_detail' production_order.pk %}">挤出任务</a></li>
                             <li class="breadcrumb-item active">生产记录</li>
@@ -109,17 +109,6 @@
             {% endif %}
 
             {# 产出统计 #}
-            <div class="card mb-3">
-                <div class="card-header bg-azure-lt">
-                    <h3 class="card-title text-azure"><i class="ti ti-package me-2"></i>产出统计</h3>
-                </div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label small">{{ form.total_output.label }} (kg)</label>
-                        {{ form.total_output }}
-                    </div>
-                </div>
-            </div>
 
             {# 备注 #}
             <div class="card">

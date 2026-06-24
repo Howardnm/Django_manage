@@ -1,15 +1,46 @@
 import logging
 
-from django.views.generic import DetailView, View
+from django.views.generic import ListView, DetailView, View
 from django.shortcuts import redirect, get_object_or_404, render
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
 from app_trial_production.models import ExtrusionTask, ProductionOrder
+from app_trial_production.filters import ExtrusionTaskFilter
 from app_trial_production.forms import ExtrusionRecordForm
 from app_trial_production.services import ExtrusionTaskService
 
 logger = logging.getLogger(__name__)
+
+
+class ExtrusionTaskListView(ExtrusionTaskAccessMixin, ListView):
+    """挤出任务列表"""
+    model = ExtrusionTask
+    template_name = 'apps/app_trial_production/extrusion/list.html'
+    context_object_name = 'tasks'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if qs is None:
+            qs = self.model.objects.all()
+        qs = qs.select_related(
+            'production_order', 'production_order__project',
+            'operator',
+        ).order_by('-created_at')
+
+        self.filter = ExtrusionTaskFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+        if not self.request.GET.get('sort'):
+            qs = qs.order_by('-created_at')
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filter
+        sort_list = self.request.GET.getlist('sort')
+        context['current_sort'] = sort_list[0] if sort_list else ''
+        return context
 
 
 class ExtrusionTaskDetailView(ExtrusionTaskAccessMixin, DetailView):
@@ -137,17 +168,8 @@ class ExtrusionTaskCompleteView(ExtrusionTaskAccessMixin, View):
             if task.operator_id != request.user.pk:
                 raise PermissionDenied("您不是该任务分配的挤出操作员")
 
-        total_output = request.POST.get('total_output')
-        if total_output:
-            try:
-                total_output = float(total_output)
-            except (ValueError, TypeError):
-                total_output = None
-        else:
-            total_output = task.total_output
-
         try:
-            ExtrusionTaskService.complete_task(task, request.user, total_output)
+            ExtrusionTaskService.complete_task(task, request.user)
             messages.success(request, '挤出任务已完成')
         except Exception:
             logger.exception(f"Extrusion complete failed: order_pk={order_pk}")

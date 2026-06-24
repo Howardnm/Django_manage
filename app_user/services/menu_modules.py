@@ -292,7 +292,7 @@ class MenuModule:
 
     @staticmethod
     def get_trial_production():
-        """返回试验排产中心菜单定义（精简版：仅保留挤出核心功能）。
+        """返回试验排产中心菜单定义。
 
         模块级: TECH_CORE + 挤出操作员 + 采购。
         配色/注塑/测试已拆分至独立菜单模块。
@@ -307,7 +307,7 @@ class MenuModule:
             "sub_items": [
                 {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY},
                 {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_EXTRUSION_OP]},
-                {"name": "挤出任务", "url_name": "trial_order_list"},
+                {"name": "挤出任务", "url_name": "trial_extrusion_task_list"},
                 {"name": "样品库存", "url_name": "trial_sample_list"},
                 {"name": "排产配置", "url_name": "trial_config", "visible_to": IdentityConfig.RND_ONLY, "permissions": ["app_trial_production.change_trialproductionconfig"]},
             ]
@@ -317,7 +317,7 @@ class MenuModule:
     def get_color_center():
         """配色中心菜单"""
         return {
-            "name": "配色中心",
+            "name": "材料配色中心",
             "icon": "ti-palette",
             "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_COLOR_OP],
             "url_name": "color_center:list",

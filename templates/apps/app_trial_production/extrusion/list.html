@@ -1,0 +1,109 @@
+{% extends "base.html" %}
+{% load static %}
+{% load project_extras %}
+
+{% block title %}挤出任务列表{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                    <li class="breadcrumb-item active">挤出任务</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-tool me-2 text-azure"></i>挤出任务列表
+                </h2>
+            </div>
+            <div class="col-auto">
+                <a href="{% url 'trial_extrusion_board' %}" class="btn btn-outline-azure">
+                    <i class="ti ti-calendar-event me-1"></i>排产工作台
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-xl">
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+
+    <div class="row row-cards mt-3">
+        <div class="col-12">
+            <div class="card">
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter text-nowrap">
+                        <thead>
+                            <tr>
+                                <th>
+                                    <a href="?{% url_replace sort='production_order__code'|sort_toggle:current_sort %}"
+                                       class="table-sort-header text-reset">工单号</a>
+                                </th>
+                                <th>实验单号</th>
+                                <th>关联项目</th>
+                                <th>操作员</th>
+                                <th>状态</th>
+                                <th>开始时间</th>
+                                <th>完成时间</th>
+                                <th>创建时间</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for task in tasks %}
+                            <tr>
+                                <td>
+                                    <a href="{% url 'trial_extrusion_detail' task.production_order.pk %}" class="fw-bold text-reset">
+                                        {{ task.production_order.code }}
+                                    </a>
+                                </td>
+                                <td>
+                                    <span class="text-muted small">{{ task.production_order.trial_code }}</span>
+                                </td>
+                                <td>
+                                    {% if task.production_order.project %}
+                                    <span class="text-truncate d-inline-block" style="max-width: 160px;">
+                                        {{ task.production_order.project.name }}
+                                    </span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>{{ task.operator.realname|default:"-" }}</td>
+                                <td>
+                                    <span class="badge {{ task.status_css_class }}">{{ task.get_status_display }}</span>
+                                </td>
+                                <td class="text-muted small">{{ task.started_at|date:"m-d H:i"|default:"-" }}</td>
+                                <td class="text-muted small">{{ task.completed_at|date:"m-d H:i"|default:"-" }}</td>
+                                <td class="text-muted small">{{ task.created_at|date:"m-d H:i" }}</td>
+                                <td>
+                                    <a href="{% url 'trial_extrusion_detail' task.production_order.pk %}"
+                                       class="btn btn-sm btn-outline-secondary">
+                                        <i class="ti ti-eye me-1"></i>详情
+                                    </a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">
+                                    <i class="ti ti-tool fs-1 d-block mb-2"></i>
+                                    暂无挤出任务
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% if page_obj %}
+                <div class="card-footer">
+                    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

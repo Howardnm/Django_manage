@@ -21,7 +21,7 @@ class ProductionOrderFormulaDetailAdmin(admin.ModelAdmin):
 
 @admin.register(ExtrusionTask)
 class ExtrusionTaskAdmin(admin.ModelAdmin):
-    list_display = ['production_order', 'operator', 'status', 'total_output', 'created_at']
+    list_display = ['production_order', 'operator', 'status', 'created_at']
     list_filter = ['status']
     search_fields = ['production_order__code', 'production_order__trial_code']
 

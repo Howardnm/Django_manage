@@ -1,25 +1,27 @@
 from django.urls import path
 from .views.ProductionOrder import (
-    ProductionOrderListView, ProductionOrderDetailView,
-    ProductionOrderCreateView, ProductionOrderUpdateView,
-    ProductionOrderInitiateView, ProductionOrderStartWorkflowView,
-    ProductionOrderStartExtrusionView, ProductionOrderDeleteView,
+    ProductionOrderDetailView, ProductionOrderCreateView,
+    ProductionOrderUpdateView, ProductionOrderInitiateView,
+    ProductionOrderStartWorkflowView, ProductionOrderStartExtrusionView,
+    ProductionOrderDeleteView,
 )
 from .views.Dashboard import TrialDashboardView
-from .views.ExtrusionBoard import (
-    ExtrusionBoardView, ExtrusionScheduleApiView,
-    ExtrusionStartApiView, ExtrusionUnscheduleApiView,
-    ExtrusionEventsApiView, ExtrusionStatsApiView,
-    PendingOrdersCardView,
+from .views.ExtrusionBoard import ExtrusionBoardView
+from .views.ExtrusionBoardApi import (
+    ExtrusionScheduleApiView, ExtrusionStartApiView,
+    ExtrusionUnscheduleApiView, ExtrusionEventsApiView,
+    ExtrusionStatsApiView, PendingOrdersCardView,
 )
 from .views.ExtrusionTask import (
-    ExtrusionTaskDetailView, ExtrusionTaskStartView,
-    ExtrusionRecordFormView, ExtrusionTaskCompleteView,
+    ExtrusionTaskListView, ExtrusionTaskDetailView,
+    ExtrusionTaskStartView, ExtrusionRecordFormView,
+    ExtrusionTaskCompleteView,
 )
 from .views.SampleInventory import (
     SampleInventoryListView, SampleInventoryDetailView,
-    SapEntryView, PelletSplitView,
+    SapEntryView,
 )
+from .views.PelletSplit import PelletSplitView
 from .views.Config import TrialConfigView
 from .views.Autocomplete import TrialAutocompleteView
 
@@ -31,7 +33,6 @@ urlpatterns = [
     path('', TrialDashboardView.as_view(), name='trial_dashboard'),
 
     # Production Orders
-    path('orders/', ProductionOrderListView.as_view(), name='trial_order_list'),
     path('orders/create/', ProductionOrderCreateView.as_view(), name='trial_order_create'),
     path('orders/initiate/', ProductionOrderInitiateView.as_view(), name='trial_order_initiate'),
     path('orders/<int:pk>/', ProductionOrderDetailView.as_view(), name='trial_order_detail'),
@@ -50,6 +51,7 @@ urlpatterns = [
     path('extrusion-board/<int:order_pk>/unschedule/', ExtrusionUnscheduleApiView.as_view(), name='trial_extrusion_board_unschedule'),
 
     # Extrusion Task
+    path('extrusion-tasks/', ExtrusionTaskListView.as_view(), name='trial_extrusion_task_list'),
     path('orders/<int:order_pk>/extrusion/', ExtrusionTaskDetailView.as_view(), name='trial_extrusion_detail'),
     path('orders/<int:order_pk>/extrusion/start/', ExtrusionTaskStartView.as_view(), name='trial_extrusion_start'),
     path('orders/<int:order_pk>/extrusion/record/', ExtrusionRecordFormView.as_view(), name='trial_extrusion_record'),

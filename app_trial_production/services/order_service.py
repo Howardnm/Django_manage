@@ -14,9 +14,11 @@ class ProductionOrderService:
     @transaction.atomic
     def create_order(user, trial_code, project_id, project_node_id=None,
                      process_profile_id=None, formula_details=None,
-                     test_item_ids=None, mold_matrix=None, remark=''):
+                     test_item_ids=None, mold_matrix=None,
+                     packaging_desc='', storage_location='', remark=''):
         """
-        创建排产工单 + 自动创建测试任务。
+        创建排产工单 — 仅创建工单本身 + 配方明细。
+        注塑/测试任务延迟到前序阶段完成后触发（check_and_advance）。
 
         Args:
             user: 创建人
@@ -35,7 +37,6 @@ class ProductionOrderService:
         from app_trial_production.models import (
             ProductionOrder, ProductionOrderFormulaDetail,
         )
-        from app_material_testing.models import TestingTask
 
         order = ProductionOrder.objects.create(
             trial_code=trial_code,
@@ -43,6 +44,8 @@ class ProductionOrderService:
             project_node_id=project_node_id,
             process_profile_id=process_profile_id,
             creator=user,
+            packaging_desc=packaging_desc,
+            storage_location=storage_location,
             remark=remark,
         )
 
@@ -60,46 +63,18 @@ class ProductionOrderService:
 
         if total_qty > 0:
             order.quantity_planned = total_qty
-            order.save(update_fields=['quantity_planned'])
 
-        # 自动创建测试任务
+        # 存储待触发子任务配置（不立即创建，等前序阶段完成后触发）
         if test_item_ids:
-            testing_task = TestingTask.objects.create(
-                production_order=order,
-                status='PENDING',
-            )
-            testing_task.test_items.set(test_item_ids)
-
-        # 处理模具×配方矩阵
+            order.test_items.set(test_item_ids)
         if mold_matrix:
-            from app_mold_injection.models import InjectionTask, MoldRequirement
-            from app_formula.models import LabFormula
-
-            formulas = list(LabFormula.objects.filter(
-                code=trial_code, project_id=project_id,
-            ).order_by('version'))
-
             has_any_mold = any(m.get('mold_id') for m in mold_matrix)
             if has_any_mold:
-                injection_task = InjectionTask.objects.create(
-                    production_order=order,
-                    source='ORDER',
-                    status='PENDING',
-                )
-                for mold_entry in mold_matrix:
-                    mold_id = mold_entry.get('mold_id')
-                    if not mold_id:
-                        continue
-                    quantities = mold_entry.get('formula_quantities', {})
-                    for formula in formulas:
-                        qty = quantities.get(str(formula.pk), 0) or quantities.get(formula.pk, 0)
-                        if qty and int(qty) > 0:
-                            MoldRequirement.objects.create(
-                                injection_task=injection_task,
-                                mold_id=mold_id,
-                                formula=formula,
-                                specimen_quantity=int(qty),
-                            )
+                import json
+                order.pending_mold_config = json.dumps(mold_matrix)
+
+        if total_qty > 0 or test_item_ids or mold_matrix:
+            order.save()
 
         logger.info(f"ProductionOrder {order.code} created by {user}")
         return order
@@ -192,35 +167,56 @@ class ProductionOrderService:
         """
         检查子任务完成情况，自动推进工单状态。
         在 ExtrusionTask / ColorMatchingTask / InjectionTask / TestingTask 完成时调用。
+
+        任务触发时机（遵循工序先后依赖）：
+        - 挤出完成       → 触发注塑任务（如有模具配置，配色任务独立并行不阻塞）
+        - 注塑完成       → 触发测试任务（如有测试项目）
         """
         if order.status == 'COMPLETED':
             return
 
         if order.status == 'EXTRUDING':
-            # 挤出+配色并行屏障
+            # 挤出完成 + 颗粒分拨完成 → 触发下游任务
+            # 配色任务独立并行，不构成屏障
             ext = getattr(order, 'extrusion_task', None)
-            color = getattr(order, 'color_task', None)
             ext_done = ext and ext.status == 'COMPLETED'
-            color_done = (
-                color is None
-                or color.status in ('COMPLETED', 'NOT_REQUIRED')
-            )
-            if ext_done and color_done:
-                # 无注塑任务 → 跳过注塑和测试，直接完成
-                injection = getattr(order, 'injection_task', None)
-                if injection is None:
-                    StateMachine.transition(order, 'COMPLETED')
-                    logger.info(f"Order {order.code} advanced to COMPLETED (skip injection)")
-                else:
-                    StateMachine.transition(order, 'INJECTION_MOLDING')
-                    logger.info(f"Order {order.code} advanced to INJECTION_MOLDING")
+            if not ext_done:
+                return
+
+            # 颗粒分拨是注塑/测试的前置条件
+            from app_trial_production.models import SampleInventory
+            pellet_split_done = SampleInventory.objects.filter(
+                production_order=order, type='PELLET',
+            ).exists()
+            if not pellet_split_done:
+                return
+
+            if order.pending_mold_config:
+                # 触发注塑任务 → 推进到注塑阶段
+                ProductionOrderService._create_injection_from_pending(order)
+                StateMachine.transition(order, 'INJECTION_MOLDING')
+                logger.info(f"Order {order.code} advanced to INJECTION_MOLDING (injection created)")
+            elif order.test_items.exists():
+                # 无注塑，直接触发测试任务 → 推进到测试阶段
+                ProductionOrderService._create_testing_from_pending(order)
+                StateMachine.transition(order, 'TESTING')
+                logger.info(f"Order {order.code} advanced to TESTING (testing created, skip injection)")
+            else:
+                # 无后续任务 → 直接完成
+                StateMachine.transition(order, 'COMPLETED')
+                logger.info(f"Order {order.code} advanced to COMPLETED (no pending tasks)")
 
         elif order.status == 'INJECTION_MOLDING':
-            # 注塑任务完成 → 推进到测试
+            # 注塑任务完成 → 触发测试任务或完成
             injection = getattr(order, 'injection_task', None)
             if injection and injection.status == 'COMPLETED':
-                StateMachine.transition(order, 'TESTING')
-                logger.info(f"Order {order.code} advanced to TESTING")
+                if order.test_items.exists():
+                    ProductionOrderService._create_testing_from_pending(order)
+                    StateMachine.transition(order, 'TESTING')
+                    logger.info(f"Order {order.code} advanced to TESTING (testing created)")
+                else:
+                    StateMachine.transition(order, 'COMPLETED')
+                    logger.info(f"Order {order.code} advanced to COMPLETED (no testing needed)")
 
         elif order.status == 'TESTING':
             # 测试任务回写完成 → 完成工单
@@ -231,3 +227,58 @@ class ProductionOrderService:
             if all_written:
                 StateMachine.transition(order, 'COMPLETED')
                 logger.info(f"Order {order.code} completed")
+
+    # ---- 子任务触发（延迟创建，不在 create_order 时立即创建） ----
+
+    @staticmethod
+    def _create_injection_from_pending(order):
+        """从 pending_mold_config 创建 InjectionTask + MoldRequirement（挤出+配色完成后调用）"""
+        import json
+        from app_mold_injection.models import InjectionTask, MoldRequirement
+        from app_formula.models import LabFormula
+
+        mold_matrix = json.loads(order.pending_mold_config)
+        formulas = list(LabFormula.objects.filter(
+            code=order.trial_code, project_id=order.project_id,
+        ).order_by('version'))
+
+        task = InjectionTask.objects.create(
+            production_order=order,
+            source='ORDER',
+            status='PENDING',
+        )
+        for mold_entry in mold_matrix:
+            mold_id = mold_entry.get('mold_id')
+            if not mold_id:
+                continue
+            quantities = mold_entry.get('formula_quantities', {})
+            for formula in formulas:
+                qty = quantities.get(str(formula.pk), 0) or quantities.get(formula.pk, 0)
+                if qty and int(qty) > 0:
+                    MoldRequirement.objects.create(
+                        injection_task=task,
+                        mold_id=mold_id,
+                        formula=formula,
+                        specimen_quantity=int(qty),
+                    )
+
+        # 清除 pending 配置，避免重复触发
+        order.pending_mold_config = ''
+        order.save(update_fields=['pending_mold_config'])
+
+        logger.info(f"InjectionTask {task.pk} created from pending mold config for order {order.code}")
+        return task
+
+    @staticmethod
+    def _create_testing_from_pending(order):
+        """从 order.test_items 创建 TestingTask（注塑完成后调用）"""
+        from app_material_testing.models import TestingTask
+
+        task = TestingTask.objects.create(
+            production_order=order,
+            status='PENDING',
+        )
+        task.test_items.set(order.test_items.all())
+
+        logger.info(f"TestingTask {task.pk} created from pending test items for order {order.code}")
+        return task

@@ -45,8 +45,19 @@ class SampleInventoryService:
             )
             samples.append(sample)
 
+        # 按分拨明细的 KG 数量汇总更新工单实际产量
+        total_kg = sum(float(s['quantity']) for s in splits if s.get('quantity'))
+        if total_kg > 0:
+            production_order.quantity_actual = total_kg
+            production_order.save(update_fields=['quantity_actual', 'updated_at'])
+
+        # 颗粒分拨完成 → 检查是否可推进工单（触发注塑/测试）
+        from app_trial_production.services.order_service import ProductionOrderService
+        ProductionOrderService.check_and_advance(production_order)
+
         logger.info(
             f"Created {len(samples)} pellet samples for order {production_order.code}"
+            f" (total={total_kg}kg)"
         )
         return samples
 

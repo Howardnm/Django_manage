@@ -15,7 +15,7 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_order_list' %}">工单列表</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">工单列表</a></li>
                         <li class="breadcrumb-item active">创建工单</li>
                     </ol>
                 </nav>
@@ -41,41 +41,59 @@
 
             <!-- 工单信息 -->
             <div class="card mb-3">
-                <div class="card-header"><h3 class="card-title"><i class="ti ti-file-text me-2"></i>工单信息</h3></div>
-                <div class="card-body">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-file-text me-2 text-blue"></i>工单信息</h3>
+                </div>
+                <div class="card-body p-0">
                     {% if form.non_field_errors %}
-                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+                    <div class="alert alert-danger m-3">{{ form.non_field_errors }}</div>
                     {% endif %}
 
                     {% if initiate_data %}
-                    <div class="datagrid mb-3">
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">关联项目</div>
-                            <div class="datagrid-content">{{ initiate_data.project_name|default:"-" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">实验单号</div>
-                            <div class="datagrid-content fw-bold">{{ initiate_data.trial_code }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">配方名称</div>
-                            <div class="datagrid-content">{{ initiate_data.formula_name|default:"-" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">配方版本数</div>
-                            <div class="datagrid-content">{{ trial_formulas|length }} 个版本</div>
-                        </div>
-                    </div>
+                    <table class="table table-vcenter card-table">
+                        <tbody>
+                            <tr>
+                                <td class="text-muted" style="width: 130px;"><i class="ti ti-building-factory me-1"></i>关联项目</td>
+                                <td class="fw-bold">{{ initiate_data.project_name|default:"-" }}</td>
+                                <td class="text-muted" style="width: 130px;"><i class="ti ti-flask me-1"></i>实验单号</td>
+                                <td class="fw-bold">{{ initiate_data.trial_code }}</td>
+                            </tr>
+                            <tr>
+                                <td class="text-muted"><i class="ti ti-test-pipe me-1"></i>配方名称</td>
+                                <td>{{ initiate_data.formula_name|default:"-" }}</td>
+                                <td class="text-muted"><i class="ti ti-versions me-1"></i>配方版本</td>
+                                <td><span class="badge bg-azure-lt">{{ trial_formulas|length }} 个版本</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                     {% endif %}
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">工艺方案 {{ form.process_profile.field.required|yesno:"*," }}</label>
-                            {{ form.process_profile }}
-                        </div>
-                        <div class="col-md-6 mb-3">
-                            <label class="form-label">{{ form.remark.label }}</label>
-                            {{ form.remark }}
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-cpu me-1 text-muted"></i>工艺方案
+                                </label>
+                                {{ form.process_profile }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-package me-1 text-muted"></i>包装说明
+                                </label>
+                                {{ form.packaging_desc }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-map-pin me-1 text-muted"></i>存放位置
+                                </label>
+                                {{ form.storage_location }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-notes me-1 text-muted"></i>{{ form.remark.label }}
+                                </label>
+                                {{ form.remark }}
+                            </div>
                         </div>
                     </div>
                     <span class="d-none">{{ form.quantity_planned }}</span>

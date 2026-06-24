@@ -1,15 +1,14 @@
 import logging
 
-from django.views.generic import ListView, DetailView, CreateView, UpdateView, View
+from django.views.generic import DetailView, CreateView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count
 
 from app_trial_production.mixins import (
     TrialProductionAccessMixin, ExtrusionTaskAccessMixin, RndAccessMixin,
 )
-from app_trial_production.models import ProductionOrder
+from app_trial_production.models import ProductionOrder, SampleInventory
 from app_mold_injection.models import MoldType
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm,
@@ -17,28 +16,6 @@ from app_trial_production.forms import (
 from app_trial_production.services import ProductionOrderService
 
 logger = logging.getLogger(__name__)
-
-
-class ProductionOrderListView(TrialProductionAccessMixin, ListView):
-    """挤出任务列表 — 仅显示生产中的工单"""
-    model = ProductionOrder
-    template_name = 'apps/app_trial_production/order/list.html'
-    context_object_name = 'orders'
-    paginate_by = 20
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if qs is None:
-            return self.model.objects.all()
-        return qs.filter(
-            status='EXTRUDING',
-        ).select_related(
-            'project', 'creator', 'process_profile',
-        ).prefetch_related(
-            'formula_details__formula',
-        ).annotate(
-            formula_count=Count('formula_details'),
-        ).order_by('-created_at')
 
 
 class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
@@ -55,9 +32,9 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         if qs is None:
             qs = self.model.objects.all()
         return qs.select_related(
-            'project', 'project_node', 'process_profile',
+            'project__material', 'project_node', 'process_profile',
             'process_profile__machine', 'process_profile__screw_combination',
-            'creator', 'extruder_operator', 'workflow_instance',
+            'creator', 'extruder_operator', 'approved_by', 'workflow_instance',
         ).prefetch_related(
             'formula_details__formula',
             'sample_inventories',
@@ -118,6 +95,36 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         from app_trial_production.services import SampleInventoryService
         context['pellet_summary'] = SampleInventoryService.get_pellet_summary(order.trial_code)
         context['specimen_summary'] = SampleInventoryService.get_specimen_summary(order.trial_code)
+
+        # 是否已完成颗粒分拨（控制分拨按钮显隐 + 注塑任务触发屏障）
+        context['has_pellet_splits'] = SampleInventory.objects.filter(
+            production_order=order, type='PELLET',
+        ).exists()
+
+        # 配方粒度的分拨明细
+        from django.db.models import Sum
+        existing_splits = SampleInventory.objects.filter(
+            production_order=order, type='PELLET',
+        ).values('formula_id', 'sub_type').annotate(
+            total_qty=Sum('quantity'),
+        )
+        split_map = {}
+        for s in existing_splits:
+            key = (s['formula_id'], s['sub_type'])
+            split_map[key] = float(s['total_qty'] or 0)
+
+        formula_split_summaries = []
+        for fd in details_map.values():
+            finished_qty = split_map.get((fd.formula_id, 'FINISHED'), 0)
+            for_injection_qty = split_map.get((fd.formula_id, 'FOR_INJECTION'), 0)
+            formula_split_summaries.append({
+                'formula': fd.formula,
+                'planned_qty': float(fd.planned_quantity or 0),
+                'finished_qty': finished_qty,
+                'for_injection_qty': for_injection_qty,
+                'total_split': finished_qty + for_injection_qty,
+            })
+        context['formula_split_summaries'] = formula_split_summaries
 
         # 操作权限
         from app_user.models import User
@@ -371,6 +378,8 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
             formula_details=formula_details,
             test_item_ids=test_item_ids,
             mold_matrix=mold_matrix,
+            packaging_desc=form.cleaned_data.get('packaging_desc', ''),
+            storage_location=form.cleaned_data.get('storage_location', ''),
             remark=form.cleaned_data.get('remark', ''),
         )
 
@@ -491,7 +500,7 @@ class ProductionOrderDeleteView(TrialProductionAccessMixin, View):
         order_code = order.code
         order.delete()
         messages.success(request, f'草稿工单 {order_code} 已删除')
-        return redirect('trial_order_list')
+        return redirect('trial_dashboard')
 
 
 class ProductionOrderStartExtrusionView(RndAccessMixin, View):
@@ -505,4 +514,4 @@ class ProductionOrderStartExtrusionView(RndAccessMixin, View):
         except Exception:
             logger.exception(f"Failed to start extrusion for order {order.pk}")
             messages.error(request, '开始挤出失败，请稍后重试')
-        return redirect('trial_extrusion_detail', order_pk=pk)
+        return redirect('trial_order_detail', pk=pk)
