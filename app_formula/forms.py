@@ -25,7 +25,7 @@ class _IsInvalidMixin:
 class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     class Meta:
         model = LabFormula
-        fields = ['code', 'name', 'material_type', 'process', 'project', 'project_node', 'research_projects', 'cost_actual', 'is_mature', 'description']
+        fields = ['code', 'name', 'material_type', 'process', 'project', 'project_node', 'research_projects', 'is_mature', 'description', 'material_color_name', 'pantone_code', 'rgb_value']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
             'material_type': forms.Select(attrs={'class': 'form-select'}),
@@ -34,6 +34,9 @@ class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
             'project_node': forms.Select(attrs={'class': 'form-select'}),
             'research_projects': forms.SelectMultiple(attrs={'class': 'form-select remote-search', 'data-model': 'research_project'}),
             'is_mature': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'material_color_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：哑光黑、亮白'}),
+            'pantone_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：PANTONE 19-4052'}),
+            'rgb_value': forms.TextInput(attrs={'class': 'form-control d-block', 'data-coloris': '', 'placeholder': '#FF5733', 'maxlength': 7}),
         }
 
     def __init__(self, *args, **kwargs):

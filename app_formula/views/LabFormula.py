@@ -438,9 +438,11 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                     process=form.cleaned_data.get('process'),
                     project=project,
                     project_node=project_node,
-                    cost_actual=form.cleaned_data.get('cost_actual'),
                     is_mature=form.cleaned_data.get('is_mature', False),
                     description=form.cleaned_data.get('description', ''),
+                    material_color_name=form.cleaned_data.get('material_color_name', ''),
+                    pantone_code=form.cleaned_data.get('pantone_code', ''),
+                    rgb_value=form.cleaned_data.get('rgb_value', ''),
                     creator=self.request.user,
                     version=versions[col_idx],
                     code=shared_code,
@@ -721,9 +723,11 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 formula.name = form.cleaned_data['name']
                 formula.material_type = form.cleaned_data['material_type']
                 formula.process = form.cleaned_data.get('process')
-                formula.cost_actual = form.cleaned_data.get('cost_actual')
                 formula.is_mature = form.cleaned_data.get('is_mature', False)
                 formula.description = form.cleaned_data.get('description', '')
+                formula.material_color_name = form.cleaned_data.get('material_color_name', '')
+                formula.pantone_code = form.cleaned_data.get('pantone_code', '')
+                formula.rgb_value = form.cleaned_data.get('rgb_value', '')
                 formula.save()
 
                 # 从 Attachment 表获取旧测试报告
@@ -911,8 +915,10 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
             'name': f"{self.original_formula.name} (副本)",
             'material_type': self.original_formula.material_type,
             'process': self.original_formula.process,
-            'cost_actual': self.original_formula.cost_actual,
             'description': self.original_formula.description,
+            'material_color_name': self.original_formula.material_color_name,
+            'pantone_code': self.original_formula.pantone_code,
+            'rgb_value': self.original_formula.rgb_value,
             'research_projects': self.original_formula.research_projects.all(),
             'is_mature': False,
         })
@@ -993,9 +999,11 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
                     process=form.cleaned_data.get('process'),
                     project=project,
                     project_node=project_node,
-                    cost_actual=form.cleaned_data.get('cost_actual'),
                     is_mature=form.cleaned_data.get('is_mature', False),
                     description=form.cleaned_data.get('description', ''),
+                    material_color_name=form.cleaned_data.get('material_color_name', ''),
+                    pantone_code=form.cleaned_data.get('pantone_code', ''),
+                    rgb_value=form.cleaned_data.get('rgb_value', ''),
                     creator=self.request.user,
                     version=versions[col_idx],
                     code=shared_code,

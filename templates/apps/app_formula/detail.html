@@ -240,6 +240,32 @@
                 </div>
             </div>
             
+            <!-- 材料颜色信息 -->
+            {% if formula.material_color_name or formula.pantone_code or formula.rgb_value %}
+            <div class="card mb-3">
+                <div class="card-header bg-pink-lt">
+                    <h3 class="card-title text-pink"><i class="ti ti-palette me-2"></i>材料颜色信息</h3>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-5 text-muted">颜色名称</dt>
+                        <dd class="col-7 fw-bold">{{ formula.material_color_name|default:"-" }}</dd>
+                        <dt class="col-5 text-muted">潘通编号</dt>
+                        <dd class="col-7">{{ formula.pantone_code|default:"-" }}</dd>
+                        <dt class="col-5 text-muted">RGB色值</dt>
+                        <dd class="col-7">
+                            {% if formula.rgb_value %}
+                            <span class="d-inline-block rounded me-1" style="width:20px;height:20px;background-color:{{ formula.rgb_value }};vertical-align:middle;border:1px solid #ddd;"></span>
+                            {{ formula.rgb_value }}
+                            {% else %}
+                            -
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- 实验描述 -->
             <div class="card mb-3">
                 <div class="card-header">

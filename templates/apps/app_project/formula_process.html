@@ -221,6 +221,19 @@
                                     </span>
                                 {% endif %}
                             </div>
+                            {% if selected_formula.material_color_name or selected_formula.pantone_code or selected_formula.rgb_value %}
+                            <div class="text-muted small">
+                                <i class="ti ti-palette me-1"></i>
+                                <span class="fw-medium text-body">{{ selected_formula.material_color_name|default:"-" }}</span>
+                                <span class="mx-2">|</span>
+                                {{ selected_formula.pantone_code|default:"-" }}
+                                <span class="mx-2">|</span>
+                                {% if selected_formula.rgb_value %}
+                                <span class="d-inline-block rounded me-1" style="width:12px;height:12px;background-color:{{ selected_formula.rgb_value }};vertical-align:middle;border:1px solid var(--tblr-border-color);"></span>
+                                {% endif %}
+                                {{ selected_formula.rgb_value|default:"-" }}
+                            </div>
+                            {% endif %}
                         </div>
                         <div class="btn-list">
                             <a href="{% url 'formula_detail' selected_formula.pk %}" class="btn btn-outline-primary btn-sm" target="_blank">

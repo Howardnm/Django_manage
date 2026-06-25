@@ -40,6 +40,11 @@ class LabFormula(models.Model):
     cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料成本自动计算")
     cost_actual = models.DecimalField("BOM实际成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="手动录入实际配方成本")
 
+    # 材料颜色信息
+    material_color_name = models.CharField("材料颜色名称", max_length=100, blank=True, help_text="例如：哑光黑、亮白、透明蓝")
+    pantone_code = models.CharField("潘通色彩编号", max_length=50, blank=True, help_text="例如：PANTONE 19-4052 Classic Blue")
+    rgb_value = models.CharField("RGB色值", max_length=7, blank=True, help_text="十六进制颜色值，例如 #FF5733")
+
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="实验员")
     created_at = models.DateTimeField("录入日期", auto_now_add=True)
     description = models.TextField("实验目的/描述", blank=True)

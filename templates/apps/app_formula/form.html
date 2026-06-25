@@ -1,8 +1,21 @@
 {% extends "base.html" %}
 {% load project_extras %}
+{% load static %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/coloris.min.css' %}">
 <style>
+    /* 恢复 Tabler 对 Coloris 色块的圆角方块样式，覆盖 coloris.css 的默认值 */
+    .clr-field button {
+        width: 1.5rem;
+        height: 1.5rem;
+        left: 6px;
+        right: auto;
+        border-radius: 6px;
+    }
+    .clr-field input {
+        padding-left: 2.5rem !important;
+    }
     /* 配方表单表格紧凑样式 */
     #bom-formset .form-control,
     #bom-formset .form-select,
@@ -171,27 +184,44 @@
                                 {% endif %}
                             </div>
                             <div class="col-md-3 mb-3">
-                                <label class="form-label">实际成本 (元/kg)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">¥</span>
-                                    {{ form.cost_actual }}
-                                </div>
-                                {% if form.cost_actual.errors %}
-                                    <div class="invalid-feedback d-block">{{ form.cost_actual.errors.0 }}</div>
+                                <label class="form-label">材料颜色名称</label>
+                                {{ form.material_color_name }}
+                                {% if form.material_color_name.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.material_color_name.errors.0 }}</div>
                                 {% endif %}
                             </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="form-label">实验描述</label>
-                                {{ form.description }}
-                                {% if form.description.errors %}
-                                    <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">潘通色彩编号</label>
+                                {{ form.pantone_code }}
+                                {% if form.pantone_code.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.pantone_code.errors.0 }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-3 mb-3">
+                                <label class="form-label">RGB色值</label>
+                                {{ form.rgb_value }}
+                                {% if form.rgb_value.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.rgb_value.errors.0 }}</div>
                                 {% endif %}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- 2. 关联信息 -->
+                <!-- 2. 实验描述 -->
+                <div class="card mb-3">
+                    <div class="card-header bg-yellow-lt">
+                        <h3 class="card-title text-yellow"><i class="ti ti-notes me-2"></i>实验描述</h3>
+                    </div>
+                    <div class="card-body">
+                        {{ form.description }}
+                        {% if form.description.errors %}
+                            <div class="invalid-feedback d-block">{{ form.description.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- 3. 关联信息 -->
                 <div class="card mb-3">
                     <div class="card-header bg-green-lt">
                         <h3 class="card-title text-green"><i class="ti ti-link me-2"></i>关联信息</h3>
@@ -219,7 +249,7 @@
                     </div>
                 </div>
 
-                <!-- 3. BOM 明细 -->
+                <!-- 4. BOM 明细 -->
                 <div class="card mb-3">
                     <div class="card-header bg-orange-lt">
                         <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
@@ -313,7 +343,7 @@
                     </div>
                 </div>
 
-                <!-- 4. 测试结果 -->
+                <!-- 5. 测试结果 -->
                 <div class="card">
                     <div class="card-header bg-purple-lt">
                         <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
@@ -739,6 +769,22 @@
             row.style.display = 'none';
         });
     </script>
+
+<script src="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/umd/coloris.min.js' %}"></script>
+<script>
+    Coloris.init();
+    Coloris({
+        el: '[data-coloris]',
+        theme: 'default',
+        themeMode: 'light',
+        format: 'hex',
+        alpha: false,
+        clearButton: true,
+        clearLabel: '清除',
+        closeButton: true,
+        closeLabel: '关闭',
+    });
+</script>
 
 {% if show_import_button %}
 {% if form.instance.pk %}
