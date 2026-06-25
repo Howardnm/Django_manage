@@ -11,7 +11,7 @@ from app_project.mixins import ProjectAccessMixin
 
 class ProjectSalesMemberManageView(ProjectAccessMixin, View):
     permission_required = 'app_project.change_project'
-    template_name = 'apps/app_project/detail/modal_box/_project_sales_member_form.html'
+    template_name = 'apps/app_project/modal/_sales_member_form.html'
 
     def get_project_and_check_perm(self, pk):
         project = get_object_or_404(Project, pk=pk)
@@ -28,10 +28,16 @@ class ProjectSalesMemberManageView(ProjectAccessMixin, View):
         else:
             form = ProjectSalesMemberForm(project=project)
 
+        existing_sum = sum(
+            float(m.workload_share) for m in project.sales_members.all()
+            if str(m.id) != member_id
+        )
+
         return render(request, self.template_name, {
             'project': project,
             'form': form,
-            'member_id': member_id
+            'member_id': member_id,
+            'existing_sum': existing_sum,
         })
 
     def post(self, request, pk):
@@ -49,10 +55,16 @@ class ProjectSalesMemberManageView(ProjectAccessMixin, View):
             form.save()
             return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 
+        existing_sum = sum(
+            float(m.workload_share) for m in project.sales_members.all()
+            if str(m.id) != member_id
+        )
+
         return render(request, self.template_name, {
             'project': project,
             'form': form,
-            'member_id': member_id
+            'member_id': member_id,
+            'existing_sum': existing_sum,
         })
 
 

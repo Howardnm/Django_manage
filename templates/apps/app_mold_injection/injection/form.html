@@ -67,7 +67,7 @@
                                     {% if formulas %}
                                     {% for f in formulas %}
                                     <td>
-                                        <input type="number" name="qty_{{ forloop.parentloop.counter0 }}_{{ f.pk }}"
+                                        <input type="number" name="variant_qty_{{ forloop.parentloop.counter0 }}_{{ f.pk }}"
                                                class="form-control qty-input" min="0" value="0" placeholder="0">
                                     </td>
                                     {% endfor %}
@@ -140,7 +140,7 @@
         {% if formulas %}
         {% for f in formulas %}
         <td>
-            <input type="number" name="qty__ROW__{{ f.pk }}" class="form-control qty-input" min="0" value="0" placeholder="0">
+            <input type="number" name="variant_qty___ROW___{{ f.pk }}" class="form-control qty-input" min="0" value="0" placeholder="0">
         </td>
         {% endfor %}
         {% else %}
@@ -159,5 +159,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/apps/app_trial_production/common/mold_matrix.js' %}"></script>
+<script src="{% static 'js/apps/app_trial_production/common/mold_matrix_formset.js' %}"></script>
 {% endblock %}

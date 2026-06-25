@@ -231,7 +231,7 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
     
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        sorted_results = self.object.test_results.select_related('test_config', 'test_config__category').order_by(
+        sorted_results = self.object.test_results.filter(production_order__isnull=True).select_related('test_config', 'test_config__category').order_by(
             'test_config__category__order', 'test_config__order'
         )
         context['sorted_test_results'] = sorted_results
@@ -340,7 +340,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                     } for b in source.bom_lines.all()]
                     context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
                     context['bom_formset'].extra = max(len(bom_initial), 1)
-                    test_initial = [{'test_config': r.test_config} for r in source.test_results.all()]
+                    test_initial = [{'test_config': r.test_config} for r in source.test_results.filter(production_order__isnull=True)]
                     context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
                     context['test_formset'].extra = max(len(test_initial), 1)
                 except LabFormula.DoesNotExist:
@@ -605,7 +605,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 test_union = OrderedDict()
                 test_index_map = {}
                 for f in all_formulas:
-                    for t in f.test_results.all():
+                    for t in f.test_results.filter(production_order__isnull=True):
                         if t.test_config_id not in test_union:
                             test_index_map[t.test_config_id] = len(test_union)
                             test_union[t.test_config_id] = {
@@ -615,7 +615,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                             }
 
                 # column 0 用主配方的实际测试值
-                for t in primary.test_results.all():
+                for t in primary.test_results.filter(production_order__isnull=True):
                     if t.test_config_id in test_union:
                         if t.test_config.data_type == 'NUMBER':
                             test_union[t.test_config_id]['value'] = t.value
@@ -639,7 +639,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                         if key in bom_index_map:
                             idx = bom_index_map[key]
                             variant_map[f"bom-{idx}-percentage_col{col_idx}"] = str(b.percentage)
-                    for t in f.test_results.all():
+                    for t in f.test_results.filter(production_order__isnull=True):
                         if t.test_config_id in test_index_map:
                             idx = test_index_map[t.test_config_id]
                             if t.test_config.data_type == 'NUMBER' and t.value is not None:
@@ -731,7 +731,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 from app_attachment.models import Attachment
                 ct = ContentType.objects.get_for_model(FormulaTestResult)
                 old_reports = {}
-                for t in formula.test_results.all():
+                for t in formula.test_results.filter(production_order__isnull=True):
                     att = Attachment.objects.filter(
                         content_type=ct, object_id=t.pk,
                         category='REPORT', is_deleted=False,
@@ -739,7 +739,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                     if att:
                         old_reports[t.test_config_id] = att.file
                 formula.bom_lines.all().delete()
-                formula.test_results.all().delete()
+                formula.test_results.filter(production_order__isnull=True).delete()
 
                 for row in bom_rows:
                     if col_idx == 0:
@@ -889,7 +889,7 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
             test_initial = [{
                 'test_config': res.test_config, 'value': res.value,
                 'test_date': res.test_date, 'remark': res.remark,
-            } for res in self.original_formula.test_results.all()]
+            } for res in self.original_formula.test_results.filter(production_order__isnull=True)]
             context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
             context['test_formset'].extra = len(test_initial)
         else:
@@ -1122,7 +1122,7 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                     pre_mix_order=bom.pre_mix_order,
                     pre_mix_time=bom.pre_mix_time,
                 )
-            for test in source.test_results.all():
+            for test in source.test_results.filter(production_order__isnull=True):
                 FormulaTestResult.objects.create(
                     formula=target,
                     test_config=test.test_config,

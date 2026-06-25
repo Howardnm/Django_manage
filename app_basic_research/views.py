@@ -117,6 +117,8 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
         for f in related_formulas:
             props = {}
             for res in f.test_results.all():
+                if res.production_order_id is not None:
+                    continue
                 if current_std not in res.test_config.standard and 'OTHER' not in res.test_config.standard: continue
                 name = res.test_config.name
                 if '密度' in name: props['density'] = res.value

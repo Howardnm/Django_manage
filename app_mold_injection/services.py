@@ -23,7 +23,7 @@ class InjectionTaskService:
             mold_requirements: list of dict {mold_id, formula_id, specimen_quantity}
         """
         from django.contrib.auth import get_user_model
-        from app_mold_injection.models import InjectionTask, MoldRequirement
+        from app_mold_injection.models import InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
 
         User = get_user_model()
         operator = User.objects.get(pk=operator_id) if operator_id else None
@@ -39,9 +39,12 @@ class InjectionTaskService:
         if mold_requirements:
             for req in mold_requirements:
                 if req.get('specimen_quantity', 0) > 0:
-                    MoldRequirement.objects.create(
+                    mr = MoldRequirement.objects.create(
                         injection_task=task,
                         mold_id=req['mold_id'],
+                    )
+                    MoldRequirementFormulaDetail.objects.create(
+                        mold_requirement=mr,
                         formula_id=req.get('formula_id'),
                         specimen_quantity=req['specimen_quantity'],
                     )
@@ -64,7 +67,7 @@ class InjectionTaskService:
             mold_requirements: list of dict {mold_id, formula_id, specimen_quantity}
         """
         from django.contrib.auth import get_user_model
-        from app_mold_injection.models import InjectionTask, MoldRequirement
+        from app_mold_injection.models import InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
 
         User = get_user_model()
         operator = User.objects.get(pk=operator_id) if operator_id else None
@@ -85,9 +88,12 @@ class InjectionTaskService:
         if mold_requirements:
             for req in mold_requirements:
                 if req.get('specimen_quantity', 0) > 0:
-                    MoldRequirement.objects.create(
+                    mr = MoldRequirement.objects.create(
                         injection_task=task,
                         mold_id=req['mold_id'],
+                    )
+                    MoldRequirementFormulaDetail.objects.create(
+                        mold_requirement=mr,
                         formula_id=req.get('formula_id'),
                         specimen_quantity=req['specimen_quantity'],
                     )

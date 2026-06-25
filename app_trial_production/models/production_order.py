@@ -32,6 +32,18 @@ class ProductionOrder(models.Model):
         Status.CANCELED: 'bg-dark-lt',
     }
 
+    STATUS_DOT_MAP = {
+        Status.DRAFT: 'bg-secondary',
+        Status.WORKFLOW_RUNNING: 'bg-purple',
+        Status.ACCEPTED: 'bg-info',
+        Status.EXTRUDING: 'bg-azure',
+        Status.INJECTION_MOLDING: 'bg-blue',
+        Status.TESTING: 'bg-yellow',
+        Status.COMPLETED: 'bg-green',
+        Status.CANCELED: 'bg-dark',
+    }
+
+
     EXTRUSION_DISPLAY_MAP = {
         Status.ACCEPTED: {
             'label': '待挤出', 'badge': 'bg-blue-lt',
@@ -45,11 +57,21 @@ class ProductionOrder(models.Model):
         },
     }
 
-    EXTRUSION_DONE_DISPLAY = {
+    _EXTRUSION_DONE = {
         'label': '已挤出', 'badge': 'bg-green-lt',
         'color': '#f5f5f5', 'border_css': 'border-green',
         'quantity_badge': 'bg-green text-white',
     }
+
+    # 挤出完成后的状态统一用「已挤出」展示
+    for _s in (Status.INJECTION_MOLDING, Status.TESTING, Status.COMPLETED):
+        EXTRUSION_DISPLAY_MAP[_s] = _EXTRUSION_DONE
+
+    def _extrusion_display(self, key, default=None):
+        """统一获取挤出日历展示属性"""
+        if self.status in self.EXTRUSION_DISPLAY_MAP:
+            return self.EXTRUSION_DISPLAY_MAP[self.status].get(key, default)
+        return default
 
     # ---- Fields ----
     code = models.CharField("工单号", max_length=50, blank=True, help_text="自动生成，如：TP20250601-01")
@@ -70,7 +92,6 @@ class ProductionOrder(models.Model):
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="审批人", related_name='approved_production_orders')
     approved_at = models.DateTimeField("审批通过时间", null=True, blank=True)
     test_items = models.ManyToManyField('app_material.TestConfig', blank=True, verbose_name="待触发测试项目", related_name="pending_production_orders", help_text="注塑完成后触发创建 TestingTask 时使用")
-    pending_mold_config = models.TextField("待触发模具配置", blank=True, help_text="挤出完成后触发创建 InjectionTask 时使用。JSON 格式: [{\"mold_id\": N, \"formula_quantities\": {\"formula_pk\": qty}}]")
     remark = models.TextField("备注", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)
@@ -141,6 +162,11 @@ class ProductionOrder(models.Model):
         return self.STATUS_CSS_MAP.get(self.status, 'bg-secondary-lt')
 
     @property
+    def status_dot_color(self):
+        """工单状态对应的状态点颜色类"""
+        return self.STATUS_DOT_MAP.get(self.status, 'bg-secondary')
+
+    @property
     def status_label(self):
         """工单状态中文显示"""
         return self.Status(self.status).label
@@ -148,17 +174,11 @@ class ProductionOrder(models.Model):
     # ---- Extrusion calendar display properties ----
     @property
     def extrusion_status_label(self):
-        """挤出日历中的状态标签（待挤出 / 挤出中 / 已挤出）"""
-        if self.status in (self.Status.INJECTION_MOLDING, self.Status.TESTING):
-            return self.EXTRUSION_DONE_DISPLAY['label']
-        return self.EXTRUSION_DISPLAY_MAP.get(self.status, {}).get('label', '')
+        return self._extrusion_display('label', '')
 
     @property
     def extrusion_status_badge(self):
-        """挤出日历中的状态徽章 CSS 类"""
-        if self.status in (self.Status.INJECTION_MOLDING, self.Status.TESTING):
-            return self.EXTRUSION_DONE_DISPLAY['badge']
-        return self.EXTRUSION_DISPLAY_MAP.get(self.status, {}).get('badge', '')
+        return self._extrusion_display('badge', '')
 
     @property
     def is_extrusion_readonly(self):
@@ -167,24 +187,15 @@ class ProductionOrder(models.Model):
 
     @property
     def extrusion_calendar_color(self):
-        """挤出日历事件背景色（十六进制）"""
-        if self.status in (self.Status.INJECTION_MOLDING, self.Status.TESTING):
-            return self.EXTRUSION_DONE_DISPLAY['color']
-        return self.EXTRUSION_DISPLAY_MAP.get(self.status, {}).get('color', '#e3f2fd')
+        return self._extrusion_display('color', '#e3f2fd')
 
     @property
     def extrusion_calendar_border(self):
-        """挤出日历事件边框 Tabler CSS 类"""
-        if self.status in (self.Status.INJECTION_MOLDING, self.Status.TESTING):
-            return self.EXTRUSION_DONE_DISPLAY['border_css']
-        return self.EXTRUSION_DISPLAY_MAP.get(self.status, {}).get('border_css', 'border-blue')
+        return self._extrusion_display('border_css', 'border-blue')
 
     @property
     def extrusion_quantity_badge(self):
-        """挤出日历事件中计划产量胶囊 CSS 类"""
-        if self.status in (self.Status.INJECTION_MOLDING, self.Status.TESTING):
-            return self.EXTRUSION_DONE_DISPLAY['quantity_badge']
-        return self.EXTRUSION_DISPLAY_MAP.get(self.status, {}).get('quantity_badge', 'bg-blue text-white')
+        return self._extrusion_display('quantity_badge', 'bg-blue text-white')
 
 
 class ProductionOrderFormulaDetail(models.Model):

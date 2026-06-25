@@ -4,13 +4,14 @@ from django.views.generic import DetailView
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectStage, ProjectNode
 from app_formula.models import LabFormula
+from app_trial_production.models.production_order import ProductionOrderFormulaDetail
 
 
 class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
     """项目配方过程详情页：按RND轮次展示配方迭代过程"""
     permission_required = 'app_project.view_project'
     model = Project
-    template_name = 'apps/app_project/detail/detail_project_formula_process.html'
+    template_name = 'apps/app_project/formula_process.html'
     context_object_name = 'project'
 
     queryset = Project.objects.select_related(
@@ -31,6 +32,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         ).prefetch_related(
             'bom_lines__raw_material__category',
             'test_results__test_config__category',
+            'test_results__production_order',
             'color_powder_bom__entries__raw_material',
         ).order_by('version')
 
@@ -45,6 +47,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             ).prefetch_related(
                 'bom_lines__raw_material__category',
                 'test_results__test_config__category',
+                'test_results__production_order',
                 'color_powder_bom__entries__raw_material',
             ).order_by('version')
 
@@ -133,6 +136,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         for f in formulas:
             formula_props[f.id] = {}
             for r in f.test_results.all():
+                if r.production_order_id is not None:
+                    continue  # 跳过工单回写结果，对比矩阵仅展示手动录入
                 all_test_configs.add(r.test_config)
                 formula_props[f.id][r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
         sorted_configs = sorted(all_test_configs, key=lambda x: (x.category.order, x.order))
@@ -267,12 +272,71 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     g['is_collapsed'] = False
                     break
 
-        # 选中的配方测试结果
-        sorted_test_results = []
+        # 关联工单列表
+        related_orders = []
         if selected_formula:
-            sorted_test_results = selected_formula.test_results.select_related(
-                'test_config', 'test_config__category'
-            ).order_by('test_config__category__order', 'test_config__order')
+            order_details = ProductionOrderFormulaDetail.objects.filter(
+                formula=selected_formula
+            ).select_related(
+                'production_order__creator',
+                'production_order__project',
+            )
+            related_orders = [
+                {
+                    'code': d.production_order.code,
+                    'status': d.production_order.get_status_display(),
+                    'status_css': d.production_order.STATUS_CSS_MAP.get(d.production_order.status, 'bg-secondary-lt'),
+                    'status_dot': d.production_order.STATUS_DOT_MAP.get(d.production_order.status, 'bg-secondary'),
+                    'planned_quantity': d.planned_quantity,
+                    'quantity_actual': d.production_order.quantity_actual,
+                    'creator': d.production_order.creator.username,
+                    'created_at': d.production_order.created_at,
+                    'scheduled_date': d.production_order.extrusion_scheduled_date,
+                    'scheduled_end': d.production_order.extrusion_scheduled_end,
+                    'pk': d.production_order.pk,
+                }
+                for d in order_details
+            ]
+
+        # 测试结果 Tab 数据（手动录入 + 各工单回写）
+        test_result_tabs = []
+        if selected_formula:
+            # 手动录入 tab
+            manual_results = [
+                r for r in selected_formula.test_results.all()
+                if r.production_order_id is None
+            ]
+            manual_results.sort(key=lambda r: (
+                r.test_config.category.order,
+                r.test_config.order,
+            ))
+            test_result_tabs.append({
+                'label': '手动录入',
+                'tab_id': 'tab-manual',
+                'results': manual_results,
+                'type': 'manual',
+            })
+
+            # 各工单 tab
+            order_results = [
+                r for r in selected_formula.test_results.all()
+                if r.production_order_id is not None
+            ]
+            order_results.sort(key=lambda r: (
+                r.production_order.code,
+                r.test_config.category.order,
+                r.test_config.order,
+            ))
+            for order, items in groupby(order_results, key=lambda r: r.production_order):
+                test_result_tabs.append({
+                    'label': order.code,
+                    'tab_id': f'tab-order-{order.pk}',
+                    'results': list(items),
+                    'type': 'order',
+                    'order': order,
+                })
+
+        has_test_results = any(t['results'] for t in test_result_tabs)
 
         # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab)
         compare_formulas = all_stage_formulas if global_compare else active_formulas
@@ -282,6 +346,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         context.update({
             'material': material,
+            'related_orders': related_orders,
             'stage_round_items': stage_round_items,
             'active_stage': active_stage,
             'active_round': active_round,
@@ -289,7 +354,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'formula_groups': formula_groups,
             'total_formula_count': len(all_stage_formulas),
             'selected_formula': selected_formula,
-            'sorted_test_results': sorted_test_results,
+            'test_result_tabs': test_result_tabs,
+            'has_test_results': has_test_results,
             'compare_mode': compare_mode,
             'global_compare': global_compare,
             'columns': columns,

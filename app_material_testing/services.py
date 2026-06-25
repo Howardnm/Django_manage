@@ -63,6 +63,7 @@ class TestingTaskService:
                 FormulaTestResult.objects.update_or_create(
                     formula=trial_result.formula,
                     test_config=trial_result.test_config,
+                    production_order=task.production_order,
                     defaults={
                         'value': trial_result.value,
                         'value_text': trial_result.value_text,

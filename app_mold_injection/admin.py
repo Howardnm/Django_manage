@@ -1,5 +1,13 @@
 from django.contrib import admin
-from app_mold_injection.models import InjectionTask, MoldRequirement, MoldType
+from app_mold_injection.models import (
+    InjectionTask, MoldRequirement, MoldRequirementFormulaDetail, MoldType,
+)
+
+
+class MoldRequirementFormulaDetailInline(admin.TabularInline):
+    model = MoldRequirementFormulaDetail
+    extra = 0
+    fields = ['formula', 'specimen_quantity']
 
 
 @admin.register(InjectionTask)
@@ -11,7 +19,10 @@ class InjectionTaskAdmin(admin.ModelAdmin):
 
 @admin.register(MoldRequirement)
 class MoldRequirementAdmin(admin.ModelAdmin):
-    list_display = ['injection_task', 'mold', 'specimen_quantity']
+    list_display = ['id', 'mold', 'production_order', 'injection_task', 'order']
+    list_filter = ['mold']
+    search_fields = ['mold__name', 'mold__mold_code']
+    inlines = [MoldRequirementFormulaDetailInline]
 
 
 @admin.register(MoldType)

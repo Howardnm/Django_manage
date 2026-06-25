@@ -270,13 +270,17 @@ def run(ctx: FakeContext) -> None:
             injection_tasks.append(it)
 
             # MoldRequirement
+            from app_mold_injection.models import MoldRequirementFormulaDetail
             for mold in pick(mold_types, random.randint(1, min(3, len(mold_types)))):
-                MoldRequirement.objects.create(
+                mr = MoldRequirement.objects.create(
                     injection_task=it,
                     mold=mold,
+                    order=random.randint(0, 5),
+                )
+                MoldRequirementFormulaDetail.objects.create(
+                    mold_requirement=mr,
                     formula=f,
                     specimen_quantity=random.choice([5, 10, 20, 50]),
-                    order=random.randint(0, 5),
                 )
 
             # SampleInventory(SPECIMEN) — 注塑产出的样条

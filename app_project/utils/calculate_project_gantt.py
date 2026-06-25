@@ -1,7 +1,3 @@
-import json
-from django.core.serializers.json import DjangoJSONEncoder
-
-
 def get_project_gantt_data(project):
     """
     构造 Highcharts Gantt 数据 (平铺模式：不显示父级项目汇总条)
@@ -68,4 +64,4 @@ def get_project_gantt_data(project):
         start_time = end_time
         prev_node_id = node_id
 
-    return json.dumps(gantt_data, cls=DjangoJSONEncoder)
+    return gantt_data

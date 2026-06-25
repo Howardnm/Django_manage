@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -55,32 +56,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-    document.getElementById('btn-save').addEventListener('click', async function() {
-        const btn = this;
-        btn.disabled = true;
-        try {
-            const resp = await fetch('{% url "project_config" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': '{{ csrf_token }}'
-                },
-                body: JSON.stringify({
-                    workflow_id: document.getElementById('workflow-select').value || null
-                })
-            });
-            const result = await resp.json();
-            if (result.status === 'success') {
-                alert('配置已保存');
-            } else {
-                alert(result.message || '保存失败');
-            }
-        } catch(err) {
-            alert('请求失败: ' + err.message);
-        } finally {
-            btn.disabled = false;
-        }
-    });
-</script>
+<script>window.PROJECT_CONFIG_URL = "{% url 'project_config' %}"; window.CSRF_TOKEN = "{{ csrf_token }}";</script>
+<script src="{% static 'js/apps/app_project/config.js' %}"></script>
 {% endblock %}

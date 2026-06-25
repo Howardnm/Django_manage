@@ -17,6 +17,9 @@ class SampleInventoryService:
         """
         挤出后创建颗粒样品批次入库记录。
 
+        同一工单 + 同一配方版本 → 同一批次号。
+        批次号格式: {工单号}-V{配方版本}，例如 PO-2024-001-V1
+
         Args:
             production_order: ProductionOrder 实例
             splits: list of dict {
@@ -27,23 +30,43 @@ class SampleInventoryService:
         Returns:
             list of SampleInventory instances
         """
-        samples = []
-        for split in splits:
-            if not split.get('quantity') or float(split['quantity']) <= 0:
-                continue
+        from app_formula.models import LabFormula
 
-            sample = SampleInventory.objects.create(
-                type='PELLET',
-                sub_type=split['sub_type'],
-                status='IN_LAB',
-                production_order=production_order,
-                formula_id=split.get('formula_id'),
-                trial_code=production_order.trial_code,
-                quantity=split['quantity'],
-                packaging_desc=split.get('packaging_desc', ''),
-                storage_location=split.get('storage_location', ''),
-            )
-            samples.append(sample)
+        # 预取所有配方版本号，避免逐个查询
+        formula_ids = {s['formula_id'] for s in splits if s.get('formula_id')}
+        formula_version_map = dict(
+            LabFormula.objects.filter(pk__in=formula_ids).values_list('pk', 'version')
+        )
+
+        # 按 formula_id 分组，同组共享同一 batch_number
+        grouped = {}
+        for split in splits:
+            fid = split.get('formula_id')
+            if fid:
+                grouped.setdefault(fid, []).append(split)
+
+        samples = []
+        for formula_id, items in grouped.items():
+            version = formula_version_map.get(formula_id, '?')
+            batch_number = f"{production_order.code}-V{version}"
+
+            for item in items:
+                if not item.get('quantity') or float(item['quantity']) <= 0:
+                    continue
+
+                sample = SampleInventory.objects.create(
+                    type='PELLET',
+                    sub_type=item['sub_type'],
+                    status='IN_LAB',
+                    production_order=production_order,
+                    formula_id=formula_id,
+                    trial_code=production_order.trial_code,
+                    batch_number=batch_number,
+                    quantity=item['quantity'],
+                    packaging_desc=item.get('packaging_desc', ''),
+                    storage_location=item.get('storage_location', ''),
+                )
+                samples.append(sample)
 
         # 按分拨明细的 KG 数量汇总更新工单实际产量
         total_kg = sum(float(s['quantity']) for s in splits if s.get('quantity'))
@@ -51,13 +74,20 @@ class SampleInventoryService:
             production_order.quantity_actual = total_kg
             production_order.save(update_fields=['quantity_actual', 'updated_at'])
 
+        # 标记挤出任务颗粒分拨已完成
+        ext = getattr(production_order, 'extrusion_task', None)
+        if ext and not ext.pellet_split_completed:
+            ext.pellet_split_completed = True
+            ext.save(update_fields=['pellet_split_completed'])
+
         # 颗粒分拨完成 → 检查是否可推进工单（触发注塑/测试）
         from app_trial_production.services.order_service import ProductionOrderService
         ProductionOrderService.check_and_advance(production_order)
 
+        batch_numbers = {s.batch_number for s in samples}
         logger.info(
-            f"Created {len(samples)} pellet samples for order {production_order.code}"
-            f" (total={total_kg}kg)"
+            f"Created {len(samples)} pellet samples ({len(batch_numbers)} batches) "
+            f"for order {production_order.code} (total={total_kg}kg)"
         )
         return samples
 
@@ -144,6 +174,9 @@ class SampleInventoryService:
         """
         按试验单汇总颗粒样品统计。
 
+        count = 独立批次数（同一 batch_number 算 1 批）
+        total_kg = 总重量
+
         Returns:
             dict {
                 'finished': {'count': int, 'total_kg': Decimal},
@@ -155,11 +188,11 @@ class SampleInventoryService:
         ).exclude(status='CONSUMED')
 
         finished = qs.filter(sub_type='FINISHED').aggregate(
-            count=Count('id'),
+            count=Count('batch_number', distinct=True),
             total_kg=Sum('quantity'),
         )
         for_injection = qs.filter(sub_type='FOR_INJECTION').aggregate(
-            count=Count('id'),
+            count=Count('batch_number', distinct=True),
             total_kg=Sum('quantity'),
         )
 

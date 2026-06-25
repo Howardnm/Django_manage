@@ -1,9 +1,11 @@
 from django import forms
+from django.forms import BaseModelFormSet, modelformset_factory, ValidationError
 from common_utils.filters import TablerFormMixin
 from .models import (
     ProductionOrder, ExtrusionTask,
     SampleInventory,
 )
+from app_mold_injection.models import MoldRequirement
 
 
 class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
@@ -24,9 +26,12 @@ class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
     """编辑生产工单"""
     class Meta:
         model = ProductionOrder
-        fields = ['remark']
+        fields = ['process_profile', 'packaging_desc', 'storage_location', 'remark']
         widgets = {
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'process_profile': forms.Select(attrs={'class': 'form-select'}),
+            'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
+            'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
+            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
         }
 
 
@@ -104,6 +109,86 @@ class PelletSplitForm(forms.Form):
 
 PelletSplitFormSet = forms.formset_factory(
     PelletSplitForm, extra=4, can_delete=True
+)
+
+
+# ---- 工单模具计划 ----
+# 一行 = 一个模具，各配方版本的注塑次数由模板裸 <input name="variant_qty_{row}_{formulaPk}"> 渲染
+# 后端通过 BaseMoldRequirementRowFormSet.get_variant_qtys(row_idx) 从 POST 原始数据读取
+
+
+class MoldRequirementRowForm(forms.ModelForm):
+    """一行对应一个模具。变体列（各配方版本注塑次数）由模板裸 <input> 渲染，不走 Django form 字段"""
+
+    class Meta:
+        model = MoldRequirement
+        fields = ['mold']
+        widgets = {
+            'mold': forms.Select(attrs={'class': 'form-select mold-select'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['mold'].required = True
+
+
+class BaseMoldRequirementRowFormSet(BaseModelFormSet):
+    """模具矩阵 FormSet：注入 formula_pks + 校验重复/空值 + 从 POST 裸数据提取变体列值"""
+
+    def __init__(self, *args, formula_pks=None, **kwargs):
+        self.formula_pks = list(formula_pks) if formula_pks else []
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        if any(self.errors):
+            return
+        molds_seen = set()
+        for i, form in enumerate(self.forms):
+            if form.cleaned_data.get('DELETE'):
+                continue
+            mold = form.cleaned_data.get('mold')
+            if not mold:
+                continue
+            if mold.pk in molds_seen:
+                raise ValidationError(f'模具 "{mold.name}" 重复选择，请检查')
+            molds_seen.add(mold.pk)
+            has_qty = any(
+                self._get_variant_qty(i, pk) > 0
+                for pk in self.formula_pks
+            )
+            if not has_qty:
+                raise ValidationError(
+                    f'模具 "{mold.name}" 至少需要一个配方版本的注塑次数大于 0'
+                )
+
+    def get_variant_qtys(self, row_idx):
+        """从 POST 裸数据提取变体列值 → {formula_pk: quantity}（仅返回 quantity > 0 的项）"""
+        result = {}
+        for pk in self.formula_pks:
+            key = f'variant_qty_{row_idx}_{pk}'
+            val = self.data.get(key, '0')
+            try:
+                qty = int(val)
+            except (ValueError, TypeError):
+                qty = 0
+            if qty > 0:
+                result[int(pk)] = qty
+        return result
+
+    def _get_variant_qty(self, row_idx, formula_pk):
+        key = f'variant_qty_{row_idx}_{formula_pk}'
+        try:
+            return int(self.data.get(key, '0'))
+        except (ValueError, TypeError):
+            return 0
+
+
+MoldRequirementRowFormSet = modelformset_factory(
+    MoldRequirement,
+    form=MoldRequirementRowForm,
+    formset=BaseMoldRequirementRowFormSet,
+    extra=0,
+    can_delete=True,
 )
 
 

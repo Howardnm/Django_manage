@@ -55,6 +55,27 @@ def smart_decimal(value):
     return '{:.2f}'.format(d)
 
 
+@register.filter
+def get_item(d, key):
+    """从字典中按键取值，模板中用法：{{ my_dict|get_item:key }}。
+    自动尝试 int/str 两种键类型，兼容 JSON 反序列化后的字符串键。"""
+    if d is None:
+        return None
+    try:
+        if hasattr(d, 'get'):
+            val = d.get(key)
+            if val is not None:
+                return val
+            # JSON 反序列化后 key 是字符串，模板中常传整数
+            alt_key = str(key) if isinstance(key, int) else (int(key) if isinstance(key, str) and key.isdigit() else None)
+            if alt_key is not None:
+                return d.get(alt_key)
+            return None
+        return d[key]
+    except (KeyError, TypeError, IndexError):
+        return None
+
+
 @register.simple_tag(takes_context=True)
 def sort_url_multi(context, field):
     """

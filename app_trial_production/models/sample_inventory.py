@@ -38,6 +38,7 @@ class SampleInventory(models.Model):
     production_order = models.ForeignKey('app_trial_production.ProductionOrder', on_delete=models.SET_NULL, null=True, blank=True, related_name='sample_inventories', verbose_name="关联工单")
     formula = models.ForeignKey('app_formula.LabFormula', on_delete=models.SET_NULL, null=True, blank=True, related_name='sample_inventories', verbose_name="对应配方版本")
     trial_code = models.CharField("实验单号", max_length=50, default='', db_index=True, help_text="按实验单号分组展示")
+    batch_number = models.CharField("批次号", max_length=100, default='', db_index=True, help_text="同一工单+同一配方版本 = 同一批，格式: 工单号-V配方版本")
 
     # ---- 数量 ----
     quantity = models.DecimalField("数量(kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="颗粒样品用")

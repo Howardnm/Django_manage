@@ -236,6 +236,7 @@ class BaseFormulaTestResultFormSet(BaseInlineFormSet):
         if not hasattr(self, '_queryset'):
             qs = super().get_queryset()
             if qs.model == FormulaTestResult:
+                qs = qs.filter(production_order__isnull=True)
                 self._queryset = qs.select_related('test_config', 'test_config__category').order_by(
                     'test_config__category__order',
                     'test_config__order'
@@ -273,7 +274,7 @@ class BaseFormulaTestResultFormSet(BaseInlineFormSet):
             }
             existing_tc_ids = set(
                 FormulaTestResult.objects
-                .filter(formula=self.instance)
+                .filter(formula=self.instance, production_order__isnull=True)
                 .exclude(pk__in=deleting_ids)
                 .values_list('test_config_id', flat=True)
             )

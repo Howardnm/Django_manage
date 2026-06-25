@@ -73,7 +73,7 @@ class InjectionCreateView(InjectionTaskAccessMixin, View):
             if not mold_id:
                 continue
             for formula in formulas:
-                qty_val = request.POST.get(f'qty_{i}_{formula.pk}', '0')
+                qty_val = request.POST.get(f'variant_qty_{i}_{formula.pk}', '0')
                 try:
                     qty = int(qty_val)
                 except (ValueError, TypeError):
@@ -153,7 +153,7 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
         return qs.select_related(
             'production_order', 'sample_inventory', 'source_project', 'operator',
         ).prefetch_related(
-            'mold_requirements__mold', 'mold_requirements__formula',
+            'mold_requirements__mold', 'mold_requirements__formula_details__formula',
             'output_specimens__mold',
         )
 
@@ -214,7 +214,7 @@ class InjectionCompleteView(InjectionTaskAccessMixin, View):
     def get(self, request, pk):
         task = get_object_or_404(
             InjectionTask.objects.prefetch_related(
-                'mold_requirements__mold', 'mold_requirements__formula',
+                'mold_requirements__mold', 'mold_requirements__formula_details__formula',
             ),
             pk=pk,
         )

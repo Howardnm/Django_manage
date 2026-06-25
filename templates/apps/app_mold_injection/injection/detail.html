@@ -128,19 +128,17 @@
                     </thead>
                     <tbody>
                         {% for req in injection_task.mold_requirements.all %}
+                        {% for detail in req.formula_details.all %}
                         <tr>
-                            <td>{{ req.mold.name }} <span class="text-muted">[{{ req.mold.mold_code }}] x{{ req.mold.cavity_count }}穴 {{ req.mold.standard }}</span></td>
+                            <td>{{ req.mold.name }} <span class="text-muted">[{{ req.mold.mold_code }}]</span></td>
                             <td>
-                                {% if req.formula %}
-                                <span class="badge bg-azure-lt">v{{ req.formula.version }}</span> {{ req.formula.name|truncatechars:20 }}
-                                {% else %}
-                                <span class="text-muted">通用</span>
-                                {% endif %}
+                                <span class="badge bg-azure-lt">v{{ detail.formula.version }}</span> {{ detail.formula.name|truncatechars:20 }}
                             </td>
                             <td>{{ req.mold.standard }}</td>
-                            <td>{{ req.mold.cavity_count }}</td>
-                            <td class="fw-bold">{{ req.specimen_quantity }}</td>
+                            <td>{{ req.mold.cavity_count }} 穴</td>
+                            <td class="fw-bold">{{ detail.specimen_quantity }}</td>
                         </tr>
+                        {% endfor %}
                         {% empty %}
                         <tr><td colspan="5" class="text-center py-3 text-muted">暂无模具需求</td></tr>
                         {% endfor %}

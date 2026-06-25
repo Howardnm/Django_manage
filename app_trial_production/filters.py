@@ -110,6 +110,17 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
         }),
     )
 
+    project = django_filters.ModelChoiceFilter(
+        field_name='production_order__project',
+        queryset=Project.objects.all(),
+        widget=forms.Select(attrs={
+            'class': 'form-select remote-search',
+            'data-model': 'project',
+            'placeholder': '检索项目名称',
+            'style': 'width: 220px;',
+        }),
+    )
+
     sort = django_filters.OrderingFilter(
         fields=(
             ('created_at', 'created_at'),
@@ -120,19 +131,20 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
     class Meta:
         model = ExtrusionTask
-        fields = ['q', 'status', 'start_date', 'end_date']
+        fields = ['q', 'status', 'project', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs['placeholder'] = '检索工单号 / 实验单号'
+            self.filters['q'].field.widget.attrs['placeholder'] = '检索工单号 / 实验单号 / 项目名称'
 
     def filter_search(self, queryset, name, value):
         if not value:
             return queryset
         return queryset.filter(
             Q(production_order__code__icontains=value) |
-            Q(production_order__trial_code__icontains=value)
+            Q(production_order__trial_code__icontains=value) |
+            Q(production_order__project__name__icontains=value)
         )
 
 

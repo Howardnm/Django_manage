@@ -16,7 +16,7 @@ from app_project.mixins import ProjectAccessMixin
 class ProjectMemberManageView(ProjectAccessMixin, View):
     """项目成员管理：需有 change_project 权限"""
     permission_required = 'app_project.change_project'
-    template_name = 'apps/app_project/detail/modal_box/_project_member_form.html'
+    template_name = 'apps/app_project/modal/_member_form.html'
 
     def get_project_and_check_perm(self, pk):
         project = get_object_or_404(Project, pk=pk)
@@ -25,7 +25,7 @@ class ProjectMemberManageView(ProjectAccessMixin, View):
 
     def get(self, request, pk):
         project = self.get_project_and_check_perm(pk)
-        
+
         # 处理编辑
         member_id = request.GET.get('member_id')
         if member_id:
@@ -34,10 +34,16 @@ class ProjectMemberManageView(ProjectAccessMixin, View):
         else:
             form = ProjectMemberForm(project=project)
 
+        existing_sum = sum(
+            float(m.workload_share) for m in project.members.all()
+            if str(m.id) != member_id
+        )
+
         return render(request, self.template_name, {
             'project': project,
             'form': form,
-            'member_id': member_id
+            'member_id': member_id,
+            'existing_sum': existing_sum,
         })
 
     def post(self, request, pk):
@@ -56,10 +62,16 @@ class ProjectMemberManageView(ProjectAccessMixin, View):
             form.save()
             return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 
+        existing_sum = sum(
+            float(m.workload_share) for m in project.members.all()
+            if str(m.id) != member_id
+        )
+
         return render(request, self.template_name, {
             'project': project,
             'form': form,
-            'member_id': member_id
+            'member_id': member_id,
+            'existing_sum': existing_sum,
         })
 
 

@@ -1,0 +1,12 @@
+<!-- 卡片容器 -->
+<div class="card">
+    <div class="card-header bg-green-lt">
+        <h3 class="card-title">项目进度甘特图</h3>
+    </div>
+    <div class="card-body p-0">
+        <!-- 图表挂载点：设置 overflow hidden 防止多余滚动条 -->
+        <div id="project-gantt" style="width:100%; overflow: hidden"></div>
+    </div>
+</div>
+
+{{ gantt_data_json|json_script:"gantt-data" }}

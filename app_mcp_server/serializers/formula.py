@@ -22,6 +22,8 @@ def serialize_formula(formula) -> Dict[str, Any]:
 
         test_results = []
         for res in formula.test_results.all():
+            if res.production_order_id is not None:
+                continue
             test_results.append({
                 "item": res.test_config.name,
                 "value": float(res.value) if res.value is not None else (res.value_text or "N/A"),

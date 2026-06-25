@@ -21,6 +21,10 @@ class AppTrialProductionConfig(AppConfig):
             person_resolver=lambda obj: obj.creator,
         )
 
+        # 注册工作流功能 — 排产工单审批不支持退回操作
+        from app_workflow.utils import workflow_feature_registry
+        workflow_feature_registry.register(ProductionOrder, allow_return=False)
+
         # 注册状态机转换规则
         self._register_state_machines()
 

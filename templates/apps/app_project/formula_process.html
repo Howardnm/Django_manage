@@ -2,29 +2,11 @@
 {% load static %}
 {% load project_extras %}
 
+{% block styles %}
+    <link rel="stylesheet" href="{% static 'css/apps/app_project/formula_process.css' %}">
+{% endblock %}
+
 {% block content %}
-<style>
-    .formula-group-toggle:not(.collapsed) .ti-chevron-down {
-        transform: rotate(180deg);
-    }
-    .formula-group-toggle {
-        cursor: pointer;
-        transition: background-color .15s;
-    }
-    .formula-group-toggle:hover {
-        background-color: rgba(0,0,0,.03) !important;
-    }
-    .compact-table td {
-        padding: 4px 4px;
-        vertical-align: middle;
-        font-size: 13px;
-    }
-    .compact-table th {
-        padding: 4px 6px;
-        white-space: nowrap;
-        font-size: 13px;
-    }
-</style>
 <div class="page-header d-print-none mb-3">
     <div class="row align-items-center">
         <div class="col">
@@ -169,6 +151,43 @@
                 {% endfor %}
             </div>
         </div>
+
+        {% if related_orders %}
+        <!-- 关联排产工单列表 -->
+        <div class="card mt-3">
+            <div class="card-header bg-green-lt d-flex align-items-center py-2 px-3">
+                <i class="ti ti-factory text-green me-2"></i>
+                <span class="fw-semibold text-green" style="font-size: 14px;">关联排产工单</span>
+                <span class="badge bg-green text-white ms-auto" style="font-size: 10px;">{{ related_orders|length }}</span>
+            </div>
+            <div class="list-group list-group-flush" style="max-height: 30vh; overflow-y: auto;">
+                {% for order in related_orders %}
+                <a href="{% url 'trial_order_detail' order.pk %}" target="_blank"
+                   class="list-group-item list-group-item-action py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge badge-dot {{ order.status_dot }} me-1"></span>
+                        <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{{ order.code }}</span>
+                        <span class="badge {{ order.status_css }} flex-shrink-0" style="font-size: 10px;">{{ order.status }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 11px;">
+                        <span><i class="ti ti-user me-1"></i>{{ order.creator }}</span>
+                        <span>{{ order.created_at|date:"m-d" }}</span>
+                    </div>
+                    {% if order.scheduled_date %}
+                    <div class="mt-1" style="font-size: 11px;">
+                        <i class="ti ti-calendar-event text-blue me-1"></i>
+                        <span class="badge bg-blue-lt text-blue">{{ order.scheduled_date|date:"m-d H:i" }}</span>
+                        {% if order.scheduled_end %}
+                        <span class="text-muted mx-1">~</span>
+                        <span class="badge bg-blue-lt text-blue">{{ order.scheduled_end|date:"m-d H:i" }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 
@@ -229,7 +248,7 @@
                     <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table compact-table">
+                    <table class="table table-vcenter card-table table-sm small">
                         <thead>
                         <tr>
                             <th>喂料口</th>
@@ -288,7 +307,7 @@
                     </h3>
                 </div>
                 <div class="table-responsive">
-                    <table class="table table-vcenter card-table compact-table">
+                    <table class="table table-vcenter card-table table-sm small">
                         <thead>
                         <tr>
                             <th>喂料口</th>
@@ -334,54 +353,76 @@
             </div>
             {% endif %}
 
-            <!-- 测试结果 -->
+            <!-- 测试结果（含手动录入 + 各工单回写） -->
+            {% if has_test_results %}
             <div class="card mb-3">
                 <div class="card-header bg-purple-lt">
                     <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table compact-table">
-                        <thead>
-                        <tr>
-                            <th>分类</th>
-                            <th>测试项目</th>
-                            <th>标准/条件</th>
-                            <th>数值 / 结果</th>
-                            <th>测试日期</th>
-                            <th>备注</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for res in sorted_test_results %}
-                            <tr>
-                                <td><span class="text-muted small">{{ res.test_config.category.name }}</span></td>
-                                <td class="fw-bold">{{ res.test_config.name }}</td>
-                                <td class="text-muted small">
-                                    {{ res.test_config.standard }}
-                                    {% if res.test_config.condition %}<br>({{ res.test_config.condition }}){% endif %}
-                                </td>
-                                <td class="fs-3 fw-bold text-dark">
-                                    {% if res.test_config.data_type == 'NUMBER' %}
-                                        {% if '密度' in res.test_config.name %}
-                                            {{ res.value|floatformat:3 }}
-                                        {% else %}
-                                            {{ res.value|floatformat:2 }}
-                                        {% endif %}
-                                    {% else %}
-                                        {{ res.value_text }}
-                                    {% endif %}
-                                    <span class="text-muted fs-5 fw-normal">{{ res.test_config.unit }}</span>
-                                </td>
-                                <td>{{ res.test_date|date:"Y-m-d"|default:"-" }}</td>
-                                <td class="text-muted">{{ res.remark }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr><td colspan="6" class="text-center text-muted py-3">暂无测试数据</td></tr>
+                {% if test_result_tabs|length > 1 %}
+                <ul class="nav nav-tabs px-3 pt-2" data-bs-toggle="tabs">
+                        {% for tab in test_result_tabs %}
+                        <li class="nav-item">
+                            <a href="#{{ tab.tab_id }}" class="nav-link {% if forloop.first %}active{% endif %}" data-bs-toggle="tab">
+                                {% if tab.type == 'order' %}
+                                <span class="badge badge-dot {{ tab.order.status_dot_color }} me-1"></span>
+                                {% endif %}
+                                {% if tab.type == 'manual' %}手动录入{% else %}{{ tab.label }}{% endif %}
+                            </a>
+                        </li>
                         {% endfor %}
-                        </tbody>
-                    </table>
+                    </ul>
+                    {% endif %}
+                    <div class="tab-content">
+                    {% for tab in test_result_tabs %}
+                    <div class="tab-pane {% if forloop.first %}active show{% endif %}" id="{{ tab.tab_id }}" role="tabpanel">
+                        <div class="table-responsive">
+                            <table class="table table-vcenter card-table table-sm small">
+                                <thead>
+                                <tr>
+                                    <th>分类</th>
+                                    <th>测试项目</th>
+                                    <th>标准/条件</th>
+                                    <th>数值 / 结果</th>
+                                    <th>测试日期</th>
+                                    <th>备注</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for res in tab.results %}
+                                    <tr>
+                                        <td><span class="text-muted small">{{ res.test_config.category.name }}</span></td>
+                                        <td class="fw-bold">{{ res.test_config.name }}</td>
+                                        <td class="text-muted small">
+                                            {{ res.test_config.standard }}
+                                            {% if res.test_config.condition %}<br>({{ res.test_config.condition }}){% endif %}
+                                        </td>
+                                        <td class="fw-bold text-dark">
+                                            {% if res.test_config.data_type == 'NUMBER' %}
+                                                {% if '密度' in res.test_config.name %}
+                                                    {{ res.value|floatformat:3 }}
+                                                {% else %}
+                                                    {{ res.value|floatformat:2 }}
+                                                {% endif %}
+                                            {% else %}
+                                                {{ res.value_text }}
+                                            {% endif %}
+                                            <span class="text-muted fw-normal small">{{ res.test_config.unit }}</span>
+                                        </td>
+                                        <td class="text-muted small">{{ res.test_date|date:"Y-m-d"|default:"-" }}</td>
+                                        <td class="text-muted small">{{ res.remark }}</td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="6" class="text-center text-muted py-3">暂无数据</td></tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
+            {% endif %}
 
             <!-- 工艺方案 -->
             <div class="card mb-3">
@@ -420,4 +461,8 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{% static 'js/apps/app_project/formula_compare.js' %}"></script>
 {% endblock %}

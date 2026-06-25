@@ -47,18 +47,18 @@ urlpatterns = [
     path('extrusion-board/pending-card/', PendingOrdersCardView.as_view(), name='trial_extrusion_board_pending_card'),
     path('extrusion-board/stats/', ExtrusionStatsApiView.as_view(), name='trial_extrusion_board_stats'),
     path('extrusion-board/schedule/', ExtrusionScheduleApiView.as_view(), name='trial_extrusion_schedule'),
-    path('extrusion-board/<int:order_pk>/start/', ExtrusionStartApiView.as_view(), name='trial_extrusion_board_start'),
-    path('extrusion-board/<int:order_pk>/unschedule/', ExtrusionUnscheduleApiView.as_view(), name='trial_extrusion_board_unschedule'),
+    path('extrusion-board/<int:pk>/start/', ExtrusionStartApiView.as_view(), name='trial_extrusion_board_start'),
+    path('extrusion-board/<int:pk>/unschedule/', ExtrusionUnscheduleApiView.as_view(), name='trial_extrusion_board_unschedule'),
 
     # Extrusion Task
     path('extrusion-tasks/', ExtrusionTaskListView.as_view(), name='trial_extrusion_task_list'),
-    path('orders/<int:order_pk>/extrusion/', ExtrusionTaskDetailView.as_view(), name='trial_extrusion_detail'),
-    path('orders/<int:order_pk>/extrusion/start/', ExtrusionTaskStartView.as_view(), name='trial_extrusion_start'),
-    path('orders/<int:order_pk>/extrusion/record/', ExtrusionRecordFormView.as_view(), name='trial_extrusion_record'),
-    path('orders/<int:order_pk>/extrusion/complete/', ExtrusionTaskCompleteView.as_view(), name='trial_extrusion_complete'),
+    path('orders/<int:pk>/extrusion/', ExtrusionTaskDetailView.as_view(), name='trial_extrusion_detail'),
+    path('orders/<int:pk>/extrusion/start/', ExtrusionTaskStartView.as_view(), name='trial_extrusion_start'),
+    path('orders/<int:pk>/extrusion/record/', ExtrusionRecordFormView.as_view(), name='trial_extrusion_record'),
+    path('orders/<int:pk>/extrusion/complete/', ExtrusionTaskCompleteView.as_view(), name='trial_extrusion_complete'),
 
     # Pellet Split (挤出后颗粒分拨)
-    path('orders/<int:order_pk>/split/', PelletSplitView.as_view(), name='trial_pellet_split'),
+    path('orders/<int:pk>/split/', PelletSplitView.as_view(), name='trial_pellet_split'),
 
     # Sample Inventory
     path('samples/', SampleInventoryListView.as_view(), name='trial_sample_list'),

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static %}
 {% block content %}
-    {% include 'apps/app_project/detail/detail_project_header.html' %}
+    {% include 'apps/app_project/detail/_header.html' %}
 
     <div class="row row-cards mt-3">
 
@@ -11,16 +11,16 @@
         <div class="col-lg-6">
 
             <!-- 1. 项目基本信息 -->
-            {% include 'apps/app_project/detail/detail_project_info.html' %}
+            {% include 'apps/app_project/detail/_info.html' %}
 
             <!-- 2. 项目档案&文件 -->
-            {% include 'apps/app_project/detail/detail_project_customer_files.html' %}
+            {% include 'apps/app_project/detail/_customer_files.html' %}
 
             <!-- 3. 材料全性能卡片 -->
-            {% include 'apps/app_project/detail/detail_project_material.html' with material=material %}
+            {% include 'apps/app_project/detail/_material.html' with material=material %}
 
-            <!-- 1. 顶部：甘特图 -->
-            {% include 'apps/app_project/detail/detail_project_gantt.html' %}
+            <!-- 4. 顶部：甘特图 -->
+            {% include 'apps/app_project/detail/_gantt.html' %}
 
         </div>
 
@@ -30,13 +30,23 @@
         <div class="col-lg-6">
             <div class="row row-cards">
 
-
-                <!-- 2. 下部：垂直进度时间轴 -->
-                {% include 'apps/app_project/detail/detail_project_progress.html' %}
+                <!-- 垂直进度时间轴 -->
+                {% include 'apps/app_project/detail/_progress.html' %}
 
             </div>
         </div>
 
+    </div>
+
+    <!-- HTMX 通用模态框容器 -->
+    <div class="modal modal-blur fade" id="modal-generic" tabindex="-1">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content" id="modal-content-placeholder">
+                <div class="p-3 text-center">
+                    <div class="spinner-border text-primary"></div>
+                </div>
+            </div>
+        </div>
     </div>
 
 {% endblock %}
@@ -44,4 +54,7 @@
 {% block extra_js %}
     <script src="{% static 'highcharts/core-12.5.0/highcharts-gantt.js' %}"></script>
     <script src="{% static 'highcharts/core-12.5.0/modules/exporting.js' %}"></script>
+    <script src="{% static 'js/apps/app_project/gantt.js' %}"></script>
+    <script src="{% static 'js/apps/app_project/member_form.js' %}"></script>
+    <script src="{% static 'js/apps/app_project/sales_member_form.js' %}"></script>
 {% endblock %}

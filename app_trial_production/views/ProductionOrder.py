@@ -1,22 +1,186 @@
 import logging
 
+from django.db import transaction
+from django.db.models import Sum, Q
 from django.views.generic import DetailView, CreateView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 
-from app_trial_production.mixins import (
-    TrialProductionAccessMixin, ExtrusionTaskAccessMixin, RndAccessMixin,
-)
-from app_trial_production.models import ProductionOrder, SampleInventory
-from app_mold_injection.models import MoldType
+from app_formula.models import LabFormula
+from app_material.models import TestConfig
+from app_mold_injection.models import MoldRequirement, MoldRequirementFormulaDetail, MoldType
+from app_project.models import Project
+from app_trial_production.mixins import TrialProductionAccessMixin, RndAccessMixin
+from app_trial_production.models import ProductionOrder, SampleInventory, TrialProductionConfig
 from app_trial_production.forms import (
-    ProductionOrderForm, ProductionOrderUpdateForm,
+    ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
 )
-from app_trial_production.services import ProductionOrderService
+from app_trial_production.services import ProductionOrderService, SampleInventoryService
+from app_user.models import User
+from app_user.mixins import IdentityConfig
 
 logger = logging.getLogger(__name__)
 
+
+# ---- 共享辅助函数 ----
+
+def _build_merged_bom(formulas, details_map=None):
+    """将同实验单号下多个配方的BOM合并为多列比例展示结构。
+
+    Returns: (rows, formula_totals, grand_total)
+    """
+    if not formulas:
+        return [], {}, 0
+    details_map = details_map or {}
+    base_formula = formulas[0]
+    rows = []
+    formula_totals = {f.pk: 0 for f in formulas}
+    grand_total = 0
+    for base_line in base_formula.bom_lines.all():
+        raw_id = base_line.raw_material_id
+        pct_columns = []
+        row_total = 0
+        for f in formulas:
+            pct = ''
+            for bl in f.bom_lines.all():
+                if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
+                    pct = bl.percentage
+                    break
+            fd = details_map.get(f.pk)
+            planned_qty = float(fd.planned_quantity) if fd else 0
+            pct_val = float(pct) if pct else 0
+            feeding_qty = round((pct_val / 100) * planned_qty, 3) if planned_qty > 0 else 0
+            formula_totals[f.pk] += feeding_qty
+            row_total += feeding_qty
+            pct_columns.append({
+                'version': f.version, 'value': pct, 'formula_pk': f.pk,
+                'feeding_qty': feeding_qty if planned_qty > 0 else 0,
+            })
+        grand_total += row_total
+        rows.append({
+            'feeding_port': base_line.get_feeding_port_display(),
+            'raw_material': base_line.raw_material,
+            'is_pre_mix': base_line.is_pre_mix,
+            'pre_mix_order': base_line.pre_mix_order,
+            'pre_mix_time': base_line.pre_mix_time,
+            'weighing_scale': base_line.get_weighing_scale_display() if base_line.weighing_scale else '',
+            'is_tail': base_line.is_tail,
+            'pct_columns': pct_columns,
+            'row_total': round(row_total, 3),
+        })
+    formula_totals = {k: round(v, 3) for k, v in formula_totals.items()}
+    return rows, formula_totals, round(grand_total, 3)
+
+
+def _build_bom_data(formulas):
+    """构建供前端JS动态计算配料表的Python字典（由模板 json_script 序列化）"""
+    if not formulas:
+        return {'formulas': [], 'rows': []}
+    rows = []
+    base_formula = formulas[0]
+    for base_line in base_formula.bom_lines.all():
+        raw_id = base_line.raw_material_id
+        percentages = {}
+        for f in formulas:
+            pct = 0
+            for bl in f.bom_lines.all():
+                if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
+                    pct = float(bl.percentage)
+                    break
+            percentages[str(f.pk)] = pct
+        rows.append({'percentages': percentages})
+    return {
+        'formulas': [{'pk': str(f.pk), 'version': f.version} for f in formulas],
+        'rows': rows,
+    }
+
+
+def _build_grouped_test_items():
+    """构建测试项目分组数据"""
+    tests = TestConfig.objects.select_related('category').order_by('category__order', 'order')
+    grouped = {}
+    for t in tests:
+        if t.category not in grouped:
+            grouped[t.category] = {'category': t.category, 'items': []}
+        grouped[t.category]['items'].append(t)
+    return list(grouped.values())
+
+
+def _save_mold_matrix(order, formset, formula_pks):
+    """批量保存模具矩阵：delete-all-then-recreate。
+
+    一行 formset form = 一个模具，变体列数据从 formset.get_variant_qtys() 读取。
+    """
+    order.mold_requirements.filter(injection_task__isnull=True).delete()
+    for i, form in enumerate(formset):
+        if form.cleaned_data.get('DELETE'):
+            continue
+        mold = form.cleaned_data.get('mold')
+        if not mold:
+            continue
+        variant_qtys = formset.get_variant_qtys(i)
+        if not variant_qtys:
+            continue
+        mr = MoldRequirement.objects.create(
+            production_order=order, mold=mold, order=i,
+        )
+        for formula_pk, qty in variant_qtys.items():
+            MoldRequirementFormulaDetail.objects.create(
+                mold_requirement=mr,
+                formula_id=formula_pk,
+                specimen_quantity=qty,
+            )
+
+
+def _build_mold_formset_initial(order, formulas):
+    """从现有 DB 数据构建 formset 初始值（纯函数，无副作用）。
+
+    Returns:
+        (queryset, variant_qty_map)
+        queryset — 每个模具一行 MoldRequirement，供 formset queryset 参数
+        variant_qty_map — {form_index: {formula_pk: quantity, ...}}，供模板回填变体列值
+    """
+    existing = list(order.mold_requirements.filter(
+        injection_task__isnull=True,
+    ).prefetch_related('formula_details').order_by('order', 'pk'))
+
+    instances = []
+    variant_qty_map = {}
+    for i, mr in enumerate(existing):
+        instances.append(mr)
+        variant_qty_map[i] = {
+            str(detail.formula_id): detail.specimen_quantity
+            for detail in mr.formula_details.all()
+        }
+    queryset = MoldRequirement.objects.filter(
+        pk__in=[i.pk for i in instances]
+    ) if instances else MoldRequirement.objects.none()
+    return queryset, variant_qty_map
+
+
+def _build_variant_qty_map_from_post(post_data, formula_pks):
+    """从 POST 数据提取变体列值，构建 {row_idx: {formula_pk_str: qty}} 映射。
+
+    用于 POST 验证失败后回填变体列输入框，避免用户数据丢失。
+    """
+    total = int(post_data.get('mold-TOTAL_FORMS', 0))
+    variant_qty_map = {}
+    for i in range(total):
+        for pk in formula_pks:
+            key = f'variant_qty_{i}_{pk}'
+            val = post_data.get(key, '')
+            if val:
+                try:
+                    qty = int(val)
+                except (ValueError, TypeError):
+                    qty = 0
+                if qty != 0:
+                    variant_qty_map.setdefault(i, {})[str(pk)] = qty
+    return variant_qty_map
+
+
+# ---- 视图 ----
 
 class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
     """排产工单详情"""
@@ -56,7 +220,6 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         context['testing_tasks'] = order.testing_tasks.all()
 
         # 配方信息
-        from app_formula.models import LabFormula
         formulas = list(LabFormula.objects.filter(
             code=order.trial_code, project=order.project,
         ).select_related(
@@ -74,7 +237,7 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
 
         # BOM 合并展示
         context['merged_bom_rows'], formula_totals_map, context['bom_grand_total'] = \
-            self._build_merged_bom(formulas, details_map)
+            _build_merged_bom(formulas, details_map)
         context['bom_formula_columns'] = [
             {
                 'version': f.version,
@@ -89,29 +252,50 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         # 模具需求矩阵
         if injection:
             context['mold_matrix'] = self._build_mold_matrix(
-                injection.mold_requirements.all(), formulas)
+                injection.mold_requirements.prefetch_related('formula_details'), formulas)
+        else:
+            plans = order.mold_requirements.filter(
+                injection_task__isnull=True,
+            ).select_related('mold').prefetch_related('formula_details')
+            if plans.exists():
+                context['mold_matrix'] = self._build_mold_matrix(
+                    plans, formulas, is_pending=True)
 
-        # 样品库存汇总
-        from app_trial_production.services import SampleInventoryService
+        # 样品库存汇总 / 该实验单号的所有工单产出汇总（跨工单聚合）
         context['pellet_summary'] = SampleInventoryService.get_pellet_summary(order.trial_code)
+
+        # 当前工单颗粒分拨明细
+        pellet_splits = SampleInventory.objects.filter(
+            production_order=order, type='PELLET',
+        ).aggregate(
+            finished_qty=Sum('quantity', filter=Q(sub_type='FINISHED')),
+            for_injection_qty=Sum('quantity', filter=Q(sub_type='FOR_INJECTION')),
+        )
+        context['pellet_data'] = {
+            'actual_qty': float(order.quantity_actual or 0),
+            'finished_qty': float(pellet_splits['finished_qty'] or 0),
+            'for_injection_qty': float(pellet_splits['for_injection_qty'] or 0),
+            'completed': ext.pellet_split_completed if ext else False,
+        }
+
         context['specimen_summary'] = SampleInventoryService.get_specimen_summary(order.trial_code)
 
         # 是否已完成颗粒分拨（控制分拨按钮显隐 + 注塑任务触发屏障）
-        context['has_pellet_splits'] = SampleInventory.objects.filter(
-            production_order=order, type='PELLET',
-        ).exists()
+        context['has_pellet_splits'] = ext.pellet_split_completed if ext else False
 
         # 配方粒度的分拨明细
-        from django.db.models import Sum
         existing_splits = SampleInventory.objects.filter(
             production_order=order, type='PELLET',
-        ).values('formula_id', 'sub_type').annotate(
+        ).values('formula_id', 'sub_type', 'batch_number').annotate(
             total_qty=Sum('quantity'),
         )
         split_map = {}
+        batch_map = {}
         for s in existing_splits:
             key = (s['formula_id'], s['sub_type'])
             split_map[key] = float(s['total_qty'] or 0)
+            if s['batch_number']:
+                batch_map[s['formula_id']] = s['batch_number']
 
         formula_split_summaries = []
         for fd in details_map.values():
@@ -123,12 +307,11 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
                 'finished_qty': finished_qty,
                 'for_injection_qty': for_injection_qty,
                 'total_split': finished_qty + for_injection_qty,
+                'batch_number': batch_map.get(fd.formula_id, ''),
             })
         context['formula_split_summaries'] = formula_split_summaries
 
         # 操作权限
-        from app_user.models import User
-        from app_user.mixins import IdentityConfig
         user = self.request.user
         context['can_start_extrusion'] = order.can_start_extrusion and (
             user.user_type == User.UserType.EXTRUSION_OPERATOR
@@ -138,14 +321,15 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
         return context
 
     @staticmethod
-    def _build_mold_matrix(mold_requirements, formulas):
-        """构建模具×配方矩阵"""
+    def _build_mold_matrix(mold_requirements, formulas, is_pending=False):
+        """构建模具×配方矩阵（详情页展示用）"""
         mold_map = {}
         for mr in mold_requirements:
             mold = mr.mold
             if mold.pk not in mold_map:
                 mold_map[mold.pk] = {'mold': mold, 'quantities': {}, 'cells': []}
-            mold_map[mold.pk]['quantities'][mr.formula_id] = mr.specimen_quantity
+            for detail in mr.formula_details.all():
+                mold_map[mold.pk]['quantities'][detail.formula_id] = detail.specimen_quantity
         mold_rows = list(mold_map.values())
         for row in mold_rows:
             row_total = 0
@@ -160,64 +344,21 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             total = sum(row['quantities'].get(f.pk, 0) for row in mold_rows)
             formula_totals.append({'formula_pk': f.pk, 'total': total})
             grand_total += total
-        return {
+        result = {
             'mold_rows': mold_rows,
             'formulas': formulas,
             'formula_totals': formula_totals,
             'grand_total': grand_total,
         }
-
-    @staticmethod
-    def _build_merged_bom(formulas, details_map=None):
-        """合并多配方BOM为多列展示"""
-        if not formulas:
-            return [], {}, 0
-        details_map = details_map or {}
-        base_formula = formulas[0]
-        rows = []
-        formula_totals = {f.pk: 0 for f in formulas}
-        grand_total = 0
-        for base_line in base_formula.bom_lines.all():
-            raw_id = base_line.raw_material_id
-            pct_columns = []
-            row_total = 0
-            for f in formulas:
-                pct = ''
-                for bl in f.bom_lines.all():
-                    if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
-                        pct = bl.percentage
-                        break
-                fd = details_map.get(f.pk)
-                planned_qty = float(fd.planned_quantity) if fd else 0
-                pct_val = float(pct) if pct else 0
-                feeding_qty = round((pct_val / 100) * planned_qty, 3) if planned_qty > 0 else 0
-                formula_totals[f.pk] += feeding_qty
-                row_total += feeding_qty
-                pct_columns.append({
-                    'version': f.version, 'value': pct, 'formula_pk': f.pk,
-                    'feeding_qty': feeding_qty if planned_qty > 0 else 0,
-                })
-            grand_total += row_total
-            rows.append({
-                'feeding_port': base_line.get_feeding_port_display(),
-                'raw_material': base_line.raw_material,
-                'is_pre_mix': base_line.is_pre_mix,
-                'pre_mix_order': base_line.pre_mix_order,
-                'pre_mix_time': base_line.pre_mix_time,
-                'weighing_scale': base_line.get_weighing_scale_display() if base_line.weighing_scale else '',
-                'is_tail': base_line.is_tail,
-                'pct_columns': pct_columns,
-                'row_total': round(row_total, 3),
-            })
-        formula_totals = {k: round(v, 3) for k, v in formula_totals.items()}
-        return rows, formula_totals, round(grand_total, 3)
-
+        if is_pending:
+            result['is_pending'] = True
+        return result
 
 class ProductionOrderCreateView(RndAccessMixin, CreateView):
     """创建排产工单"""
     model = ProductionOrder
     form_class = ProductionOrderForm
-    template_name = 'apps/app_trial_production/order/create.html'
+    template_name = 'apps/app_trial_production/order/form.html'
 
     def get_initial(self):
         initial = super().get_initial()
@@ -228,89 +369,50 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['page_mode'] = 'create'
+        context['formula_details_map'] = {}
+        context['existing_test_item_ids'] = set()
         context['mold_types'] = MoldType.objects.filter(status='AVAILABLE').order_by('mold_code')
         initiate_data = self.request.session.get('trial_initiate_data')
         if initiate_data:
             context['initiate_data'] = initiate_data
             context['trial_code'] = initiate_data.get('trial_code', '')
-            from app_formula.models import LabFormula
             formulas = list(LabFormula.objects.filter(
                 code=initiate_data.get('trial_code', ''),
                 project_id=initiate_data.get('project_id'),
             ).prefetch_related('bom_lines__raw_material__category').order_by('version'))
             context['trial_formulas'] = formulas
 
-            # 测试样条模具（预填充注塑矩阵）
-            context['test_specimen_molds'] = MoldType.objects.filter(
+            # BOM 合并展示 + JS 计算数据
+            context['merged_bom_rows'] = _build_merged_bom(formulas)[0]
+            context['bom_data'] = _build_bom_data(formulas)
+
+            # 构建模具 formset（一行=一个模具，变体列由模板裸 <input> 渲染）
+            formula_pks = [f.pk for f in formulas]
+            test_molds = MoldType.objects.filter(
                 status='AVAILABLE', mold_type='TEST_SPECIMEN',
             ).order_by('mold_code')
 
-            # BOM 合并展示 + JS 计算数据
-            context['merged_bom_rows'] = self._build_merged_bom(formulas)
-            context['bom_data'] = self._build_bom_data(formulas)
+            if self.request.method == 'POST':
+                context['mold_formset'] = MoldRequirementRowFormSet(
+                    self.request.POST, prefix='mold', formula_pks=formula_pks)
+                # 从 POST 数据恢复变体列值（验证失败时保留用户输入）
+                context['variant_qty_map'] = _build_variant_qty_map_from_post(
+                    self.request.POST, formula_pks,
+                )
+            else:
+                initial = [{'mold': m} for m in test_molds]
+                context['mold_formset'] = MoldRequirementRowFormSet(
+                    queryset=MoldRequirement.objects.none(),
+                    initial=initial, prefix='mold', formula_pks=formula_pks,
+                )
+                context['variant_qty_map'] = {}
+            context['formula_pks'] = formula_pks
 
         # 测试项目分组
-        from app_material.models import TestConfig
-        tests = TestConfig.objects.select_related('category').order_by('category__order', 'order')
-        grouped = {}
-        for t in tests:
-            if t.category not in grouped:
-                grouped[t.category] = {'category': t.category, 'items': []}
-            grouped[t.category]['items'].append(t)
-        context['grouped_test_items'] = list(grouped.values())
+        context['grouped_test_items'] = _build_grouped_test_items()
         return context
 
-    @staticmethod
-    def _build_merged_bom(formulas):
-        """将同实验单号下多个配方的BOM合并为多列比例展示结构（创建页简化版）"""
-        if not formulas:
-            return []
-        base_formula = formulas[0]
-        rows = []
-        for base_line in base_formula.bom_lines.all():
-            raw_id = base_line.raw_material_id
-            pct_columns = []
-            for f in formulas:
-                pct = ''
-                for bl in f.bom_lines.all():
-                    if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
-                        pct = bl.percentage
-                        break
-                pct_columns.append({'version': f.version, 'value': pct, 'formula_pk': f.pk})
-            rows.append({
-                'feeding_port': base_line.get_feeding_port_display(),
-                'raw_material': base_line.raw_material,
-                'is_pre_mix': base_line.is_pre_mix,
-                'pre_mix_order': base_line.pre_mix_order,
-                'pre_mix_time': base_line.pre_mix_time,
-                'weighing_scale': base_line.get_weighing_scale_display() if base_line.weighing_scale else '',
-                'is_tail': base_line.is_tail,
-                'pct_columns': pct_columns,
-            })
-        return rows
-
-    @staticmethod
-    def _build_bom_data(formulas):
-        """构建供前端JS动态计算配料表的Python字典（由模板 json_script 序列化）"""
-        if not formulas:
-            return {'formulas': [], 'rows': []}
-        rows = []
-        base_formula = formulas[0]
-        for base_line in base_formula.bom_lines.all():
-            raw_id = base_line.raw_material_id
-            percentages = {}
-            for f in formulas:
-                pct = 0
-                for bl in f.bom_lines.all():
-                    if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
-                        pct = float(bl.percentage)
-                        break
-                percentages[str(f.pk)] = pct
-            rows.append({'percentages': percentages})
-        return {
-            'formulas': [{'pk': str(f.pk), 'version': f.version} for f in formulas],
-            'rows': rows,
-        }
 
     def form_valid(self, form):
         initiate_data = self.request.session.get('trial_initiate_data') or {}
@@ -324,7 +426,6 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
             RndAccessMixin.check_project_ownership(project, self.request.user)
 
         # 构建配方明细
-        from app_formula.models import LabFormula
         formulas = list(LabFormula.objects.filter(
             code=trial_code, project_id=project_id,
         ).order_by('version'))
@@ -343,80 +444,150 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 'needs_color_matching': needs_cm,
             })
 
-        # 构建模具矩阵
-        mold_matrix = []
-        mold_count = int(self.request.POST.get('mold_count', 0))
-        for i in range(mold_count):
-            mold_id = self.request.POST.get(f'mold_{i}')
-            if not mold_id:
-                continue
-            formula_quantities = {}
-            for formula in formulas:
-                qty_val = self.request.POST.get(f'qty_{i}_{formula.pk}', '0')
-                try:
-                    qty = int(qty_val)
-                except (ValueError, TypeError):
-                    qty = 0
-                if qty > 0:
-                    formula_quantities[str(formula.pk)] = qty
-            if formula_quantities:
-                mold_matrix.append({
-                    'mold_id': int(mold_id),
-                    'formula_quantities': formula_quantities,
-                })
-
         # 测试项目
         test_item_ids = self.request.POST.getlist('test_items') or None
 
-        # 委托 Service 创建
-        self.object = ProductionOrderService.create_order(
-            user=self.request.user,
-            trial_code=trial_code,
-            project_id=project_id,
-            project_node_id=project_node_id,
-            process_profile_id=form.instance.process_profile_id,
-            formula_details=formula_details,
-            test_item_ids=test_item_ids,
-            mold_matrix=mold_matrix,
-            packaging_desc=form.cleaned_data.get('packaging_desc', ''),
-            storage_location=form.cleaned_data.get('storage_location', ''),
-            remark=form.cleaned_data.get('remark', ''),
-        )
+        with transaction.atomic():
+            # 委托 Service 创建工单（不再传 mold_matrix，由 formset 处理）
+            self.object = ProductionOrderService.create_order(
+                user=self.request.user,
+                trial_code=trial_code,
+                project_id=project_id,
+                project_node_id=project_node_id,
+                process_profile_id=form.instance.process_profile_id,
+                formula_details=formula_details,
+                test_item_ids=test_item_ids,
+                packaging_desc=form.cleaned_data.get('packaging_desc', ''),
+                storage_location=form.cleaned_data.get('storage_location', ''),
+                remark=form.cleaned_data.get('remark', ''),
+            )
+
+            # 保存模具矩阵
+            mold_formset = MoldRequirementRowFormSet(
+                self.request.POST, prefix='mold',
+                formula_pks=[f['formula_id'] for f in formula_details],
+            )
+            if mold_formset.is_valid():
+                _save_mold_matrix(
+                    self.object, mold_formset,
+                    [f['formula_id'] for f in formula_details],
+                )
 
         self.request.session.pop('trial_initiate_data', None)
         messages.success(self.request, f'生产工单 {self.object.code} 创建成功')
         return redirect('trial_order_detail', pk=self.object.pk)
 
 
-class ProductionOrderUpdateView(ExtrusionTaskAccessMixin, UpdateView):
-    """编辑排产工单"""
+class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
+    """编辑排产工单（仅草稿状态可编辑）"""
     model = ProductionOrder
     form_class = ProductionOrderUpdateForm
-    template_name = 'apps/app_trial_production/order/edit.html'
+    template_name = 'apps/app_trial_production/order/form.html'
 
     def get_object(self, queryset=None):
-        return self.get_object_or_deny()
+        obj = super().get_object(queryset)
+        if obj.status != ProductionOrder.Status.DRAFT:
+            raise PermissionDenied('仅草稿状态的工单可编辑')
+        if obj.project:
+            RndAccessMixin.check_project_ownership(obj.project, self.request.user)
+        elif obj.creator_id != self.request.user.pk:
+            raise PermissionDenied('您不是该工单的创建者')
+        return obj
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['formula_details'] = self.object.formula_details.select_related(
-            'formula').order_by('formula__version')
+        order = self.object
+        context['page_mode'] = 'edit'
+
+        context['mold_types'] = MoldType.objects.filter(status='AVAILABLE').order_by('mold_code')
+
+        # 配方信息（从订单的 trial_code + project 查找）
+        formulas = list(LabFormula.objects.filter(
+            code=order.trial_code,
+            project_id=order.project_id,
+        ).prefetch_related('bom_lines__raw_material__category').order_by('version'))
+        context['trial_formulas'] = formulas
+
+        # 现有配方明细 → 预填计划产量 & 配色标记
+        formula_details_map = {}
+        for fd in order.formula_details.all():
+            formula_details_map[fd.formula_id] = fd
+        context['formula_details_map'] = formula_details_map
+
+        # BOM 合并展示 + JS 计算数据
+        context['merged_bom_rows'] = _build_merged_bom(formulas, formula_details_map)[0]
+        context['bom_data'] = _build_bom_data(formulas)
+
+        # 现有模具配置（从 mold_requirements 读取，构建 formset 初始值）
+        formula_pks = [f.pk for f in formulas]
+        context['formula_pks'] = formula_pks
+
+        if self.request.method == 'POST':
+            context['mold_formset'] = MoldRequirementRowFormSet(
+                self.request.POST, prefix='mold', formula_pks=formula_pks)
+            context['variant_qty_map'] = _build_variant_qty_map_from_post(
+                self.request.POST, formula_pks,
+            )
+        else:
+            queryset, variant_qty_map = _build_mold_formset_initial(order, formulas)
+            context['mold_formset'] = MoldRequirementRowFormSet(
+                queryset=queryset, prefix='mold', formula_pks=formula_pks)
+            context['variant_qty_map'] = variant_qty_map
+
+        # 已选测试项目 ID 集合
+        context['existing_test_item_ids'] = set(
+            order.test_items.values_list('pk', flat=True)
+        )
+
+        # 测试项目分组
+        context['grouped_test_items'] = _build_grouped_test_items()
+
         return context
 
     def form_valid(self, form):
-        self.object = form.save()
-        for fd in self.object.formula_details.all():
-            qty_str = self.request.POST.get(f'planned_qty_{fd.formula_id}', '')
-            if qty_str:
-                try:
-                    fd.planned_quantity = float(qty_str)
-                except (ValueError, TypeError):
-                    pass
-            fd.needs_color_matching = self.request.POST.get(
-                f'needs_color_{fd.formula_id}') == 'on'
-            fd.save(update_fields=['planned_quantity', 'needs_color_matching'])
+        with transaction.atomic():
+            order = form.save()
+
+            # 更新配方明细 & 计划总产量
+            total_qty = 0
+            for fd in order.formula_details.all():
+                qty_str = self.request.POST.get(f'planned_qty_{fd.formula_id}', '')
+                if qty_str:
+                    try:
+                        fd.planned_quantity = float(qty_str)
+                    except (ValueError, TypeError):
+                        pass
+                else:
+                    fd.planned_quantity = 0
+                fd.needs_color_matching = self.request.POST.get(
+                    f'needs_color_{fd.formula_id}') == 'on'
+                fd.save(update_fields=['planned_quantity', 'needs_color_matching'])
+                total_qty += float(fd.planned_quantity or 0)
+
+            # 保存模具矩阵（delete-all-then-recreate）
+            formula_pks = [fd.formula_id for fd in order.formula_details.all()]
+            mold_formset = MoldRequirementRowFormSet(
+                self.request.POST, prefix='mold', formula_pks=formula_pks)
+            if mold_formset.is_valid():
+                _save_mold_matrix(order, mold_formset, formula_pks)
+
+            # 更新测试项目
+            test_item_ids = self.request.POST.getlist('test_items')
+            if test_item_ids:
+                order.test_items.set([int(tid) for tid in test_item_ids if tid.isdigit()])
+            else:
+                order.test_items.clear()
+
+            order.quantity_planned = total_qty
+            order.save(update_fields=['quantity_planned', 'updated_at'])
+
+            logger.info(
+                f"ProductionOrder {order.code} updated by {self.request.user}, "
+                f"mold_plan_count={order.mold_requirements.filter(injection_task__isnull=True).count()}, "
+                f"formula_count={order.formula_details.count()}, test_items={len(test_item_ids)}"
+            )
         messages.success(self.request, '工单更新成功')
-        return redirect('trial_order_detail', pk=self.object.pk)
+        return redirect('trial_order_detail', pk=order.pk)
 
 
 class ProductionOrderStartWorkflowView(RndAccessMixin, View):
@@ -433,7 +604,6 @@ class ProductionOrderStartWorkflowView(RndAccessMixin, View):
         elif order.creator_id != request.user.pk:
             raise PermissionDenied("您不是该工单的创建者")
 
-        from app_trial_production.models import TrialProductionConfig
         config = TrialProductionConfig.get()
         if not config.workflow_definition:
             messages.error(request, '未配置审批流程，请先在排产配置中设置')
@@ -461,7 +631,6 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
             project = get_object_or_404(Project, pk=project_id)
             RndAccessMixin.check_project_ownership(project, request.user)
 
-        from app_formula.models import LabFormula
         formulas = LabFormula.objects.filter(
             code=trial_code, project_id=project_id,
         ).order_by('version')

@@ -1,38 +1,4 @@
 {% load project_extras %}
-<style>
-    .compare-table td:nth-child(1),
-    .compare-table td:nth-child(2),
-    .compare-table td:nth-child(3),
-    .compare-table td:nth-child(4) {
-        white-space: nowrap;
-    }
-    .compare-table {
-        border-collapse: separate;
-        border-spacing: 0;
-    }
-    .compare-table th,
-    .compare-table td {
-        border-right: 1px solid var(--tblr-border-color, #e5e7eb);
-        border-bottom: 1px solid var(--tblr-border-color, #e5e7eb);
-    }
-    .compare-table th:first-child,
-    .compare-table td:first-child {
-        border-left: 1px solid var(--tblr-border-color, #e5e7eb);
-    }
-    .compare-table thead th {
-        border-top: 1px solid var(--tblr-border-color, #e5e7eb);
-    }
-    .compare-table th.sticky-col,
-    .compare-table td.sticky-col {
-        position: sticky;
-    }
-    .compare-table thead th.sticky-col {
-        z-index: 3;
-    }
-    .compare-table tbody td.sticky-col {
-        z-index: 2;
-    }
-</style>
 <div class="card">
     <div class="card-header bg-teal-lt d-flex justify-content-between align-items-center">
         <h3 class="card-title text-teal mb-0">
@@ -287,41 +253,3 @@
         </table>
     </div>
 </div>
-
-<script>
-(function() {
-    const table = document.querySelector('.compare-table');
-    if (!table) return;
-    const STICKY_COLS = 4;
-
-    function fixSticky() {
-        const headerCells = table.querySelectorAll('thead > tr:first-child > th');
-        const offsets = [];
-        let cum = 0;
-        headerCells.forEach(function(th, i) {
-            if (i < STICKY_COLS) {
-                offsets[i] = cum;
-                cum += th.offsetWidth;
-            }
-        });
-        table.querySelectorAll('tr').forEach(function(row) {
-            var cells = row.children;
-            var isThead = row.parentElement.tagName === 'THEAD';
-            for (var i = 0; i < Math.min(STICKY_COLS, cells.length); i++) {
-                var cell = cells[i];
-                var isPreSticky = cell.classList.contains('sticky-col');
-                if (cell.colSpan > 1 && !isPreSticky) continue;
-                cell.classList.add('sticky-col');
-                cell.style.left = isPreSticky ? cell.style.left || offsets[0] + 'px' : offsets[i] + 'px';
-                if (!/bg-/.test(cell.className) && !cell.style.backgroundColor) {
-                    cell.style.backgroundColor = isThead ? '#f8f9fa' : '#fff';
-                }
-            }
-        });
-    }
-
-    fixSticky();
-    window.addEventListener('resize', fixSticky);
-    new ResizeObserver(fixSticky).observe(table);
-})();
-</script>

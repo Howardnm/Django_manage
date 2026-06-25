@@ -25,3 +25,7 @@ class AppProjectConfig(AppConfig):
             display_name_resolver=lambda obj: str(obj),
             person_resolver=lambda obj: obj.project.manager,
         )
+
+        # 注册工作流功能 — 项目节点审批不支持退回操作
+        from app_workflow.utils import workflow_feature_registry
+        workflow_feature_registry.register(ProjectNode, allow_return=False)

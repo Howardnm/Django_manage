@@ -48,7 +48,7 @@ class ExtrusionTaskDetailView(ExtrusionTaskAccessMixin, DetailView):
     model = ExtrusionTask
     template_name = 'apps/app_trial_production/extrusion/detail.html'
     context_object_name = 'task'
-    pk_url_kwarg = 'order_pk'
+    pk_url_kwarg = 'pk'
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -59,12 +59,12 @@ class ExtrusionTaskDetailView(ExtrusionTaskAccessMixin, DetailView):
             'production_order__process_profile',
             'production_order__process_profile__machine',
             'operator',
-        ).filter(production_order_id=self.kwargs['order_pk'])
+        ).filter(production_order_id=self.kwargs['pk'])
 
     def get_object(self, queryset=None):
         # ExtrusionTask 按 production_order_id 查找，不能直接用 get_object_or_deny 的 pk 查找
         qs = self.model.objects.all()
-        obj = get_object_or_404(qs, production_order_id=self.kwargs['order_pk'])
+        obj = get_object_or_404(qs, production_order_id=self.kwargs['pk'])
         self.check_object_permission(obj)
         return obj
 
@@ -87,11 +87,11 @@ class ExtrusionTaskDetailView(ExtrusionTaskAccessMixin, DetailView):
 class ExtrusionTaskStartView(ExtrusionTaskAccessMixin, View):
     """开始挤出任务"""
 
-    def post(self, request, order_pk):
-        task = get_object_or_404(ExtrusionTask, production_order_id=order_pk)
+    def post(self, request, pk):
+        task = get_object_or_404(ExtrusionTask, production_order_id=pk)
         if task.status != 'PENDING':
             messages.warning(request, '任务状态不允许开始')
-            return redirect('trial_extrusion_detail', order_pk=order_pk)
+            return redirect('trial_extrusion_detail', pk=pk)
 
         # 操作员归属校验
         if task.operator_id and task.operator_id != request.user.pk:
@@ -102,22 +102,22 @@ class ExtrusionTaskStartView(ExtrusionTaskAccessMixin, View):
             ExtrusionTaskService.start_task(task, request.user)
             messages.success(request, '挤出任务已开始')
         except Exception:
-            logger.exception(f"Extrusion start failed: order_pk={order_pk}")
+            logger.exception(f"Extrusion start failed: pk={pk}")
             messages.error(request, '系统错误，请稍后重试')
-        return redirect('trial_extrusion_record', order_pk=order_pk)
+        return redirect('trial_extrusion_record', pk=pk)
 
 
 class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
     """挤出参数记录表单"""
     template_name = 'apps/app_trial_production/extrusion/record_form.html'
 
-    def get(self, request, order_pk):
+    def get(self, request, pk):
         task = get_object_or_404(
             ExtrusionTask.objects.select_related(
                 'production_order', 'production_order__process_profile',
                 'production_order__process_profile__machine',
             ),
-            production_order_id=order_pk,
+            production_order_id=pk,
         )
 
         # 从工艺方案预填（始终执行，form.initial 仅对实例中仍为默认值的字段生效）
@@ -136,17 +136,17 @@ class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
             'process_profile': process_profile,
         })
 
-    def post(self, request, order_pk):
-        task = get_object_or_404(ExtrusionTask, production_order_id=order_pk)
+    def post(self, request, pk):
+        task = get_object_or_404(ExtrusionTask, production_order_id=pk)
         form = ExtrusionRecordForm(request.POST, instance=task)
         if form.is_valid():
             try:
                 ExtrusionTaskService.save_record(task, form.cleaned_data, request.user)
                 messages.success(request, '挤出生产记录已保存')
             except Exception:
-                logger.exception(f"Extrusion record save failed: order_pk={order_pk}")
+                logger.exception(f"Extrusion record save failed: pk={pk}")
                 messages.error(request, '系统错误，请稍后重试')
-            return redirect('trial_extrusion_detail', order_pk=order_pk)
+            return redirect('trial_extrusion_detail', pk=pk)
 
         return render(request, self.template_name, {
             'task': task,
@@ -158,11 +158,11 @@ class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
 class ExtrusionTaskCompleteView(ExtrusionTaskAccessMixin, View):
     """完成挤出任务"""
 
-    def post(self, request, order_pk):
-        task = get_object_or_404(ExtrusionTask, production_order_id=order_pk)
+    def post(self, request, pk):
+        task = get_object_or_404(ExtrusionTask, production_order_id=pk)
         if task.status != 'IN_PROGRESS':
             messages.warning(request, '当前任务状态不允许完成')
-            return redirect('trial_extrusion_detail', order_pk=order_pk)
+            return redirect('trial_extrusion_detail', pk=pk)
 
         if not request.user.is_superuser and task.operator_id:
             if task.operator_id != request.user.pk:
@@ -172,6 +172,6 @@ class ExtrusionTaskCompleteView(ExtrusionTaskAccessMixin, View):
             ExtrusionTaskService.complete_task(task, request.user)
             messages.success(request, '挤出任务已完成')
         except Exception:
-            logger.exception(f"Extrusion complete failed: order_pk={order_pk}")
+            logger.exception(f"Extrusion complete failed: pk={pk}")
             messages.error(request, '系统错误，请稍后重试')
-        return redirect('trial_order_detail', pk=order_pk)
+        return redirect('trial_order_detail', pk=pk)

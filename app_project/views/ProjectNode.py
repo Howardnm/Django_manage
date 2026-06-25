@@ -16,7 +16,7 @@ from app_workflow.services import WorkflowService
 class ProjectNodeUpdateView(ProjectAccessMixin, View):
     """常规更新：需有 change_project 权限"""
     permission_required = 'app_project.change_project'
-    template_name = 'apps/app_project/detail/modal_box/_project_progress_update.html'
+    template_name = 'apps/app_project/modal/_progress_update.html'
 
     def get_node_and_check_perm(self, pk):
         """辅助方法：获取节点并检查项目级权限"""
@@ -112,7 +112,7 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
 class NodeFailedView(ProjectAccessMixin, View):
     """节点失败：需有 change_project 权限"""
     permission_required = 'app_project.change_project'
-    template_name = 'apps/app_project/detail/modal_box/_project_progress_failed.html'
+    template_name = 'apps/app_project/modal/_progress_failed.html'
 
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
@@ -135,7 +135,7 @@ class NodeFailedView(ProjectAccessMixin, View):
 class InsertFeedbackView(ProjectAccessMixin, View):
     """客户反馈：需有 change_project 权限"""
     permission_required = 'app_project.change_project'
-    template_name = 'apps/app_project/detail/modal_box/_project_progress_feedback.html'
+    template_name = 'apps/app_project/modal/_progress_feedback.html'
 
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)

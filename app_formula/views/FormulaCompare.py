@@ -280,6 +280,8 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         for f in formulas:
             props = {}
             for r in f.test_results.all():
+                if r.production_order_id is not None:
+                    continue
                 all_test_configs.add(r.test_config)
                 props[r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
             formula_props[f.id] = props

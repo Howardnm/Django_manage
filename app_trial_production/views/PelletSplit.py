@@ -21,7 +21,7 @@ class PelletSplitView(SampleInventoryAccessMixin, View):
     def _resolve_order(self):
         if not hasattr(self, '_order'):
             from app_trial_production.models import ProductionOrder
-            self._order = get_object_or_404(ProductionOrder, pk=self.kwargs['order_pk'])
+            self._order = get_object_or_404(ProductionOrder, pk=self.kwargs['pk'])
         return self._order
 
     def _get_formulas(self):
@@ -31,7 +31,7 @@ class PelletSplitView(SampleInventoryAccessMixin, View):
             code=order.trial_code, project=order.project,
         ).order_by('version')
 
-    def get(self, request, order_pk):
+    def get(self, request, pk):
         order = self._resolve_order()
         formulas = self._get_formulas()
 
@@ -93,7 +93,7 @@ class PelletSplitView(SampleInventoryAccessMixin, View):
             'formula_summaries': formula_summaries,
         })
 
-    def post(self, request, order_pk):
+    def post(self, request, pk):
         order = self._resolve_order()
         formulas = self._get_formulas()
 
@@ -152,7 +152,7 @@ class PelletSplitView(SampleInventoryAccessMixin, View):
                 except Exception:
                     logger.exception(f"Pellet split failed for order {order.code}")
                     messages.error(request, '分拨操作失败，请稍后重试')
-            return redirect('trial_order_detail', pk=order_pk)
+            return redirect('trial_order_detail', pk=pk)
 
         # 校验失败：重新渲染，注入 row_label 供模板使用
         idx = 0

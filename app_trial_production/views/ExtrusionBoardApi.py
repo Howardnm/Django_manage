@@ -165,8 +165,8 @@ class ExtrusionStartApiView(ExtrusionTaskAccessMixin, View):
     """POST: 开始挤出生产（创建 ExtrusionTask + ColorMatchingTask）"""
     enforce_dept_isolation = False
 
-    def post(self, request, order_pk):
-        order = get_object_or_404(ProductionOrder, pk=order_pk, status='ACCEPTED')
+    def post(self, request, pk):
+        order = get_object_or_404(ProductionOrder, pk=pk, status='ACCEPTED')
 
         try:
             ProductionOrderService.start_extrusion(order, request.user)
@@ -182,8 +182,8 @@ class ExtrusionUnscheduleApiView(ExtrusionTaskAccessMixin, View):
     """POST: 取消排期（将工单退回待排产池）"""
     enforce_dept_isolation = False
 
-    def post(self, request, order_pk):
-        order = get_object_or_404(ProductionOrder, pk=order_pk, status='ACCEPTED')
+    def post(self, request, pk):
+        order = get_object_or_404(ProductionOrder, pk=pk, status='ACCEPTED')
         ProductionOrderService.schedule_extrusion(order, None)
         return JsonResponse({
             'success': True,

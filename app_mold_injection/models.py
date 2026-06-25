@@ -131,7 +131,7 @@ class InjectionTask(models.Model):
 
 
 class MoldRequirement(models.Model):
-    """注塑任务的模具需求明细 — 一张任务可含多种模具"""
+    """模具需求 — 一行对应一个模具，配方版本注塑次数由 formula_details 子表存储"""
     injection_task = models.ForeignKey(
         InjectionTask,
         on_delete=models.CASCADE,
@@ -139,27 +139,62 @@ class MoldRequirement(models.Model):
         related_name='mold_requirements',
         verbose_name="所属注塑任务",
     )
+    production_order = models.ForeignKey(
+        'app_trial_production.ProductionOrder',
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='mold_requirements',
+        verbose_name="关联工单",
+        help_text="工单规划阶段即创建，injection_task 创建后关联",
+    )
     mold = models.ForeignKey(
         MoldType,
         on_delete=models.PROTECT,
         related_name='mold_requirements',
         verbose_name="使用模具",
     )
-    formula = models.ForeignKey(
-        'app_formula.LabFormula',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='mold_requirements_by_formula',
-        verbose_name="对应配方版本",
-        help_text="多配方排产时指定对应配方；为空则适用于所有配方",
-    )
-    specimen_quantity = models.PositiveIntegerField("计划制样数量")
     order = models.PositiveIntegerField("排序", default=0)
 
     class Meta:
-        verbose_name = "模具需求明细"
-        verbose_name_plural = "模具需求明细"
+        verbose_name = "模具需求"
+        verbose_name_plural = "模具需求"
         ordering = ['order']
 
     def __str__(self):
-        return f"{self.mold.name} × {self.specimen_quantity}"
+        total = sum(
+            d.specimen_quantity for d in self.formula_details.all()
+        ) if self.pk else 0
+        return f"{self.mold.name} — {total} 次"
+
+
+class MoldRequirementFormulaDetail(models.Model):
+    """模具需求-配方明细 — 每个配方版本的注塑次数"""
+    mold_requirement = models.ForeignKey(
+        MoldRequirement,
+        on_delete=models.CASCADE,
+        related_name='formula_details',
+        verbose_name="所属模具需求",
+    )
+    formula = models.ForeignKey(
+        'app_formula.LabFormula',
+        on_delete=models.PROTECT,
+        null=True, blank=True,
+        verbose_name="对应配方版本",
+        help_text="渠道A（排产工单）必填；渠道B（样品库取料）可为空",
+    )
+    specimen_quantity = models.PositiveIntegerField("计划制样数量", default=0)
+
+    class Meta:
+        verbose_name = "模具需求-配方明细"
+        verbose_name_plural = "模具需求-配方明细"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['mold_requirement', 'formula'],
+                name='uq_mold_req_formula',
+            ),
+        ]
+
+    def __str__(self):
+        if self.formula_id:
+            return f"{self.mold_requirement.mold.name} × v{self.formula.version} — {self.specimen_quantity} 次"
+        return f"{self.mold_requirement.mold.name} — {self.specimen_quantity} 次（通用）"

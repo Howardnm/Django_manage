@@ -201,6 +201,12 @@ class FormulaBOM(AbstractBOMEntry):
 class FormulaTestResult(models.Model):
     formula = models.ForeignKey(LabFormula, on_delete=models.CASCADE, related_name='test_results')
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
+    production_order = models.ForeignKey(
+        'app_trial_production.ProductionOrder',
+        on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="来源工单",
+        help_text="从哪个生产工单回写的结果；为空表示手动录入",
+    )
 
     # 【修改】改为 DecimalField，保留3位小数
     value = models.DecimalField("测试数值", max_digits=10, decimal_places=3, null=True, blank=True)
@@ -214,13 +220,25 @@ class FormulaTestResult(models.Model):
 
     class Meta:
         verbose_name = "实验测试结果"
-        # 【核心优化】添加联合索引或单列索引
         indexes = [
             models.Index(fields=['formula']),
             models.Index(fields=['test_config']),
             models.Index(fields=['value_text']),
         ]
-        unique_together = ('formula', 'test_config')
+        constraints = [
+            # 工单回写结果：同一(formula, test_config, production_order)唯一
+            models.UniqueConstraint(
+                fields=['formula', 'test_config', 'production_order'],
+                condition=models.Q(production_order__isnull=False),
+                name='uq_test_per_order',
+            ),
+            # 手动录入结果：同一(formula, test_config)唯一
+            models.UniqueConstraint(
+                fields=['formula', 'test_config'],
+                condition=models.Q(production_order__isnull=True),
+                name='uq_test_manual',
+            ),
+        ]
 
 
 # 4. 色粉配比表 (Color Powder BOM) - 配色部门填写，与配方1:1绑定

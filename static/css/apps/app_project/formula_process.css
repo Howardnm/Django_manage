@@ -1,0 +1,53 @@
+/* ==========================================
+   配方过程页 + 配方对比面板 — app_project/formula_process.html & detail/_formula_compare_panel.html
+   依赖: Tabler 1.4.0 CSS 变量
+   ========================================== */
+
+/* 配方分组折叠按钮 */
+.formula-group-toggle:not(.collapsed) .ti-chevron-down {
+    transform: rotate(180deg);
+}
+.formula-group-toggle {
+    cursor: pointer;
+    transition: background-color .15s;
+}
+.formula-group-toggle:hover {
+    background-color: rgba(0,0,0,.03) !important;
+}
+
+/* ==========================================
+   配方对比表（_formula_compare_panel）
+   ========================================== */
+
+.compare-table td:nth-child(1),
+.compare-table td:nth-child(2),
+.compare-table td:nth-child(3),
+.compare-table td:nth-child(4) {
+    white-space: nowrap;
+}
+.compare-table {
+    border-collapse: separate;
+    border-spacing: 0;
+}
+.compare-table th,
+.compare-table td {
+    border-right: 1px solid var(--tblr-border-color, #e5e7eb);
+    border-bottom: 1px solid var(--tblr-border-color, #e5e7eb);
+}
+.compare-table th:first-child,
+.compare-table td:first-child {
+    border-left: 1px solid var(--tblr-border-color, #e5e7eb);
+}
+.compare-table thead th {
+    border-top: 1px solid var(--tblr-border-color, #e5e7eb);
+}
+.compare-table th.sticky-col,
+.compare-table td.sticky-col {
+    position: sticky;
+}
+.compare-table thead th.sticky-col {
+    z-index: 3;
+}
+.compare-table tbody td.sticky-col {
+    z-index: 2;
+}

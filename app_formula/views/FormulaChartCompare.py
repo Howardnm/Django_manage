@@ -92,14 +92,14 @@ class FormulaChartDataAPI(FormulaAccessMixin, TemplateView):
                     bom_line = f.bom_lines.filter(raw_material_id=x_axis_id).first()
                     x_val = bom_line.percentage if bom_line else 0
                 elif x_axis_type == 'test_config':
-                    test_res = f.test_results.filter(test_config_id=x_axis_id).first()
+                    test_res = f.test_results.filter(test_config_id=x_axis_id, production_order__isnull=True).first()
                     x_val = test_res.value if test_res else None
 
                 if y_axis_type == 'raw_material':
                     bom_line = f.bom_lines.filter(raw_material_id=y_axis_id).first()
                     y_val = bom_line.percentage if bom_line else 0
                 elif y_axis_type == 'test_config':
-                    test_res = f.test_results.filter(test_config_id=y_axis_id).first()
+                    test_res = f.test_results.filter(test_config_id=y_axis_id, production_order__isnull=True).first()
                     y_val = test_res.value if test_res else None
                 
                 if x_val is not None and y_val is not None:

@@ -11,7 +11,7 @@ from app_user.models import ReviewGroup
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
 from .services import WorkflowService
 from .engine import WorkflowEngine
-from .utils import related_object_router
+from .utils import related_object_router, workflow_feature_registry
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
 from .exceptions import (TaskNotFoundError, CancelNotAllowedError, InvalidActionError,
@@ -606,8 +606,8 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         related_display_name = related_object_router.get_display_name(related_object)
         related_object_url = related_object_router.resolve(related_object)
 
-        # 项目节点审批流程：节点状态型审批，不存在过程退回，隐藏退回按钮
-        is_project_node_workflow = (content_type_model == 'projectnode')
+        # 退回按钮显示判定：由各业务 app 在 apps.py 中通过 workflow_feature_registry 注册
+        allow_return = workflow_feature_registry.allow_return(related_object)
 
         status_map = self._build_status_map(instance)
         bpmn_xml = instance.definition.bpmn_xml
@@ -622,7 +622,7 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
             'related_model_name': related_model_name,
             'related_object_url': related_object_url,
             'content_type_model': content_type_model,
-            'is_project_node_workflow': is_project_node_workflow,
+            'allow_return': allow_return,
             'status_map': status_map,
             'bpmn_xml': bpmn_xml,
         }

@@ -24,6 +24,9 @@ class ExtrusionTask(AbstractExtrusionParams):
     completed_at = models.DateTimeField("完成时间", null=True, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
+    # ---- 颗粒分拨 ----
+    pellet_split_completed = models.BooleanField("颗粒分拨已完成", default=False)
+
     class Meta:
         verbose_name = "挤出任务"
         verbose_name_plural = "挤出任务"

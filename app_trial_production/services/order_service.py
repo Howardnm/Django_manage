@@ -14,11 +14,12 @@ class ProductionOrderService:
     @transaction.atomic
     def create_order(user, trial_code, project_id, project_node_id=None,
                      process_profile_id=None, formula_details=None,
-                     test_item_ids=None, mold_matrix=None,
+                     test_item_ids=None,
                      packaging_desc='', storage_location='', remark=''):
         """
         创建排产工单 — 仅创建工单本身 + 配方明细。
         注塑/测试任务延迟到前序阶段完成后触发（check_and_advance）。
+        模具需求通过 MoldRequirement inline formset 单独保存。
 
         Args:
             user: 创建人
@@ -28,7 +29,6 @@ class ProductionOrderService:
             process_profile_id: 工艺方案ID（可选）
             formula_details: list of dict {formula_id, planned_quantity, needs_color_matching}
             test_item_ids: list of TestConfig IDs
-            mold_matrix: list of dict {mold_id, formula_quantities: {formula_id: qty}}
             remark: 备注
 
         Returns:
@@ -64,16 +64,11 @@ class ProductionOrderService:
         if total_qty > 0:
             order.quantity_planned = total_qty
 
-        # 存储待触发子任务配置（不立即创建，等前序阶段完成后触发）
+        # 存储待触发子任务配置
         if test_item_ids:
             order.test_items.set(test_item_ids)
-        if mold_matrix:
-            has_any_mold = any(m.get('mold_id') for m in mold_matrix)
-            if has_any_mold:
-                import json
-                order.pending_mold_config = json.dumps(mold_matrix)
 
-        if total_qty > 0 or test_item_ids or mold_matrix:
+        if total_qty > 0 or test_item_ids:
             order.save()
 
         logger.info(f"ProductionOrder {order.code} created by {user}")
@@ -184,14 +179,10 @@ class ProductionOrderService:
                 return
 
             # 颗粒分拨是注塑/测试的前置条件
-            from app_trial_production.models import SampleInventory
-            pellet_split_done = SampleInventory.objects.filter(
-                production_order=order, type='PELLET',
-            ).exists()
-            if not pellet_split_done:
+            if not ext.pellet_split_completed:
                 return
 
-            if order.pending_mold_config:
+            if order.mold_requirements.filter(injection_task__isnull=True).exists():
                 # 触发注塑任务 → 推进到注塑阶段
                 ProductionOrderService._create_injection_from_pending(order)
                 StateMachine.transition(order, 'INJECTION_MOLDING')
@@ -232,41 +223,25 @@ class ProductionOrderService:
 
     @staticmethod
     def _create_injection_from_pending(order):
-        """从 pending_mold_config 创建 InjectionTask + MoldRequirement（挤出+配色完成后调用）"""
-        import json
-        from app_mold_injection.models import InjectionTask, MoldRequirement
-        from app_formula.models import LabFormula
+        """从 order.mold_requirements（planning阶段）创建 InjectionTask 并关联 MoldRequirement"""
+        from app_mold_injection.models import InjectionTask
 
-        mold_matrix = json.loads(order.pending_mold_config)
-        formulas = list(LabFormula.objects.filter(
-            code=order.trial_code, project_id=order.project_id,
-        ).order_by('version'))
+        plans = order.mold_requirements.filter(injection_task__isnull=True)
+        if not plans.exists():
+            return None
 
         task = InjectionTask.objects.create(
             production_order=order,
             source='ORDER',
             status='PENDING',
         )
-        for mold_entry in mold_matrix:
-            mold_id = mold_entry.get('mold_id')
-            if not mold_id:
-                continue
-            quantities = mold_entry.get('formula_quantities', {})
-            for formula in formulas:
-                qty = quantities.get(str(formula.pk), 0) or quantities.get(formula.pk, 0)
-                if qty and int(qty) > 0:
-                    MoldRequirement.objects.create(
-                        injection_task=task,
-                        mold_id=mold_id,
-                        formula=formula,
-                        specimen_quantity=int(qty),
-                    )
+        # 将规划阶段的 MoldRequirement 关联到新建的注塑任务
+        plans.update(injection_task=task)
 
-        # 清除 pending 配置，避免重复触发
-        order.pending_mold_config = ''
-        order.save(update_fields=['pending_mold_config'])
-
-        logger.info(f"InjectionTask {task.pk} created from pending mold config for order {order.code}")
+        logger.info(
+            f"InjectionTask {task.pk} created from {plans.count()} mold plans "
+            f"for order {order.code}"
+        )
         return task
 
     @staticmethod

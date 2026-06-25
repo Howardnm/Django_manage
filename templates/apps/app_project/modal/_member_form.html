@@ -82,39 +82,5 @@
 </form>
 
 <script>
-(function() {
-    let existingSum = 0;
-    {% for m in project.members.all %}
-        {% if m.id|stringformat:"s" != member_id %}
-            existingSum += parseFloat("{{ m.workload_share }}");
-        {% endif %}
-    {% endfor %}
-
-    const inputWorkload = document.getElementById('input-workload');
-    const btnSave = document.getElementById('btn-save-member');
-    const warningBox = document.getElementById('frontend-warning');
-    const warningText = document.getElementById('warning-text');
-    const currentTotalText = document.getElementById('current-total-text');
-
-    function validate() {
-        const newValue = parseFloat(inputWorkload.value) || 0;
-        const total = existingSum + newValue;
-
-        currentTotalText.textContent = (total * 100).toFixed(0) + '%';
-
-        if (total > 1.0001) {
-            warningBox.classList.remove('d-none');
-            warningText.innerHTML = `<strong>权重超标！</strong> 总工作量将达到 <b>${(total*100).toFixed(0)}%</b>，请调减。`;
-            btnSave.disabled = true;
-            inputWorkload.classList.add('is-invalid');
-        } else {
-            warningBox.classList.add('d-none');
-            btnSave.disabled = false;
-            inputWorkload.classList.remove('is-invalid');
-        }
-    }
-
-    inputWorkload.addEventListener('input', validate);
-    validate();
-})();
+document.getElementById('project-member-form').dataset.existingSum = '{{ existing_sum }}';
 </script>
