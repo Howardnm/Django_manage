@@ -152,14 +152,7 @@ class BaseMoldRequirementRowFormSet(BaseModelFormSet):
             if mold.pk in molds_seen:
                 raise ValidationError(f'模具 "{mold.name}" 重复选择，请检查')
             molds_seen.add(mold.pk)
-            has_qty = any(
-                self._get_variant_qty(i, pk) > 0
-                for pk in self.formula_pks
-            )
-            if not has_qty:
-                raise ValidationError(
-                    f'模具 "{mold.name}" 至少需要一个配方版本的注塑次数大于 0'
-                )
+            # 注意：不要求每行必须有非零数量，_save_mold_matrix 会自动跳过空行
 
     def get_variant_qtys(self, row_idx):
         """从 POST 裸数据提取变体列值 → {formula_pk: quantity}（仅返回 quantity > 0 的项）"""

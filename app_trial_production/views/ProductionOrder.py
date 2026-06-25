@@ -2,6 +2,8 @@ import logging
 
 from django.db import transaction
 from django.db.models import Sum, Q
+from django.forms import modelformset_factory
+from django.utils.safestring import mark_safe
 from django.views.generic import DetailView, CreateView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
@@ -178,6 +180,23 @@ def _build_variant_qty_map_from_post(post_data, formula_pks):
                 if qty != 0:
                     variant_qty_map.setdefault(i, {})[str(pk)] = qty
     return variant_qty_map
+
+
+def _build_mold_formset_error_message(formset):
+    """构建 formset 验证错误信息"""
+    lines = ['<div class="d-flex align-items-center gap-2 mb-2">'
+             '<i class="ti ti-alert-triangle fs-4"></i>'
+             '<strong>模具需求保存失败，请修正以下问题：</strong></div>']
+    for e in formset.non_form_errors():
+        lines.append(f'<div class="ms-4">• {e}</div>')
+    for i, sf in enumerate(formset):
+        if not sf.errors:
+            continue
+        for field_name, errs in sf.errors.items():
+            label = sf[field_name].label if field_name in sf.fields else field_name
+            for e in errs:
+                lines.append(f'<div class="ms-4">• 第{i+1}行 {label}: {e}</div>')
+    return mark_safe('\n'.join(lines)) if len(lines) > 1 else ''
 
 
 # ---- 视图 ----
@@ -362,6 +381,7 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
+        initial['quantity_planned'] = 0  # 默认值，JS 会根据计划产量动态更新
         initiate_data = self.request.session.get('trial_initiate_data')
         if initiate_data:
             initial['process_profile'] = initiate_data.get('process_profile_id')
@@ -402,7 +422,18 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 )
             else:
                 initial = [{'mold': m} for m in test_molds]
-                context['mold_formset'] = MoldRequirementRowFormSet(
+                # 动态构建 formset class（extra=预填模具数），每次新建 class，避免线程安全问题
+                from app_trial_production.forms import (
+                    BaseMoldRequirementRowFormSet, MoldRequirementRowForm,
+                )
+                PrefillFormSet = modelformset_factory(
+                    MoldRequirement,
+                    form=MoldRequirementRowForm,
+                    formset=BaseMoldRequirementRowFormSet,
+                    extra=len(initial),
+                    can_delete=True,
+                )
+                context['mold_formset'] = PrefillFormSet(
                     queryset=MoldRequirement.objects.none(),
                     initial=initial, prefix='mold', formula_pks=formula_pks,
                 )
@@ -447,8 +478,18 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
         # 测试项目
         test_item_ids = self.request.POST.getlist('test_items') or None
 
+        # ★ 先校验模具 formset（仅读 POST 数据，无需事务），失败则直接返回表单
+        mold_formset = MoldRequirementRowFormSet(
+            self.request.POST, prefix='mold',
+            formula_pks=[f['formula_id'] for f in formula_details],
+        )
+        if not mold_formset.is_valid():
+            error_msg = _build_mold_formset_error_message(mold_formset)
+            messages.error(self.request, error_msg)
+            return self.form_invalid(form)
+
         with transaction.atomic():
-            # 委托 Service 创建工单（不再传 mold_matrix，由 formset 处理）
+            # 委托 Service 创建工单
             self.object = ProductionOrderService.create_order(
                 user=self.request.user,
                 trial_code=trial_code,
@@ -463,15 +504,10 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
             )
 
             # 保存模具矩阵
-            mold_formset = MoldRequirementRowFormSet(
-                self.request.POST, prefix='mold',
-                formula_pks=[f['formula_id'] for f in formula_details],
+            _save_mold_matrix(
+                self.object, mold_formset,
+                [f['formula_id'] for f in formula_details],
             )
-            if mold_formset.is_valid():
-                _save_mold_matrix(
-                    self.object, mold_formset,
-                    [f['formula_id'] for f in formula_details],
-                )
 
         self.request.session.pop('trial_initiate_data', None)
         messages.success(self.request, f'生产工单 {self.object.code} 创建成功')
@@ -545,6 +581,15 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        # ★ 先校验模具 formset（仅读 POST 数据），失败则直接返回表单
+        formula_pks = [fd.formula_id for fd in self.object.formula_details.all()]
+        mold_formset = MoldRequirementRowFormSet(
+            self.request.POST, prefix='mold', formula_pks=formula_pks)
+        if not mold_formset.is_valid():
+            error_msg = _build_mold_formset_error_message(mold_formset)
+            messages.error(self.request, error_msg)
+            return self.form_invalid(form)
+
         with transaction.atomic():
             order = form.save()
 
@@ -565,11 +610,7 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
                 total_qty += float(fd.planned_quantity or 0)
 
             # 保存模具矩阵（delete-all-then-recreate）
-            formula_pks = [fd.formula_id for fd in order.formula_details.all()]
-            mold_formset = MoldRequirementRowFormSet(
-                self.request.POST, prefix='mold', formula_pks=formula_pks)
-            if mold_formset.is_valid():
-                _save_mold_matrix(order, mold_formset, formula_pks)
+            _save_mold_matrix(order, mold_formset, formula_pks)
 
             # 更新测试项目
             test_item_ids = self.request.POST.getlist('test_items')
