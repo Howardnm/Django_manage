@@ -794,7 +794,201 @@
 {% endif %}
     {% csrf_token %}
     <input type="hidden" name="experiment_code" class="search-picker-value">
-    {% include 'includes/search_picker_modal.html' with modal_id='modal-import-formula' modal_title='选择来源实验单' search_model='experiment' search_url_name='formula_api_search_experiment' placeholder='输入实验单号搜索...' show_detail_button='1' %}
+
+    <div class="modal modal-blur fade" id="modal-import-formula" tabindex="-1"
+         data-search-url="{% url 'formula_api_search_experiment' %}">
+        <div class="modal-dialog modal-xl modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="ti ti-file-import me-2"></i>选择来源实验单
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="关闭"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group input-group-flat mb-3">
+                        <input type="text" class="form-control" id="import-search-input"
+                               placeholder="输入实验单号或名称搜索..."
+                               autocomplete="off">
+                        <span class="input-group-text"><i class="ti ti-search"></i></span>
+                    </div>
+                    <div class="table-responsive" style="max-height: 50vh; overflow-y: auto;">
+                        <table class="table card-table table-vcenter text-nowrap" id="import-results-table">
+                            <thead>
+                                <tr>
+                                    <th style="width: 180px">实验单号</th>
+                                    <th>实验单名称</th>
+                                    <th style="width: 130px">配方版本数量</th>
+                                    <th style="width: 100px">v1版本</th>
+                                </tr>
+                            </thead>
+                            <tbody id="import-results-tbody">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-5">
+                                        <i class="ti ti-search fs-2 d-block mb-2 opacity-50"></i>
+                                        请输入关键词开始搜索
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top"
+                         id="import-pagination" style="display: none !important;">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="import-prev-btn" disabled>
+                            <i class="ti ti-chevron-left"></i> 上一页
+                        </button>
+                        <span class="text-muted small" id="import-page-info"></span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="import-next-btn" disabled>
+                            下一页 <i class="ti ti-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-teal" id="import-confirm-btn" disabled>
+                        <i class="ti ti-check me-1"></i>确认选择
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </form>
+
+<script>
+(function() {
+    var modal = document.getElementById('modal-import-formula');
+    if (!modal || modal.dataset.importReady) return;
+    modal.dataset.importReady = '1';
+
+    var searchUrl = modal.dataset.searchUrl;
+    var input = document.getElementById('import-search-input');
+    var tbody = document.getElementById('import-results-tbody');
+    var pagination = document.getElementById('import-pagination');
+    var pageInfo = document.getElementById('import-page-info');
+    var prevBtn = document.getElementById('import-prev-btn');
+    var nextBtn = document.getElementById('import-next-btn');
+    var confirmBtn = document.getElementById('import-confirm-btn');
+
+    var currentPage = 1;
+    var totalPages = 0;
+    var selectedValue = null;
+    var debounceTimer = null;
+
+    function showEmpty(icon, msg) {
+        tbody.innerHTML =
+            '<tr><td colspan="4" class="text-center text-muted py-5">'
+            + '<i class="ti ' + icon + ' fs-2 d-block mb-2 opacity-50"></i>'
+            + msg + '</td></tr>';
+        pagination.style.display = 'none';
+    }
+
+    function renderResults(results, selectedVal) {
+        if (!results.length) {
+            showEmpty('ti-mood-empty', '无匹配结果');
+            return;
+        }
+        var rows = '';
+        results.forEach(function(r) {
+            var isActive = String(r.value) === String(selectedVal);
+            var rowClass = isActive ? 'table-active' : '';
+            var checkIcon = isActive ? '<i class="ti ti-check text-teal ms-1"></i>' : '';
+            var linkHtml = r.url
+                ? '<a href="' + r.url + '" target="_blank" class="btn btn-sm btn-outline-secondary" '
+                  + 'onclick="event.stopPropagation()" title="在新标签页中查看v1版本详情">'
+                  + '<i class="ti ti-external-link"></i> 查看</a>'
+                : '<span class="text-muted">—</span>';
+            rows +=
+                '<tr class="import-result-row ' + rowClass + '" data-value="' + r.value + '" style="cursor: pointer">'
+                + '<td><span class="text-monospace">' + r.value + '</span>' + checkIcon + '</td>'
+                + '<td>' + (r.latest_name || '') + '</td>'
+                + '<td>' + r.version_count + '</td>'
+                + '<td>' + linkHtml + '</td>'
+                + '</tr>';
+        });
+        tbody.innerHTML = rows;
+
+        tbody.querySelectorAll('.import-result-row').forEach(function(row) {
+            row.addEventListener('click', function(e) {
+                if (e.target.closest('a')) return;
+                selectedValue = this.dataset.value;
+                confirmBtn.disabled = false;
+                tbody.querySelectorAll('.import-result-row').forEach(function(r) {
+                    r.classList.remove('table-active');
+                    var icon = r.querySelector('.ti-check');
+                    if (icon) icon.remove();
+                });
+                this.classList.add('table-active');
+                var td = this.querySelector('td:first-child');
+                var check = document.createElement('i');
+                check.className = 'ti ti-check text-teal ms-1';
+                td.appendChild(check);
+            });
+        });
+    }
+
+    function doSearch(page) {
+        if (debounceTimer) clearTimeout(debounceTimer);
+        var query = input.value.trim();
+        if (!query) {
+            showEmpty('ti-search', '请输入关键词开始搜索');
+            return;
+        }
+        tbody.innerHTML =
+            '<tr><td colspan="4" class="text-center py-3">'
+            + '<div class="spinner-border spinner-border-sm text-muted"></div></td></tr>';
+        var qs = '?q=' + encodeURIComponent(query)
+            + '&page=' + page
+            + '&page_size=8';
+        fetch(searchUrl + qs)
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                totalPages = Math.ceil(data.total / data.page_size);
+                currentPage = data.page;
+                renderResults(data.results, selectedValue);
+                pageInfo.textContent = '第 ' + data.page + ' 页，共 ' + data.total + ' 条';
+                prevBtn.disabled = !data.has_prev;
+                nextBtn.disabled = !data.has_next;
+                pagination.style.display = 'flex';
+            })
+            .catch(function() {
+                showEmpty('ti-alert-triangle', '搜索失败，请重试');
+            });
+    }
+
+    input.addEventListener('input', function() {
+        currentPage = 1;
+        selectedValue = null;
+        confirmBtn.disabled = true;
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function() { doSearch(1); }, 350);
+    });
+
+    prevBtn.addEventListener('click', function() {
+        if (currentPage > 1) doSearch(currentPage - 1);
+    });
+    nextBtn.addEventListener('click', function() {
+        if (currentPage < totalPages) doSearch(currentPage + 1);
+    });
+
+    confirmBtn.addEventListener('click', function() {
+        var form = modal.closest('form');
+        if (form) {
+            form.querySelector('.search-picker-value').value = selectedValue;
+            form.submit();
+        }
+    });
+
+    modal.addEventListener('shown.bs.modal', function() {
+        input.focus();
+    });
+    modal.addEventListener('hidden.bs.modal', function() {
+        input.value = '';
+        currentPage = 1;
+        selectedValue = null;
+        confirmBtn.disabled = true;
+        showEmpty('ti-search', '请输入关键词开始搜索');
+    });
+})();
+</script>
 {% endif %}
 {% endblock %}
