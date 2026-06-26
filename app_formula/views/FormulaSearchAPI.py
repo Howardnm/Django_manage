@@ -20,7 +20,7 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
         qs = self.get_queryset()
         qs = qs.filter(
             Q(code__icontains=query) | Q(name__icontains=query)
-        ).select_related('project', 'project_node')
+        )
 
         page = request.GET.get('page')
         if page is not None:

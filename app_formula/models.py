@@ -17,7 +17,7 @@ class LabFormula(models.Model):
     """
     # 【修改】允许为空，由后端自动生成
     code = models.CharField("实验单号", max_length=50, blank=True, help_text="自动生成，如：L20231001-01，同批次配方共享同一单号")
-    name = models.CharField("配方名称", max_length=100, blank=False)
+    name = models.CharField("配方名称", max_length=100, blank=False, db_index=True)
 
     # 关联
     material_type = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="基材类型")
