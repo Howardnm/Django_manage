@@ -18,7 +18,7 @@ from ._base import (
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[5/13] Creating process data...")
+    print("\n[5/16] Creating process data...")
 
     # --- MachineModel ---
     from app_process.models import MachineModel

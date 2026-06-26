@@ -30,7 +30,7 @@ def _load_form_specs():
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[11/13] Creating form templates & submissions...")
+    print("\n[14/16] Creating form templates & submissions...")
 
     from app_form_management.models import FormTemplate, FormSubmission
     from app_project.models import Project

@@ -19,7 +19,7 @@ from ._base import FakeContext, fake, pick_one, pick, rand_decimal, rand_date, C
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[9/13] Creating formulas...")
+    print("\n[9/16] Creating formulas...")
 
     from app_formula.models import (
         LabFormula, FormulaBOM, FormulaTestResult,
@@ -50,6 +50,17 @@ def run(ctx: FakeContext) -> None:
         seq = max_seq + 1
         code = f"{code_prefix}-{seq:02d}"
 
+        # 随机颜色信息
+        color_names = ["哑光黑", "亮白", "透明蓝", "碳灰", "象牙白", "钢琴黑", "", ""]
+        pantone_codes = [
+            "PANTONE 19-4052 Classic Blue",
+            "PANTONE 18-1664 Fiery Red",
+            "PANTONE 14-4103 Gray Violet",
+            "PANTONE 11-0601 Bright White",
+            "", "", "", "",
+        ]
+        rgb_values = ["#2C3E50", "#E74C3C", "#8E44AD", "#F1F1F1", "#1A1A1A", "", "", ""]
+
         f = LabFormula.objects.create(
             code=code,
             name=f"{project.name} - {p_node.get_stage_display() if p_node else 'RND'} formula",
@@ -61,6 +72,9 @@ def run(ctx: FakeContext) -> None:
             creator=pick_one(ctx.rnd_users),
             cost_predicted=rand_decimal(10, 50, 2),
             cost_actual=rand_decimal(12, 55, 2) if random.random() < 0.4 else None,
+            material_color_name=random.choice(color_names),
+            pantone_code=random.choice(pantone_codes),
+            rgb_value=random.choice(rgb_values),
             description=fake.text(60) if random.random() < 0.5 else "",
         )
 

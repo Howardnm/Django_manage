@@ -17,7 +17,7 @@ User = get_user_model()
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[1/13] Creating users & departments...")
+    print("\n[1/16] Creating users & departments...")
 
     # --- 部门 ---
     from app_user.models import Department

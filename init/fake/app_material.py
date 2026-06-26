@@ -14,7 +14,7 @@ from ._base import FakeContext, pick_one, pick, rand_decimal, COUNT_MATERIALS
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[3/13] Creating material library...")
+    print("\n[3/16] Creating material library...")
 
     # --- MaterialCharacteristic ---
     from app_material.models.material import MaterialCharacteristic

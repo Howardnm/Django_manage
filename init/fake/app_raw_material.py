@@ -14,7 +14,7 @@ from ._base import FakeContext, pick_one, pick, rand_decimal
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[4/13] Creating raw material properties...")
+    print("\n[4/16] Creating raw material properties...")
 
     from app_raw_material.models import RawMaterialProperty
 

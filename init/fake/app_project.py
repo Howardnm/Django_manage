@@ -18,7 +18,7 @@ from ._base import FakeContext, pick_one, pick, rand_decimal, COUNT_PROJECTS
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[7/13] Creating projects...")
+    print("\n[7/16] Creating projects...")
 
     from app_project.models import (
         Project, ProjectNode, ProjectMember, ProjectSalesMember, ProjectStage,

@@ -38,7 +38,7 @@ BPMN_TASK_MAP = {
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[13/13] Creating notifications & approval instances...")
+    print("\n[16/16] Creating notifications & approval instances...")
 
     # =====================================================================
     # 1. Notification

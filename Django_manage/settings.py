@@ -106,23 +106,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'Django_manage.wsgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
-
 # DATABASES = {
-#     "default": {
-#         "ENGINE": "django.db.backends.mysql",
-#         "NAME": "django_manage",
-#         "USER": "django_manage",
-#         "PASSWORD": "6THtw4rFdHpmZ3Ze",
-#         "HOST": "127.0.0.1",
-#         "PORT": "3306",
+#     'default': {
+#         'ENGINE': 'django.db.backends.sqlite3',
+#         'NAME': BASE_DIR / 'db.sqlite3',
 #     }
 # }
+
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.mysql",
+        "NAME": "django_manage",
+        "USER": "root",  # django_manage
+        "PASSWORD": "123456",  # 6THtw4rFdHpmZ3Ze
+        "HOST": "127.0.0.1",
+        "PORT": "3306",
+    }
+}
 
 # DATABASES = {
 #     'default': {

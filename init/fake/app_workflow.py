@@ -40,7 +40,7 @@ def _read_bpmn_xml(filename: str) -> str:
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[6/13] Creating workflow definitions & review groups...")
+    print("\n[6/16] Creating workflow definitions & review groups...")
 
     # =====================================================================
     # 1. 创建 ReviewGroup（对接到 BPMN camunda:candidateGroups）

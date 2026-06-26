@@ -18,7 +18,7 @@ User = get_user_model()
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[12/13] Creating catalog data...")
+    print("\n[15/16] Creating catalog data...")
 
     from app_catalog.models.catalog import (
         CatalogCategory, MirrorScenario, MirrorCharacteristic, CatalogProduct,

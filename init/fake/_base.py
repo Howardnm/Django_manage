@@ -191,9 +191,11 @@ def print_summary(ctx: FakeContext) -> None:
     from app_catalog.models.member import CatalogMember
     from app_notification.models import Notification
     from app_trial_production.models import (
-        ProductionOrder, MoldType, ExtrusionTask, ColorMatchingTask,
-        InjectionTask, TestingTask, TrialTestResult, SampleInventory,
+        ProductionOrder, ProductionOrderFormulaDetail, ExtrusionTask, SampleInventory,
     )
+    from app_mold_injection.models import MoldType, InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
+    from app_color_center.models import ColorMatchingTask
+    from app_material_testing.models import TestingTask, TrialTestResult
 
     User = get_user_model()
 
@@ -220,7 +222,10 @@ def print_summary(ctx: FakeContext) -> None:
         ("FormulaBOM", FormulaBOM.objects.count()),
         ("FormulaTestResult", FormulaTestResult.objects.count()),
         ("MoldType", MoldType.objects.count()),
+        ("MoldRequirement", MoldRequirement.objects.count()),
+        ("MoldReqFormulaDetail", MoldRequirementFormulaDetail.objects.count()),
         ("ProductionOrder", ProductionOrder.objects.count()),
+        ("POFormulaDetail", ProductionOrderFormulaDetail.objects.count()),
         ("ExtrusionTask", ExtrusionTask.objects.count()),
         ("ColorMatchingTask", ColorMatchingTask.objects.count()),
         ("InjectionTask", InjectionTask.objects.count()),

@@ -31,22 +31,31 @@ def run_all():
     from .app_basic_research import run as run_app_basic_research
     from .app_formula import run as run_app_formula
     from .app_trial_production import run as run_app_trial_production
+    from .app_mold_injection import run as run_app_mold_injection
+    from .app_color_center import run as run_app_color_center
+    from .app_material_testing import run as run_app_material_testing
     from .app_form_management import run as run_app_form_management
     from .app_catalog import run as run_app_catalog
     from .app_notification import run as run_app_notification
 
-    run_app_user(ctx)             # 1. 用户与部门
-    run_app_repository(ctx)       # 2. 客户与等级因子
-    run_app_material(ctx)         # 3. 材料库
-    run_app_raw_material(ctx)     # 4. 原材料属性
-    run_app_process(ctx)          # 5. 工艺数据
-    run_app_workflow(ctx)         # 6. 工作流定义
-    run_app_project(ctx)          # 7. 商业项目
-    run_app_basic_research(ctx)   # 8. 预研项目
-    run_app_formula(ctx)          # 9. 配方 + BOM + 色粉配比
-    run_app_trial_production(ctx) # 10. 试生产（NEW）
-    run_app_form_management(ctx)  # 11. 表单模板与提交
-    run_app_catalog(ctx)          # 12. 电子手册
-    run_app_notification(ctx)     # 13. 通知 + 审批实例
+    run_app_user(ctx)              # 1. 用户与部门
+    run_app_repository(ctx)        # 2. 客户与等级因子
+    run_app_material(ctx)          # 3. 材料库
+    run_app_raw_material(ctx)      # 4. 原材料属性
+    run_app_process(ctx)           # 5. 工艺数据
+    run_app_workflow(ctx)          # 6. 工作流定义
+    run_app_project(ctx)           # 7. 商业项目
+    run_app_basic_research(ctx)    # 8. 预研项目
+    run_app_formula(ctx)           # 9. 配方 + BOM + 色粉配比 + 颜色字段
+
+    # 按工序流水线依赖顺序
+    run_app_trial_production(ctx)  # 10. 排产工单 + 挤出任务 + 颗粒样品
+    run_app_mold_injection(ctx)    # 11. 模具台账 + 注塑任务 + 样条样品
+    run_app_color_center(ctx)      # 12. 配色任务
+    run_app_material_testing(ctx)  # 13. 测试任务 + 测试结果
+
+    run_app_form_management(ctx)   # 14. 表单模板与提交
+    run_app_catalog(ctx)           # 15. 电子手册
+    run_app_notification(ctx)      # 16. 通知 + 审批实例
 
     print_summary(ctx)

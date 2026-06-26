@@ -14,7 +14,7 @@ from ._base import FakeContext, fake, pick_one, COUNT_RESEARCH_PROJECTS
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[8/13] Creating research projects...")
+    print("\n[8/16] Creating research projects...")
 
     from app_basic_research.models import ResearchProject, ResearchProjectNode, ResearchStage
 

@@ -12,7 +12,7 @@ from ._base import FakeContext, fake, COUNT_CUSTOMERS
 
 @transaction.atomic
 def run(ctx: FakeContext) -> None:
-    print("\n[2/13] Creating repository base data...")
+    print("\n[2/16] Creating repository base data...")
 
     # --- GradeFactor ---
     from app_repository.models import GradeFactor
