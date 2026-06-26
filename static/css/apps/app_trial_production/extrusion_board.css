@@ -72,7 +72,17 @@
 /* ===== 事件卡片（Tabler 类承担大部分样式，此处仅 FC 特有覆盖） ===== */
 .fc .fc-daygrid-event { margin-top: 2px; border-radius: var(--tblr-border-radius); border: none; background: transparent; padding: 1px 2px; }
 .fc-tabler-event { min-height: 22px; }
-.fc-tabler-event .fc-ev-code { font-weight: 600; font-size: 12px; flex-shrink: 1; }
+.fc-tabler-event .fc-ev-code {
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+}
+.fc-tabler-event .badge { flex-shrink: 0; }
 .fc-tabler-event-readonly { opacity: 0.85; }
 
 /* ===== 时间网格视图 ===== */
@@ -106,8 +116,9 @@
     transform: translateY(4px);
     transition: opacity 0.15s, transform 0.15s;
     min-width: 200px;
-    max-width: 280px;
+    width: max-content;
     font-size: 12px;
+    white-space: nowrap;
 }
 .fc-event-popover.active { opacity: 1; transform: translateY(0); }
 .fc-event-popover .fc-popover-label { min-width: 56px; }

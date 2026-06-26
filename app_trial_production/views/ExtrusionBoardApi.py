@@ -31,7 +31,7 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
         ).select_related(
             'project', 'extrusion_task', 'process_profile',
         ).prefetch_related(
-            'formula_details__formula',
+            'formula_details__formula__material_type',
         )
 
         if start_str and end_str:
@@ -51,6 +51,24 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
         for order in qs.order_by('extrusion_scheduled_date'):
             formula_versions = [f'v{fd.formula.version}' for fd in order.formula_details.all()]
             has_color = order.formula_details.filter(needs_color_matching=True).exists()
+
+            # 从关联配方中提取颜色信息（取第一个有数据的配方）
+            material_type_name = ''
+            material_color_name = ''
+            pantone_code = ''
+            rgb_value = ''
+            for fd in order.formula_details.all():
+                f = fd.formula
+                if not material_type_name and f.material_type_id:
+                    material_type_name = f.material_type.name
+                if not material_color_name and f.material_color_name:
+                    material_color_name = f.material_color_name
+                if not pantone_code and f.pantone_code:
+                    pantone_code = f.pantone_code
+                if not rgb_value and f.rgb_value:
+                    rgb_value = f.rgb_value
+                if all([material_type_name, material_color_name, pantone_code, rgb_value]):
+                    break
 
             start_dt = order.extrusion_scheduled_date
             end_dt = order.extrusion_scheduled_end or start_dt
@@ -96,6 +114,10 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
                     'status_badge': order.extrusion_status_badge,
                     'quantity_badge': order.extrusion_quantity_badge,
                     'border_css': order.extrusion_calendar_border,
+                    'material_type_name': material_type_name,
+                    'material_color_name': material_color_name,
+                    'pantone_code': pantone_code,
+                    'rgb_value': rgb_value,
                 },
             })
 

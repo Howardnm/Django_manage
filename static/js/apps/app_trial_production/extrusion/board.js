@@ -214,6 +214,22 @@ document.addEventListener('DOMContentLoaded', function () {
             var formulaCount = props.formula_count || 0;
             var isReadonly = !arg.event.startEditable;
 
+            // 颜色胶囊：有 RGB 色值则用，否则回退到默认灰
+            var rgbValue = props.rgb_value || '';
+            var materialTypeName = props.material_type_name || '';
+            var colorCapsule = '';
+            if (materialTypeName) {
+                var bgColor = rgbValue || '#6c7a91';
+                // 根据背景明度自适应文字颜色
+                var r = parseInt(bgColor.slice(1, 3), 16) || 108;
+                var g = parseInt(bgColor.slice(3, 5), 16) || 122;
+                var b = parseInt(bgColor.slice(5, 7), 16) || 145;
+                var luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                var textColor = luminance > 0.6 ? '#1e293b' : '#ffffff';
+                colorCapsule = '<span class="badge me-1" style="background-color:' + bgColor + ';color:' + textColor + ';font-size:10px;">'
+                    + materialTypeName + '</span>';
+            }
+
             return {
                 html:
                     '<div class="fc-tabler-event d-flex flex-row align-items-start gap-1 p-1 rounded border ' +
@@ -227,13 +243,15 @@ document.addEventListener('DOMContentLoaded', function () {
                             'data-project-name="' + (props.project_name || '') + '" ' +
                             'data-process-profile="' + (props.process_profile_name || '') + '" ' +
                             'data-created-at="' + (props.created_at || '') + '" ' +
-                            'data-stage-node="' + (props.stage_node || '') + '">' +
+                            'data-stage-node="' + (props.stage_node || '') + '" ' +
+                            'data-material-type="' + materialTypeName + '" ' +
+                            'data-color-name="' + (props.material_color_name || '') + '" ' +
+                            'data-pantone="' + (props.pantone_code || '') + '" ' +
+                            'data-rgb="' + rgbValue + '">' +
+                        colorCapsule +
                         '<span class="fc-ev-code fw-semibold">' + arg.event.title + '</span>' +
                         (props.quantity
                             ? ' <span class="badge ' + (props.quantity_badge || 'bg-blue text-white') + '">' + parseInt(props.quantity) + ' kg</span>'
-                            : '') +
-                        (props.status_label
-                            ? ' <span class="badge ' + props.status_badge + '">' + props.status_label + '</span>'
                             : '') +
                     '</div>'
             };
@@ -353,8 +371,36 @@ document.addEventListener('DOMContentLoaded', function () {
             var processProfile = card.dataset.processProfile || '-';
             var createdAt = card.dataset.createdAt || '-';
 
+            // 颜色信息
+            var materialType = card.dataset.materialType || '';
+            var colorName = card.dataset.colorName || '';
+            var pantone = card.dataset.pantone || '';
+            var rgbVal = card.dataset.rgb || '';
+
+            // 基材类型胶囊：背景色用 RGB，自适应文字颜色
+            var matCapsule = '';
+            if (materialType) {
+                var bgColor = rgbVal || '#6c7a91';
+                var r = parseInt(bgColor.slice(1, 3), 16) || 108;
+                var g = parseInt(bgColor.slice(3, 5), 16) || 122;
+                var b = parseInt(bgColor.slice(5, 7), 16) || 145;
+                var lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+                matCapsule = '<span class="badge" style="background-color:' + bgColor + ';color:' + (lum > 0.6 ? '#1e293b' : '#ffffff') + ';">' + materialType + '</span>';
+            }
+
             var html =
                 '<div class="fw-bold pb-1 mb-1 border-bottom">' + info.event.title + '</div>' +
+                (materialType || colorName || rgbVal
+                    ? '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">颜色信息</span>'
+                        + matCapsule
+                        + (colorName ? ' <span class="mx-1">|</span> ' + colorName : '')
+                        + (pantone ? ' <span class="badge bg-secondary-lt">' + pantone + '</span>' : '')
+                        + (rgbVal
+                            ? ' <span class="d-inline-block rounded ms-1" style="width:14px;height:14px;background-color:' + rgbVal
+                                + ';vertical-align:middle;border:1px solid var(--tblr-border-color);"></span> ' + rgbVal
+                            : '')
+                        + '</div>'
+                    : '') +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">实验单号</span><span class="fw-bold">' + trialCode + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">计划产量</span><span class="badge bg-purple-lt">' + quantity + ' kg</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配方数量</span><span class="badge bg-blue-lt">' + formulaCount + ' 个</span></div>' +

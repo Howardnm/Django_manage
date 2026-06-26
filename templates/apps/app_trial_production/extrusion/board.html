@@ -99,10 +99,15 @@
 
     {# ========== 排产日历 ========== #}
     <div class="card">
-        <div class="card-header">
-            <h3 class="card-title">
+        <div class="card-header d-flex align-items-center">
+            <h3 class="card-title mb-0">
                 <i class="ti ti-calendar me-2 text-blue"></i>排产日历
             </h3>
+            <span class="ms-auto small text-muted">
+                <span class="badge badge-dot bg-blue me-1"></span>待挤出
+                <span class="badge badge-dot bg-orange ms-2 me-1"></span>挤出中
+                <span class="badge badge-dot bg-green ms-2 me-1"></span>已挤出
+            </span>
         </div>
         <div class="card-body p-2">
             <div id="extrusion-calendar"></div>

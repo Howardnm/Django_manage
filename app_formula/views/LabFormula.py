@@ -268,6 +268,27 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             initial['project_node'] = session_data['project_node_id']
         if session_data.get('name'):
             initial['name'] = session_data['name']
+
+        # 从导入源配方预填充基础信息
+        import_source_id = session_data.get('import_source_id')
+        if import_source_id:
+            try:
+                source = LabFormula.objects.only(
+                    'name', 'material_type_id', 'process_id', 'description',
+                    'material_color_name', 'pantone_code', 'rgb_value',
+                ).get(pk=import_source_id)
+                # 基础信息：全量导入（不含关联信息）
+                initial['name'] = initial.get('name') or source.name
+                initial['material_type'] = initial.get('material_type') or source.material_type_id
+                initial['process'] = initial.get('process') or source.process_id
+                initial['description'] = initial.get('description') or source.description
+                initial['material_color_name'] = initial.get('material_color_name') or source.material_color_name
+                initial['pantone_code'] = initial.get('pantone_code') or source.pantone_code
+                initial['rgb_value'] = initial.get('rgb_value') or source.rgb_value
+                # 关联信息不导入：project / project_node / research_projects 保持原样
+            except LabFormula.DoesNotExist:
+                pass
+
         return initial
 
     def _get_session_data(self):
@@ -1103,7 +1124,7 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
 
 
 class FormulaImportFromView(FormulaAccessMixin, View):
-    """从指定配方导入 BOM 明细(全量) + 测试项目(仅配置，不含结果)"""
+    """从指定配方导入基础信息 + BOM 明细(全量) + 测试项目(仅配置，不含结果)；关联信息/测试结果不导入"""
     permission_required = 'app_formula.change_labformula'
 
     def post(self, request, pk):
@@ -1118,6 +1139,20 @@ class FormulaImportFromView(FormulaAccessMixin, View):
         self.check_object_permission(source)
 
         with transaction.atomic():
+            # 基础信息全量导入（不含关联信息）
+            target.name = source.name
+            target.material_type = source.material_type
+            target.process = source.process
+            target.description = source.description
+            target.material_color_name = source.material_color_name
+            target.pantone_code = source.pantone_code
+            target.rgb_value = source.rgb_value
+            target.save(update_fields=[
+                'name', 'material_type', 'process', 'description',
+                'material_color_name', 'pantone_code', 'rgb_value',
+            ])
+
+            # BOM 明细全量导入
             for bom in source.bom_lines.all():
                 FormulaBOM.objects.create(
                     formula=target,
@@ -1130,11 +1165,14 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                     pre_mix_order=bom.pre_mix_order,
                     pre_mix_time=bom.pre_mix_time,
                 )
+
+            # 测试项目仅导入配置，不含结果
             for test in source.test_results.filter(production_order__isnull=True):
                 FormulaTestResult.objects.create(
                     formula=target,
                     test_config=test.test_config,
                 )
+
         target.calculate_cost()
-        messages.success(request, f'已从「{source.code}」导入 {source.bom_lines.count()} 项 BOM 和 {source.test_results.count()} 个测试项目')
+        messages.success(request, f'已从「{source.code}」导入基础信息、{source.bom_lines.count()} 项 BOM、{source.test_results.count()} 个测试项目')
         return redirect(reverse('formula_edit', kwargs={'pk': pk}))
