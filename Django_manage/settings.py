@@ -113,27 +113,27 @@ WSGI_APPLICATION = 'Django_manage.wsgi.application'
 #     }
 # }
 
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.mysql",
-        "NAME": "django_manage",
-        "USER": "root",  # django_manage
-        "PASSWORD": "123456",  # 6THtw4rFdHpmZ3Ze
-        "HOST": "127.0.0.1",
-        "PORT": "3306",
-    }
-}
-
 # DATABASES = {
-#     'default': {
-#         'ENGINE': 'django.db.backends.postgresql',
-#         'NAME': 'django_manage',
-#         'USER': 'admin',
-#         'PASSWORD': '850996480',
-#         'HOST': '192.168.123.47',
-#         'PORT': '3307',
+#     "default": {
+#         "ENGINE": "django.db.backends.mysql",
+#         "NAME": "django_manage",
+#         "USER": "root",  # django_manage
+#         "PASSWORD": "123456",  # 6THtw4rFdHpmZ3Ze
+#         "HOST": "127.0.0.1",
+#         "PORT": "3306",
 #     }
 # }
+
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'django_manage',
+        'USER': 'postgres',
+        'PASSWORD': '123456',
+        'HOST': '127.0.0.1',
+        'PORT': '5432',
+    }
+}
 
 # 自定义用户模型
 AUTH_USER_MODEL = 'app_user.User'

@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views import View
-from django.db.models import Q
+from django.db.models import Q, Count, Max, Min
 from app_formula.models import LabFormula
 from app_formula.mixins import FormulaAccessMixin
 
@@ -55,3 +55,95 @@ class FormulaAutocompleteView(FormulaAccessMixin, View):
             'text': f"{item.name} (实验单号: {item.code} | 版本号: v{item.version})",
         } for item in qs[:20]]
         return JsonResponse(data, safe=False)
+
+
+class ExperimentOrderAutocompleteView(FormulaAccessMixin, View):
+    """
+    实验单搜索 API — 按 code 去重聚合，返回实验单列表（而非单个配方版本）
+    用于「导入数据」功能：选择一个实验单后，将其下所有版本的 BOM 合并导入
+    每条结果附带 v1 配方的详情页链接，方便用户在导入前预览。
+    """
+    permission_required = 'app_formula.view_labformula'
+    model = LabFormula
+
+    def get(self, request):
+        query = request.GET.get('q', '')
+        qs = self.get_queryset()
+        qs = qs.filter(
+            Q(code__icontains=query) | Q(name__icontains=query)
+        )
+
+        # 按 code 聚合，获取每个实验单的版本数、最新版本名、版本号范围
+        aggregated = qs.values('code').annotate(
+            version_count=Count('id'),
+            latest_name=Max('name'),  # 用最高版本号对应的名称
+            min_version=Min('version'),
+            max_version=Max('version'),
+        ).order_by('-code')
+
+        def _build_results(rows):
+            """将聚合行转为结果列表，批量获取 v1 配方 pk 用于生成详情链接"""
+            if not rows:
+                return []
+            # 批量获取所有实验单的 v1 配方 pk（单次查询）
+            code_version_pairs = [(r['code'], r['min_version']) for r in rows]
+            from django.db.models import Q as _Q
+            v1_filter = _Q()
+            for code, min_v in code_version_pairs:
+                v1_filter |= _Q(code=code, version=min_v)
+            v1_map = {}
+            if v1_filter:
+                for f in LabFormula.objects.filter(v1_filter).only('pk', 'code', 'version'):
+                    v1_map[f.code] = f.pk
+
+            results = []
+            for row in rows:
+                code = row['code']
+                version_count = row['version_count']
+                max_v = row['max_version']
+                latest_name = row['latest_name'] or ''
+
+                if version_count == 1:
+                    version_desc = f'v{max_v}'
+                else:
+                    version_desc = f"v{row['min_version']}~v{max_v}"
+
+                v1_pk = v1_map.get(code)
+                url = reverse('formula_detail', kwargs={'pk': v1_pk}) if v1_pk else ''
+
+                results.append({
+                    'value': code,
+                    'text': f'{code} — 共{version_count}个版本 ({version_desc}) | 最新: {latest_name}',
+                    'version_count': version_count,
+                    'latest_name': latest_name,
+                    'url': url,
+                })
+            return results
+
+        page = request.GET.get('page')
+        if page is not None:
+            try:
+                page = int(page)
+                page_size = int(request.GET.get('page_size', 8))
+            except (ValueError, TypeError):
+                page = 1
+                page_size = 8
+            if page < 1:
+                page = 1
+
+            total = aggregated.count()
+            offset = (page - 1) * page_size
+            results = _build_results(list(aggregated[offset:offset + page_size]))
+
+            return JsonResponse({
+                'results': results,
+                'total': total,
+                'page': page,
+                'page_size': page_size,
+                'has_next': offset + page_size < total,
+                'has_prev': page > 1,
+            })
+
+        # 无分页时返回前20条
+        results = _build_results(list(aggregated[:20]))
+        return JsonResponse({'results': results, 'total': len(results)})

@@ -266,6 +266,19 @@ class BaseFormulaTestResultFormSet(BaseInlineFormSet):
         if any(self.errors):
             return
 
+        # 检查 formset 内部是否有重复的 test_config
+        seen_tc_ids = set()
+        for form in self.forms:
+            if self._is_form_deleted(form):
+                continue
+            tc = form.cleaned_data.get('test_config')
+            if tc:
+                if tc.pk in seen_tc_ids:
+                    raise forms.ValidationError(
+                        '测试项目"%s"在本次提交中重复出现，请删除重复行。' % tc.name
+                    )
+                seen_tc_ids.add(tc.pk)
+
         # 补充检查：新增行是否与数据库中已有记录重复
         # Django 的 validate_unique 只检查 formset 内部，不检查与 DB 的冲突
         if self.instance and self.instance.pk:

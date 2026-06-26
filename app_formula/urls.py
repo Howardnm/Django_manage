@@ -2,7 +2,7 @@ from django.urls import path
 from .views.LabFormula import *
 from .views.FormulaCompare import FormulaCompareView, FormulaCompareCartView
 from .views.FormulaChartCompare import FormulaChartCompareView, FormulaChartDataAPI
-from .views.FormulaSearchAPI import FormulaAutocompleteView
+from .views.FormulaSearchAPI import FormulaAutocompleteView, ExperimentOrderAutocompleteView
 
 urlpatterns = [
     path('list/', LabFormulaListView.as_view(), name='formula_list'),
@@ -20,4 +20,5 @@ urlpatterns = [
     path('api/compare-cart/', FormulaCompareCartView.as_view(), name='formula_compare_cart'),
     path('api/chart-data/', FormulaChartDataAPI.as_view(), name='formula_chart_data_api'),
     path('api/search/', FormulaAutocompleteView.as_view(), name='formula_api_search'),
+    path('api/search-experiment/', ExperimentOrderAutocompleteView.as_view(), name='formula_api_search_experiment'),
 ]

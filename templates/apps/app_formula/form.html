@@ -793,8 +793,8 @@
 <form method="post" action="{% url 'formula_import_prepare' %}">
 {% endif %}
     {% csrf_token %}
-    <input type="hidden" name="source_id" class="search-picker-value">
-    {% include 'includes/search_picker_modal.html' with modal_id='modal-import-formula' modal_title='选择来源配方' search_model='formula' search_url_name='formula_api_search' placeholder='输入配方代号或名称搜索...' show_detail_button='1' %}
+    <input type="hidden" name="experiment_code" class="search-picker-value">
+    {% include 'includes/search_picker_modal.html' with modal_id='modal-import-formula' modal_title='选择来源实验单' search_model='experiment' search_url_name='formula_api_search_experiment' placeholder='输入实验单号搜索...' show_detail_button='1' %}
 </form>
 {% endif %}
 {% endblock %}

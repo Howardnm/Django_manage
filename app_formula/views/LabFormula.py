@@ -4,7 +4,7 @@ from django.contrib import messages
 from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.core.exceptions import PermissionDenied
 from django.db.models import Subquery, OuterRef, DecimalField, Q
@@ -16,6 +16,16 @@ from app_formula.mixins import FormulaAccessMixin
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
 from django.utils.safestring import mark_safe
+
+
+def _build_integrity_error_message(e):
+    """将 IntegrityError（唯一约束冲突）转为用户友好的错误信息"""
+    err_str = str(e)
+    if 'uq_test_manual' in err_str:
+        return '测试项目重复：同一配方中已存在相同的测试项目，请检查并删除重复的测试行。'
+    if 'uq_test_per_order' in err_str:
+        return '该工单回写的测试结果已存在，请勿重复录入。'
+    return '保存失败，数据违反唯一性约束，请检查输入是否重复。'
 
 
 def _build_formula_error_message(form, bom_formset=None, test_formset=None):
@@ -91,21 +101,28 @@ class FormulaStartFreshView(FormulaAccessMixin, View):
 
 
 class FormulaImportPrepareView(FormulaAccessMixin, View):
-    """将待导入的源配方 ID 存入 session，跳转新增页以预填充 formsets"""
+    """将待导入的实验单 code 存入 session，跳转新增页以预填充 formsets（合并该实验单下所有版本的 BOM）"""
     permission_required = 'app_formula.add_labformula'
 
     def post(self, request):
-        source_id = request.POST.get('source_id')
-        if not source_id:
-            messages.error(request, '请选择要导入的配方')
+        experiment_code = request.POST.get('experiment_code')
+        if not experiment_code:
+            messages.error(request, '请选择要导入的实验单')
             return redirect(reverse('formula_add'))
-        source = get_object_or_404(LabFormula, pk=source_id)
-        self.check_object_permission(source)
+        # 验证该实验单下至少有一个配方版本，且用户有权限访问
+        formulas = LabFormula.objects.filter(code=experiment_code)
+        if not formulas.exists():
+            messages.error(request, f'实验单「{experiment_code}」不存在')
+            return redirect(reverse('formula_add'))
+        # 对每个版本的 formula 做权限校验
+        for f in formulas:
+            self.check_object_permission(f)
 
         session_data = request.session.get('formula_prepare', {})
-        session_data['import_source_id'] = int(source_id)
+        session_data['import_experiment_code'] = experiment_code
         request.session['formula_prepare'] = session_data
-        messages.success(request, f'已从「{source.code}」加载 BOM 和测试项目数据，请确认后保存。')
+        version_count = formulas.count()
+        messages.success(request, f'已从实验单「{experiment_code}」（{version_count}个版本）加载 BOM 和测试项目数据，请确认后保存。')
         return redirect(reverse('formula_add'))
 
 
@@ -269,23 +286,24 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         if session_data.get('name'):
             initial['name'] = session_data['name']
 
-        # 从导入源配方预填充基础信息
-        import_source_id = session_data.get('import_source_id')
-        if import_source_id:
+        # 从导入实验单预填充基础信息（取版本号最大的配方）
+        import_experiment_code = session_data.get('import_experiment_code')
+        if import_experiment_code:
             try:
-                source = LabFormula.objects.only(
+                source = LabFormula.objects.filter(code=import_experiment_code).order_by('-version').only(
                     'name', 'material_type_id', 'process_id', 'description',
                     'material_color_name', 'pantone_code', 'rgb_value',
-                ).get(pk=import_source_id)
-                # 基础信息：全量导入（不含关联信息）
-                initial['name'] = initial.get('name') or source.name
-                initial['material_type'] = initial.get('material_type') or source.material_type_id
-                initial['process'] = initial.get('process') or source.process_id
-                initial['description'] = initial.get('description') or source.description
-                initial['material_color_name'] = initial.get('material_color_name') or source.material_color_name
-                initial['pantone_code'] = initial.get('pantone_code') or source.pantone_code
-                initial['rgb_value'] = initial.get('rgb_value') or source.rgb_value
-                # 关联信息不导入：project / project_node / research_projects 保持原样
+                ).first()
+                if source:
+                    # 基础信息：全量导入（不含关联信息）
+                    initial['name'] = initial.get('name') or source.name
+                    initial['material_type'] = initial.get('material_type') or source.material_type_id
+                    initial['process'] = initial.get('process') or source.process_id
+                    initial['description'] = initial.get('description') or source.description
+                    initial['material_color_name'] = initial.get('material_color_name') or source.material_color_name
+                    initial['pantone_code'] = initial.get('pantone_code') or source.pantone_code
+                    initial['rgb_value'] = initial.get('rgb_value') or source.rgb_value
+                    # 关联信息不导入：project / project_node / research_projects 保持原样
             except LabFormula.DoesNotExist:
                 pass
 
@@ -349,36 +367,142 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
             context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
         else:
-            import_source_id = session_data.get('import_source_id')
-            if import_source_id:
+            import_experiment_code = session_data.get('import_experiment_code')
+            if import_experiment_code:
                 try:
-                    source = LabFormula.objects.prefetch_related('bom_lines', 'test_results').get(pk=import_source_id)
-                    bom_initial = [{
-                        'feeding_port': b.feeding_port, 'weighing_scale': b.weighing_scale,
-                        'raw_material': b.raw_material, 'percentage': b.percentage,
-                        'is_tail': b.is_tail, 'is_pre_mix': b.is_pre_mix,
-                        'pre_mix_order': b.pre_mix_order, 'pre_mix_time': b.pre_mix_time,
-                    } for b in source.bom_lines.all()]
-                    context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
-                    context['bom_formset'].extra = max(len(bom_initial), 1)
-                    test_initial = [{'test_config': r.test_config} for r in source.test_results.filter(production_order__isnull=True)]
-                    context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
-                    context['test_formset'].extra = max(len(test_initial), 1)
+                    source_formulas = list(LabFormula.objects.filter(
+                        code=import_experiment_code
+                    ).prefetch_related(
+                        'bom_lines__raw_material__category',
+                        'test_results__test_config__category',
+                    ).order_by('version'))
+                    if not source_formulas:
+                        raise LabFormula.DoesNotExist()
+
+                    source_count = len(source_formulas)
+
+                    if source_count > 1:
+                        # 多版本 → 多列模式：每个源版本一列，用户可调整各列百分比
+                        from collections import OrderedDict
+
+                        # 构建 BOM 并集 (按 raw_material_id + feeding_port 去重)
+                        bom_union = OrderedDict()
+                        bom_index_map = {}
+                        for f in source_formulas:
+                            for b in f.bom_lines.all():
+                                key = (b.raw_material_id, b.feeding_port)
+                                if key not in bom_union:
+                                    bom_index_map[key] = len(bom_union)
+                                    bom_union[key] = {
+                                        'feeding_port': b.feeding_port,
+                                        'weighing_scale': b.weighing_scale,
+                                        'raw_material': b.raw_material,
+                                        'is_tail': b.is_tail,
+                                        'is_pre_mix': b.is_pre_mix,
+                                        'pre_mix_order': b.pre_mix_order,
+                                        'pre_mix_time': b.pre_mix_time,
+                                        'percentage': Decimal('0'),
+                                    }
+
+                        # column 0 = 第一个源版本的 percentage
+                        primary = source_formulas[0]
+                        for b in primary.bom_lines.all():
+                            key = (b.raw_material_id, b.feeding_port)
+                            if key in bom_union:
+                                bom_union[key]['percentage'] = b.percentage
+
+                        FormulaBOMFormSet.extra = max(len(bom_union), 1)
+                        context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=list(bom_union.values()))
+                        context['bom_index_map'] = bom_index_map
+
+                        # 构建测试并集 (按 test_config_id 去重)
+                        test_union = OrderedDict()
+                        test_index_map = {}
+                        for f in source_formulas:
+                            for t in f.test_results.filter(production_order__isnull=True):
+                                if t.test_config_id not in test_union:
+                                    test_index_map[t.test_config_id] = len(test_union)
+                                    test_union[t.test_config_id] = {
+                                        'test_config': t.test_config,
+                                        'test_date': t.test_date,
+                                        'remark': t.remark,
+                                    }
+                        # column 0 = 第一个源版本的测试值
+                        for t in primary.test_results.filter(production_order__isnull=True):
+                            if t.test_config_id in test_union:
+                                if t.test_config.data_type == 'NUMBER':
+                                    test_union[t.test_config_id]['value'] = t.value
+                                elif t.test_config.data_type == 'SELECT':
+                                    test_union[t.test_config_id]['value_text'] = t.value_text
+                                    test_union[t.test_config_id]['value_select'] = t.value_text
+                                else:
+                                    test_union[t.test_config_id]['value_text'] = t.value_text
+
+                        FormulaTestResultFormSet.extra = max(len(test_union), 1)
+                        context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=list(test_union.values()))
+                        context['test_index_map'] = test_index_map
+
+                        # 构建 variant_data (非 column 0 的百分比和测试数值)
+                        variant_map = {}
+                        for col_idx, f in enumerate(source_formulas):
+                            if col_idx == 0:
+                                continue
+                            for b in f.bom_lines.all():
+                                key = (b.raw_material_id, b.feeding_port)
+                                if key in bom_index_map:
+                                    idx = bom_index_map[key]
+                                    variant_map[f'bom-{idx}-percentage_col{col_idx}'] = str(b.percentage)
+                            for t in f.test_results.filter(production_order__isnull=True):
+                                if t.test_config_id in test_index_map:
+                                    idx = test_index_map[t.test_config_id]
+                                    if t.test_config.data_type == 'NUMBER' and t.value is not None:
+                                        variant_map[f'test-{idx}-value_col{col_idx}'] = str(t.value)
+                                    elif t.value_text:
+                                        variant_map[f'test-{idx}-value_text_col{col_idx}'] = t.value_text
+
+                        context['variant_data'] = json.dumps(variant_map)
+                        context['enable_multi_column'] = True
+                        context['num_columns'] = source_count
+                        context['formula_columns'] = source_formulas
+                        # 设置列标签（显示源版本号）
+                        context['column_labels'] = [f'v{f.version}' for f in source_formulas]
+                    else:
+                        # 只有一个版本 → 单列，直接展示其 BOM
+                        bom_initial = [{
+                            'feeding_port': b.feeding_port, 'weighing_scale': b.weighing_scale,
+                            'raw_material': b.raw_material, 'percentage': b.percentage,
+                            'is_tail': b.is_tail, 'is_pre_mix': b.is_pre_mix,
+                            'pre_mix_order': b.pre_mix_order, 'pre_mix_time': b.pre_mix_time,
+                        } for b in source_formulas[0].bom_lines.all()]
+                        context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
+                        context['bom_formset'].extra = max(len(bom_initial), 1)
+                        test_initial = [{'test_config': r.test_config} for r in source_formulas[0].test_results.filter(production_order__isnull=True)]
+                        context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
+                        context['test_formset'].extra = max(len(test_initial), 1)
+                        context['num_columns'] = 1
+
                 except LabFormula.DoesNotExist:
                     FormulaBOMFormSet.extra = 6
                     FormulaTestResultFormSet.extra = 9
                     context['bom_formset'] = FormulaBOMFormSet(prefix='bom', queryset=LabFormula.objects.none())
                     context['test_formset'] = FormulaTestResultFormSet(prefix='test', queryset=LabFormula.objects.none())
+                    context['num_columns'] = 1
             else:
                 FormulaBOMFormSet.extra = 6
                 FormulaTestResultFormSet.extra = 9
                 context['bom_formset'] = FormulaBOMFormSet(prefix='bom', queryset=LabFormula.objects.none())
                 context['test_formset'] = FormulaTestResultFormSet(prefix='test', queryset=LabFormula.objects.none())
+                context['num_columns'] = 1
         if self.request.POST:
-            context['num_columns'] = int(self.request.POST.get('num_columns', 1))
-            context['variant_data'] = json.dumps({k: v for k, v in self.request.POST.items() if '_col' in k})
+            # 只有当没有导入多版本实验单时，才用 POST 中的 num_columns 覆盖
+            if 'num_columns' not in context or context['num_columns'] == 1:
+                context['num_columns'] = int(self.request.POST.get('num_columns', 1))
+            if 'variant_data' not in context:
+                context['variant_data'] = json.dumps({k: v for k, v in self.request.POST.items() if '_col' in k})
         else:
-            context['num_columns'] = 1
+            # 只有在没有导入数据时，才将 num_columns 重置为 1
+            if 'num_columns' not in context:
+                context['num_columns'] = 1
         context['next_url'] = self.request.GET.get(
             'next', self.request.META.get('HTTP_REFERER', '')
         )
@@ -544,7 +668,11 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         if not (bom_formset.is_valid() and test_formset.is_valid()):
             messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
             return self.render_to_response(self.get_context_data(form=form))
-        created = self._create_formula_variants(form, bom_formset, test_formset)
+        try:
+            created = self._create_formula_variants(form, bom_formset, test_formset)
+        except IntegrityError as e:
+            messages.error(self.request, _build_integrity_error_message(e))
+            return self.render_to_response(self.get_context_data(form=form))
         self.object = created[0]
         count = len(created)
         if count == 1:
@@ -847,17 +975,21 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
             return self.render_to_response(self.get_context_data(form=form))
 
-        if context.get('batch_edit_mode'):
-            updated = self._update_formula_variants(form, bom_formset, test_formset)
-            self.object = updated[0]
-            messages.success(self.request, f"已更新 {len(updated)} 个配方")
-        else:
-            with transaction.atomic():
-                self.object = form.save()
-                bom_formset.save()
-                test_formset.save()
-                self.object.calculate_cost()
-            messages.success(self.request, "配方已更新")
+        try:
+            if context.get('batch_edit_mode'):
+                updated = self._update_formula_variants(form, bom_formset, test_formset)
+                self.object = updated[0]
+                messages.success(self.request, f"已更新 {len(updated)} 个配方")
+            else:
+                with transaction.atomic():
+                    self.object = form.save()
+                    bom_formset.save()
+                    test_formset.save()
+                    self.object.calculate_cost()
+                messages.success(self.request, "配方已更新")
+        except IntegrityError as e:
+            messages.error(self.request, _build_integrity_error_message(e))
+            return self.render_to_response(self.get_context_data(form=form))
 
         return redirect(self.get_success_url())
 
@@ -1106,7 +1238,11 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
             return self.render_to_response(self.get_context_data(form=form))
         form.instance.pk = None
         form.instance.code = None
-        created = self._create_formula_variants(form, bom_formset, test_formset)
+        try:
+            created = self._create_formula_variants(form, bom_formset, test_formset)
+        except IntegrityError as e:
+            messages.error(self.request, _build_integrity_error_message(e))
+            return self.render_to_response(self.get_context_data(form=form))
         self.object = created[0]
         count = len(created)
         if count == 1:
@@ -1124,55 +1260,118 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
 
 
 class FormulaImportFromView(FormulaAccessMixin, View):
-    """从指定配方导入基础信息 + BOM 明细(全量) + 测试项目(仅配置，不含结果)；关联信息/测试结果不导入"""
+    """从指定实验单导入（合并所有版本）到目标实验单的所有配方版本：基础信息 + BOM 明细(合并去重) + 测试项目(仅配置，不含结果)；关联信息/测试结果不导入"""
     permission_required = 'app_formula.change_labformula'
 
     def post(self, request, pk):
         target = get_object_or_404(LabFormula, pk=pk)
         self.check_object_permission(target)
 
-        source_id = request.POST.get('source_id')
-        if not source_id:
-            messages.error(request, '请选择要导入的配方')
+        experiment_code = request.POST.get('experiment_code')
+        if not experiment_code:
+            messages.error(request, '请选择要导入的实验单')
             return redirect(reverse('formula_edit', kwargs={'pk': pk}))
-        source = get_object_or_404(LabFormula, pk=source_id)
-        self.check_object_permission(source)
+
+        # 源：被选中的实验单下所有版本
+        source_formulas = list(LabFormula.objects.filter(code=experiment_code).prefetch_related('bom_lines', 'test_results'))
+        if not source_formulas:
+            messages.error(request, f'实验单「{experiment_code}」不存在')
+            return redirect(reverse('formula_edit', kwargs={'pk': pk}))
+        for f in source_formulas:
+            self.check_object_permission(f)
+
+        # 目标：与当前编辑配方同 code 的所有版本（批量编辑模式下的兄弟配方）
+        targets = list(LabFormula.objects.filter(code=target.code).order_by('version'))
+        for t in targets:
+            self.check_object_permission(t)
+
+        # 取源实验单中版本号最大的配方作为基础信息模板
+        source = max(source_formulas, key=lambda f: f.version)
+
+        # BOM 明细合并去重（所有源版本合并，按 key 去重，percentage 取均值）
+        bom_merged = {}  # key: (feeding_port, weighing_scale, raw_material_id)
+        for f in source_formulas:
+            for bom in f.bom_lines.all():
+                key = (bom.feeding_port, bom.weighing_scale, bom.raw_material_id)
+                if key in bom_merged:
+                    existing = bom_merged[key]
+                    existing['percentage_sum'] += bom.percentage
+                    existing['count'] += 1
+                else:
+                    bom_merged[key] = {
+                        'feeding_port': bom.feeding_port,
+                        'weighing_scale': bom.weighing_scale,
+                        'raw_material': bom.raw_material,
+                        'percentage_sum': bom.percentage,
+                        'count': 1,
+                        'is_tail': bom.is_tail,
+                        'is_pre_mix': bom.is_pre_mix,
+                        'pre_mix_order': bom.pre_mix_order,
+                        'pre_mix_time': bom.pre_mix_time,
+                    }
+
+        # 测试项目合并去重（所有源版本按 test_config 去重）
+        seen_test_configs = set()
+        test_configs = []
+        for f in source_formulas:
+            for test in f.test_results.filter(production_order__isnull=True):
+                if test.test_config_id not in seen_test_configs:
+                    seen_test_configs.add(test.test_config_id)
+                    test_configs.append(test.test_config)
+
+        total_bom = 0
+        total_tests = 0
+        target_count = 0
 
         with transaction.atomic():
-            # 基础信息全量导入（不含关联信息）
-            target.name = source.name
-            target.material_type = source.material_type
-            target.process = source.process
-            target.description = source.description
-            target.material_color_name = source.material_color_name
-            target.pantone_code = source.pantone_code
-            target.rgb_value = source.rgb_value
-            target.save(update_fields=[
-                'name', 'material_type', 'process', 'description',
-                'material_color_name', 'pantone_code', 'rgb_value',
-            ])
+            for target_formula in targets:
+                # 基础信息全量导入（不含关联信息，取源最新版本）
+                target_formula.name = source.name
+                target_formula.material_type = source.material_type
+                target_formula.process = source.process
+                target_formula.description = source.description
+                target_formula.material_color_name = source.material_color_name
+                target_formula.pantone_code = source.pantone_code
+                target_formula.rgb_value = source.rgb_value
+                target_formula.save(update_fields=[
+                    'name', 'material_type', 'process', 'description',
+                    'material_color_name', 'pantone_code', 'rgb_value',
+                ])
 
-            # BOM 明细全量导入
-            for bom in source.bom_lines.all():
-                FormulaBOM.objects.create(
-                    formula=target,
-                    feeding_port=bom.feeding_port,
-                    weighing_scale=bom.weighing_scale,
-                    raw_material=bom.raw_material,
-                    percentage=bom.percentage,
-                    is_tail=bom.is_tail,
-                    is_pre_mix=bom.is_pre_mix,
-                    pre_mix_order=bom.pre_mix_order,
-                    pre_mix_time=bom.pre_mix_time,
-                )
+                # 清除旧 BOM 和旧测试项目（手动录入部分），再导入新数据
+                target_formula.bom_lines.all().delete()
+                target_formula.test_results.filter(production_order__isnull=True).delete()
 
-            # 测试项目仅导入配置，不含结果
-            for test in source.test_results.filter(production_order__isnull=True):
-                FormulaTestResult.objects.create(
-                    formula=target,
-                    test_config=test.test_config,
-                )
+                for data in bom_merged.values():
+                    avg_pct = data['percentage_sum'] / data['count']
+                    FormulaBOM.objects.create(
+                        formula=target_formula,
+                        feeding_port=data['feeding_port'],
+                        weighing_scale=data['weighing_scale'],
+                        raw_material=data['raw_material'],
+                        percentage=avg_pct,
+                        is_tail=data['is_tail'],
+                        is_pre_mix=data['is_pre_mix'],
+                        pre_mix_order=data['pre_mix_order'],
+                        pre_mix_time=data['pre_mix_time'],
+                    )
 
-        target.calculate_cost()
-        messages.success(request, f'已从「{source.code}」导入基础信息、{source.bom_lines.count()} 项 BOM、{source.test_results.count()} 个测试项目')
+                for tc in test_configs:
+                    FormulaTestResult.objects.create(
+                        formula=target_formula,
+                        test_config=tc,
+                    )
+
+                target_formula.calculate_cost()
+                total_bom += len(bom_merged)
+                total_tests += len(test_configs)
+                target_count += 1
+
+        source_version_count = len(source_formulas)
+        messages.success(
+            request,
+            f'已从实验单「{experiment_code}」（{source_version_count}个版本）'
+            f'导入到 {target_count} 个目标配方（{target.code}），'
+            f'共 {len(bom_merged)} 项 BOM（去重后）、{len(test_configs)} 个测试项目'
+        )
         return redirect(reverse('formula_edit', kwargs={'pk': pk}))
