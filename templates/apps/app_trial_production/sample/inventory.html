@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}样品库存{% endblock %}
 
@@ -18,115 +19,345 @@
 </div>
 
 <div class="container-xl">
-    {# Tab 切换 #}
-    <ul class="nav nav-tabs mb-3">
-        {% for value, label in tab_choices %}
-        <li class="nav-item">
-            <a class="nav-link {% if active_tab == value %}active{% endif %}"
-               href="?tab={{ value }}{% if current_status %}&status={{ current_status }}{% endif %}">
-                {{ label }}
-            </a>
-        </li>
-        {% endfor %}
-    </ul>
-
-    {# 状态过滤 #}
-    <div class="mb-3">
-        <a href="?tab={{ active_tab }}" class="btn btn-sm {% if not current_status %}btn-primary{% else %}btn-outline-secondary{% endif %}">全部</a>
-        {% for value, label in status_choices %}
-        <a href="?tab={{ active_tab }}&status={{ value }}" class="btn btn-sm {% if current_status == value %}btn-primary{% else %}btn-outline-secondary{% endif %}">{{ label }}</a>
-        {% endfor %}
-    </div>
-
-    {# 待打样颗粒入口（仅颗粒 Tab 显示） #}
-    {% if active_tab == 'PELLET' and available_for_injection %}
-    <div class="card mb-3 border-azure">
-        <div class="card-header bg-azure-lt">
-            <h3 class="card-title"><i class="ti ti-arrow-big-right me-2"></i>待打样颗粒（可供注塑取料）</h3>
+    {# ── 汇总统计卡片 ──────────────────────────────────── #}
+    <div class="row row-cards mb-3">
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-green">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <span class="avatar bg-green-lt me-3">
+                            <i class="ti ti-building-warehouse text-green fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="subheader">成品颗粒（可入SAP）</div>
+                            <div class="h2 mb-0">
+                                {{ stats.finished_pellets.batch_count|default:0 }} 批
+                            </div>
+                            <div class="text-muted small">
+                                {{ stats.finished_pellets.total_kg|default:0|floatformat:1 }} kg
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body p-0">
-            <div class="table-responsive">
-                <table class="table card-table table-vcenter mb-0">
-                    <thead><tr><th>实验单号</th><th>配方</th><th>数量(kg)</th><th>位置</th><th>操作</th></tr></thead>
-                    <tbody>
-                        {% for s in available_for_injection %}
-                        <tr>
-                            <td class="fw-bold">{{ s.trial_code }}</td>
-                            <td>{{ s.formula.name|default:"-" }} v{{ s.formula.version|default:"-" }}</td>
-                            <td>{{ s.quantity }}</td>
-                            <td>{{ s.storage_location|default:"-" }}</td>
-                            <td><a href="{% url 'trial_sample_detail' s.pk %}" class="btn btn-sm btn-outline-primary">详情</a></td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-orange">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <span class="avatar bg-orange-lt me-3">
+                            <i class="ti ti-injection text-orange fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="subheader">待打样颗粒（待注塑消耗）</div>
+                            <div class="h2 mb-0">
+                                {{ stats.for_injection.batch_count|default:0 }} 批
+                            </div>
+                            <div class="text-muted small">
+                                {{ stats.for_injection.total_kg|default:0|floatformat:1 }} kg
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card border-azure">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <span class="avatar bg-azure-lt me-3">
+                            <i class="ti ti-microscope text-azure fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="subheader">样条样品（待测试消耗）</div>
+                            <div class="h2 mb-0">
+                                {{ stats.specimens.total_count|default:0 }} 条记录
+                            </div>
+                            <div class="text-muted small">
+                                {{ stats.specimens.total_specimens|default:0 }} 条
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="card">
+                <div class="card-body p-3">
+                    <div class="d-flex align-items-center">
+                        <span class="avatar bg-purple-lt me-3">
+                            <i class="ti ti-package text-purple fs-2"></i>
+                        </span>
+                        <div>
+                            <div class="subheader">已入SAP仓库</div>
+                            <div class="h2 mb-0">
+                                {{ stats.sap_stored.count|default:0 }} 条
+                            </div>
+                            <div class="text-muted small">已归档至正式仓储</div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    {% endif %}
 
-    {# 按试验单号分组展示 #}
-    {% for group in grouped_samples %}
+    {# ── 三层 Tab 卡片（状态优先 → 类型 → 子类型） ───── #}
     <div class="card mb-3">
-        <div class="card-header">
-            <h3 class="card-title">
-                {{ group.trial_code }}
-                {% if group.production_order %}
-                <a href="{% url 'trial_order_detail' group.production_order.pk %}" class="ms-2 btn btn-sm btn-outline-secondary">
-                    <i class="ti ti-link"></i> {{ group.production_order.code }}
+        <div class="card-body py-2">
+            {# L1: 库存状态（顶行，首页预选"在实验房"） #}
+            <ul class="nav nav-tabs mb-2">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'status' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}status=ALL">
+                        <i class="ti ti-filter me-1"></i>全部状态
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'IN_LAB' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'status' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}status=IN_LAB">
+                        <i class="ti ti-package me-1"></i>在实验房
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'SAP_STORED' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'status' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}status=SAP_STORED">
+                        <i class="ti ti-building-warehouse me-1"></i>已入SAP仓库
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'CONSUMED' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'status' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}status=CONSUMED">
+                        <i class="ti ti-check me-1"></i>已消耗
+                    </a>
+                </li>
+            </ul>
+            {# L2: 颗粒/样条切换 #}
+            <ul class="nav nav-tabs mb-2">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_type != 'SPECIMEN' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'type' and k != 'sub_type' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=PELLET">
+                        <i class="ti ti-package me-1"></i>颗粒样品
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_type == 'SPECIMEN' %}active{% endif %}"
+                       href="?{% for k,v in request.GET.items %}{% if k != 'type' and k != 'sub_type' and k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=SPECIMEN">
+                        <i class="ti ti-clipboard me-1"></i>样条样品
+                    </a>
+                </li>
+            </ul>
+            {# L3: 子类型 #}
+            <div class="btn-list">
+                {% if current_type != 'SPECIMEN' %}
+                {# ── 颗粒子类型 ── #}
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=PELLET"
+                   class="btn btn-sm {% if not current_sub_type %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    全部颗粒
+                </a>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=PELLET&sub_type=FINISHED"
+                   class="btn btn-sm {% if current_sub_type == 'FINISHED' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="ti ti-building-warehouse me-1"></i>成品颗粒（可入SAP）
+                </a>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=PELLET&sub_type=FOR_INJECTION"
+                   class="btn btn-sm {% if current_sub_type == 'FOR_INJECTION' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="ti ti-injection me-1"></i>待打样颗粒（待注塑消耗）
+                </a>
+                {% else %}
+                {# ── 样条子类型 ── #}
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=SPECIMEN"
+                   class="btn btn-sm {% if not current_sub_type %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    全部样条
+                </a>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=SPECIMEN&sub_type=FOR_TESTING"
+                   class="btn btn-sm {% if current_sub_type == 'FOR_TESTING' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="ti ti-microscope me-1"></i>待测试样条
+                </a>
+                <a href="?{% for k,v in request.GET.items %}{% if k != 'sub_type' and k != 'page' and k != 'type' %}{{ k }}={{ v }}&{% endif %}{% endfor %}type=SPECIMEN&sub_type=TESTED"
+                   class="btn btn-sm {% if current_sub_type == 'TESTED' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+                    <i class="ti ti-check me-1"></i>已测试样条
                 </a>
                 {% endif %}
-            </h3>
-            <span class="badge bg-secondary-lt ms-auto">{{ group.items|length }} 条</span>
+            </div>
         </div>
+    </div>
+
+    {# ── 批量操作栏（仅成品颗粒可选，待打样/样条会被后续工序消耗） #}
+    <div id="batch-action-bar" class="alert alert-success d-flex align-items-center mb-3" style="display: none !important;">
+        <i class="ti ti-checkbox me-2"></i>
+        <span id="batch-selected-text">已选 0 条样品</span>
+        <span class="text-muted small ms-2">（仅成品颗粒可入SAP）</span>
+        <div class="ms-auto">
+            <a href="#" id="batch-sap-btn" class="btn btn-sm btn-success me-2"
+               data-batch-url="{% url 'trial_sample_sap_entry_batch' %}">
+                <i class="ti ti-building-warehouse me-1"></i>批量SAP入库
+            </a>
+            <button type="button" class="btn btn-sm btn-ghost-secondary" onclick="clearAllSelections()">
+                取消选择
+            </button>
+        </div>
+    </div>
+
+    {# ── 筛选 + 数据表格（合并卡片） ─────────────────────── #}
+    <div class="card">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+
         <div class="table-responsive">
-            <table class="table card-table table-vcenter mb-0">
+            <table class="table card-table table-vcenter table-hover mb-0">
                 <thead>
                     <tr>
+                        <th style="width: 40px;" title="仅成品颗粒可多选入SAP">
+                            <input type="checkbox" class="form-check-input" id="select-all">
+                        </th>
+                        <th>实验单号</th>
                         <th>类型</th>
                         <th>子类型</th>
-                        <th>配方</th>
-                        {% if active_tab == 'PELLET' %}<th>数量(kg)</th>{% endif %}
-                        {% if active_tab == 'SPECIMEN' %}<th>样条数</th><th>合格数</th><th>模具</th>{% endif %}
+                        <th>配方版本</th>
+                        <th>数量</th>
+                        <th>批次号</th>
                         <th>状态</th>
-                        <th>位置</th>
-                        <th>操作</th>
+                        <th>存放位置</th>
+                        <th>来源 · 去向</th>
+                        <th style="width: 140px;">操作</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for s in group.items %}
+                    {% for s in samples %}
                     <tr>
-                        <td><span class="badge bg-{% if s.type == 'PELLET' %}green{% else %}yellow{% endif %}-lt">{{ s.get_type_display }}</span></td>
-                        <td>{{ s.get_sub_type_display }}</td>
-                        <td>{{ s.formula.name|default:"-" }}{% if s.formula %} v{{ s.formula.version }}{% endif %}</td>
-                        {% if active_tab == 'PELLET' %}
-                        <td class="fw-bold">{{ s.quantity|default:"-" }}</td>
-                        {% endif %}
-                        {% if active_tab == 'SPECIMEN' %}
-                        <td>{{ s.specimen_count|default:"-" }}</td>
-                        <td class="fw-bold">{{ s.specimen_qualified|default:"-" }}</td>
-                        <td>{{ s.mold.name|default:"-" }}</td>
-                        {% endif %}
-                        <td><span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span></td>
-                        <td>{{ s.storage_location|default:"-" }}</td>
+                        {# Checkbox — 仅 IN_LAB 状态可选中 #}
                         <td>
-                            <a href="{% url 'trial_sample_detail' s.pk %}" class="btn btn-sm btn-outline-primary">详情</a>
                             {% if s.can_sap_entry %}
-                            <a href="{% url 'trial_sample_sap_entry' s.pk %}" class="btn btn-sm btn-outline-success">SAP入库</a>
+                            <input type="checkbox" class="form-check-input sample-checkbox" value="{{ s.pk }}" data-status="{{ s.status }}">
                             {% endif %}
+                        </td>
+                        {# 实验单号 #}
+                        <td>
+                            {% if s.production_order %}
+                            <a href="{% url 'trial_order_detail' s.production_order.pk %}" class="fw-bold text-reset">
+                                {{ s.trial_code }}
+                            </a>
+                            {% else %}
+                            <span class="fw-bold">{{ s.trial_code }}</span>
+                            {% endif %}
+                        </td>
+                        {# 类型 #}
+                        <td>
+                            <span class="badge {% if s.type == 'PELLET' %}bg-green-lt text-green{% else %}bg-yellow-lt text-yellow{% endif %}">
+                                {{ s.get_type_display }}
+                            </span>
+                        </td>
+                        {# 子类型 #}
+                        <td>
+                            {% if s.sub_type == 'FINISHED' %}
+                            <span class="badge bg-green-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'FOR_INJECTION' %}
+                            <span class="badge bg-orange-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'FOR_TESTING' %}
+                            <span class="badge bg-azure-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'TESTED' %}
+                            <span class="badge bg-purple-lt">{{ s.get_sub_type_display }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary-lt">{{ s.get_sub_type_display }}</span>
+                            {% endif %}
+                        </td>
+                        {# 配方版本 #}
+                        <td>
+                            {% if s.formula %}
+                            <span title="{{ s.formula.name }}">{{ s.formula.name }} <span class="text-muted">v{{ s.formula.version }}</span></span>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        {# 数量 #}
+                        <td class="fw-bold">
+                            {% if s.is_pellet %}
+                            {{ s.quantity|default:"-" }} kg
+                            {% else %}
+                            {{ s.specimen_count|default:"-" }} 条
+                            {% endif %}
+                        </td>
+                        {# 批次号 #}
+                        <td>
+                            {% if s.batch_number %}
+                            <code>{{ s.batch_number }}</code>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        {# 状态 #}
+                        <td>
+                            <span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span>
+                        </td>
+                        {# 存放位置 #}
+                        <td>{{ s.storage_location|default:"-" }}</td>
+                        {# 来源·去向 #}
+                        <td>
+                            <div class="d-flex flex-column small">
+                                {# 来源 #}
+                                <span class="text-muted">
+                                    <i class="ti ti-arrow-narrow-left me-1"></i>
+                                    {% if s.is_pellet and s.production_order %}
+                                    挤出({{ s.production_order.code }})
+                                    {% elif s.is_specimen and s.injection_task %}
+                                    注塑 #{{ s.injection_task.pk }}
+                                    {% else %}
+                                    -
+                                    {% endif %}
+                                </span>
+                                {# 去向 #}
+                                <span>
+                                    {% if s.status == 'SAP_STORED' %}
+                                    <i class="ti ti-building-warehouse me-1 text-green"></i>SAP仓库
+                                    {% elif s.status == 'CONSUMED' %}
+                                    <i class="ti ti-injection me-1 text-purple"></i>
+                                    {% with consumed_by=s.injection_tasks.all|first %}
+                                    {% if consumed_by %}注塑 #{{ consumed_by.pk }}{% else %}已消耗{% endif %}
+                                    {% endwith %}
+                                    {% elif s.sub_type == 'FOR_TESTING' %}
+                                    <i class="ti ti-microscope me-1 text-azure"></i>待测试
+                                    {% elif s.sub_type == 'TESTED' %}
+                                    <i class="ti ti-check me-1 text-green"></i>已测试
+                                    {% else %}
+                                    <i class="ti ti-dots me-1 text-muted"></i>-
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </td>
+                        {# 操作 #}
+                        <td>
+                            <div class="btn-list">
+                                <a href="{% url 'trial_sample_detail' s.pk %}" class="btn btn-sm btn-outline-primary" title="详情">
+                                    <i class="ti ti-eye"></i>
+                                </a>
+                                {% if s.can_sap_entry %}
+                                <a href="{% url 'trial_sample_sap_entry' s.pk %}" class="btn btn-sm btn-outline-success" title="SAP入库">
+                                    <i class="ti ti-building-warehouse"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="11" class="text-center py-5 text-muted">
+                            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
+
+        {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
     </div>
-    {% empty %}
-    <div class="card">
-        <div class="card-body text-center py-5 text-muted">
-            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
-        </div>
-    </div>
-    {% endfor %}
 </div>
+<script src="{% static 'js/apps/app_trial_production/sample/inventory.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    initRemoteTomSelectAll(document, {
+        apiUrl: "{% url 'trial_api_search' %}",
+        valueField: 'id',
+        responseKey: 'results',
+    });
+});
+</script>
 {% endblock %}

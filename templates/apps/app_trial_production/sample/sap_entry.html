@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}SAP入库 - {{ sample }}{% endblock %}
+{% block title %}{% if is_batch %}批量SAP入库{% else %}SAP入库 — {{ samples.0.trial_code }}{% endif %}{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -8,51 +8,90 @@
         <div class="page-pretitle">
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">样品库存</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_detail' sample.pk %}">{{ sample }}</a></li>
-                    <li class="breadcrumb-item active">SAP入库</li>
+                    {% if not is_batch and samples|length == 1 %}
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_detail' samples.0.pk %}">{{ samples.0.trial_code }}</a></li>
+                    {% endif %}
+                    <li class="breadcrumb-item active">{% if is_batch %}批量SAP入库{% else %}SAP入库{% endif %}</li>
                 </ol>
             </nav>
         </div>
-        <h2 class="page-title">SAP 入库操作</h2>
+        <h2 class="page-title">
+            {% if is_batch %}
+            <i class="ti ti-building-warehouse me-2"></i>批量SAP入库
+            {% else %}
+            SAP 入库操作
+            {% endif %}
+        </h2>
     </div>
 </div>
 
 <div class="container-xl">
     <form method="post">
         {% csrf_token %}
+        {# 批量模式：携带样品 ID 列表 #}
+        {% if is_batch %}
+        <input type="hidden" name="ids" value="{{ sample_ids }}">
+        {% endif %}
+
         <div class="row row-cards">
             <div class="col-lg-8">
+
+                {# ── 样品信息 ────────────────────────────── #}
                 <div class="card">
-                    <div class="card-header"><h3 class="card-title">样品信息</h3></div>
-                    <div class="card-body">
-                        <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">样品类型</div>
-                                <div class="datagrid-content">{{ sample.get_type_display }} - {{ sample.get_sub_type_display }}</div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">实验单号</div>
-                                <div class="datagrid-content">{{ sample.trial_code }}</div>
-                            </div>
-                            {% if sample.is_pellet %}
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">数量(kg)</div>
-                                <div class="datagrid-content fw-bold">{{ sample.quantity }}</div>
-                            </div>
-                            {% endif %}
-                            {% if sample.is_specimen %}
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">样条数量</div>
-                                <div class="datagrid-content fw-bold">{{ sample.specimen_count }}</div>
-                            </div>
-                            {% endif %}
-                        </div>
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            {% if is_batch %}选中样品清单{% else %}样品信息{% endif %}
+                        </h3>
+                        <span class="badge bg-primary-lt ms-auto">{{ samples|length }} 条</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table card-table table-vcenter mb-0">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>实验单号</th>
+                                    <th>类型</th>
+                                    <th>子类型</th>
+                                    <th>数量</th>
+                                    <th>位置</th>
+                                    <th>批次号</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for s in samples %}
+                                <tr>
+                                    <td class="text-muted">{{ forloop.counter }}</td>
+                                    <td class="fw-bold">{{ s.trial_code }}</td>
+                                    <td>
+                                        <span class="badge {% if s.is_pellet %}bg-green-lt{% else %}bg-yellow-lt{% endif %}">
+                                            {{ s.get_type_display }}
+                                        </span>
+                                    </td>
+                                    <td>{{ s.get_sub_type_display }}</td>
+                                    <td class="fw-bold">
+                                        {% if s.is_pellet %}{{ s.quantity }} kg{% else %}{{ s.specimen_count }} 条{% endif %}
+                                    </td>
+                                    <td>{{ s.storage_location|default:"-" }}</td>
+                                    <td><code>{{ s.batch_number }}</code></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
 
-                <div class="card mt-3">
-                    <div class="card-header"><h3 class="card-title">SAP 入库信息</h3></div>
+                {# ── SAP 入库信息表单 ────────────────────── #}
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">SAP 入库信息</h3>
+                        {% if is_batch %}
+                        <span class="text-muted small ms-2">
+                            <i class="ti ti-info-circle me-1"></i>所有选中样品将使用相同的SAP入库信息
+                        </span>
+                        {% endif %}
+                    </div>
                     <div class="card-body">
                         {% for field in form %}
                         <div class="mb-3">
@@ -66,19 +105,33 @@
                 </div>
             </div>
 
+            {# ── 操作按钮 ────────────────────────────────── #}
             <div class="col-lg-4">
                 <div class="card">
                     <div class="card-body d-grid gap-2">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="ti ti-package me-1"></i> 确认入库
+                        <button type="submit" class="btn btn-success">
+                            <i class="ti ti-building-warehouse me-2"></i>
+                            {% if is_batch %}确认批量入库 ({{ samples|length }} 条){% else %}确认入库{% endif %}
                         </button>
-                        <a href="{% url 'trial_sample_detail' sample.pk %}" class="btn btn-outline-secondary">取消</a>
+                        {% if not is_batch and samples|length == 1 %}
+                        <a href="{% url 'trial_sample_detail' samples.0.pk %}" class="btn btn-outline-secondary">取消</a>
+                        {% else %}
+                        <a href="{% url 'trial_sample_list' %}" class="btn btn-outline-secondary">取消</a>
+                        {% endif %}
                     </div>
                 </div>
+
                 <div class="card mt-3">
                     <div class="card-body text-muted small">
                         <i class="ti ti-info-circle me-1"></i>
-                        SAP入库后，样品状态将变更为"已入SAP仓库"，表示样品已流出实验房。
+                        <strong>SAP入库规则：</strong>仅<strong>成品颗粒</strong>允许入SAP仓库。
+                        待打样颗粒（FOR_INJECTION）将被注塑消耗，
+                        样条样品（SPECIMEN）将被测试消耗，均不可入SAP。
+                        <br><br>
+                        入库后样品状态将变更为"已入SAP仓库"，表示样品已正式归档至仓储管理系统。
+                        {% if is_batch %}
+                        <br><br><strong>注意：</strong>仅"成品颗粒 + 在实验房"状态的样品会被成功入库，不满足条件的将被跳过。
+                        {% endif %}
                     </div>
                 </div>
             </div>

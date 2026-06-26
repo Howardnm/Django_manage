@@ -240,3 +240,166 @@ class SampleInventoryService:
         ).select_related(
             'production_order', 'formula',
         ).order_by('-created_at')
+
+    @staticmethod
+    def get_global_stats():
+        """全局样品库存汇总统计（供列表页顶部卡片使用）。
+
+        Returns:
+            dict {
+                'finished_pellets': {'batch_count': int, 'total_kg': Decimal|None},
+                'for_injection': {'batch_count': int, 'total_kg': Decimal|None},
+                'specimens': {'total_count': int, 'total_specimens': int|None},
+                'sap_stored': {'count': int},
+            }
+        """
+        base = SampleInventory.objects.all()
+
+        # 成品颗粒（可入SAP）
+        finished_pellets = base.filter(
+            type='PELLET', sub_type='FINISHED', status='IN_LAB',
+        ).aggregate(
+            batch_count=Count('batch_number', distinct=True),
+            total_kg=Sum('quantity'),
+        )
+
+        # 待打样颗粒（待注塑消耗）
+        for_injection = base.filter(
+            type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
+        ).aggregate(
+            batch_count=Count('batch_number', distinct=True),
+            total_kg=Sum('quantity'),
+        )
+
+        specimens = base.filter(type='SPECIMEN').aggregate(
+            total_count=Count('id'),
+            total_specimens=Sum('specimen_count'),
+        )
+
+        sap_stored = base.filter(status='SAP_STORED').aggregate(
+            count=Count('id'),
+        )
+
+        return {
+            'finished_pellets': finished_pellets,
+            'for_injection': for_injection,
+            'specimens': specimens,
+            'sap_stored': sap_stored,
+        }
+
+    @staticmethod
+    def get_lifecycle(sample):
+        """构建单个样品的生命周期事件时间线。
+
+        按时间顺序返回事件列表，每个事件标注是否为当前状态。
+
+        Returns:
+            list[dict] — [{label, description, timestamp, is_current, icon}]
+        """
+        events = []
+
+        if sample.is_pellet:
+            # 1) 工单创建
+            if sample.production_order:
+                events.append({
+                    'label': '工单创建',
+                    'description': str(sample.production_order),
+                    'timestamp': sample.production_order.created_at,
+                    'is_current': False,
+                    'icon': 'ti ti-file-text',
+                })
+
+            # 2) 挤出完成
+            if sample.production_order and hasattr(sample.production_order, 'extrusion_task'):
+                ext = sample.production_order.extrusion_task
+                if ext and ext.completed_at:
+                    events.append({
+                        'label': '挤出完成',
+                        'description': f'挤出任务 (操作员: {ext.operator or "-"})',
+                        'timestamp': ext.completed_at,
+                        'is_current': False,
+                        'icon': 'ti ti-tool',
+                    })
+
+            # 3) 颗粒分拨入库（当前，除非已消耗/已SAP）
+            events.append({
+                'label': '颗粒分拨入库',
+                'description': (
+                    f'{sample.quantity or 0}kg, {sample.get_sub_type_display()}'
+                ),
+                'timestamp': sample.created_at,
+                'is_current': sample.status == SampleInventory.Status.IN_LAB,
+                'icon': 'ti ti-package',
+            })
+
+            # 4) 待注塑消耗（FOR_INJECTION 已关联注塑任务但尚未消耗）
+            if (sample.sub_type == SampleInventory.SubType.FOR_INJECTION
+                    and sample.injection_task
+                    and sample.status != SampleInventory.Status.CONSUMED):
+                events.append({
+                    'label': '待注塑消耗',
+                    'description': f'预留工单注塑任务 #{sample.injection_task.pk}',
+                    'timestamp': sample.injection_task.created_at,
+                    'is_current': sample.status == SampleInventory.Status.IN_LAB,
+                    'icon': 'ti ti-injection',
+                })
+
+            # 5) SAP 入库（成品颗粒）或 注塑消耗（FOR_INJECTION 已消耗）
+            if sample.status == SampleInventory.Status.SAP_STORED:
+                events.append({
+                    'label': 'SAP入库',
+                    'description': (
+                        f'物料号: {sample.sap_material_code or "-"}, '
+                        f'批次: {sample.sap_batch_number or "-"}'
+                    ),
+                    'timestamp': sample.sap_warehouse_date or sample.updated_at,
+                    'is_current': True,
+                    'icon': 'ti ti-building-warehouse',
+                })
+
+            # 6) 注塑消耗（FOR_INJECTION 已被消耗）
+            if sample.status == SampleInventory.Status.CONSUMED:
+                tasks = sample.injection_tasks.all()
+                for task in tasks:
+                    events.append({
+                        'label': '注塑消耗',
+                        'description': f'注塑任务 #{task.pk}',
+                        'timestamp': task.created_at,
+                        'is_current': True,
+                        'icon': 'ti ti-injection',
+                    })
+
+        elif sample.is_specimen:
+            # 1) 注塑任务
+            if sample.injection_task:
+                events.append({
+                    'label': '注塑任务',
+                    'description': f'注塑任务 #{sample.injection_task.pk}',
+                    'timestamp': sample.injection_task.created_at,
+                    'is_current': False,
+                    'icon': 'ti ti-injection',
+                })
+
+            # 2) 样条入库
+            events.append({
+                'label': '样条入库',
+                'description': (
+                    f'{sample.specimen_count or 0}条'
+                    f'（合格 {sample.specimen_qualified or 0}条）'
+                ),
+                'timestamp': sample.created_at,
+                'is_current': sample.sub_type == SampleInventory.SubType.FOR_TESTING,
+                'icon': 'ti ti-clipboard',
+            })
+
+            # 3) 测试完成
+            if sample.sub_type == SampleInventory.SubType.TESTED:
+                events.append({
+                    'label': '测试完成',
+                    'description': '已测试样条',
+                    'timestamp': sample.updated_at,
+                    'is_current': True,
+                    'icon': 'ti ti-microscope',
+                })
+
+        return events

@@ -238,6 +238,20 @@ class ProductionOrderService:
         # 将规划阶段的 MoldRequirement 关联到新建的注塑任务
         plans.update(injection_task=task)
 
+        # 将工单下未关联的 FOR_INJECTION 颗粒链接到该注塑任务
+        from app_trial_production.models import SampleInventory
+        linked = SampleInventory.objects.filter(
+            production_order=order,
+            type='PELLET',
+            sub_type='FOR_INJECTION',
+            status='IN_LAB',
+            injection_task__isnull=True,
+        ).update(injection_task=task)
+        if linked:
+            logger.info(
+                f"Linked {linked} FOR_INJECTION samples to InjectionTask {task.pk}"
+            )
+
         logger.info(
             f"InjectionTask {task.pk} created from {plans.count()} mold plans "
             f"for order {order.code}"

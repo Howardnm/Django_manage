@@ -149,13 +149,69 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
 
 class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    """样品库存筛选器"""
-    type = django_filters.ChoiceFilter(choices=SampleInventory.Type.choices)
-    sub_type = django_filters.ChoiceFilter(choices=SampleInventory.SubType.choices)
-    status = django_filters.ChoiceFilter(choices=SampleInventory.Status.choices)
-    trial_code = django_filters.CharFilter(
-        field_name='trial_code', lookup_expr='icontains')
+    """样品库存筛选器 — 完整版：全文检索 + 多维度筛选 + 排序"""
+
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    # type / sub_type / status 已由三层 Tab 卡片接管 — 保留为隐藏字段
+    type = django_filters.ChoiceFilter(
+        choices=SampleInventory.Type.choices, widget=forms.HiddenInput,
+    )
+    sub_type = django_filters.ChoiceFilter(
+        choices=SampleInventory.SubType.choices, widget=forms.HiddenInput,
+    )
+    status = django_filters.ChoiceFilter(
+        choices=SampleInventory.Status.choices, widget=forms.HiddenInput,
+    )
+
+    project = django_filters.ModelChoiceFilter(
+        field_name='production_order__project',
+        queryset=Project.objects.all(),
+        widget=forms.Select(attrs={
+            'class': 'form-select remote-search',
+            'data-model': 'project',
+            'placeholder': '检索项目名称',
+            'style': 'width: 220px;',
+        }),
+    )
+
+    storage_location = django_filters.CharFilter(
+        field_name='storage_location', lookup_expr='icontains',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '存放位置',
+            'style': 'width: 140px;',
+        }),
+    )
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('created_at', 'created_at'),
+            ('trial_code', 'trial_code'),
+            ('quantity', 'quantity'),
+            ('specimen_count', 'specimen_count'),
+        ),
+        widget=forms.HiddenInput,
+    )
 
     class Meta:
         model = SampleInventory
-        fields = ['type', 'sub_type', 'status', 'trial_code']
+        fields = ['q', 'type', 'sub_type', 'status', 'project',
+                  'storage_location', 'start_date', 'end_date']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'q' in self.filters:
+            self.filters['q'].field.widget.attrs['placeholder'] = (
+                '检索实验单号 / 批次号 / 配方名称 / 工单号'
+            )
+
+    def filter_search(self, queryset, name, value):
+        if not value:
+            return queryset
+        return queryset.filter(
+            Q(trial_code__icontains=value) |
+            Q(batch_number__icontains=value) |
+            Q(formula__name__icontains=value) |
+            Q(production_order__code__icontains=value)
+        )

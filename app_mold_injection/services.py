@@ -49,6 +49,20 @@ class InjectionTaskService:
                         specimen_quantity=req['specimen_quantity'],
                     )
 
+        # 将工单下未关联的 FOR_INJECTION 颗粒链接到该注塑任务
+        from app_trial_production.models import SampleInventory
+        linked = SampleInventory.objects.filter(
+            production_order=production_order,
+            type='PELLET',
+            sub_type='FOR_INJECTION',
+            status='IN_LAB',
+            injection_task__isnull=True,
+        ).update(injection_task=task)
+        if linked:
+            logger.info(
+                f"Linked {linked} FOR_INJECTION samples to InjectionTask {task.pk}"
+            )
+
         logger.info(f"InjectionTask created from order {production_order.code}")
         return task
 
@@ -130,6 +144,20 @@ class InjectionTaskService:
         if specimen_outputs:
             from app_trial_production.services.sample_service import SampleInventoryService
             SampleInventoryService.create_specimen_batch(task, specimen_outputs)
+
+        # 将关联的 FOR_INJECTION 颗粒标记为已消耗
+        from app_trial_production.models import SampleInventory
+        consumed = SampleInventory.objects.filter(
+            injection_task=task,
+            type='PELLET',
+            sub_type='FOR_INJECTION',
+            status='IN_LAB',
+        ).update(status='CONSUMED')
+        if consumed:
+            logger.info(
+                f"Marked {consumed} FOR_INJECTION samples as CONSUMED "
+                f"for InjectionTask {task.pk}"
+            )
 
         # 渠道A：推进排产工单状态
         production_order = task.production_order

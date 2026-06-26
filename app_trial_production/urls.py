@@ -19,7 +19,7 @@ from .views.ExtrusionTask import (
 )
 from .views.SampleInventory import (
     SampleInventoryListView, SampleInventoryDetailView,
-    SapEntryView,
+    SapEntryView, SampleInventoryApiView,
 )
 from .views.PelletSplit import PelletSplitView
 from .views.Config import TrialConfigView
@@ -62,6 +62,8 @@ urlpatterns = [
 
     # Sample Inventory
     path('samples/', SampleInventoryListView.as_view(), name='trial_sample_list'),
+    path('samples/batch/sap-entry/', SapEntryView.as_view(), name='trial_sample_sap_entry_batch'),
+    path('samples/api/search/', SampleInventoryApiView.as_view(), name='trial_sample_api_search'),
     path('samples/<int:pk>/', SampleInventoryDetailView.as_view(), name='trial_sample_detail'),
     path('samples/<int:pk>/sap-entry/', SapEntryView.as_view(), name='trial_sample_sap_entry'),
 

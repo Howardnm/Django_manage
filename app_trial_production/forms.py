@@ -186,22 +186,30 @@ MoldRequirementRowFormSet = modelformset_factory(
 
 
 class SapEntryForm(TablerFormMixin, forms.ModelForm):
-    """SAP 入库表单"""
+    """SAP 入库表单 — 单样品/批量通用，字段非必填（由 Service 层处理实际保存）"""
     class Meta:
         model = SampleInventory
         fields = ['sap_material_code', 'sap_batch_number',
                   'sap_warehouse_date', 'sap_storage_location']
         widgets = {
-            'sap_material_code': forms.TextInput(attrs={'class': 'form-control'}),
-            'sap_batch_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'sap_material_code': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'SAP物料编码',
+            }),
+            'sap_batch_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'SAP批次号',
+            }),
             'sap_warehouse_date': forms.DateInput(attrs={
-                'class': 'form-control', 'type': 'date'}),
-            'sap_storage_location': forms.TextInput(attrs={'class': 'form-control'}),
+                'class': 'form-control', 'type': 'date',
+            }),
+            'sap_storage_location': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '如: WH-A-03',
+            }),
         }
 
-
-class SapEntryFormForSpecimen(forms.Form):
-    """样条样品的 SAP 入库表单（样条不涉及 SAP 物料号，仅记录位置）"""
-    sap_storage_location = forms.CharField(
-        required=False, max_length=50, label="SAP库位",
-        widget=forms.TextInput(attrs={'class': 'form-control'}))
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for f in self.fields.values():
+            f.required = False

@@ -98,5 +98,26 @@ class SampleInventory(models.Model):
 
     @property
     def can_sap_entry(self):
-        """是否可执行SAP入库"""
-        return self.status == self.Status.IN_LAB
+        """是否可执行SAP入库 — 仅成品颗粒允许入SAP仓库。
+
+        待打样颗粒 (FOR_INJECTION) 会被注塑消耗，
+        样条样品 (SPECIMEN) 会被测试消耗，均不允许入SAP。
+        """
+        return (
+            self.type == self.Type.PELLET
+            and self.sub_type == self.SubType.FINISHED
+            and self.status == self.Status.IN_LAB
+        )
+
+    @property
+    def is_reserved_for_injection(self):
+        """FOR_INJECTION 颗粒是否已关联工单注塑任务（渠道A）。
+
+        关联后不允许创建独立注塑任务（渠道B），
+        应由工单注塑任务自动消耗。
+        """
+        return (
+            self.type == self.Type.PELLET
+            and self.sub_type == self.SubType.FOR_INJECTION
+            and self.injection_task is not None
+        )
