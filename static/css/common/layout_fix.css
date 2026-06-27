@@ -1,0 +1,15 @@
+/**
+ * Tabler 布局修复：防止 body 左侧出现缝隙
+ *
+ * 问题：Windows 滚动条占用视口宽度时，body 背景色在侧边栏左边缘与浏览器左边缘之间
+ *       形成可见缝隙。根本原因是固定定位侧边栏使用 left:0，但 viewport 宽度计算
+ *       （含/不含滚动条）在不同 OS 上不一致。
+ *
+ * 修复：限制 body 水平溢出，消除可见缝隙。
+ */
+html {
+    overflow-x: hidden;
+}
+body {
+    overflow-x: hidden;
+}

@@ -42,7 +42,6 @@ function initRemoteTomSelect(el, opts) {
         labelField: 'text',
         searchField: 'text',
         copyClassesToDropdown: false,
-        dropdownParent: 'body',
         create: false,
         preload: 'focus',
         placeholder: placeholder,
