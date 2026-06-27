@@ -89,19 +89,41 @@
                         </div>
 
                         <!-- 性能指标 FormSet -->
+                        <style>
+                            #property-table .form-control,
+                            #property-table .form-select {
+                                padding: 2px 6px;
+                                font-size: 12px;
+                                height: auto;
+                                min-height: 28px;
+                            }
+                            #property-table .ts-wrapper .ts-control {
+                                padding: 2px 6px;
+                                font-size: 12px;
+                                min-height: 28px;
+                            }
+                            #property-table td {
+                                padding: 4px 4px;
+                                vertical-align: middle;
+                            }
+                            #property-table th {
+                                padding: 4px 6px;
+                                white-space: nowrap;
+                            }
+                        </style>
                         <div class="card mb-3">
                             <div class="card-header bg-purple-lt">
                                 <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>性能指标录入</h3>
                             </div>
-                            <div style="min-height: 250px;">
-                                <table class="table table-vcenter card-table">
+                            <div>
+                                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="property-table" style="font-size: 13px; table-layout: auto;">
                                     <thead>
                                     <tr>
                                         <th style="width: 35%;">测试项目</th>
-                                        <th style="width: 20%;">数值 / 结果</th>
-                                        <th style="width: 20%;">测试日期</th>
-                                        <th>备注</th>
-                                        <th class="w-1"></th>
+                                        <th style="width: auto;">数值 / 结果</th>
+                                        <th style="width: 100px;">测试日期</th>
+                                        <th style="width: 100px;">备注</th>
+                                        <th style="width: 50px;">删除</th>
                                     </tr>
                                     </thead>
                                     <tbody id="property-formset">
@@ -111,21 +133,17 @@
                                             {{ form.id }}
                                             <td>{{ form.test_config }}</td>
                                             <td>
-                                                <!-- 数值输入框 -->
                                                 {{ form.value }}
-                                                <!-- 文本输入框 -->
                                                 {{ form.value_text }}
-                                                <!-- 选择框 -->
                                                 {{ form.value_select }}
                                             </td>
                                             <td>{{ form.test_date }}</td>
                                             <td>{{ form.remark }}</td>
                                             <td class="text-center">
-                                                {% if property_formset.can_delete %}
-                                                    <div class="form-check form-check-inline m-0" title="删除此行">
-                                                        {{ form.DELETE }}
-                                                    </div>
-                                                {% endif %}
+                                                <button type="button" class="btn btn-sm btn-ghost-danger btn-icon delete-row-btn" title="删除此行">
+                                                    <i class="ti ti-trash"></i>
+                                                </button>
+                                                <div style="display:none;">{{ form.DELETE }}</div>
                                             </td>
                                         </tr>
                                     {% endfor %}
@@ -134,7 +152,7 @@
                             </div>
                             <div class="card-footer">
                                 <button type="button" class="btn btn-ghost-purple" id="add-property">
-                                    <i class="ti ti-plus me-1"></i> 添加一行
+                                    <i class="ti ti-plus me-1"></i> 添加测试项
                                 </button>
                             </div>
                         </div>
@@ -171,8 +189,8 @@
         </div>
     </form>
 
-    <!-- 修正：使用 empty_form 模板 -->
-    <script type="text/template" id="empty-form-template">
+    <!-- 隐藏的空表单模板 -->
+    <template id="empty-form-template">
         <tr class="property-form">
             {{ property_formset.empty_form.id }}
             <td>{{ property_formset.empty_form.test_config }}</td>
@@ -184,13 +202,14 @@
             <td>{{ property_formset.empty_form.test_date }}</td>
             <td>{{ property_formset.empty_form.remark }}</td>
             <td class="text-center">
-                <div class="form-check form-check-inline m-0">
-                    {{ property_formset.empty_form.DELETE }}
-                </div>
+                <button type="button" class="btn btn-sm btn-ghost-danger btn-icon delete-row-btn" title="删除此行">
+                    <i class="ti ti-trash"></i>
+                </button>
+                <div style="display:none;">{{ property_formset.empty_form.DELETE }}</div>
             </td>
         </tr>
-    </script>
-    
+    </template>
+
     <script>
         // 预加载所有 TestConfig 的数据类型信息
         const testConfigMeta = {};
@@ -207,16 +226,16 @@
             const textInput = row.querySelector('.value-text');
             const selectInput = row.querySelector('.value-select');
             const configId = selectElement.value;
-            
+
             if (!configId) return;
-            
+
             const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
-            
+
             // 重置显示
             valueInput.style.display = 'none';
             textInput.style.display = 'none';
             selectInput.style.display = 'none';
-            
+
             if (meta.type === 'NUMBER') {
                 valueInput.style.display = 'block';
                 if (selectElement.dataset.initialized === 'true') {
@@ -235,17 +254,17 @@
                     valueInput.value = '';
                     textInput.value = '';
                 }
-                
+
                 // 动态填充选项
                 if (selectInput.options.length <= 1) {
                     const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
-                    
+
                     selectInput.innerHTML = '';
                     const emptyOpt = document.createElement('option');
                     emptyOpt.value = '';
                     emptyOpt.text = '---------';
                     selectInput.appendChild(emptyOpt);
-                    
+
                     meta.options.forEach(opt => {
                         const option = document.createElement('option');
                         option.value = opt;
@@ -257,7 +276,7 @@
                     });
                 }
             }
-            
+
             selectElement.dataset.initialized = 'true';
         }
 
@@ -276,29 +295,36 @@
                 const newRow = template.replace(/__prefix__/g, count);
                 tbody.insertAdjacentHTML('beforeend', newRow);
                 totalForms.value = count + 1;
-                
-                // 复用全局通用函数，自动检测表格内/外场景
-                if (window.TomSelect) {
-                    initLocalTomSelectAll(tbody.lastElementChild, {
-                        onChange: function() { toggleValueInput(this.input); }
-                    });
-                }
+
+                initLocalTomSelectAll(tbody.lastElementChild, {
+                    onChange: function() { toggleValueInput(this.input); }
+                });
             });
-            
+
+            // 删除行按钮
+            document.addEventListener('click', function(e) {
+                var btn = e.target.closest('.delete-row-btn');
+                if (!btn) return;
+                var row = btn.closest('tr');
+                var checkbox = row.querySelector('input[type=checkbox][name$="-DELETE"]');
+                if (checkbox) checkbox.checked = true;
+                row.style.display = 'none';
+            });
+
             // 初始化现有行的显示状态 (针对性能指标的 test_config)
             setTimeout(() => {
-                document.querySelectorAll('.form-select-search').forEach(select => {
+                document.querySelectorAll('#property-table .form-select-search').forEach(select => {
                     if (select.value) {
                         const row = select.closest('tr');
                         const selectInput = row.querySelector('.value-select');
                         const textInput = row.querySelector('.value-text');
                         const configId = select.value;
                         const meta = testConfigMeta[configId];
-                        
+
                         if (meta && meta.type === 'SELECT' && textInput.value) {
                             selectInput.setAttribute('data-current-value', textInput.value);
                         }
-                        
+
                         toggleValueInput(select);
                     }
                 });
