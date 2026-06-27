@@ -3,11 +3,11 @@ from django import forms
 from django.contrib.auth.models import Group
 from django.contrib.auth import get_user_model
 from app_project.models import Project, ProjectNode
-from common_utils.filters import DateRangeFilterMixin
+from common_utils.filters import DateRangeFilterMixin, TablerFilterMixin
 
 User = get_user_model()
 
-class PanelFilter(DateRangeFilterMixin, django_filters.FilterSet):
+class PanelFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """
     全景面板过滤器
     包含日期范围筛选 (created_at) 和 用户组筛选
@@ -17,7 +17,7 @@ class PanelFilter(DateRangeFilterMixin, django_filters.FilterSet):
         field_name='manager__groups',  # 筛选项目负责人的组
         label='用户组',
         empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '用户组'})
     )
 
     class Meta:
@@ -25,7 +25,7 @@ class PanelFilter(DateRangeFilterMixin, django_filters.FilterSet):
         fields = ['start_date', 'end_date', 'group']
 
 
-class ProjectStatisticsFilter(django_filters.FilterSet):
+class ProjectStatisticsFilter(TablerFilterMixin, django_filters.FilterSet):
     """
     项目统计专用过滤器
     """
@@ -44,14 +44,14 @@ class ProjectStatisticsFilter(django_filters.FilterSet):
         field_name='manager__groups',
         label='成员组',
         empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '成员组'})
     )
     manager = django_filters.ModelChoiceFilter(
-        queryset=User.objects.filter(is_staff=True).order_by('username'),
+        queryset=User.objects.all().order_by('username'),
         field_name='manager',
         label='成员',
         empty_label="所有成员",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '成员'})
     )
 
     class Meta:

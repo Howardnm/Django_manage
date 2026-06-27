@@ -2,8 +2,7 @@ import django_filters
 from django.db.models import Q
 from django import forms
 from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group, Permission
-from django.contrib.contenttypes.models import ContentType
+from app_user.models import WorkGroup
 from app_project.models import Project, ProjectNode, ProjectStage
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
@@ -36,16 +35,13 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         widget=forms.HiddenInput
     )
 
-    # 3. 负责人筛选 (最终方案：使用 ModelChoiceFilter)
+    # 3. 负责人筛选
     manager = django_filters.ModelChoiceFilter(
-        queryset=User.objects.filter(
-            Q(groups__permissions__codename='change_project') |
-            Q(user_permissions__codename='change_project')
-        ).distinct().order_by('username'),
+        queryset=User.objects.filter(user_type=User.UserType.ENGINEER).order_by('username'),
         field_name='manager',
         label='负责人',
         empty_label="所有负责人",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '负责人'})
     )
 
     # 4. 阶段筛选
@@ -54,16 +50,16 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         choices=ProjectStage.choices,
         label='当前阶段',
         empty_label="所有阶段",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '当前阶段'})
     )
 
-    # 5. 用户组筛选
+    # 5. 工作组筛选 (L5 数据资产隔离)
     group = django_filters.ModelChoiceFilter(
-        queryset=Group.objects.all(),
-        field_name='manager__groups',
-        label='所属组',
+        queryset=WorkGroup.objects.all(),
+        field_name='manager__work_groups',
+        label='工作组',
         empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '工作组'})
     )
 
     class Meta:

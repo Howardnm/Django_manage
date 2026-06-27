@@ -2,28 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask
-
-
-class TablerFilterMixin:
-    """自动给搜索框、下拉框添加 Tabler 样式"""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.filters.items():
-            widget = field.field.widget
-            attrs = widget.attrs
-            existing_class = attrs.get('class', '')
-            if field_name == 'q':
-                widget.attrs.update({
-                    'class': 'form-control',
-                    'placeholder': attrs.get('placeholder', '输入关键字搜索...')
-                })
-            elif isinstance(widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-select form-select-search".strip()
-            elif isinstance(widget, forms.DateInput):
-                if 'form-control' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-control".strip()
-                attrs['type'] = 'date'
+from common_utils.filters import TablerFilterMixin
 
 
 # ==========================================
@@ -41,14 +20,14 @@ class WorkflowTaskFilter(TablerFilterMixin, django_filters.FilterSet):
         field_name='instance__definition',
         label='所属流程',
         empty_label='所有流程',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '所属流程'})
     )
 
     status = django_filters.ChoiceFilter(
         choices=WorkflowTask.STATUS_CHOICES,
         label='审批结果',
         empty_label='全部状态',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '审批结果'})
     )
 
     start_date = django_filters.DateFilter(
@@ -92,14 +71,14 @@ class WorkflowInstanceFilter(TablerFilterMixin, django_filters.FilterSet):
         field_name='definition',
         label='所属流程',
         empty_label='所有流程',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '所属流程'})
     )
 
     status = django_filters.ChoiceFilter(
         choices=WorkflowInstance.STATUS_CHOICES,
         label='流程状态',
         empty_label='全部状态',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '流程状态'})
     )
 
     start_date = django_filters.DateFilter(
@@ -142,7 +121,7 @@ class WorkflowDefinitionFilter(TablerFilterMixin, django_filters.FilterSet):
         choices=[(True, '启用中'), (False, '已禁用')],
         label='启用状态',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '启用状态'})
     )
 
     class Meta:

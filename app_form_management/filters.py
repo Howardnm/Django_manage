@@ -3,30 +3,7 @@ from django import forms
 from django.db.models import Q
 from .models import FormTemplate, FormSubmission
 from app_workflow.models import WorkflowDefinition, WorkflowInstance
-
-
-class TablerFilterMixin:
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field_name, field in self.filters.items():
-            widget = field.field.widget
-            attrs = widget.attrs
-            existing_class = attrs.get('class', '')
-            if field_name == 'q':
-                widget.attrs.update({
-                    'class': 'form-control',
-                    'placeholder': attrs.get('placeholder', '输入关键字搜索...')
-                })
-            elif isinstance(widget, (forms.Select, forms.SelectMultiple)):
-                if 'form-select' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-select form-select-search".strip()
-            elif isinstance(widget, forms.DateInput):
-                if 'form-control' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-control".strip()
-                attrs['type'] = 'date'
-            elif isinstance(widget, forms.TextInput):
-                if 'form-control' not in existing_class:
-                    attrs['class'] = f"{existing_class} form-control".strip()
+from common_utils.filters import TablerFilterMixin
 
 
 # ==========================================
@@ -49,14 +26,14 @@ class FormTemplateFilter(TablerFilterMixin, django_filters.FilterSet):
         choices=[(True, '启用中'), (False, '已禁用')],
         label='启用状态',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '启用状态'})
     )
 
     workflow = django_filters.ModelChoiceFilter(
         queryset=WorkflowDefinition.objects.all().order_by('name'),
         label='关联审批流程',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '审批流程'})
     )
 
     class Meta:
@@ -91,7 +68,7 @@ class MyDraftsFilter(TablerFilterMixin, django_filters.FilterSet):
         queryset=FormTemplate.objects.all().order_by('name'),
         label='表单模板',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '表单模板'})
     )
 
     class Meta:
@@ -121,7 +98,7 @@ class MySubmissionsFilter(TablerFilterMixin, django_filters.FilterSet):
         queryset=FormTemplate.objects.all().order_by('name'),
         label='表单模板',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '表单模板'})
     )
 
     workflow_status = django_filters.ChoiceFilter(
@@ -135,7 +112,7 @@ class MySubmissionsFilter(TablerFilterMixin, django_filters.FilterSet):
         method='filter_workflow_status',
         label='流程进度',
         empty_label='全部',
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '流程进度'})
     )
 
     start_date = django_filters.DateFilter(

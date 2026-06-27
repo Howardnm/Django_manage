@@ -1,9 +1,12 @@
 import django_filters
 from django.db.models import Q
 from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from app_basic_research.models import ResearchProject, ResearchStage
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
+
+User = get_user_model()
 
 
 class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
@@ -34,12 +37,12 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
     )
 
     # 3. 负责人筛选
-    manager = django_filters.ChoiceFilter(
-        method='filter_manager',
+    manager = django_filters.ModelChoiceFilter(
+        queryset=User.objects.filter(user_type=User.UserType.ENGINEER).order_by('username'),
+        field_name='manager',
         label='负责人',
-        choices=[('me', '只看我的')],
         empty_label="所有负责人",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '负责人'})
     )
 
     # 4. 阶段筛选
@@ -48,7 +51,7 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         choices=ResearchStage.choices,
         label='当前阶段',
         empty_label="所有阶段",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '当前阶段'})
     )
 
     # 5. 用户组筛选
@@ -57,7 +60,7 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         field_name='manager__groups',
         label='所属组',
         empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '所属组'})
     )
 
     class Meta:
@@ -73,8 +76,3 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
             Q(manager__username__icontains=value) |
             Q(description__icontains=value)
         )
-
-    def filter_manager(self, queryset, name, value):
-        if value == 'me':
-            return queryset.filter(manager=self.request.user)
-        return queryset

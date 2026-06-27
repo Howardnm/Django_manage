@@ -13,14 +13,15 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
         queryset=ApplicationScenario.objects.all(),
         widget=forms.SelectMultiple(attrs={
             'class': 'form-select remote-search tomselect-multi-remote',
-            'data-model': 'applicationscenario'
+            'data-model': 'applicationscenario',
+            'data-placeholder': '搜索应用场景...',
         }),
         conjoined=False
     )
 
     category = django_filters.ModelChoiceFilter(
         queryset=MaterialType.objects.all(),
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '材料类别'})
     )
 
     melt_min = django_filters.NumberFilter(method='filter_metric', label='熔指 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))

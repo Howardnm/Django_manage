@@ -13,7 +13,7 @@ class LabFormulaFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.F
         queryset=MaterialType.objects.all(),
         label='基材类型',
         empty_label="所有类型",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '基材类型'})
     )
 
     # --- 性能指标范围筛选 ---

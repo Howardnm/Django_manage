@@ -18,24 +18,22 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         queryset=Customer.objects.all(),
         label='直接客户',
         empty_label="所有客户",
-        widget=forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'})
+        widget=forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer', 'data-placeholder': '输入客户名称搜索...'})
     )
 
-    # 业务员筛选：精准匹配 SALES 角色
     salesperson = django_filters.ModelChoiceFilter(
         queryset=User.objects.filter(user_type=User.UserType.SALES),
         label='负责业务员',
         empty_label="所有人员",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '业务员'})
     )
 
-    # 部门筛选：对应 app_user.Department
     dept = django_filters.ModelChoiceFilter(
         queryset=Department.objects.all(),
         field_name='project__manager__department',
         label='研发部门',
         empty_label="所有部门",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '研发部门'})
     )
 
     start_date = django_filters.DateFilter(

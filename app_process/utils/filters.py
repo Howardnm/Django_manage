@@ -30,7 +30,7 @@ class ScrewCombinationFilter(TablerFilterMixin, DateRangeFilterMixin, django_fil
         field_name='machines', # 多对多筛选
         label='适用机台',
         empty_label="所有机台",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '适用机台'})
     )
 
     class Meta:
@@ -51,17 +51,18 @@ class ProcessProfileFilter(TablerFilterMixin, DateRangeFilterMixin, django_filte
         queryset=MachineModel.objects.all(),
         label='适用机台',
         empty_label="所有机台",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '适用机台'})
     )
-    
-    # 【新增】适用材料筛选 (多选)
+
     material_types = django_filters.ModelMultipleChoiceFilter(
         queryset=MaterialType.objects.all(),
-        field_name='material_types', # 多对多筛选
+        field_name='material_types',
         label='适用材料',
-        # 使用 SelectMultiple 控件，并添加 form-select-search 类以启用 Tom Select
-        widget=forms.SelectMultiple(attrs={'class': 'form-select form-select-search'}),
-        conjoined=False # False 表示 OR 关系 (只要包含其中一个即可)，True 表示 AND 关系
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-select form-select-search',
+            'data-placeholder': '搜索适用材料...',
+        }),
+        conjoined=False
     )
 
     class Meta:

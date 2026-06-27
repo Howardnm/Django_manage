@@ -29,10 +29,9 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         queryset=RawMaterialType.objects.all(),
         label='类型',
         empty_label="所有类型",
-        widget=forms.Select(attrs={'class': 'form-select'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '材料类型'})
     )
-    
-    # 关键修改：添加 style 和 data-placeholder 属性
+
     supplier = django_filters.ModelChoiceFilter(
         queryset=Supplier.objects.all(),
         label='供应商',

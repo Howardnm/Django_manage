@@ -62,25 +62,48 @@ class TablerFormMixin:
 
 class TablerFilterMixin:
     """
-    混入类：自动给 FilterSet 中的字段添加 Tabler/Bootstrap 样式类
+    混入类：自动给 FilterSet 中的字段添加 Tabler/Bootstrap 样式类 + TomSelect 适配
+
+    Select/SelectMultiple 自动添加 form-select + form-select-search（启用本地搜索），
+    但排除以下类：no-tomselect, value-select, remote-search, tomselect-multi-local
     """
+
+    # 排除类集合 — 这些类有专属的 TomSelect 初始化方式
+    _TS_EXCLUDE_CLASSES = {'no-tomselect', 'value-select', 'remote-search', 'tomselect-multi-local'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # 1. 给搜索框 'q' 添加样式
-        if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs.update({
-                'class': 'form-control',
-                'placeholder': '输入关键字搜索...'
-            })
+        for field_name, field in self.filters.items():
+            widget = field.field.widget
+            attrs = widget.attrs
+            existing_class = attrs.get('class', '')
 
-        # 2. 遍历所有字段，根据 Widget 类型添加样式
-        # 注意：django-filters 的 form 是动态生成的，有时直接修改 filters 里的 widget attrs 更有效
-        pass
-        # (目前的实现主要针对 q，如果需要自动处理所有 Select/Input，可以在这里扩展，
-        # 但为了保持兼容性，我们暂时只保留你之前代码中的逻辑，即主要处理 q，
-        # 其他字段在定义时通过 widget=forms.Select(attrs={'class': 'form-select'}) 指定)
+            if field_name == 'q':
+                attrs.update({
+                    'class': 'form-control',
+                    'placeholder': attrs.get('placeholder', '输入关键字搜索...')
+                })
+
+            elif isinstance(widget, (forms.Select, forms.SelectMultiple)):
+                # 确保 form-select 存在
+                if 'form-select' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-select".strip()
+                    existing_class = attrs['class']
+
+                # 自动添加 form-select-search（本地搜索），除非被排除
+                if not self._TS_EXCLUDE_CLASSES & set(existing_class.split()):
+                    if 'form-select-search' not in existing_class:
+                        attrs['class'] = f"{existing_class} form-select-search".strip()
+
+            elif isinstance(widget, forms.DateInput):
+                if 'form-control' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-control".strip()
+                attrs['type'] = 'date'
+
+            elif isinstance(widget, forms.TextInput):
+                if 'form-control' not in existing_class:
+                    attrs['class'] = f"{existing_class} form-control".strip()
 
 
 class DateRangeFilterMixin(django_filters.FilterSet):
