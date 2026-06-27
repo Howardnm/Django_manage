@@ -39,11 +39,9 @@
                 </div>
 
             {# ── 5. 其他字段（下拉筛选框）── #}
-            {# 将 widget 的 style（如 width: 150px）透传到外层容器， #}
-            {# 确保 TomSelect 控件宽度不随选中内容伸缩。               #}
-            {# 无 style 的原生 select 则自然撑开。                    #}
+            {# d-inline-block 防 flex 拉伸；宽度由 widget 自身 style 控制 #}
             {% else %}
-                <div class="d-inline-block" style="{{ field.field.widget.attrs.style }}">
+                <div class="d-inline-block">
                     {{ field }}
                 </div>
             {% endif %}

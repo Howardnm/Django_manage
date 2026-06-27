@@ -1,0 +1,77 @@
+/**
+ * TomSelect → Tabler UI 适配（全部使用 --tblr 变量）
+ *
+ * 全局生效（base.html 加载），覆盖所有页面。
+ */
+/* ── 输入框：对齐 Tabler form-select ── */
+.ts-wrapper .ts-control {
+    min-height: calc(var(--tblr-form-select-height, 2.25rem) + 2px);
+    padding: var(--tblr-spacer-2, 0.375rem) var(--tblr-spacer-3, 0.75rem);
+    font-size: var(--tblr-body-font-size);
+    line-height: var(--tblr-body-line-height);
+    color: var(--tblr-body-color);
+    background-color: var(--tblr-bg-forms);
+    border-color: var(--tblr-border-color);
+    border-radius: var(--tblr-border-radius);
+    display: flex;
+    align-items: center;
+    transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+/* 聚焦态：复用 Tabler form-select:focus 光晕 */
+.ts-wrapper.focus .ts-control {
+    color: var(--tblr-body-color);
+    background-color: var(--tblr-bg-forms);
+    border-color: rgba(var(--tblr-primary-rgb), 0.5);
+    box-shadow: var(--tblr-shadow-input), 0 0 0 var(--tblr-focus-ring-width) var(--tblr-focus-ring-color);
+}
+
+/* 单值模式：选中项与 placeholder 垂直居中 */
+.ts-wrapper.single .ts-control .item,
+.ts-wrapper.single .ts-control input {
+    padding: 0;
+    line-height: var(--tblr-body-line-height);
+}
+
+/* ── 下拉面板：对齐 Tabler dropdown-menu ── */
+.ts-dropdown {
+    margin-top: 2px;
+    font-size: var(--tblr-body-font-size);
+    color: var(--tblr-body-color);
+    background: var(--tblr-bg-surface);
+    border: var(--tblr-border-width) solid var(--tblr-border-color);
+    border-radius: var(--tblr-border-radius);
+    box-shadow: var(--tblr-shadow-dropdown);
+}
+
+/* 选项 */
+.ts-dropdown .option {
+    padding: var(--tblr-spacer-2, 0.375rem) var(--tblr-spacer-3, 0.75rem);
+    color: var(--tblr-body-color);
+    transition: background-color 0.1s ease;
+}
+.ts-dropdown .option:hover,
+.ts-dropdown .option.active {
+    background-color: var(--tblr-bg-surface-secondary);
+}
+.ts-dropdown .option.selected {
+    background-color: var(--tblr-primary);
+    color: var(--tblr-white);
+}
+
+/* 下拉面板内搜索输入框 */
+.ts-dropdown .ts-input {
+    padding: var(--tblr-spacer-2, 0.375rem) var(--tblr-spacer-3, 0.75rem);
+    border-bottom: var(--tblr-border-width) solid var(--tblr-border-color);
+}
+
+/* 多选标签 */
+.ts-wrapper.multi .ts-control [data-value] {
+    background: var(--tblr-bg-surface-secondary);
+    border: var(--tblr-border-width) solid var(--tblr-border-color);
+    border-radius: var(--tblr-border-radius);
+    padding: 0 var(--tblr-spacer-2, 0.375rem);
+    margin: 1px 3px 1px 0;
+    font-size: var(--tblr-body-font-size);
+    line-height: 1.6;
+}
