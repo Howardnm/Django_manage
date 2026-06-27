@@ -42,7 +42,7 @@
     border: var(--tblr-border-width) solid var(--tblr-border-color);
     border-radius: var(--tblr-border-radius);
     box-shadow: var(--tblr-shadow-dropdown);
-    min-width: unset;
+    min-width: 100%;
     width: max-content;
     z-index: var(--tblr-zindex-dropdown, 1000); /* 防止被卡片 header/footer 遮挡 */
     text-align: left; /* 防止从表格 text-center 继承居中对齐 */
