@@ -110,3 +110,96 @@ function destroyTomSelectAll(container) {
         }
     });
 }
+
+
+/* ================================================================
+   TomSelect 本地搜索 — 通用初始化函数
+   与远程搜索共享统一的 render / onDropdownOpen UI 配置
+
+   Tabler 布局由 .page-wrapper 滚动，window.scrollY 恒为 0，
+   因此全局不使用 dropdownParent: 'body'，统一走 CSS 定位。
+   仅当显式传入 opts.dropdownParent 时才启用。
+================================================================ */
+/**
+ * 初始化单个本地搜索 TomSelect
+ *
+ * @param {Element} el      - 带 .form-select-search 类的 <select> 元素
+ * @param {Object}  [opts]  - 可选覆盖项：
+ *   {string|false} dropdownParent - 强制设置（'body' 或 false 禁用）
+ *   {string}  placeholder         - 占位文本
+ *   {function} onChange           - 选项变更回调
+ *   {Array}   plugins             - TomSelect 插件列表
+ */
+function initLocalTomSelect(el, opts) {
+    if (!window.TomSelect) return;
+    if (el.tomselect) return; // 防止重复初始化
+
+    opts = opts || {};
+
+    var placeholder = opts.placeholder || el.getAttribute('placeholder') || '输入搜索...';
+
+    var config = {
+        copyClassesToDropdown: false,
+        controlInput: '<input>',
+        create: false,
+        placeholder: placeholder,
+        // ── 与远程搜索统一的 UI 配置 ──
+        onDropdownOpen: function () {
+            if (this.dropdown_content) {
+                this.dropdown_content.style.maxHeight = '22rem';
+            }
+        },
+        render: {
+            option: function (data, escape) {
+                return '<div>' + escape(data.text) + '</div>';
+            },
+            item: function (data, escape) {
+                return '<div>' + escape(data.text) + '</div>';
+            },
+            no_results: function (data, escape) {
+                return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
+            }
+        }
+    };
+
+    // ── dropdownParent 决策 ──
+    // Tabler 布局由 .page-wrapper 滚动，window.scrollY 恒为 0，
+    // 因此全局禁用 dropdownParent: 'body'，统一使用 CSS 定位
+    // 仅当显式传入 opts.dropdownParent 时才设置
+    if (opts.dropdownParent) {
+        config.dropdownParent = opts.dropdownParent;
+    }
+
+    // 合并自定义选项
+    if (opts.onChange) config.onChange = opts.onChange;
+    if (opts.plugins) config.plugins = opts.plugins;
+
+    new TomSelect(el, config);
+}
+
+
+/**
+ * 批量初始化容器内所有 .form-select-search 元素
+ *
+ * @param {Element} container - 父容器 DOM 元素
+ * @param {Object}  [opts]    - 传递给 initLocalTomSelect 的配置
+ */
+function initLocalTomSelectAll(container, opts) {
+    container.querySelectorAll('.form-select-search').forEach(function (el) {
+        initLocalTomSelect(el, opts);
+    });
+}
+
+
+/**
+ * 销毁容器内所有本地搜索 TomSelect 实例（用于 HTMX beforeSwap 等场景）
+ *
+ * @param {Element} container - 父容器 DOM 元素
+ */
+function destroyLocalTomSelectAll(container) {
+    container.querySelectorAll('.form-select-search').forEach(function (el) {
+        if (el.tomselect) {
+            el.tomselect.destroy();
+        }
+    });
+}

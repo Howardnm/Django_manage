@@ -32,11 +32,13 @@ class SampleInventoryService:
         """
         from app_formula.models import LabFormula
 
-        # 预取所有配方版本号，避免逐个查询
+        # 预取所有配方版本号 + SAP物料号（沿 formula→project→material 链），避免逐个查询
         formula_ids = {s['formula_id'] for s in splits if s.get('formula_id')}
-        formula_version_map = dict(
-            LabFormula.objects.filter(pk__in=formula_ids).values_list('pk', 'version')
+        formula_meta = LabFormula.objects.filter(pk__in=formula_ids).values_list(
+            'pk', 'version', 'project__material__sap_material_code',
         )
+        formula_version_map = {pk: version for pk, version, _ in formula_meta}
+        formula_sap_map = {pk: sap or '' for pk, _, sap in formula_meta}
 
         # 按 formula_id 分组，同组共享同一 batch_number
         grouped = {}
@@ -49,6 +51,7 @@ class SampleInventoryService:
         for formula_id, items in grouped.items():
             version = formula_version_map.get(formula_id, '?')
             batch_number = f"{production_order.code}-V{version}"
+            sap_code = formula_sap_map.get(formula_id, '')
 
             for item in items:
                 if not item.get('quantity') or float(item['quantity']) <= 0:
@@ -65,6 +68,7 @@ class SampleInventoryService:
                     quantity=item['quantity'],
                     packaging_desc=item.get('packaging_desc', ''),
                     storage_location=item.get('storage_location', ''),
+                    sap_material_code=sap_code,
                 )
                 samples.append(sample)
 

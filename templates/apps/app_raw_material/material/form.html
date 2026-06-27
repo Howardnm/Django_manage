@@ -93,7 +93,7 @@
                             <div class="card-header bg-purple-lt">
                                 <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>性能指标录入</h3>
                             </div>
-                            <div class="table-responsive" style="min-height: 250px;">
+                            <div style="min-height: 250px;">
                                 <table class="table table-vcenter card-table">
                                     <thead>
                                     <tr>
@@ -277,30 +277,11 @@
                 tbody.insertAdjacentHTML('beforeend', newRow);
                 totalForms.value = count + 1;
                 
-                // 重新初始化新添加行的 Tom Select (针对性能指标的 test_config)
+                // 复用全局通用函数，自动检测表格内/外场景
                 if (window.TomSelect) {
-                    const newRowElement = tbody.lastElementChild;
-                    const newSelect = newRowElement.querySelector('.form-select-search');
-                    
-                    if (newSelect) {
-                        new TomSelect(newSelect, {
-                            copyClassesToDropdown: false,
-                            dropdownParent: 'body',
-                            controlInput: '<input>',
-                            create: false,
-                            placeholder: '输入搜索...',
-                            onChange: function(value) {
-                                if (typeof toggleValueInput === 'function') {
-                                    toggleValueInput(newSelect);
-                                }
-                            },
-                            render: {
-                                no_results: function (data, escape) {
-                                    return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                                }
-                            }
-                        });
-                    }
+                    initLocalTomSelectAll(tbody.lastElementChild, {
+                        onChange: function() { toggleValueInput(this.input); }
+                    });
                 }
             });
             

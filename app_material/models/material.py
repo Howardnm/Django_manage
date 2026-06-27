@@ -97,6 +97,7 @@ class TestConfig(models.Model):
 class MaterialLibrary(models.Model):
     grade_name = models.CharField("材料牌号", max_length=100, unique=True)
     manufacturer = models.CharField("生产厂家", max_length=100, blank=True)
+    sap_material_code = models.CharField("SAP物料号", max_length=50, blank=False, help_text="对应SAP系统的物料编码，用于排产样品分拨时自动预填")
     category = models.ForeignKey(MaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
     scenarios = models.ManyToManyField(ApplicationScenario, blank=True, verbose_name="适用场景", related_name="materials")
     characteristics = models.ManyToManyField(MaterialCharacteristic, blank=True, verbose_name="特征属性", related_name="materials")

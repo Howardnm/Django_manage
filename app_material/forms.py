@@ -24,6 +24,7 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             }),
             'flammability': forms.Select(attrs={'class': 'form-select'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'SAP物料编码，如：A01000212345'}),
             # 对外发布开关 (使用 Tabler 的 switch 样式，通过 CSS 控制)
             'is_published': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
@@ -41,7 +42,7 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
         model = MaterialDataPoint
         fields = ['test_config', 'value', 'value_text', 'remark']
         widgets = {
-            'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
+            'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'style': 'width: 550px;', 'onchange': 'toggleValueInput(this)'}),
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),

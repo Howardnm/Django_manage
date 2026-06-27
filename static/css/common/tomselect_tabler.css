@@ -44,6 +44,8 @@
     box-shadow: var(--tblr-shadow-dropdown);
     min-width: unset;
     width: max-content;
+    z-index: var(--tblr-zindex-dropdown, 1000); /* 防止被卡片 header/footer 遮挡 */
+    text-align: left; /* 防止从表格 text-center 继承居中对齐 */
 }
 
 /* 拉高面板显示更多选项 */
@@ -51,9 +53,10 @@
     max-height: 22rem;
 }
 
-/* 选项：不换行 */
+/* 选项：紧凑、不换行 */
 .ts-dropdown .option {
-    padding: 0.375rem 0.75rem;
+    padding: 0.2rem 0.5rem;
+    font-size: 0.8125rem;
     color: var(--tblr-body-color);
     white-space: nowrap;
     transition: background-color 0.1s ease;

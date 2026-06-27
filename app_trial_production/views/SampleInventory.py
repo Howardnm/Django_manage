@@ -146,12 +146,20 @@ class SapEntryView(SampleInventoryAccessMixin, View):
     # ── 单样品模式 ──────────────────────────────────────────
 
     def _get_single(self, request, pk):
-        sample = get_object_or_404(SampleInventory, pk=pk)
+        sample = get_object_or_404(
+            SampleInventory.objects.select_related('formula__project__material'),
+            pk=pk,
+        )
         if not sample.can_sap_entry:
             messages.warning(request, '当前样品状态不允许SAP入库')
             return redirect('trial_sample_detail', pk=pk)
 
-        form = SapEntryForm(instance=sample)
+        # 沿 formula→project→material 链预填 SAP 物料号
+        initial = {}
+        sap_code = self._lookup_sap_code(sample)
+        if sap_code:
+            initial['sap_material_code'] = sap_code
+        form = SapEntryForm(instance=sample, initial=initial)
         return render(request, self.template_name, {
             'samples': [sample],
             'form': form,
@@ -196,13 +204,19 @@ class SapEntryView(SampleInventoryAccessMixin, View):
             type=SampleInventory.Type.PELLET,
             sub_type=SampleInventory.SubType.FINISHED,
             status=SampleInventory.Status.IN_LAB,
-        ).select_related('formula', 'production_order').order_by('-created_at')
+        ).select_related('formula__project__material', 'production_order').order_by('-created_at')
 
         if not samples:
             messages.warning(request, '所选样品均不满足入库条件（仅"在实验房"的"成品颗粒"允许入SAP）')
             return redirect('trial_sample_list')
 
-        form = SapEntryForm()
+        # 若所有样品共享同一 SAP 物料号，则预填
+        initial = {}
+        sap_codes = {self._lookup_sap_code(s) for s in samples}
+        sap_codes.discard('')
+        if len(sap_codes) == 1:
+            initial['sap_material_code'] = sap_codes.pop()
+        form = SapEntryForm(initial=initial)
         return render(request, self.template_name, {
             'samples': samples,
             'form': form,
@@ -257,6 +271,13 @@ class SapEntryView(SampleInventoryAccessMixin, View):
         return redirect('trial_sample_list')
 
     # ── 工具方法 ────────────────────────────────────────────
+
+    @staticmethod
+    def _lookup_sap_code(sample):
+        """沿 formula→project→material 链查找 SAP 物料号，找不到返回空字符串"""
+        if sample.formula and sample.formula.project and sample.formula.project.material:
+            return sample.formula.project.material.sap_material_code or ''
+        return ''
 
     @staticmethod
     def _parse_ids(request):

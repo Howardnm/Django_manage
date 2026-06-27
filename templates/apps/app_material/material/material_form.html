@@ -88,15 +88,13 @@
                 initRemoteTomSelectAll(document, {apiUrl: "{% url 'repo_api_search' %}"});
 
                 // --- 3. 初始化本地多选的 Tom Select (胶囊样式) ---
-                // 适用于 ProcessProfileForm 中的 material_types
                 document.querySelectorAll('.tomselect-multi-local').forEach(function (el) {
                     new TomSelect(el, {
-                        mode: 'multi', // 启用多选模式
+                        mode: 'multi',
                         copyClassesToDropdown: false,
-                        dropdownParent: 'body',
                         create: false,
                         placeholder: '请选择...',
-                        plugins: ['remove_button'], // 允许移除已选中的项
+                        plugins: ['remove_button'],
                         render: {
                             option: function (data, escape) {
                                 return '<div>' + escape(data.text) + '</div>';
@@ -111,31 +109,7 @@
                     });
                 });
 
-                // --- 4. 初始化 FormSet 内部的 Tom Select (本地搜索，单选) ---
-                // 适用于 MaterialDataPointForm 中的 test_config
-                function initFormsetTomSelect(element) {
-                    if (window.TomSelect && !element.classList.contains('tomselected')) {
-                        new TomSelect(element, {
-                            copyClassesToDropdown: false,
-                            dropdownParent: 'body',
-                            controlInput: '<input>',
-                            create: false,
-                            placeholder: '点击搜索...',
-                            plugins: ['remove_button', 'clear_button'],
-                            render: {
-                                no_results: function (data, escape) {
-                                    return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                                }
-                            },
-                            onChange: function(value) {
-                                if (typeof toggleValueInput === 'function') {
-                                    toggleValueInput(element);
-                                }
-                            }
-                        });
-                    }
-                }
-                document.querySelectorAll('.form-select-search').forEach(initFormsetTomSelect);
+                // --- 4. FormSet 本地搜索 — 已由 base.html 的 initLocalTomSelectAll() 统一处理 ---
             }
 
             // --- FormSet 动态添加行逻辑 ---
@@ -155,8 +129,8 @@
                     tableBody.appendChild(newRow);
                     totalFormsInput.value = formIdx + 1;
 
-                    // 【关键】给新行里的下拉框应用 Tom Select
-                    newRow.querySelectorAll('.form-select-search').forEach(initFormsetTomSelect);
+                    // 【关键】给新行里的下拉框应用 Tom Select（复用全局通用函数）
+                    initLocalTomSelectAll(newRow);
                 });
             }
 

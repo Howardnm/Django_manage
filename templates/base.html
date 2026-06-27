@@ -64,27 +64,12 @@
 
 <!-- ======================================================= -->
 <!-- Tom Select 集成 (实现下拉搜索) 在base引入tom-select.complete.min.js -->
+<!-- 本地搜索(.form-select-search) → initLocalTomSelectAll() 自动检测表格/卡片场景 -->
+<!-- 远程搜索(.remote-search)         → initRemoteTomSelectAll() 页面手动调用        -->
 <!-- ======================================================= -->
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        var selects = document.querySelectorAll('.form-select-search');
-
-        if (window.TomSelect) {
-            selects.forEach(function (el) {
-                new TomSelect(el, {
-                    copyClassesToDropdown: false,
-                    dropdownParent: 'body', // 关键：防止下拉菜单被卡片遮挡
-                    controlInput: '<input>',
-                    create: false,
-                    placeholder: '输入搜索...',
-                    render: {
-                        no_results: function (data, escape) {
-                            return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                        }
-                    }
-                });
-            });
-        }
+        initLocalTomSelectAll(document);
     });
 </script>
 

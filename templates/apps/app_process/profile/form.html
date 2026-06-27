@@ -282,13 +282,10 @@
                 var multiLocalSelects = document.querySelectorAll('.tomselect-multi-local');
                 multiLocalSelects.forEach(function (el) {
                     new TomSelect(el, {
-                        mode: 'multi', // 启用多选模式
+                        mode: 'multi',
                         copyClassesToDropdown: false,
-                        dropdownParent: 'body',
                         create: false,
                         placeholder: '请选择...',
-                        // 对于本地多选，不需要远程加载，也不需要 preload
-                        // preload: 'focus', // 移除此项，避免加载所有选项
                         render: {
                             option: function (data, escape) {
                                 return '<div>' + escape(data.text) + '</div>';

@@ -82,11 +82,7 @@
         font-size: 12px;
         min-height: 26px;
     }
-    /* 确保表格容器支持横向滚动 */
-    .table-responsive {
-        -webkit-overflow-scrolling: touch;
-    }
-</style>
+    /* 表单内表格不使用 table-responsive（避免 TomSelect 下拉定位问题）*/</style>
 {% endblock %}
 
 {% block content %}
@@ -254,7 +250,7 @@
                     <div class="card-header bg-orange-lt">
                         <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
                     </div>
-                    <div class="table-responsive">
+                    <div>
                         <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
@@ -348,7 +344,7 @@
                     <div class="card-header bg-purple-lt">
                         <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                     </div>
-                    <div class="table-responsive">
+                    <div>
                         <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
@@ -669,20 +665,9 @@
                     fillRowColumns(newRowElement, count);
 
                     if (window.TomSelect) {
-                        newRowElement.querySelectorAll('.form-select-search').forEach(function(el) {
-                            new TomSelect(el, {
-                                copyClassesToDropdown: false,
-                                dropdownParent: 'body',
-                                controlInput: '<input>',
-                                create: false,
-                                placeholder: '输入搜索...',
-                                onChange: function() { toggleValueInput(el); },
-                                render: {
-                                    no_results: function(data, escape) {
-                                        return '<div class="no-results p-2 text-muted small">无匹配结果</div>';
-                                    }
-                                }
-                            });
+                        // 复用全局通用函数，自动检测表格内/外场景
+                        initLocalTomSelectAll(newRowElement, {
+                            onChange: function() { toggleValueInput(this.input); }
                         });
 
                         newRowElement.querySelectorAll('.remote-search').forEach(function(el) {
