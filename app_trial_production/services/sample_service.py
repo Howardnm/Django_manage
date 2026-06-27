@@ -242,52 +242,6 @@ class SampleInventoryService:
         ).order_by('-created_at')
 
     @staticmethod
-    def get_global_stats():
-        """全局样品库存汇总统计（供列表页顶部卡片使用）。
-
-        Returns:
-            dict {
-                'finished_pellets': {'batch_count': int, 'total_kg': Decimal|None},
-                'for_injection': {'batch_count': int, 'total_kg': Decimal|None},
-                'specimens': {'total_count': int, 'total_specimens': int|None},
-                'sap_stored': {'count': int},
-            }
-        """
-        base = SampleInventory.objects.all()
-
-        # 成品颗粒（可入SAP）
-        finished_pellets = base.filter(
-            type='PELLET', sub_type='FINISHED', status='IN_LAB',
-        ).aggregate(
-            batch_count=Count('batch_number', distinct=True),
-            total_kg=Sum('quantity'),
-        )
-
-        # 待打样颗粒（待注塑消耗）
-        for_injection = base.filter(
-            type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
-        ).aggregate(
-            batch_count=Count('batch_number', distinct=True),
-            total_kg=Sum('quantity'),
-        )
-
-        specimens = base.filter(type='SPECIMEN').aggregate(
-            total_count=Count('id'),
-            total_specimens=Sum('specimen_count'),
-        )
-
-        sap_stored = base.filter(status='SAP_STORED').aggregate(
-            count=Count('id'),
-        )
-
-        return {
-            'finished_pellets': finished_pellets,
-            'for_injection': for_injection,
-            'specimens': specimens,
-            'sap_stored': sap_stored,
-        }
-
-    @staticmethod
     def get_lifecycle(sample):
         """构建单个样品的生命周期事件时间线。
 

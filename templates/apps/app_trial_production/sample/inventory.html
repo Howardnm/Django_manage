@@ -18,89 +18,7 @@
     </div>
 </div>
 
-<div class="container-xl">
-    {# ── 汇总统计卡片 ──────────────────────────────────── #}
-    <div class="row row-cards mb-3">
-        <div class="col-sm-6 col-lg-3">
-            <div class="card border-green">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <span class="avatar bg-green-lt me-3">
-                            <i class="ti ti-building-warehouse text-green fs-2"></i>
-                        </span>
-                        <div>
-                            <div class="subheader">成品颗粒（可入SAP）</div>
-                            <div class="h2 mb-0">
-                                {{ stats.finished_pellets.batch_count|default:0 }} 批
-                            </div>
-                            <div class="text-muted small">
-                                {{ stats.finished_pellets.total_kg|default:0|floatformat:1 }} kg
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card border-orange">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <span class="avatar bg-orange-lt me-3">
-                            <i class="ti ti-injection text-orange fs-2"></i>
-                        </span>
-                        <div>
-                            <div class="subheader">待打样颗粒（待注塑消耗）</div>
-                            <div class="h2 mb-0">
-                                {{ stats.for_injection.batch_count|default:0 }} 批
-                            </div>
-                            <div class="text-muted small">
-                                {{ stats.for_injection.total_kg|default:0|floatformat:1 }} kg
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card border-azure">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <span class="avatar bg-azure-lt me-3">
-                            <i class="ti ti-microscope text-azure fs-2"></i>
-                        </span>
-                        <div>
-                            <div class="subheader">样条样品（待测试消耗）</div>
-                            <div class="h2 mb-0">
-                                {{ stats.specimens.total_count|default:0 }} 条记录
-                            </div>
-                            <div class="text-muted small">
-                                {{ stats.specimens.total_specimens|default:0 }} 条
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card">
-                <div class="card-body p-3">
-                    <div class="d-flex align-items-center">
-                        <span class="avatar bg-purple-lt me-3">
-                            <i class="ti ti-package text-purple fs-2"></i>
-                        </span>
-                        <div>
-                            <div class="subheader">已入SAP仓库</div>
-                            <div class="h2 mb-0">
-                                {{ stats.sap_stored.count|default:0 }} 条
-                            </div>
-                            <div class="text-muted small">已归档至正式仓储</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
+<div class="container-xl mt-3">
     {# ── 三层 Tab 卡片（状态优先 → 类型 → 子类型） ───── #}
     <div class="card mb-3">
         <div class="card-body py-2">
@@ -182,7 +100,7 @@
     </div>
 
     {# ── 批量操作栏（仅成品颗粒可选，待打样/样条会被后续工序消耗） #}
-    <div id="batch-action-bar" class="alert alert-success d-flex align-items-center mb-3" style="display: none !important;">
+    <div id="batch-action-bar" class="alert alert-success align-items-center mb-3" style="display: none;">
         <i class="ti ti-checkbox me-2"></i>
         <span id="batch-selected-text">已选 0 条样品</span>
         <span class="text-muted small ms-2">（仅成品颗粒可入SAP）</span>
@@ -191,7 +109,7 @@
                data-batch-url="{% url 'trial_sample_sap_entry_batch' %}">
                 <i class="ti ti-building-warehouse me-1"></i>批量SAP入库
             </a>
-            <button type="button" class="btn btn-sm btn-ghost-secondary" onclick="clearAllSelections()">
+            <button type="button" class="btn btn-sm btn-ghost-secondary" onclick="clearAllSampleSelections()">
                 取消选择
             </button>
         </div>
@@ -206,7 +124,7 @@
                 <thead>
                     <tr>
                         <th style="width: 40px;" title="仅成品颗粒可多选入SAP">
-                            <input type="checkbox" class="form-check-input" id="select-all">
+                            <input type="checkbox" class="form-check-input" id="select-all" onclick="toggleAllSample(this)">
                         </th>
                         <th>实验单号</th>
                         <th>类型</th>

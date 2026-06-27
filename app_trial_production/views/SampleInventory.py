@@ -1,6 +1,6 @@
 import logging
 
-from django.db.models import Count, Sum, Q
+from django.db.models import Q
 from django.http import JsonResponse
 from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SampleInventoryListView(SampleInventoryAccessMixin, ListView):
     """
-    统一样品库存列表页 — 平铺表格 + 多维度筛选 + 汇总统计卡片。
+    统一样品库存列表页 — 平铺表格 + 多维度筛选。
 
     取消旧版 PELLET/SPECIMEN Tab 切换，
     type/sub_type 改为 filter 下拉选择，支持组合筛选。
@@ -63,7 +63,6 @@ class SampleInventoryListView(SampleInventoryAccessMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filter
-        context['stats'] = SampleInventoryService.get_global_stats()
         # Tab 状态（首页预选：在实验房 + 颗粒 + 成品颗粒）
         context['current_type'] = self.request.GET.get('type', 'PELLET')
         context['current_sub_type'] = self.request.GET.get('sub_type',

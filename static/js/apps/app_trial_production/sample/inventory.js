@@ -1,69 +1,63 @@
 /**
  * 样品库存列表页 — 批量选择 + SAP 入库交互
+ * 参考成品材料列表的勾选模式：全选用 onclick，操作按需查询 :checked
  */
 
-document.addEventListener('DOMContentLoaded', function () {
-    var selectAll = document.getElementById('select-all');
+/** 全选 / 取消全选 — 参考 material_list toggleAll 模式 */
+function toggleAllSample(source) {
     var checkboxes = document.querySelectorAll('.sample-checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = source.checked;
+    }
+    updateBatchBar();
+}
+
+/** 取消全部选择 */
+function clearAllSampleSelections() {
+    var checkboxes = document.querySelectorAll('.sample-checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].checked = false;
+    }
+    document.getElementById('select-all').checked = false;
+    updateBatchBar();
+}
+
+/** 更新批量操作栏的显示/隐藏及选中计数 */
+function updateBatchBar() {
+    var checked = document.querySelectorAll('.sample-checkbox:checked');
     var batchBar = document.getElementById('batch-action-bar');
     var batchSelectedText = document.getElementById('batch-selected-text');
     var batchSapBtn = document.getElementById('batch-sap-btn');
-    // 从 data 属性读取批量入库 URL 基础路径，避免硬编码
     var batchSapBaseUrl = batchSapBtn ? batchSapBtn.getAttribute('data-batch-url') : '';
+    var selectAll = document.getElementById('select-all');
 
-    if (!selectAll || !batchBar) return;
-
-    function getSelectedIds() {
-        var checked = document.querySelectorAll('.sample-checkbox:checked');
-        return Array.from(checked).map(function (cb) { return cb.value; });
-    }
-
-    function updateBatchBar() {
-        var ids = getSelectedIds();
-        if (ids.length > 0) {
-            // 直接修改 inline style 会覆盖原有的 display:none（包括 !important）
-            batchBar.style.display = 'flex';
-            batchSelectedText.textContent = '已选 ' + ids.length + ' 条样品';
-            if (batchSapBtn && batchSapBaseUrl) {
-                batchSapBtn.href = batchSapBaseUrl + '?ids=' + ids.join(',');
-            }
-        } else {
-            batchBar.style.display = 'none';
-            selectAll.checked = false;
+    if (checked.length > 0) {
+        batchBar.classList.add('d-flex');
+        batchBar.style.display = '';
+        batchSelectedText.textContent = '已选 ' + checked.length + ' 条样品';
+        if (batchSapBtn && batchSapBaseUrl) {
+            var ids = Array.from(checked).map(function (cb) { return cb.value; });
+            batchSapBtn.href = batchSapBaseUrl + '?ids=' + ids.join(',');
         }
+    } else {
+        batchBar.classList.remove('d-flex');
+        batchBar.style.display = 'none';
+        if (selectAll) selectAll.checked = false;
     }
+}
 
-    // 全选 / 取消全选
-    selectAll.addEventListener('change', function () {
-        checkboxes.forEach(function (cb) {
-            cb.checked = selectAll.checked;
-        });
-        updateBatchBar();
-    });
-
-    // 单个 checkbox 变化
-    checkboxes.forEach(function (cb) {
-        cb.addEventListener('change', function () {
-            if (!cb.checked) {
-                selectAll.checked = false;
-            } else if (getSelectedIds().length === checkboxes.length) {
-                selectAll.checked = true;
-            }
+document.addEventListener('DOMContentLoaded', function () {
+    // 单个 checkbox 变化时同步全选状态 + 刷新操作栏
+    var checkboxes = document.querySelectorAll('.sample-checkbox');
+    for (var i = 0; i < checkboxes.length; i++) {
+        checkboxes[i].addEventListener('change', function () {
+            var all = document.querySelectorAll('.sample-checkbox');
+            var checked = document.querySelectorAll('.sample-checkbox:checked');
+            document.getElementById('select-all').checked = checked.length === all.length;
             updateBatchBar();
         });
-    });
+    }
 
     // 初始状态
     updateBatchBar();
 });
-
-/** 取消全部选择（供模板按钮 onclick 调用） */
-function clearAllSelections() {
-    document.querySelectorAll('.sample-checkbox:checked').forEach(function (cb) {
-        cb.checked = false;
-    });
-    var selectAll = document.getElementById('select-all');
-    if (selectAll) selectAll.checked = false;
-    var batchBar = document.getElementById('batch-action-bar');
-    if (batchBar) batchBar.style.display = 'none';
-}
