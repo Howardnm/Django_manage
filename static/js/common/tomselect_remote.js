@@ -45,6 +45,11 @@ function initRemoteTomSelect(el, opts) {
         create: false,
         preload: 'focus',
         placeholder: placeholder,
+        onDropdownOpen: function () {
+            if (this.dropdown_content) {
+                this.dropdown_content.style.maxHeight = '22rem';
+            }
+        },
         load: function (query, callback) {
             var url = apiUrl + '?model=' + modelType + '&q=' + encodeURIComponent(query);
             fetch(url)

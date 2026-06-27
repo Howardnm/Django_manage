@@ -33,7 +33,7 @@
     line-height: var(--tblr-body-line-height);
 }
 
-/* ── 下拉面板：对齐 Tabler dropdown-menu ── */
+/* ── 下拉面板：宽度按内容自适应，不换行 ── */
 .ts-dropdown {
     margin-top: 2px;
     font-size: var(--tblr-body-font-size);
@@ -42,17 +42,25 @@
     border: var(--tblr-border-width) solid var(--tblr-border-color);
     border-radius: var(--tblr-border-radius);
     box-shadow: var(--tblr-shadow-dropdown);
+    min-width: unset;
+    width: max-content;
 }
 
-/* 选项 */
+/* 拉高面板显示更多选项 */
+.ts-dropdown .ts-dropdown-content {
+    max-height: 22rem;
+}
+
+/* 选项：不换行 */
 .ts-dropdown .option {
-    padding: var(--tblr-spacer-2, 0.375rem) var(--tblr-spacer-3, 0.75rem);
+    padding: 0.375rem 0.75rem;
     color: var(--tblr-body-color);
+    white-space: nowrap;
     transition: background-color 0.1s ease;
 }
 .ts-dropdown .option:hover,
 .ts-dropdown .option.active {
-    background-color: var(--tblr-bg-surface-secondary);
+    background-color: rgba(var(--tblr-primary-rgb), 0.08);
 }
 .ts-dropdown .option.selected {
     background-color: var(--tblr-primary);
