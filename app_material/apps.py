@@ -7,28 +7,32 @@ class AppMaterialConfig(AppConfig):
 
     def ready(self):
         # 注册自动补全（供 common_utils MaterialAutocompleteView 使用）
-        from common_utils.autocomplete_registry import register_autocomplete
+        from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
+        from app_material.mixins import MaterialAccessMixin
         from app_material.models.material import MaterialLibrary, ApplicationScenario, TestConfig, MaterialCharacteristic
         from django.db.models import Q
 
         register_autocomplete('material',
-            lambda q: MaterialLibrary.objects.filter(
+            lambda q: MaterialLibrary.objects.only('pk', 'grade_name', 'manufacturer').filter(
                 Q(grade_name__icontains=q) | Q(manufacturer__icontains=q)),
             lambda m: {'value': m.pk, 'text': f'{m.grade_name} ({m.manufacturer})'},
-            'material_detail')
+            'material_detail',
+            access_filter=make_autocomplete_access_filter(MaterialAccessMixin),
+        )
 
         register_autocomplete('scenario',
-            lambda q: ApplicationScenario.objects.filter(name__icontains=q),
+            lambda q: ApplicationScenario.objects.only('pk', 'name').filter(name__icontains=q),
             lambda s: {'value': s.pk, 'text': s.name})
 
         register_autocomplete('test_config',
-            lambda q: TestConfig.objects.filter(
-                Q(name__icontains=q) | Q(standard__icontains=q)),
+            lambda q: TestConfig.objects.select_related('category').only(
+                'pk', 'name', 'standard', 'condition', 'category__name'
+            ).filter(Q(name__icontains=q) | Q(standard__icontains=q)),
             lambda t: {'value': t.pk,
                 'text': f'[{t.category.name}] {t.name} - {t.standard}{f" ({t.condition})" if t.condition else ""}'})
 
         register_autocomplete('characteristic',
-            lambda q: MaterialCharacteristic.objects.filter(name__icontains=q),
+            lambda q: MaterialCharacteristic.objects.only('pk', 'name').filter(name__icontains=q),
             lambda c: {'value': c.pk, 'text': c.name})
 
         # 注册附件配置

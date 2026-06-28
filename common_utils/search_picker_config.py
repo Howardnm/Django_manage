@@ -68,9 +68,9 @@ class SearchPickerConfig:
     #    label?, placeholder?, options?, model?, api_url?, value_field?, response_key?,
     #    multi? (仅 user 类型: True=多选, False=单选)}
     search_fields: list = field(default_factory=list)
-    # response_mapping 子项结构：
-    #   {results_key?, total_key?, page_key?, page_size_key?,
-    #    has_next_key?, has_prev_key?, value_field?, text_field?}
+    # response_mapping 子项结构（camelCase，直接透传到 JS 端）：
+    #   {resultsKey?, totalKey?, pageKey?, pageSizeKey?,
+    #    hasNextKey?, hasPrevKey?, valueField?, textField?}
     response_mapping: dict = field(default_factory=dict)
 
     @property

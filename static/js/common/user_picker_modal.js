@@ -144,12 +144,18 @@
             });
         }
 
-        // 搜索输入
+        // 搜索输入（300ms 防抖，避免每敲一个字符就发一次 API 请求）
         var searchInput = document.getElementById('pickerSearch_' + id);
         if (searchInput && !searchInput.dataset.bound) {
             searchInput.dataset.bound = '1';
             searchInput.addEventListener('input', function () {
-                filterUserTree(id);
+                var inst = getInstance(id);
+                if (inst) {
+                    if (inst._searchTimer) clearTimeout(inst._searchTimer);
+                    inst._searchTimer = setTimeout(function () {
+                        filterUserTree(id);
+                    }, 300);
+                }
             });
         }
 
@@ -233,7 +239,8 @@
             selectedIds: [],
             callback: null,
             treeData: [],
-            multi: !!options.multi
+            multi: !!options.multi,
+            _searchTimer: null
         };
         bindEvents(id);
     }
@@ -311,6 +318,7 @@
         inst.selectedIds = [];
         inst.multi = !!options.multi;
         inst.treeData = [];
+        if (inst._searchTimer) { clearTimeout(inst._searchTimer); inst._searchTimer = null; }
 
         // 更新标题
         if (options.title) {

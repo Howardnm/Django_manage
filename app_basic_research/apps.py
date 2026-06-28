@@ -9,14 +9,16 @@ class AppBasicResearchConfig(AppConfig):
         import app_basic_research.utils.signals
 
         # 注册自动补全
-        from common_utils.autocomplete_registry import register_autocomplete
+        from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
+        from app_basic_research.mixins import BasicResearchAccessMixin
         from app_basic_research.models import ResearchProject
         from django.db.models import Q
 
         register_autocomplete('research_project',
-            lambda q: ResearchProject.objects.filter(
+            lambda q: ResearchProject.objects.only('pk', 'code', 'name').filter(
                 Q(code__icontains=q) | Q(name__icontains=q)),
             lambda r: {'value': r.pk, 'text': f'{r.code} {r.name}'},
+            access_filter=make_autocomplete_access_filter(BasicResearchAccessMixin),
         )
 
         # 注册附件配置

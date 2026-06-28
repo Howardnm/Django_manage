@@ -9,11 +9,16 @@ MaterialAutocompleteView 依赖各 app 在 AppConfig.ready() 中通过
 register_autocomplete() 注册模型类型，本模块不导入任何业务模块。
 """
 
+import time
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views import View
 from common_utils.autocomplete_registry import get_registry
+
+# 模块级简单 TTL 缓存（组织树变更多发于维护期，60s 缓存大幅减少重复查询）
+_user_tree_cache = {'data': None, 'expires_at': 0}
+_USER_TREE_TTL = 60
 
 
 class MaterialAutocompleteView(LoginRequiredMixin, View):
@@ -56,6 +61,15 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
 
         qs = entry['builder'](query)
 
+        # 应用权限过滤（L1 角色检查 / L4 部门隔离 / L5 工作组隔离）
+        access_filter = entry.get('access_filter')
+        if access_filter:
+            from django.core.exceptions import PermissionDenied
+            try:
+                qs = access_filter(request.user, qs)
+            except PermissionDenied:
+                return JsonResponse([], safe=False)
+
         page = request.GET.get('page')
         if page is not None:
             page = int(page)
@@ -84,27 +98,52 @@ class UserTreeAPIView(View):
     供前端 user_picker_modal.js 调用。
 
     URL: /common/api/user-tree/?q=<search>
+
+    性能优化：
+        - Prefetch 对象确保 is_active 过滤不下发到 Python 层、避免 N+1
+        - .only() 限制 User 字段为仅需的 pk / username / first_name
+        - 搜索时 Python 侧过滤（利用 prefetch 缓存，无额外 DB 查询）
     """
 
     def get(self, request):
         from app_user.models import Department, WorkGroup, ReviewGroup
         from django.contrib.auth import get_user_model
-        from django.db.models import Q
+        from django.db.models import Q, Prefetch
         User = get_user_model()
         search = request.GET.get('q', '').strip()
 
+        # 无搜索时走缓存（组织树变化频率低，60s TTL）
+        if not search:
+            now = time.time()
+            if _user_tree_cache['data'] is not None and _user_tree_cache['expires_at'] > now:
+                return JsonResponse(_user_tree_cache['data'])
+
+        # 基础用户查询集：仅拉取需要的字段
+        base_user_qs = User.objects.filter(is_active=True).only('pk', 'username', 'first_name')
+
         nodes = []
 
-        # 1. Department → WorkGroup → User
-        depts = Department.objects.prefetch_related('workgroup_set__members').all()
+        # 1. Department → WorkGroup → User（单次查询 + Prefetch）
+        depts = Department.objects.prefetch_related(
+            Prefetch(
+                'workgroup_set',
+                queryset=WorkGroup.objects.filter(is_active=True).prefetch_related(
+                    Prefetch('members', queryset=base_user_qs, to_attr='_active_members')
+                ),
+                to_attr='_active_workgroups',
+            )
+        )
         for dept in depts:
             wg_children = []
-            for wg in dept.workgroup_set.filter(is_active=True):
-                users = wg.members.filter(is_active=True)
+            for wg in dept._active_workgroups:
+                users = wg._active_members
                 if search:
-                    users = users.filter(
-                        Q(username__icontains=search) | Q(first_name__icontains=search))
-                if not users.exists():
+                    users = [
+                        u for u in users
+                        if search.lower() in u.username.lower()
+                        or search.lower() in (u.first_name or '').lower()
+                    ]
+                if not users:
                     continue
                 wg_children.append({
                     'id': f'wg_{wg.pk}',
@@ -121,13 +160,18 @@ class UserTreeAPIView(View):
                     'collapsed': True,
                 })
 
-        # 2. ReviewGroup
-        for rg in ReviewGroup.objects.filter(is_active=True).prefetch_related('members'):
-            users = rg.members.filter(is_active=True)
+        # 2. ReviewGroup → User（单次查询 + Prefetch）
+        for rg in ReviewGroup.objects.filter(is_active=True).prefetch_related(
+            Prefetch('members', queryset=base_user_qs, to_attr='_active_members')
+        ):
+            users = rg._active_members
             if search:
-                users = users.filter(
-                    Q(username__icontains=search) | Q(first_name__icontains=search))
-            if not users.exists():
+                users = [
+                    u for u in users
+                    if search.lower() in u.username.lower()
+                    or search.lower() in (u.first_name or '').lower()
+                ]
+            if not users:
                 continue
             nodes.append({
                 'id': f'rg_{rg.pk}',
@@ -137,10 +181,10 @@ class UserTreeAPIView(View):
                 'collapsed': True,
             })
 
-        # 3. Unassigned users
+        # 3. Unassigned users（单次查询）
         unassigned = User.objects.filter(
             is_active=True, work_groups__isnull=True, review_groups__isnull=True
-        ).distinct()
+        ).only('pk', 'username', 'first_name').distinct()
         if search:
             unassigned = unassigned.filter(
                 Q(username__icontains=search) | Q(first_name__icontains=search))
@@ -153,7 +197,11 @@ class UserTreeAPIView(View):
                 'collapsed': False,
             })
 
-        return JsonResponse({'nodes': nodes})
+        data = {'nodes': nodes}
+        if not search:
+            _user_tree_cache['data'] = data
+            _user_tree_cache['expires_at'] = time.time() + _USER_TREE_TTL
+        return JsonResponse(data)
 
     @staticmethod
     def _format_user(u):

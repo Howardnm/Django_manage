@@ -9,15 +9,19 @@ class AppRawMaterialConfig(AppConfig):
         import app_raw_material.signals
 
         # 注册自动补全
-        from common_utils.autocomplete_registry import register_autocomplete
+        from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
+        from app_raw_material.mixins import RawMaterialAccessMixin
         from app_raw_material.models import RawMaterial
         from django.db.models import Q
 
         register_autocomplete('raw_material',
-            lambda q: RawMaterial.objects.filter(
-                Q(name__icontains=q) | Q(model_name__icontains=q)),
+            lambda q: RawMaterial.objects.select_related('category').only(
+                'pk', 'name', 'model_name', 'category__name'
+            ).filter(Q(name__icontains=q) | Q(model_name__icontains=q)),
             lambda r: {'value': r.pk, 'text': f'{r.name} {r.model_name or ""} ({r.category.name})'},
-            'raw_material_detail')
+            'raw_material_detail',
+            access_filter=make_autocomplete_access_filter(RawMaterialAccessMixin),
+        )
 
         # 注册附件配置
         from app_attachment.registry import register_attachment

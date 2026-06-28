@@ -7,14 +7,17 @@ class AppProcessConfig(AppConfig):
 
     def ready(self):
         # 注册自动补全
-        from common_utils.autocomplete_registry import register_autocomplete
+        from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
+        from app_process.mixins import ProcessAccessMixin
         from app_process.models import ProcessProfile
         from django.db.models import Q
 
         register_autocomplete('process',
-            lambda q: ProcessProfile.objects.filter(name__icontains=q),
+            lambda q: ProcessProfile.objects.only('pk', 'name').filter(name__icontains=q),
             lambda p: {'value': p.pk, 'text': p.name},
-            'process_profile_detail')
+            'process_profile_detail',
+            access_filter=make_autocomplete_access_filter(ProcessAccessMixin),
+        )
 
         # 注册附件配置
         from app_attachment.registry import register_attachment

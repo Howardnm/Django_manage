@@ -24,7 +24,8 @@ class CommonUtilsConfig(AppConfig):
         User = get_user_model()
 
         register_autocomplete('user',
-            lambda q: User.objects.filter(is_active=True).filter(
-                Q(username__icontains=q) | Q(first_name__icontains=q)),
+            lambda q: User.objects.only('pk', 'username', 'first_name').filter(
+                is_active=True,
+            ).filter(Q(username__icontains=q) | Q(first_name__icontains=q)),
             lambda u: {'value': u.pk, 'text': f'{u.first_name or u.username}'},
         )

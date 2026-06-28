@@ -10,14 +10,17 @@ class AppProjectConfig(AppConfig):
         import app_project.utils.signals
 
         # 注册自动补全
-        from common_utils.autocomplete_registry import register_autocomplete
+        from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
+        from app_project.mixins import ProjectAccessMixin
         from .models import Project
         from django.db.models import Q
 
         register_autocomplete('commercial_project',
-            lambda q: Project.objects.filter(name__icontains=q),
+            lambda q: Project.objects.only('pk', 'name').filter(name__icontains=q),
             lambda p: {'value': p.pk, 'text': p.name},
-            'project_detail')
+            'project_detail',
+            access_filter=make_autocomplete_access_filter(ProjectAccessMixin),
+        )
 
         from django.urls import reverse
         from app_workflow.utils import related_object_router
