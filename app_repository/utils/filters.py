@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from app_user.models import Department
 from ..models import Customer, OEM, ProjectRepository
 from common_utils.filters import TablerFilterMixin
+from common_utils.forms import UserPickerWidget
 
 User = get_user_model()
 
@@ -21,11 +22,14 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
         widget=forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer', 'data-placeholder': '输入客户名称搜索...'})
     )
 
-    salesperson = django_filters.ModelChoiceFilter(
-        queryset=User.objects.filter(user_type=User.UserType.SALES),
+    salesperson = django_filters.CharFilter(
+        method='filter_salesperson',
         label='负责业务员',
-        empty_label="所有人员",
-        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '业务员'})
+        widget=UserPickerWidget(
+            attrs={'placeholder': '点击选择业务员'},
+            title='选择业务员',
+            multi=False,
+        )
     )
 
     dept = django_filters.ModelChoiceFilter(
@@ -54,6 +58,14 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
     class Meta:
         model = ProjectRepository
         fields = ['q', 'customer', 'salesperson', 'dept', 'start_date']
+
+    def filter_salesperson(self, queryset, name, value):
+        if not value:
+            return queryset
+        try:
+            return queryset.filter(salesperson_id=int(value))
+        except (ValueError, TypeError):
+            return queryset
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(

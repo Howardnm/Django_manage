@@ -1,14 +1,30 @@
+"""
+通用过滤器工具。
+
+Exports:
+    TablerFormMixin              — Form 自动 CSS 类注入
+    TablerFilterMixin            — FilterSet 自动 CSS 类注入 + TomSelect 适配
+    DateRangeFilterMixin         — 通用日期范围筛选（created_at）
+    DateRangeUpdatedFilterMixin  — 通用日期范围筛选（updated_at）
+"""
+
 import django_filters
 from django import forms
+from common_utils.forms import UserPickerWidget
 
 
 class TablerFormMixin:
     """
-    混入类：
-    1. 自动给普通字段添加 form-control
-    2. 自动给 Checkbox 添加 form-check-input
-    3. 自动给 Select 添加 form-select 和 form-select-search (启用 Tom Select)
-    4. 自动给 DateInput 添加 form-control 和 type='date'
+    Django Form 自动样式混入。
+
+    根据 widget 类型自动注入 Tabler/Bootstrap CSS 类：
+    - Select/SelectMultiple → form-select + form-select-search（启用 TomSelect 本地搜索）
+    - CheckboxInput → form-check-input
+    - DateInput → form-control + type='date'
+    - 其他非 HiddenInput → form-control
+
+    排除规则：class 包含 no-tomselect / value-select / remote-search /
+    tomselect-multi-local 时，不自动添加 form-select-search。
     """
 
     def __init__(self, *args, **kwargs):
@@ -51,7 +67,13 @@ class TablerFormMixin:
                     attrs['class'] = f"{existing_class} form-control".strip()
                 attrs['type'] = 'date' # 强制日期控件
             # -----------------------------------------------------------
-            # 情况 4: 其他输入框 (Text, Number, Email, File, Password...)
+            # 情况 4: 自定义 Widget（UserPickerWidget 等）— 跳过，由模板自行处理样式
+            # -----------------------------------------------------------
+            elif isinstance(field.widget, UserPickerWidget):
+                pass  # Widget 自身模板已包含完整样式
+
+            # -----------------------------------------------------------
+            # 情况 5: 其他输入框 (Text, Number, Email, File, Password...)
             # -----------------------------------------------------------
             else:
                 # 排除 HiddenInput，不需要样式
@@ -62,14 +84,19 @@ class TablerFormMixin:
 
 class TablerFilterMixin:
     """
-    混入类：自动给 FilterSet 中的字段添加 Tabler/Bootstrap 样式类 + TomSelect 适配
+    django-filter FilterSet 自动样式混入。
 
-    Select/SelectMultiple 自动添加 form-select + form-select-search（启用本地搜索），
-    但排除以下类：no-tomselect, value-select, remote-search, tomselect-multi-local
+    根据 widget 类型自动注入 CSS 类：
+    - q 字段 → form-control + 默认 placeholder
+    - Select/SelectMultiple → form-select + form-select-search（TomSelect 本地搜索）
+    - DateInput → form-control + type='date'
+    - TextInput → form-control
+    - UserPickerWidget → 跳过（widget 自行处理样式）
+
+    _TS_EXCLUDE_CLASSES 中的 class 存在时不自动添加 form-select-search。
     """
 
-    # 排除类集合 — 这些类有专属的 TomSelect 初始化方式
-    _TS_EXCLUDE_CLASSES = {'no-tomselect', 'value-select', 'remote-search', 'tomselect-multi-local'}
+    _TS_EXCLUDE_CLASSES = {'no-tomselect', 'value-select', 'remote-search', 'tomselect-multi-local', 'tomselect-multi-remote'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -100,6 +127,9 @@ class TablerFilterMixin:
                 if 'form-control' not in existing_class:
                     attrs['class'] = f"{existing_class} form-control".strip()
                 attrs['type'] = 'date'
+
+            elif isinstance(widget, UserPickerWidget):
+                pass  # Widget 自身模板已包含完整样式
 
             elif isinstance(widget, forms.TextInput):
                 if 'form-control' not in existing_class:

@@ -1,180 +1,35 @@
+{% load static %}
 {% comment %}
 可复用人员选择器组件。
+CSS/JS 已由 base.html 全局加载，本模板仅提供静态 overlay DOM。
+
 用法：
   {% include 'includes/user_picker_modal.html' with picker_id='myPicker' %}
+  或由 JS 动态创建：window.ensureUserPickerOverlay(id, {title:'选择人员'})
 然后在 JS 中调用：
   openUserPicker('myPicker', function(user) { console.log(user.id, user.label); });
 {% endcomment %}
 
-<div class="user-picker-overlay" id="pickerOverlay_{{ picker_id }}">
+<div class="user-picker-overlay" id="pickerOverlay_{{ picker_id }}"
+     data-api-url="{% url 'user_tree_api' %}">
     <div class="user-picker-dialog">
         <div class="user-picker-header">
             <span>选择人员</span>
-            <span style="cursor:pointer;font-size:20px;" onclick="closeUserPicker('{{ picker_id }}')">&times;</span>
+            <span class="user-picker-close">&times;</span>
         </div>
         <div class="user-picker-body">
             <input type="text" class="user-picker-search" id="pickerSearch_{{ picker_id }}"
-                   placeholder="搜索姓名或用户名..." oninput="filterUserTree('{{ picker_id }}')">
+                   placeholder="搜索姓名或用户名...">
             <div class="user-picker-tree" id="pickerTree_{{ picker_id }}">
-                <div style="text-align:center;color:#909399;padding:30px;">加载中...</div>
+                <div class="user-picker-empty">加载中...</div>
             </div>
         </div>
         <div class="user-picker-footer">
-            <span id="pickerSelected_{{ picker_id }}" style="font-size:13px;color:#606266;flex:1;"></span>
-            <button onclick="closeUserPicker('{{ picker_id }}')"
-                    style="border:1px solid #dcdfe6;background:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;">取消</button>
+            <span id="pickerSelected_{{ picker_id }}" class="user-picker-selected-text"></span>
+            <button class="user-picker-cancel-btn">取消</button>
             <button id="pickerConfirm_{{ picker_id }}"
-                    style="border:none;background:#409eff;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;"
-                    disabled onclick="confirmUserPicker('{{ picker_id }}')">确认</button>
+                    class="user-picker-confirm-btn"
+                    disabled>确认</button>
         </div>
     </div>
 </div>
-
-<style>
-.user-picker-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(0,0,0,0.45); z-index: 10001; align-items: center; justify-content: center; }
-.user-picker-overlay.show { display: flex; }
-.user-picker-dialog { background: #fff; border-radius: 8px; width: 560px; max-height: 80vh;
-    display: flex; flex-direction: column; box-shadow: 0 6px 30px rgba(0,0,0,0.2); }
-.user-picker-header { padding: 14px 20px; border-bottom: 1px solid #eee;
-    font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
-.user-picker-body { padding: 16px 20px; flex: 1; overflow-y: auto; min-height: 300px; }
-.user-picker-footer { padding: 12px 20px; border-top: 1px solid #eee;
-    display: flex; align-items: center; gap: 8px; }
-.user-picker-search { width: 100%; padding: 8px 12px; border: 1px solid #dcdfe6; border-radius: 4px;
-    font-size: 14px; margin-bottom: 12px; outline: none; box-sizing: border-box; }
-.user-picker-search:focus { border-color: #409eff; }
-
-/* Tree nodes */
-.tree-node { user-select: none; }
-.tree-node-header { display: flex; align-items: center; gap: 6px; padding: 5px 8px;
-    border-radius: 4px; cursor: pointer; transition: background 0.1s; }
-.tree-node-header:hover { background: #f0f2f5; }
-.tree-node-header.selected { background: #ecf5ff; }
-.tree-node-arrow { width: 16px; font-size: 10px; color: #909399; text-align: center; flex-shrink: 0;
-    transition: transform 0.15s; }
-.tree-node-arrow.expanded { transform: rotate(90deg); }
-.tree-node-icon { font-size: 14px; flex-shrink: 0; }
-.tree-node-label { font-size: 13px; color: #303133; }
-.tree-node-label.user { font-size: 13px; }
-.tree-node-children { padding-left: 20px; display: none; }
-.tree-node-children.open { display: block; }
-.tree-leaf { padding: 4px 8px 4px 28px; border-radius: 4px; cursor: pointer;
-    font-size: 13px; color: #303133; transition: background 0.1s; }
-.tree-leaf:hover { background: #f0f2f5; }
-.tree-leaf.selected { background: #ecf5ff; color: #409eff; font-weight: 500; }
-
-.user-picker-empty { text-align: center; color: #909399; padding: 30px; }
-</style>
-
-<script>
-(function() {
-    var pickerId = '{{ picker_id }}';
-    var _selectedUser = null;
-    var _callback = null;
-    var _treeData = [];
-
-    // ── Public API ──
-    window.openUserPicker = function(id, cb) {
-        if (id !== pickerId) return;
-        _callback = cb;
-        _selectedUser = null;
-        document.getElementById('pickerOverlay_' + id).classList.add('show');
-        document.getElementById('pickerSearch_' + id).value = '';
-        document.getElementById('pickerConfirm_' + id).disabled = true;
-        document.getElementById('pickerSelected_' + id).textContent = '';
-        loadTree(id, '');
-    };
-
-    window.closeUserPicker = function(id) {
-        if (id !== pickerId) return;
-        document.getElementById('pickerOverlay_' + id).classList.remove('show');
-    };
-
-    window.confirmUserPicker = function(id) {
-        if (id !== pickerId || !_selectedUser) return;
-        if (_callback) _callback(_selectedUser);
-        closeUserPicker(id);
-    };
-
-    // ── Load tree from API ──
-    async function loadTree(id, query) {
-        var treeEl = document.getElementById('pickerTree_' + id);
-        treeEl.innerHTML = '<div style="text-align:center;color:#909399;padding:30px;">加载中...</div>';
-        try {
-            var url = '/common/api/user-tree/?q=' + encodeURIComponent(query);
-            var resp = await fetch(url);
-            var data = await resp.json();
-            _treeData = data.nodes || [];
-            renderTree(id);
-        } catch(e) {
-            treeEl.innerHTML = '<div class="user-picker-empty">加载失败，请重试</div>';
-        }
-    }
-
-    function renderTree(id) {
-        var treeEl = document.getElementById('pickerTree_' + id);
-        if (_treeData.length === 0) {
-            treeEl.innerHTML = '<div class="user-picker-empty">无匹配人员</div>';
-            return;
-        }
-        var html = '';
-        _treeData.forEach(function(node) {
-            html += renderNode(node, 0);
-        });
-        treeEl.innerHTML = html;
-    }
-
-    function renderNode(node, depth) {
-        if (node.type === 'user') {
-            return '<div class="tree-leaf" data-id="' + node.id + '" data-label="' + escapeHtml(node.label)
-                + '" onclick="selectUserLeaf(this, \'' + pickerId + '\')">'
-                + escapeHtml(node.label) + '</div>';
-        }
-        var icon = node.type === 'department' ? '&#127970;' : (node.type === 'reviewgroup' ? '&#128101;' : '&#128100;');
-        var collapsed = node.collapsed !== false;
-        return '<div class="tree-node">'
-            + '<div class="tree-node-header" onclick="toggleTreeNode(this, \'' + pickerId + '\')">'
-            + '<span class="tree-node-arrow' + (collapsed ? '' : ' expanded') + '">&#9654;</span>'
-            + '<span class="tree-node-icon">' + icon + '</span>'
-            + '<span class="tree-node-label">' + escapeHtml(node.label) + '</span>'
-            + '</div>'
-            + '<div class="tree-node-children' + (collapsed ? '' : ' open') + '">'
-            + (node.children || []).map(function(c) { return renderNode(c, depth + 1); }).join('')
-            + '</div></div>';
-    }
-
-    // ── Interactions ──
-    window.toggleTreeNode = function(header, id) {
-        if (id !== pickerId) return;
-        var arrow = header.querySelector('.tree-node-arrow');
-        var children = header.nextElementSibling;
-        if (children) {
-            var isOpen = children.classList.contains('open');
-            if (isOpen) { children.classList.remove('open'); arrow.classList.remove('expanded'); }
-            else { children.classList.add('open'); arrow.classList.add('expanded'); }
-        }
-    };
-
-    window.selectUserLeaf = function(el, id) {
-        if (id !== pickerId) return;
-        document.querySelectorAll('#pickerTree_' + id + ' .tree-leaf').forEach(function(e) { e.classList.remove('selected'); });
-        el.classList.add('selected');
-        _selectedUser = { id: el.getAttribute('data-id'), label: el.getAttribute('data-label') };
-        document.getElementById('pickerSelected_' + id).textContent = '已选: ' + _selectedUser.label;
-        document.getElementById('pickerConfirm_' + id).disabled = false;
-    };
-
-    window.filterUserTree = function(id) {
-        if (id !== pickerId) return;
-        var q = document.getElementById('pickerSearch_' + id).value.trim();
-        loadTree(id, q);
-    };
-
-    function escapeHtml(s) {
-        var d = document.createElement('div');
-        d.textContent = s;
-        return d.innerHTML;
-    }
-})();
-</script>

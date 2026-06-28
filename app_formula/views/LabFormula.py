@@ -15,6 +15,7 @@ from app_formula.utils.filters import LabFormulaFilter
 from app_formula.mixins import FormulaAccessMixin
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
+from app_formula.utils.search_picker_config import for_formula_import
 from django.utils.safestring import mark_safe
 
 
@@ -317,6 +318,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         context['page_title'] = '新增实验配方'
         context['show_import_button'] = True
         context['enable_multi_column'] = True
+        context['search_picker'] = for_formula_import()
         session_data = self._get_session_data()
         project_node_id = session_data.get('project_node_id')
         project_id = session_data.get('project_id')
@@ -703,6 +705,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '编辑实验配方'
         context['show_import_button'] = True
+        context['search_picker'] = for_formula_import()
         context['project_node_stage'] = self.object.project_node.stage if self.object.project_node else None
         context['can_be_mature'] = self.object.project_node.can_be_mature if self.object.project_node else True
         context['project_name'] = self.object.project.name if self.object.project else None

@@ -13,7 +13,7 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
         queryset=ApplicationScenario.objects.all(),
         widget=forms.SelectMultiple(attrs={
             'class': 'form-select remote-search tomselect-multi-remote',
-            'data-model': 'applicationscenario',
+            'data-model': 'scenario',
             'data-placeholder': '搜索应用场景...',
         }),
         conjoined=False

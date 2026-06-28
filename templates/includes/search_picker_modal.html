@@ -1,50 +1,51 @@
+{% load static %}
 {% comment %}
-  通用搜索选择器模态框 — 搜索引擎风格：输入框 + 分页结果列表
+  通用搜索选择器模态框 v3.1
 
-  依赖：
-  - 搜索 API 返回格式：{results: [{value, text}, ...], total, page, page_size, has_next, has_prev}
-  - API URL 需支持 ?model=<search_model>&q=<query>&page=<n>&page_size=<n>
-  - Bootstrap 5 modal + Tabler Icons
+  所有配置由 View 层统一注入 context['search_picker']。
+  模板零参数调用：{% include 'includes/search_picker_modal.html' %}
 
-  用法示例：
-  {% include 'includes/search_picker_modal.html' with
-     modal_id='import-formula-modal'
-     modal_title='选择来源配方'
-     search_model='formula'
-     search_url_name='material_api_search'
-     placeholder='输入配方代号或名称搜索...'
-     show_detail_button='1'
-  %}
+  View 用法:
+    from common_utils.search_picker_config import SearchPickerConfig
+    context['search_picker'] = SearchPickerConfig.for_formula_import()
 
-  show_detail_button='1' 时，每条结果右侧会出现「查看」按钮（需要 API 返回 url 字段）。
-  外层需要一个 <form> 包裹，包含：
-  - <input type="hidden" name="source_id" class="search-picker-value">
-  - data-search-model="{{ search_model }}"
-  - data-search-url="{% url search_url_name %}"
-  - 确认按钮 type="submit"
+  依赖（base.html 已全局加载）：
+    - Bootstrap 5 modal + Tabler Icons
+    - tomselect_remote.js
+    - search_picker_modal.css / search_picker_modal.js
 {% endcomment %}
 
-<div class="modal modal-blur fade" id="{{ modal_id }}" tabindex="-1"
-     data-search-model="{{ search_model }}"
-     data-search-url="{% url search_url_name %}"
-     data-show-detail="{{ show_detail_button|default:'0' }}">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+{% if search_picker %}
+{% with cfg=search_picker %}
+<script type="application/json" id="{{ cfg.modal_id }}-config">{{ cfg.json|safe }}</script>
+
+<div class="modal modal-blur fade" id="{{ cfg.modal_id }}" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">
-                    <i class="ti ti-search me-2"></i>{{ modal_title|default:'搜索选择' }}
+                    <i class="ti ti-search me-2"></i>{{ cfg.modal_title|default:'搜索选择' }}
                 </h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
+
             <div class="modal-body p-3">
-                <div class="input-group input-group-flat mb-3">
-                    <input type="text" class="form-control search-picker-input"
-                           placeholder="{{ placeholder|default:'输入关键词搜索...' }}"
-                           autocomplete="off">
-                    <span class="input-group-text"><i class="ti ti-search"></i></span>
+                {# simple 模式输入区（JS 动态注入 input） #}
+                <div class="search-picker-input-area mb-3"></div>
+
+                {# multi 模式字段区（JS 动态渲染） #}
+                <div class="search-picker-fields mb-3"></div>
+
+                {# 结果区（JS 动态填充） #}
+                <div class="search-picker-results">
+                    <div class="search-picker-status">
+                        <i class="ti ti-search"></i>
+                        <span>请输入关键词开始搜索</span>
+                    </div>
                 </div>
-                <div class="search-picker-results" style="max-height: 50vh; overflow-y: auto;"></div>
-                <div class="search-picker-pagination d-none d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
+
+                {# 分页 #}
+                <div class="search-picker-pagination justify-content-between align-items-center mt-2 pt-2 border-top">
                     <button type="button" class="btn btn-sm btn-outline-secondary search-prev-btn" disabled>
                         <i class="ti ti-chevron-left"></i> 上一页
                     </button>
@@ -54,6 +55,7 @@
                     </button>
                 </div>
             </div>
+
             <div class="modal-footer">
                 <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">取消</button>
                 <button type="button" class="btn btn-teal search-confirm-btn" disabled>
@@ -63,165 +65,5 @@
         </div>
     </div>
 </div>
-
-<script>
-(function() {
-    function initSearchPicker(modal) {
-        if (modal.dataset.pickerReady) return;
-        modal.dataset.pickerReady = '1';
-
-        const input = modal.querySelector('.search-picker-input');
-        const resultsContainer = modal.querySelector('.search-picker-results');
-        const pagination = modal.querySelector('.search-picker-pagination');
-        const pageInfo = modal.querySelector('.search-page-info');
-        const prevBtn = modal.querySelector('.search-prev-btn');
-        const nextBtn = modal.querySelector('.search-next-btn');
-        const confirmBtn = modal.querySelector('.search-confirm-btn');
-        const searchModel = modal.dataset.searchModel;
-        const searchUrl = modal.dataset.searchUrl;
-        const showDetail = modal.dataset.showDetail === '1';
-
-        let currentPage = 1;
-        let totalPages = 0;
-        let selectedValue = null;
-        let selectedText = '';
-        let debounceTimer = null;
-
-        function showStatus(icon, msg) {
-            resultsContainer.innerHTML =
-                `<div class="text-center text-muted py-5">
-                    <i class="ti ${icon} fs-2 d-block mb-2 opacity-50"></i>${msg}
-                </div>`;
-        }
-
-        function renderResults(results, selectedVal) {
-            if (!results.length) {
-                showStatus('ti-mood-empty', '无匹配结果');
-                return;
-            }
-            let html = '<div class="list-group list-group-flush">';
-            results.forEach(function(r) {
-                const active = String(r.value) === String(selectedVal) ? ' active' : '';
-                html += `<a href="#" class="list-group-item list-group-item-action${active} search-result-item"
-                          data-value="${r.value}" data-text="${r.text.replace(/"/g, '&quot;')}">
-                          <div class="d-flex align-items-center">
-                              <div class="flex-fill text-truncate">${r.text}</div>
-                              ${showDetail && r.url ? `<span class="search-detail-link ms-2" data-url="${r.url}" title="查看详情"><i class="ti ti-external-link"></i></span>` : ''}
-                              ${active ? '<i class="ti ti-check text-teal ms-2"></i>' : ''}
-                          </div>
-                      </a>`;
-            });
-            html += '</div>';
-            resultsContainer.innerHTML = html;
-
-            // 详情链接点击：打开新标签页，不触发行选择
-            resultsContainer.querySelectorAll('.search-detail-link').forEach(function(link) {
-                link.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    window.open(this.dataset.url, '_blank');
-                });
-            });
-
-            resultsContainer.querySelectorAll('.search-result-item').forEach(function(item) {
-                item.addEventListener('click', function(e) {
-                    if (e.target.closest('.search-detail-link')) return;
-                    e.preventDefault();
-                    selectedValue = this.dataset.value;
-                    selectedText = this.dataset.text;
-                    confirmBtn.disabled = false;
-                    resultsContainer.querySelectorAll('.search-result-item').forEach(function(el) {
-                        el.classList.remove('active');
-                        const icon = el.querySelector('.ti-check');
-                        if (icon) icon.remove();
-                    });
-                    this.classList.add('active');
-                    const check = document.createElement('i');
-                    check.className = 'ti ti-check text-teal ms-2';
-                    this.querySelector('.d-flex').appendChild(check);
-                });
-            });
-        }
-
-        function doSearch(page) {
-            if (debounceTimer) clearTimeout(debounceTimer);
-            const query = input.value.trim();
-            if (!query) {
-                showStatus('ti-search', '请输入关键词开始搜索');
-                pagination.classList.add('d-none');
-                pagination.classList.remove('d-flex');
-                return;
-            }
-            resultsContainer.innerHTML =
-                '<div class="text-center py-3"><div class="spinner-border spinner-border-sm text-muted"></div></div>';
-            const qs = '?model=' + encodeURIComponent(searchModel)
-                + '&q=' + encodeURIComponent(query)
-                + '&page=' + page
-                + '&page_size=8';
-            fetch(searchUrl + qs)
-                .then(function(r) { return r.json(); })
-                .then(function(data) {
-                    totalPages = Math.ceil(data.total / data.page_size);
-                    currentPage = data.page;
-                    renderResults(data.results, selectedValue);
-                    pageInfo.textContent = '第 ' + data.page + ' 页，共 ' + data.total + ' 条';
-                    prevBtn.disabled = !data.has_prev;
-                    nextBtn.disabled = !data.has_next;
-                    pagination.classList.remove('d-none');
-                    pagination.classList.add('d-flex');
-                })
-                .catch(function() {
-                    showStatus('ti-alert-triangle', '搜索失败，请重试');
-                });
-        }
-
-        input.addEventListener('input', function() {
-            currentPage = 1;
-            selectedValue = null;
-            selectedText = '';
-            confirmBtn.disabled = true;
-            if (debounceTimer) clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(function() { doSearch(1); }, 350);
-        });
-
-        prevBtn.addEventListener('click', function() {
-            if (currentPage > 1) doSearch(currentPage - 1);
-        });
-        nextBtn.addEventListener('click', function() {
-            if (currentPage < totalPages) doSearch(currentPage + 1);
-        });
-
-        confirmBtn.addEventListener('click', function() {
-            const form = modal.closest('form');
-            if (form) {
-                form.querySelector('.search-picker-value').value = selectedValue;
-                form.submit();
-            }
-        });
-
-        // 打开模态框时聚焦搜索框
-        modal.addEventListener('shown.bs.modal', function() {
-            input.focus();
-        });
-        // 关闭时重置
-        modal.addEventListener('hidden.bs.modal', function() {
-            input.value = '';
-            currentPage = 1;
-            selectedValue = null;
-            selectedText = '';
-            confirmBtn.disabled = true;
-            showStatus('ti-search', '请输入关键词开始搜索');
-            pagination.classList.add('d-none');
-            pagination.classList.remove('d-flex');
-        });
-    }
-
-    // 监听 Bootstrap 模态框打开事件，懒初始化
-    document.addEventListener('show.bs.modal', function(e) {
-        const modal = e.target;
-        if (modal.dataset.searchModel) {
-            initSearchPicker(modal);
-        }
-    });
-})();
-</script>
+{% endwith %}
+{% endif %}

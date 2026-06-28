@@ -6,6 +6,7 @@
     <title>{{ submission.template.name }} - 提交详情</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    <link rel="stylesheet" href="{% static 'css/common/user_picker_modal.css' %}">
     {% if workflow_data %}
     <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
     <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
@@ -397,6 +398,7 @@
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
+<script src="{% static 'js/common/user_picker_modal.js' %}"></script>
 
 <script>
     // ── 服务端预计算数据 ──

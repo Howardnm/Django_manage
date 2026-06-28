@@ -1,62 +1,47 @@
+"""
+通用 API 视图。
+
+Exports:
+    MaterialAutocompleteView — 通用搜索自动补全（TomSelect / search_picker_modal 共用）
+    UserTreeAPIView        — 组织架构人员树 API
+
+MaterialAutocompleteView 依赖各 app 在 AppConfig.ready() 中通过
+register_autocomplete() 注册模型类型，本模块不导入任何业务模块。
+"""
+
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.urls import reverse
 from django.views import View
-from django.db.models import Q
-from app_material.models.material import MaterialType, ApplicationScenario, MaterialLibrary, TestConfig, MaterialCharacteristic
-from app_material.mixins import MaterialAccessMixin
-from app_raw_material.models import RawMaterial
-from app_process.models import ProcessProfile
-from app_basic_research.models import ResearchProject
-from app_project.models import Project
-from django.contrib.auth.models import User
+from common_utils.autocomplete_registry import get_registry
 
 
-class MaterialAutocompleteView(MaterialAccessMixin, View):
-    permission_required = 'app_material.view_materiallibrary'
+class MaterialAutocompleteView(LoginRequiredMixin, View):
     """
-    通用搜索接口（分页模式供 search_picker_modal，数组模式兼容 TomSelect remote-search）
+    通用搜索自动补全 API。
+
+    支持两种响应模式：
+    - 分页模式（传 page 参数）：供 search_picker_modal 使用
+    - 数组模式（不传 page）：供 TomSelect remote-search 使用
+
+    模型类型通过注册表（autocomplete_registry）查找，各 app 在
+    AppConfig.ready() 中注册自己的 builder/formatter。
+
+    URL: /common/api/search/?model=<type>&q=<query>&page=<n>
     """
 
-    MODEL_BUILDERS = {
-        'material': lambda query: MaterialLibrary.objects.filter(
-            Q(grade_name__icontains=query) | Q(manufacturer__icontains=query)),
-        'raw_material': lambda query: RawMaterial.objects.filter(
-            Q(name__icontains=query) | Q(model_name__icontains=query)),
-        'process': lambda query: ProcessProfile.objects.filter(name__icontains=query),
-        'test_config': lambda query: TestConfig.objects.filter(
-            Q(name__icontains=query) | Q(standard__icontains=query)),
-        'scenario': lambda query: ApplicationScenario.objects.filter(name__icontains=query),
-        'characteristic': lambda query: MaterialCharacteristic.objects.filter(name__icontains=query),
-        'research_project': lambda query: ResearchProject.objects.filter(
-            Q(code__icontains=query) | Q(name__icontains=query)),
-        'user': lambda query: User.objects.filter(is_active=True).filter(
-            Q(username__icontains=query) | Q(first_name__icontains=query)),
-        'commercial_project': lambda query: Project.objects.filter(name__icontains=query),
-    }
-
-    MODEL_FORMATTERS = {
-        'material': lambda item: {'value': item.pk, 'text': f"{item.grade_name} ({item.manufacturer})"},
-        'raw_material': lambda item: {'value': item.pk, 'text': f"{item.name} {item.model_name or ''} ({item.category.name})"},
-        'process': lambda item: {'value': item.pk, 'text': item.name},
-        'test_config': lambda item: {'value': item.pk,
-            'text': f"[{item.category.name}] {item.name} - {item.standard}{f' ({item.condition})' if item.condition else ''}"},
-        'scenario': lambda item: {'value': item.pk, 'text': item.name},
-        'characteristic': lambda item: {'value': item.pk, 'text': item.name},
-        'research_project': lambda item: {'value': item.pk, 'text': f"{item.code} {item.name}"},
-        'user': lambda item: {'value': item.pk, 'text': f"{item.first_name or item.username}"},
-        'commercial_project': lambda item: {'value': item.pk, 'text': item.name},
-    }
-
-    MODEL_DETAIL_URLS = {
-        'material': 'material_detail',
-        'raw_material': 'raw_material_detail',
-        'process': 'process_profile_detail',
-        'commercial_project': 'project_detail',
-    }
+    def _lookup(self, model_type):
+        """从注册表查找模型类型的处理器。"""
+        registry = get_registry()
+        return registry.get(model_type)
 
     def _format_item(self, model_type, item):
-        data = self.MODEL_FORMATTERS[model_type](item)
-        url_name = self.MODEL_DETAIL_URLS.get(model_type)
+        """对单个结果应用格式化器，并注入详情 URL。"""
+        entry = self._lookup(model_type)
+        if not entry:
+            return {}
+        data = entry['formatter'](item)
+        url_name = entry.get('detail_url')
         if url_name:
             data['url'] = reverse(url_name, kwargs={'pk': item.pk})
         return data
@@ -65,10 +50,11 @@ class MaterialAutocompleteView(MaterialAccessMixin, View):
         model_type = request.GET.get('model')
         query = request.GET.get('q', '')
 
-        if not model_type or model_type not in self.MODEL_BUILDERS:
+        entry = self._lookup(model_type) if model_type else None
+        if not entry:
             return JsonResponse([], safe=False)
 
-        qs = self.MODEL_BUILDERS[model_type](query)
+        qs = entry['builder'](query)
 
         page = request.GET.get('page')
         if page is not None:
@@ -86,16 +72,24 @@ class MaterialAutocompleteView(MaterialAccessMixin, View):
                 'has_prev': page > 1,
             })
 
-        data = [self.MODEL_FORMATTERS[model_type](item) for item in qs[:20]]
+        data = [entry['formatter'](item) for item in qs[:20]]
         return JsonResponse(data, safe=False)
 
 
 class UserTreeAPIView(View):
-    """组织架构人员树 API——返回 Department → WorkGroup → User + ReviewGroup 树形 JSON"""
+    """
+    组织架构人员树 API。
+
+    返回三级树形 JSON：Department → WorkGroup → User + ReviewGroup + 未分配用户。
+    供前端 user_picker_modal.js 调用。
+
+    URL: /common/api/user-tree/?q=<search>
+    """
 
     def get(self, request):
         from app_user.models import Department, WorkGroup, ReviewGroup
         from django.contrib.auth import get_user_model
+        from django.db.models import Q
         User = get_user_model()
         search = request.GET.get('q', '').strip()
 

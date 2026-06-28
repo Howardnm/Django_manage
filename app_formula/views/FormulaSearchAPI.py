@@ -62,6 +62,13 @@ class ExperimentOrderAutocompleteView(FormulaAccessMixin, View):
     实验单搜索 API — 按 code 去重聚合，返回实验单列表（而非单个配方版本）
     用于「导入数据」功能：选择一个实验单后，将其下所有版本的 BOM 合并导入
     每条结果附带 v1 配方的详情页链接，方便用户在导入前预览。
+
+    查询参数：
+    - q: 通用关键词（兼容旧版，搜索 code + name）
+    - code: 实验单号前缀匹配（istartswith，可利用索引）
+    - name: 配方名称包含匹配（icontains）
+    - page/page_size: 分页
+    多参数组合时为 AND 逻辑。
     """
     permission_required = 'app_formula.view_labformula'
     model = LabFormula
@@ -69,9 +76,29 @@ class ExperimentOrderAutocompleteView(FormulaAccessMixin, View):
     def get(self, request):
         query = request.GET.get('q', '')
         qs = self.get_queryset()
-        qs = qs.filter(
-            Q(code__icontains=query) | Q(name__icontains=query)
-        )
+
+        # ── 多字段筛选（AND 组合，各自利用索引） ──
+        # 实验单号 — 前缀匹配（可走 B-tree 索引）
+        code_val = request.GET.get('code', '').strip()
+        if code_val:
+            qs = qs.filter(code__istartswith=code_val)
+
+        # 配方名称 — 包含匹配
+        name_val = request.GET.get('name', '').strip()
+        if name_val:
+            qs = qs.filter(name__icontains=name_val)
+
+        # 创建人（实验员）— 精确匹配
+        owner_id = request.GET.get('owner_id', '').strip()
+        if owner_id:
+            qs = qs.filter(creator_id=owner_id)
+
+        # 兼容旧版单一关键词搜索（仅在未使用多字段时单独生效，
+        # 若同时提供了 q 和多字段，则 AND 追加）
+        if query:
+            qs = qs.filter(
+                Q(code__icontains=query) | Q(name__icontains=query)
+            )
 
         # 按 code 聚合，获取每个实验单的版本数、最新版本名、版本号范围
         aggregated = qs.values('code').annotate(

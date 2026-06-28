@@ -8,6 +8,17 @@ class AppRawMaterialConfig(AppConfig):
     def ready(self):
         import app_raw_material.signals
 
+        # 注册自动补全
+        from common_utils.autocomplete_registry import register_autocomplete
+        from app_raw_material.models import RawMaterial
+        from django.db.models import Q
+
+        register_autocomplete('raw_material',
+            lambda q: RawMaterial.objects.filter(
+                Q(name__icontains=q) | Q(model_name__icontains=q)),
+            lambda r: {'value': r.pk, 'text': f'{r.name} {r.model_name or ""} ({r.category.name})'},
+            'raw_material_detail')
+
         # 注册附件配置
         from app_attachment.registry import register_attachment
         from app_attachment.configs import AttachmentConfig

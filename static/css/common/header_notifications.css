@@ -1,0 +1,21 @@
+/* ==========================================
+   消息通知下拉面板 — includes/header_modules/header_notifictions.html
+   依赖: Bootstrap 5, Tabler 1.4.0
+   ========================================== */
+
+.notifications-dropdown {
+    width: 430px;
+}
+
+.notifications-list {
+    max-height: 380px;
+    overflow-y: auto;
+}
+
+.notification-actor {
+    max-width: 80px;
+}
+
+.notification-status-badge {
+    min-width: 55px;
+}

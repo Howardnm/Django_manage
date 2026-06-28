@@ -1,0 +1,38 @@
+{% comment %}
+  UserPickerWidget 渲染模板
+  通过 openUserPicker() API 打开组织架构树，选中后回写。
+
+  UI 采用 Tabler input-icon 模式，与筛选器中搜索框、日期框视觉统一。
+  onclick 挂在外层 div 上，点击图标或输入框均可触发。
+{% endcomment %}
+<div class="user-picker-field input-icon"
+     data-picker-name="{{ name }}" data-picker-multi="{{ multi|yesno:'1,0' }}"
+     data-picker-title="{{ title|escapejs }}"
+     style="max-width: 180px; cursor: pointer"
+     onclick="(function(wrapper){
+         var name = wrapper.getAttribute('data-picker-name');
+         var isMulti = wrapper.getAttribute('data-picker-multi') === '1';
+         var title = wrapper.getAttribute('data-picker-title');
+         var hiddenEl = wrapper.querySelector('input[type=hidden]');
+         var displayEl = wrapper.querySelector('input[readonly]');
+         openUserPicker('filter__' + name, function(r){
+             if (isMulti) {
+                 hiddenEl.value = r.users.map(function(u){return u.id}).join(',');
+                 displayEl.value = r.users.length + '人已选';
+             } else {
+                 hiddenEl.value = r.id;
+                 displayEl.value = r.label;
+             }
+         }, {multi: isMulti, title: title, dynamic: true});
+     })(this)">
+    <span class="input-icon-addon">
+        <i class="ti ti-users"></i>
+    </span>
+    <input type="hidden" name="{{ name }}"
+           value="{{ value }}" id="id_{{ name }}"
+           data-picker-widget="1">
+    <input type="text" class="form-control" readonly
+           value="{{ display_value }}"
+           id="id_{{ name }}__display"
+           placeholder="{{ attrs.placeholder|default:'点击选择人员...' }}">
+</div>

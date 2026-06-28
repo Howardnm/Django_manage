@@ -14,6 +14,12 @@
     <link rel="stylesheet" href="{% static 'css/common/tomselect_tabler.css' %}">
     <!-- 修复 body 左侧滚动条缝隙 -->
     <link rel="stylesheet" href="{% static 'css/common/layout_fix.css' %}">
+    <!-- 侧边栏样式（全局加载） -->
+    <link rel="stylesheet" href="{% static 'css/common/sidebar.css' %}">
+    <!-- 通用搜索选择器模态框样式（全局加载） -->
+    <link rel="stylesheet" href="{% static 'css/common/search_picker_modal.css' %}">
+    <!-- 人员选择器模态框样式（全局加载，搜索选择器 user 字段类型依赖） -->
+    <link rel="stylesheet" href="{% static 'css/common/user_picker_modal.css' %}">
     <!-- Tabler Icons Webfont -->
     <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}"/>
     <!-- 引入 HTMX, 建议放在 <head> 中 -->
@@ -61,6 +67,9 @@
 <script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
 <script src="{% static 'tom-select/core-2.2.2/dist/js/tom-select.complete.min.js' %}"></script>
 <script src="{% static 'js/common/tomselect_remote.js' %}"></script>
+<script src="{% static 'js/common/search_picker_modal.js' %}"></script>
+<script src="{% static 'js/common/user_picker_modal.js' %}"></script>
+<script>window.USER_PICKER_API_URL = '{% url "user_tree_api" %}';</script>
 
 <!-- ======================================================= -->
 <!-- Tom Select 集成 (实现下拉搜索) 在base引入tom-select.complete.min.js -->

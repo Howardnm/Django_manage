@@ -8,6 +8,17 @@ class AppBasicResearchConfig(AppConfig):
     def ready(self):
         import app_basic_research.utils.signals
 
+        # 注册自动补全
+        from common_utils.autocomplete_registry import register_autocomplete
+        from app_basic_research.models import ResearchProject
+        from django.db.models import Q
+
+        register_autocomplete('research_project',
+            lambda q: ResearchProject.objects.filter(
+                Q(code__icontains=q) | Q(name__icontains=q)),
+            lambda r: {'value': r.pk, 'text': f'{r.code} {r.name}'},
+        )
+
         # 注册附件配置
         from app_attachment.registry import register_attachment
         from app_attachment.configs import AttachmentConfig

@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from app_basic_research.models import ResearchProject, ResearchStage
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
+from common_utils.forms import UserPickerWidget
 
 User = get_user_model()
 
@@ -36,13 +37,15 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         widget=forms.HiddenInput
     )
 
-    # 3. 负责人筛选
-    manager = django_filters.ModelChoiceFilter(
-        queryset=User.objects.filter(user_type=User.UserType.ENGINEER).order_by('username'),
-        field_name='manager',
+    # 3. 负责人筛选（组织架构树选择器）
+    manager = django_filters.CharFilter(
+        method='filter_manager',
         label='负责人',
-        empty_label="所有负责人",
-        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '负责人'})
+        widget=UserPickerWidget(
+            attrs={'placeholder': '点击选择负责人'},
+            title='选择负责人',
+            multi=False,
+        )
     )
 
     # 4. 阶段筛选
@@ -66,6 +69,14 @@ class ResearchProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
     class Meta:
         model = ResearchProject
         fields = ['q', 'manager', 'group', 'stage', 'start_date', 'end_date']
+
+    def filter_manager(self, queryset, name, value):
+        if not value:
+            return queryset
+        try:
+            return queryset.filter(manager_id=int(value))
+        except (ValueError, TypeError):
+            return queryset
 
     def filter_search(self, queryset, name, value):
         if not value:

@@ -1,0 +1,133 @@
+/* ==========================================
+   通用搜索选择器模态框 — includes/search_picker_modal.html
+   依赖: Bootstrap 5, Tabler 1.4.0 CSS 变量, TomSelect
+   支持: list / table 双展示模式, simple / multi 双搜索模式
+   ========================================== */
+
+/* ── 结果容器 ── */
+.search-picker-results {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+/* ── 状态提示（初始/空/错误/加载） ── */
+.search-picker-status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2.5rem 1rem;
+    color: var(--tblr-secondary, #6c757d);
+}
+.search-picker-status .ti {
+    font-size: 2.5rem;
+    display: block;
+    margin-bottom: 0.5rem;
+    opacity: 0.4;
+}
+
+.search-picker-spinner {
+    display: flex;
+    justify-content: center;
+    padding: 2rem;
+}
+
+/* ── 列表模式 ── */
+.search-picker-list .list-group-item {
+    cursor: pointer;
+    transition: background-color 0.15s;
+}
+.search-picker-list .list-group-item.active {
+    background-color: var(--tblr-teal-lt, rgba(14, 166, 132, 0.1));
+    border-color: var(--tblr-teal-lt, rgba(14, 166, 132, 0.15));
+}
+
+/* ── 表格模式 ── */
+.search-picker-table-wrapper {
+    max-height: 50vh;
+    overflow-y: auto;
+}
+.search-picker-table {
+    margin-bottom: 0;
+}
+.search-picker-table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.1s;
+}
+.search-picker-table tbody tr:hover {
+    background-color: var(--tblr-gray-100, #f8f9fa);
+}
+.search-picker-table tbody tr.table-active {
+    background-color: var(--tblr-teal-lt, rgba(14, 166, 132, 0.1));
+}
+
+/* 选中勾标 */
+.search-picker-check {
+    color: var(--tblr-teal, #14a684);
+    margin-left: 0.5rem;
+}
+
+/* ── 详情链接（列表和表格共用） ── */
+.search-detail-link {
+    flex-shrink: 0;
+    cursor: pointer;
+}
+.search-detail-link:hover {
+    opacity: 0.7;
+}
+
+/* ── 分页 ── */
+.search-picker-pagination {
+    display: none;
+}
+.search-picker-pagination.visible {
+    display: flex;
+}
+
+/* ── 多字段搜索表单（multi 模式） ── */
+.search-picker-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+.search-picker-field {
+    flex: 1 1 180px;
+    min-width: 150px;
+}
+.search-picker-field label {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 500;
+    margin-bottom: 0.25rem;
+    color: var(--tblr-secondary, #6c757d);
+}
+.search-picker-field input,
+.search-picker-field select {
+    width: 100%;
+}
+.search-picker-field .ts-wrapper {
+    width: 100%;
+}
+
+/* ── 人员选择器字段（user 类型） ── */
+.search-picker-field-user {
+    display: flex;
+    gap: 0.25rem;
+}
+.search-picker-field-user input[readonly] {
+    flex: 1;
+    cursor: pointer;
+    background-color: var(--tblr-bg-surface, #fff);
+}
+.search-picker-field-user button {
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
+/* 搜索按钮 */
+.search-picker-field-btn {
+    flex: 0 0 auto;
+    align-self: flex-end;
+    min-width: auto;
+}

@@ -1,0 +1,189 @@
+/* ==========================================
+   人员选择器模态框 — includes/user_picker_modal.html
+   依赖: Bootstrap 5
+   ========================================== */
+
+.user-picker-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 10001;
+    align-items: center;
+    justify-content: center;
+}
+
+.user-picker-overlay.show {
+    display: flex;
+}
+
+.user-picker-dialog {
+    background: #fff;
+    border-radius: var(--tblr-border-radius, 8px);
+    width: 560px;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 6px 30px rgba(0, 0, 0, 0.2);
+}
+
+.user-picker-header {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--tblr-border-color, #eee);
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.user-picker-body {
+    padding: 16px 20px;
+    flex: 1;
+    overflow-y: auto;
+    min-height: 300px;
+}
+
+.user-picker-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--tblr-border-color, #eee);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.user-picker-search {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #dcdfe6;
+    border-radius: var(--tblr-border-radius, 4px);
+    font-size: 14px;
+    margin-bottom: 12px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.user-picker-search:focus {
+    border-color: var(--tblr-primary, #409eff);
+}
+
+.user-picker-close {
+    cursor: pointer;
+    font-size: 20px;
+}
+
+/* Tree nodes */
+.tree-node {
+    user-select: none;
+}
+
+.tree-node-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 8px;
+    border-radius: var(--tblr-border-radius, 4px);
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.tree-node-header:hover {
+    background: var(--tblr-gray-100, #f0f2f5);
+}
+
+.tree-node-header.selected {
+    background: #ecf5ff;
+}
+
+.tree-node-arrow {
+    width: 16px;
+    font-size: 10px;
+    color: var(--tblr-gray-500, #909399);
+    text-align: center;
+    flex-shrink: 0;
+    transition: transform 0.15s;
+}
+
+.tree-node-arrow.expanded {
+    transform: rotate(90deg);
+}
+
+.tree-node-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.tree-node-label {
+    font-size: 13px;
+    color: #303133;
+}
+
+.tree-node-label.user {
+    font-size: 13px;
+}
+
+.tree-node-children {
+    padding-left: 20px;
+    display: none;
+}
+
+.tree-node-children.open {
+    display: block;
+}
+
+.tree-leaf {
+    padding: 4px 8px 4px 28px;
+    border-radius: var(--tblr-border-radius, 4px);
+    cursor: pointer;
+    font-size: 13px;
+    color: #303133;
+    transition: background 0.1s;
+}
+
+.tree-leaf:hover {
+    background: var(--tblr-gray-100, #f0f2f5);
+}
+
+.tree-leaf.selected {
+    background: #ecf5ff;
+    color: var(--tblr-primary, #409eff);
+    font-weight: 500;
+}
+
+/* Footer */
+.user-picker-selected-text {
+    font-size: 13px;
+    color: var(--tblr-gray-600, #606266);
+    flex: 1;
+}
+
+.user-picker-cancel-btn {
+    border: 1px solid #dcdfe6;
+    background: #fff;
+    padding: 6px 16px;
+    border-radius: var(--tblr-border-radius, 4px);
+    cursor: pointer;
+}
+
+.user-picker-confirm-btn {
+    border: none;
+    background: var(--tblr-primary, #409eff);
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: var(--tblr-border-radius, 4px);
+    cursor: pointer;
+}
+
+.user-picker-confirm-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.user-picker-empty {
+    text-align: center;
+    color: var(--tblr-gray-500, #909399);
+    padding: 30px;
+}

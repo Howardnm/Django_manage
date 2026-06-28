@@ -1,5 +1,8 @@
+{% load static %}
 {% load project_extras %}
 <!-- 消息通知 (Notifications) -->
+<link rel="stylesheet" href="{% static 'css/common/header_notifications.css' %}">
+
 <div class="nav-item dropdown me-3">
     <a href="#" class="nav-link px-0" data-bs-toggle="dropdown" tabindex="-1" aria-label="Show notifications" aria-expanded="false">
         <i class="ti ti-bell fs-2"></i>
@@ -8,7 +11,7 @@
         {% endif %}
     </a>
 
-    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card" style="width: 430px;">
+    <div class="dropdown-menu dropdown-menu-arrow dropdown-menu-end dropdown-menu-card notifications-dropdown">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">最近消息</h3>
@@ -16,8 +19,8 @@
                     <a href="{% url 'notification_mark_all_as_read' %}" class="ms-auto small text-secondary">全部标记为已读</a>
                 {% endif %}
             </div>
-            <div class="list-group list-group-flush list-group-hoverable" style="max-height: 380px; overflow-y: auto;">
-                
+            <div class="list-group list-group-flush list-group-hoverable notifications-list">
+
                 {% for notification in unread_notifications %}
                     <a href="{% url 'notification_mark_as_read' notification.pk %}" class="list-group-item list-group-item-action">
                         <div class="row align-items-center">
@@ -27,7 +30,7 @@
                             <div class="col">
                                 {# --- 第一行：谁，关于什么项目 --- #}
                                 <div class="d-flex align-items-center mb-1">
-                                    <span class="fw-bold text-truncate" style="max-width: 80px;">{{ notification.actor.username|default:"系统" }}</span>
+                                    <span class="fw-bold text-truncate notification-actor">{{ notification.actor.username|default:"系统" }}</span>
                                     {% if notification.action_object %}
                                         <span class="badge bg-blue-lt ms-2 me-auto text-truncate" title="项目名称">
                                             <i class="ti ti-folder-filled opacity-50"></i>{{ notification.action_object.name }}
@@ -37,7 +40,7 @@
                                         </span>
                                     {% endif %}
                                 </div>
-                                
+
                                 {# --- 第二行：核心动作 --- #}
                                 <div class="text-secondary text-truncate mb-1">
                                     {{ notification.verb }}
@@ -50,7 +53,7 @@
                                             <span class="badge bg-purple-lt">
                                                 第{{ notification.target.round }}轮
                                             </span>
-                                            <span class="badge {{ notification.target.status_css_class }} me-2" style="min-width: 55px;">
+                                            <span class="badge {{ notification.target.status_css_class }} notification-status-badge">
                                                 {{ notification.target.get_status_display }}
                                             </span>
                                         {% endif %}
@@ -69,7 +72,7 @@
                     </div>
                 {% endfor %}
             </div>
-            
+
             <div class="card-footer text-center">
                 <a href="{% url 'notification_list' %}" class="text-secondary">查看所有消息</a>
             </div>
