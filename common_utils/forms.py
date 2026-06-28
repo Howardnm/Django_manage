@@ -58,12 +58,24 @@ class UserPickerWidget(forms.TextInput):
         return mark_safe(render_to_string(self.template_name, context))
 
     def _get_display_value(self, value):
-        """给定 value（用户 ID 或 逗号分隔的 IDs），尝试获取 display label。"""
+        """给定 value（用户 ID 或逗号分隔的 IDs），查询数据库获取 display label。
+
+        解决 GET 请求带参数重新加载页面时，display input 为空的问题。
+        """
         if not value:
             return ''
-        # 简单返回 raw value — JS 会在 confirm 时写入 display
-        # 如需回显历史选中值，由调用方通过 Widget 的 value_from_datadict 处理
-        return ''
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        ids = [int(v) for v in str(value).split(',') if v.strip().isdigit()]
+        if not ids:
+            return ''
+        users = list(User.objects.filter(pk__in=ids).only('pk', 'username', 'first_name'))
+        if not users:
+            return ''
+        if self.multi:
+            return f'{len(users)}人已选'
+        u = users[0]
+        return f'{u.first_name or u.username} ({u.username})'
 
     class Media:
         css = {'all': ['css/common/user_picker_modal.css']}
