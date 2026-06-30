@@ -12,25 +12,23 @@
     </div>
     <div class="card-body">
         <div class="row">
-            <!-- 第一行：牌号 + 厂家 -->
-            <div class="col-md-6 mb-3">
-                <label class="form-label required">材料牌号 (Grade Name)</label>
+            <!-- 第一行：牌号 + 厂家 + 分类 + SAP -->
+            <div class="col-md-3 mb-3">
+                <label class="form-label required">材料牌号</label>
                 {{ form.grade_name }}
                 {% if form.grade_name.errors %}
                     <div class="invalid-feedback d-block">{{ form.grade_name.errors.0 }}</div>
                 {% endif %}
             </div>
-            <div class="col-md-6 mb-3">
-                <label class="form-label">生产厂家 (Manufacturer)</label>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">生产厂家</label>
                 {{ form.manufacturer }}
             </div>
-
-            <!-- 第二行：分类 + SAP物料号 -->
-            <div class="col-md-6 mb-3">
+            <div class="col-md-3 mb-3">
                 <label class="form-label required">所属类型</label>
                 {{ form.category }}
             </div>
-            <div class="col-md-6 mb-3">
+            <div class="col-md-3 mb-3">
                 <label class="form-label required">SAP物料号</label>
                 {{ form.sap_material_code }}
                 {% if form.sap_material_code.errors %}
@@ -38,13 +36,28 @@
                 {% endif %}
             </div>
 
-            <!-- 第三行：阻燃等级 -->
-            <div class="col-md-6 mb-3">
+            <!-- 第二行：阻燃等级 + 颜色名称 + 潘通 + RGB -->
+            <div class="col-md-3 mb-3">
                 <label class="form-label">阻燃等级</label>
                 {{ form.flammability }}
             </div>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">材料颜色名称</label>
+                {{ form.material_color_name }}
+                <small class="form-hint">例如：哑光黑、亮白</small>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">潘通色彩编号</label>
+                {{ form.pantone_code }}
+                <small class="form-hint">例如：PANTONE 19-4052</small>
+            </div>
+            <div class="col-md-3 mb-3">
+                <label class="form-label">RGB色值</label>
+                {{ form.rgb_value }}
+                <small class="form-hint">十六进制颜色值，例如 #FF5733</small>
+            </div>
 
-            <!-- 第四行：特征属性 -->
+            <!-- 第三行：特征属性 -->
             <div class="col-md-12 mb-3">
                 <label class="form-label">材料特征属性</label>
                 {{ form.characteristics }}

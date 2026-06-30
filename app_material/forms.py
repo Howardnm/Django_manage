@@ -27,6 +27,10 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'SAP物料编码，如：A01000212345'}),
             # 对外发布开关 (使用 Tabler 的 switch 样式，通过 CSS 控制)
             'is_published': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            # 颜色字段
+            'material_color_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：哑光黑、亮白'}),
+            'pantone_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：PANTONE 19-4052'}),
+            'rgb_value': forms.TextInput(attrs={'class': 'form-control d-block', 'data-coloris': '', 'placeholder': '#FF5733', 'maxlength': 7}),
         }
 
     def __init__(self, *args, **kwargs):

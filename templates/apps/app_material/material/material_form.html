@@ -1,4 +1,22 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/coloris.min.css' %}">
+<style>
+    /* 恢复 Tabler 对 Coloris 色块的圆角方块样式，覆盖 coloris.css 的默认值 */
+    .clr-field button {
+        width: 1.5rem;
+        height: 1.5rem;
+        left: 6px;
+        right: auto;
+        border-radius: 6px;
+    }
+    .clr-field input {
+        padding-left: 2.5rem !important;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
     <div class="page-header d-print-none">
@@ -145,4 +163,20 @@
             });
         });
     </script>
+
+<script src="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/umd/coloris.min.js' %}"></script>
+<script>
+    Coloris.init();
+    Coloris({
+        el: '[data-coloris]',
+        theme: 'default',
+        themeMode: 'light',
+        format: 'hex',
+        alpha: false,
+        clearButton: true,
+        clearLabel: '清除',
+        closeButton: true,
+        closeLabel: '关闭',
+    });
+</script>
 {% endblock %}

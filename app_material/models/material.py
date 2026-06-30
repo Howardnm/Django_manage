@@ -105,8 +105,13 @@ class MaterialLibrary(models.Model):
     # 新增：对外发布开关 (用于控制电子手册是否显示)
     is_published = models.BooleanField("对外发布", default=False, help_text="勾选后，该材料将同步并显示在电子手册系统中。")
 
-    flammability = models.CharField("阻燃等级", max_length=20, blank=True,
-                                    choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
+    flammability = models.CharField("阻燃等级", max_length=20, blank=True, choices=[('HB', 'HB'), ('V-2', 'V-2'), ('V-0', 'V-0'), ('5VB', '5VB'), ('5VA', '5VA')])
+
+    # 材料颜色信息
+    material_color_name = models.CharField("材料颜色名称", max_length=100, blank=True, help_text="例如：哑光黑、亮白、透明蓝")
+    pantone_code = models.CharField("潘通色彩编号", max_length=50, blank=True, help_text="例如：PANTONE 19-4052 Classic Blue")
+    rgb_value = models.CharField("RGB色值", max_length=7, blank=True, help_text="十六进制颜色值，例如 #FF5733")
+
     description = models.TextField("特性描述", blank=True)
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
 

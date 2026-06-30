@@ -60,6 +60,28 @@
             </div>
 
             <div class="datagrid-item">
+                <div class="datagrid-title">材料颜色名称</div>
+                <div class="datagrid-content">{{ material.material_color_name|default:"-" }}</div>
+            </div>
+
+            <div class="datagrid-item">
+                <div class="datagrid-title">潘通色彩编号</div>
+                <div class="datagrid-content">{{ material.pantone_code|default:"-" }}</div>
+            </div>
+
+            <div class="datagrid-item">
+                <div class="datagrid-title">RGB色值</div>
+                <div class="datagrid-content">
+                    {% if material.rgb_value %}
+                        <span class="color-preview d-inline-block rounded me-2" style="width:16px;height:16px;background:{{ material.rgb_value }};vertical-align:middle;"></span>
+                        {{ material.rgb_value }}
+                    {% else %}
+                        <span class="text-muted">-</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="datagrid-item">
                 <div class="datagrid-title">适用场景</div>
                 <div class="datagrid-content">
                     {% if material.scenarios.exists %}
