@@ -361,3 +361,236 @@ class SampleInventoryService:
                 })
 
         return events
+
+    @staticmethod
+    def get_order_sap_material_code(production_order):
+        """沿工单 trial_code→LabFormula→project→material 链查找 SAP 物料号。
+
+        Args:
+            production_order: ProductionOrder 实例
+
+        Returns:
+            str: 第一个非空 SAP 物料号，找不到返回空字符串
+        """
+        from app_formula.models import LabFormula
+
+        if not production_order.trial_code:
+            return ''
+
+        formulas = LabFormula.objects.filter(
+            code=production_order.trial_code,
+            project__material__sap_material_code__gt='',
+        ).select_related('project__material')[:1]
+
+        for f in formulas:
+            if f.project and f.project.material:
+                return f.project.material.sap_material_code
+        return ''
+
+    @staticmethod
+    def compute_orphan_summary(orphan_samples):
+        """计算独立样品的汇总统计。
+
+        Args:
+            orphan_samples: list of SampleInventory
+
+        Returns:
+            dict with pellet/kg and specimen counts
+        """
+        summary = {
+            'total': len(orphan_samples),
+            'pellet_finished_count': 0,
+            'pellet_finished_kg': 0.0,
+            'pellet_finished_in_lab': 0,
+            'pellet_for_injection_count': 0,
+            'pellet_for_injection_kg': 0.0,
+            'specimen_for_testing_count': 0,
+            'specimen_tested_count': 0,
+        }
+        for s in orphan_samples:
+            if s.type == 'PELLET':
+                qty = float(s.quantity or 0)
+                if s.sub_type == 'FINISHED':
+                    summary['pellet_finished_count'] += 1
+                    summary['pellet_finished_kg'] += qty
+                    if s.status == 'IN_LAB':
+                        summary['pellet_finished_in_lab'] += 1
+                elif s.sub_type == 'FOR_INJECTION':
+                    summary['pellet_for_injection_count'] += 1
+                    summary['pellet_for_injection_kg'] += qty
+            elif s.type == 'SPECIMEN':
+                if s.sub_type == 'FOR_TESTING':
+                    summary['specimen_for_testing_count'] += 1
+                elif s.sub_type == 'TESTED':
+                    summary['specimen_tested_count'] += 1
+        return summary
+
+    @staticmethod
+    def get_order_sample_summaries(production_order_ids, sample_qs):
+        """按工单汇总已筛选样品的统计信息。
+
+        Args:
+            production_order_ids: set/list of ProductionOrder pk
+            sample_qs: QuerySet[SampleInventory] — 已应用筛选条件的样品 QuerySet
+
+        Returns:
+            dict: {order_id: {
+                'total_samples': int,
+                'pellet_finished_kg': Decimal,
+                'pellet_for_injection_kg': Decimal,
+                'specimen_for_testing_count': int,
+                'specimen_tested_count': int,
+                'active_status': str,  # 该工单组中最多见的非CONSUMED状态
+            }}
+        """
+        from collections import Counter
+        from django.db.models import Q
+
+        summaries = {}
+        if not production_order_ids:
+            return summaries
+
+        status_counter = {}
+
+        for sample in sample_qs.select_related(None).prefetch_related(None):
+            oid = sample.production_order_id
+            if not oid or oid not in production_order_ids:
+                continue
+            if oid not in summaries:
+                summaries[oid] = {
+                    'total_samples': 0,
+                    'pellet_finished_kg': 0,
+                    'pellet_for_injection_kg': 0,
+                    'specimen_for_testing_count': 0,
+                    'specimen_tested_count': 0,
+                    'pellet_finished_sap': 0,   # 已入SAP的成品颗粒数
+                    'pellet_finished_in_lab': 0,  # 仍在实验房的成品颗粒数
+                }
+                status_counter[oid] = Counter()
+
+            s = summaries[oid]
+            s['total_samples'] += 1
+            status_counter[oid][sample.status] += 1
+
+            if sample.type == 'PELLET':
+                qty = float(sample.quantity or 0)
+                if sample.sub_type == 'FINISHED':
+                    s['pellet_finished_kg'] += qty
+                    if sample.status == 'SAP_STORED':
+                        s['pellet_finished_sap'] += 1
+                    elif sample.status == 'IN_LAB':
+                        s['pellet_finished_in_lab'] += 1
+                elif sample.sub_type == 'FOR_INJECTION':
+                    s['pellet_for_injection_kg'] += qty
+            elif sample.type == 'SPECIMEN':
+                if sample.sub_type == 'FOR_TESTING':
+                    s['specimen_for_testing_count'] += 1
+                elif sample.sub_type == 'TESTED':
+                    s['specimen_tested_count'] += 1
+
+        for oid, counter in status_counter.items():
+            # 优先 IN_LAB > SAP_STORED > 其他，取最活跃的状态
+            active = 'IN_LAB' if 'IN_LAB' in counter else (
+                'SAP_STORED' if 'SAP_STORED' in counter else (
+                    counter.most_common(1)[0][0] if counter else ''
+                )
+            )
+            summaries[oid]['active_status'] = active
+
+        return summaries
+
+    @staticmethod
+    def build_order_groups(samples_qs):
+        """按 production_order 分组样品 + 计算汇总统计（供列表页复用）。
+
+        将已筛选的 SampleInventory QuerySet 分为两组：
+        - 关联工单的样品 → 按工单分组，每组附带汇总统计
+        - 独立样品（无工单关联）→ 平铺列表
+
+        Args:
+            samples_qs: QuerySet[SampleInventory] — 已应用筛选条件的样品
+
+        Returns:
+            (groups, orphan_samples)
+            groups: list[dict] — [{'order': ProductionOrder, 'samples': [...], 'summary': {...}, 'samples_count': int}, ...]
+            orphan_samples: list[SampleInventory] — production_order=None 的样品
+        """
+        from collections import OrderedDict
+        from app_trial_production.models import ProductionOrder
+
+        order_samples = OrderedDict()
+        orphan = []
+        for s in samples_qs:
+            if s.production_order_id:
+                key = s.production_order_id
+                if key not in order_samples:
+                    order_samples[key] = []
+                order_samples[key].append(s)
+            else:
+                orphan.append(s)
+
+        order_ids = list(order_samples.keys())
+        orders_map = {}
+        if order_ids:
+            orders = ProductionOrder.objects.filter(
+                pk__in=order_ids,
+            ).select_related('project', 'creator')
+            orders_map = {o.pk: o for o in orders}
+
+        summaries = SampleInventoryService.get_order_sample_summaries(
+            set(orders_map.keys()),
+            samples_qs.filter(production_order__in=order_ids),
+        )
+
+        groups = []
+        for oid, samples in order_samples.items():
+            order = orders_map.get(oid)
+            if not order:
+                orphan.extend(samples)
+                continue
+            summary = summaries.get(oid, {})
+            groups.append({
+                'order': order,
+                'samples': samples,
+                'summary': summary,
+                'samples_count': len(samples),
+            })
+
+        groups.sort(key=lambda g: g['order'].code or '', reverse=True)
+        return groups, orphan
+
+    @staticmethod
+    @transaction.atomic
+    def create_standalone_sample(data):
+        """创建不关联工单的独立样品。
+
+        用于样品库手动新增场景，不绑定任何 ProductionOrder。
+
+        Args:
+            data: dict with keys matching SampleInventory fields:
+                type, sub_type, formula_id (optional), trial_code (optional),
+                quantity (for PELLET), specimen_count/specimen_qualified (for SPECIMEN),
+                storage_location, packaging_desc, mold_id (optional), batch_label (optional)
+
+        Returns:
+            SampleInventory 实例
+        """
+        sample = SampleInventory.objects.create(
+            type=data['type'],
+            sub_type=data['sub_type'],
+            status='IN_LAB',
+            production_order=None,
+            formula_id=data.get('formula_id'),
+            trial_code=data.get('trial_code', ''),
+            quantity=data.get('quantity'),
+            specimen_count=data.get('specimen_count'),
+            specimen_qualified=data.get('specimen_qualified'),
+            storage_location=data.get('storage_location', ''),
+            packaging_desc=data.get('packaging_desc', ''),
+            mold_id=data.get('mold_id'),
+            batch_label=data.get('batch_label', ''),
+            batch_number=data.get('batch_label', ''),  # 独立样品用 batch_label 作为批次号
+        )
+
+        logger.info(f"Standalone sample {sample.pk} created (type={sample.type}, sub_type={sample.sub_type})")
+        return sample

@@ -1,7 +1,7 @@
 import logging
 
 from django.views.generic import ListView, DetailView, View
-from django.shortcuts import redirect, get_object_or_404
+from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
 from django.db.models import Count
 from app_material_testing.mixins import TestingAccessMixin
@@ -213,3 +213,72 @@ class WriteBackView(TestingAccessMixin, View):
             logger.exception(f"Write-back failed for task {task.pk}")
             messages.error(request, '回写测试结果时发生错误，请稍后重试')
         return redirect('material_testing:detail', pk=pk)
+
+
+# ── 样条库存（测试中心管辖） ──────────────────────────────────────────
+
+class TestingSampleListView(TestingAccessMixin, View):
+    """测试中心样条库存列表 — 全部样条（FOR_TESTING + TESTED），按工单分组表格呈现。"""
+
+    template_name = 'apps/app_material_testing/specimens.html'
+    paginate_by = 20
+
+    def _get_filtered_qs(self, request):
+        from app_trial_production.models import SampleInventory
+        from app_trial_production.filters import SampleInventoryFilter
+
+        qs = SampleInventory.objects.select_related(
+            'production_order',
+            'production_order__project',
+            'formula',
+            'mold',
+            'injection_task',
+        ).prefetch_related('injection_tasks')
+
+        # Hard-code 范围：所有样条
+        qs = qs.filter(type='SPECIMEN')
+        # 排除已消耗
+        qs = qs.exclude(status='CONSUMED')
+
+        self.filter = SampleInventoryFilter(request.GET, queryset=qs)
+        qs = self.filter.qs
+
+        # 子类型筛选（默认全部样条）
+        sub_type_param = request.GET.get('sub_type', '')
+        if sub_type_param == 'FOR_TESTING':
+            qs = qs.filter(sub_type='FOR_TESTING')
+        elif sub_type_param == 'TESTED':
+            qs = qs.filter(sub_type='TESTED')
+
+        return qs.order_by('-created_at')
+
+    def get(self, request):
+        from django.core.paginator import Paginator
+        from app_trial_production.services import SampleInventoryService
+
+        samples_qs = self._get_filtered_qs(request)
+        order_groups, orphan_samples = SampleInventoryService.build_order_groups(samples_qs)
+
+        has_order = request.GET.get('has_order', '')
+        show_orphan_only = (has_order == 'false')
+
+        page_num = int(request.GET.get('page', 1))
+
+        if show_orphan_only:
+            paginator = Paginator(orphan_samples, self.paginate_by)
+            page_obj = paginator.get_page(page_num)
+        else:
+            paginator = Paginator(order_groups, self.paginate_by)
+            page_obj = paginator.get_page(page_num)
+
+        context = {
+            'order_groups': order_groups,
+            'orphan_samples': orphan_samples,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'filter': self.filter,
+            'current_sub_type': request.GET.get('sub_type', ''),
+            'show_orphan_only': show_orphan_only,
+            'orphan_count': len(orphan_samples),
+        }
+        return render(request, self.template_name, context)

@@ -9,9 +9,9 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">样品库存</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">成品颗粒库存</a></li>
                     {% if not is_batch and samples|length == 1 %}
-                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_detail' samples.0.pk %}">{{ samples.0.trial_code }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_detail' samples.0.pk %}?from=trial">{{ samples.0.trial_code }}</a></li>
                     {% endif %}
                     <li class="breadcrumb-item active">{% if is_batch %}批量SAP入库{% else %}SAP入库{% endif %}</li>
                 </ol>
@@ -114,7 +114,7 @@
                             {% if is_batch %}确认批量入库 ({{ samples|length }} 条){% else %}确认入库{% endif %}
                         </button>
                         {% if not is_batch and samples|length == 1 %}
-                        <a href="{% url 'trial_sample_detail' samples.0.pk %}" class="btn btn-outline-secondary">取消</a>
+                        <a href="{% url 'trial_sample_detail' samples.0.pk %}?from=trial" class="btn btn-outline-secondary">取消</a>
                         {% else %}
                         <a href="{% url 'trial_sample_list' %}" class="btn btn-outline-secondary">取消</a>
                         {% endif %}

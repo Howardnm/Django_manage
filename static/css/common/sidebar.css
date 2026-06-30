@@ -37,7 +37,7 @@
 .navbar-vertical .nav-item.active > .nav-link,
 .navbar-vertical .nav-link.active {
     background-color: var(--sidebar-active-bg);
-    color: #ffffff;
+    color: #71bfff;
     box-shadow: inset 2px 0 0 var(--tblr-primary);
 }
 

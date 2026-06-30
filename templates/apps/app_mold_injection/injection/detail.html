@@ -67,7 +67,7 @@
                     <div class="datagrid-item">
                         <div class="datagrid-title">物料来源(样品库)</div>
                         <div class="datagrid-content">
-                            <a href="{% url 'trial_sample_detail' injection_task.sample_inventory.pk %}">
+                            <a href="{% url 'trial_sample_detail' injection_task.sample_inventory.pk %}?from=mold_injection">
                                 {{ injection_task.sample_inventory.trial_code }} - {{ injection_task.sample_inventory.quantity }}kg
                             </a>
                         </div>

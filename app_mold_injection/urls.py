@@ -7,6 +7,9 @@ from app_mold_injection.views.injection import (
 from app_mold_injection.views.mold import (
     MoldTypeListView, MoldTypeCreateView, MoldTypeUpdateView,
 )
+from app_mold_injection.views.sample import (
+    MoldSampleListView, MoldSampleCreateView,
+)
 
 app_name = 'mold_injection'
 
@@ -23,4 +26,8 @@ urlpatterns = [
     path('molds/', MoldTypeListView.as_view(), name='mold_list'),
     path('molds/add/', MoldTypeCreateView.as_view(), name='mold_add'),
     path('molds/<int:pk>/edit/', MoldTypeUpdateView.as_view(), name='mold_edit'),
+
+    # Sample inventory (injection scope: FOR_INJECTION pellets + FOR_TESTING specimens)
+    path('samples/', MoldSampleListView.as_view(), name='sample_list'),
+    path('samples/add/', MoldSampleCreateView.as_view(), name='sample_add'),
 ]

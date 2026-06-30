@@ -308,7 +308,7 @@ class MenuModule:
                 {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY},
                 {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_EXTRUSION_OP]},
                 {"name": "挤出任务", "url_name": "trial_extrusion_task_list"},
-                {"name": "样品库存", "url_name": "trial_sample_list"},
+                {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
                 {"name": "排产配置", "url_name": "trial_config", "visible_to": IdentityConfig.RND_ONLY, "permissions": ["app_trial_production.change_trialproductionconfig"]},
             ]
         }
@@ -336,6 +336,7 @@ class MenuModule:
             "url_name": "mold_injection:task_list",
             "sub_items": [
                 {"name": "注塑任务", "url_name": "mold_injection:task_list"},
+                {"name": "样品库存", "url_name": "mold_injection:sample_list"},
                 {"name": "模具台账", "url_name": "mold_injection:mold_list"},
             ]
         }
@@ -350,6 +351,7 @@ class MenuModule:
             "url_name": "material_testing:list",
             "sub_items": [
                 {"name": "测试任务", "url_name": "material_testing:list"},
+                {"name": "样条库存", "url_name": "material_testing:specimens"},
             ]
         }
 

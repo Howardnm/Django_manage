@@ -55,7 +55,7 @@
                                 <ul class="navbar-nav nav-sub-tree ms-3 ps-1 border-start border-white-subtle">
                                     {% for sub in item.sub_items %}
                                         <li class="nav-item">
-                                            <a class="nav-link py-1 px-3 mb-1 rounded-1 sidebar-sub-link {% if sub.is_active %}active text-white bg-primary-lt{% endif %}"
+                                            <a class="nav-link py-1 px-3 mb-1 rounded-1 sidebar-sub-link {% if sub.is_active %}active{% endif %}"
                                                href="{{ sub.url }}">
                                                 <span class="nav-link-title">{{ sub.name }}</span>
                                             </a>

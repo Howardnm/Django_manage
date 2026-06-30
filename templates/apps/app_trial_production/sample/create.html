@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}新增成品颗粒{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">成品颗粒库存</a></li>
+                    <li class="breadcrumb-item active">新增成品颗粒</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">
+            <i class="ti ti-plus me-2"></i>新增成品颗粒
+            <span class="text-muted small ms-2">（不关联工单，独立样品记录）</span>
+        </h2>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+    <div class="row">
+        <div class="col-lg-8">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">样品信息</h3>
+                </div>
+                <div class="card-body">
+                    <form method="POST" id="sample-create-form">
+                        {% csrf_token %}
+
+                        {# type / sub_type 固定为 PELLET + FINISHED — 隐藏字段 #}
+                        {{ form.type }}
+                        {{ form.sub_type }}
+
+                        {# 配方版本（可选） #}
+                        <div class="mb-3">
+                            <label class="form-label">配方版本（可选）</label>
+                            {{ form.formula }}
+                            {% if form.formula.errors %}
+                            <div class="text-danger small">{{ form.formula.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# 实验单号 #}
+                        <div class="mb-3">
+                            <label class="form-label">实验单号（可选）</label>
+                            {{ form.trial_code }}
+                            {% if form.trial_code.errors %}
+                            <div class="text-danger small">{{ form.trial_code.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# 数量 #}
+                        <div class="mb-3">
+                            <label class="form-label">数量(kg)</label>
+                            {{ form.quantity }}
+                            {% if form.quantity.errors %}
+                            <div class="text-danger small">{{ form.quantity.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# 包装说明 #}
+                        <div class="mb-3">
+                            <label class="form-label">包装说明（可选）</label>
+                            {{ form.packaging_desc }}
+                            {% if form.packaging_desc.errors %}
+                            <div class="text-danger small">{{ form.packaging_desc.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {# 存放位置 #}
+                        <div class="mb-3">
+                            <label class="form-label">存放位置（可选）</label>
+                            {{ form.storage_location }}
+                            {% if form.storage_location.errors %}
+                            <div class="text-danger small">{{ form.storage_location.errors }}</div>
+                            {% endif %}
+                        </div>
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <div class="d-flex gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="ti ti-plus me-1"></i>创建成品颗粒
+                            </button>
+                            <a href="{% url 'trial_sample_list' %}" class="btn btn-ghost-secondary">取消</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        {# 右侧提示 #}
+        <div class="col-lg-4">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="card-title">
+                        <i class="ti ti-info-circle me-1"></i>说明
+                    </h4>
+                    <ul class="list-unstyled text-muted">
+                        <li class="mb-2">
+                            <i class="ti ti-check text-green me-1"></i>
+                            在此创建的样品<strong>不关联任何工单</strong>。
+                        </li>
+                        <li class="mb-2">
+                            <i class="ti ti-check text-green me-1"></i>
+                            创建的样品为<strong>成品颗粒</strong>（PELLET + FINISHED）。
+                        </li>
+                        <li class="mb-2">
+                            <i class="ti ti-check text-green me-1"></i>
+                            成品颗粒可用于后续<strong>SAP 仓库入库</strong>。
+                        </li>
+                        <li class="text-muted">
+                            <i class="ti ti-alert-triangle text-warning me-1"></i>
+                            创建的样品默认状态为<strong>"在实验房"</strong>。
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{% static 'js/common/tomselect_remote.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 隐藏 type / sub_type 字段（固定值由视图层设置）
+    var typeEl = document.getElementById('id_type');
+    var subTypeEl = document.getElementById('id_sub_type');
+    if (typeEl) typeEl.parentElement.style.display = 'none';
+    if (subTypeEl) subTypeEl.parentElement.style.display = 'none';
+
+    // 初始化 TomSelect 远程搜索（配方选择）
+    initRemoteTomSelectAll(document, {
+        apiUrl: "{% url 'trial_api_search' %}",
+        valueField: 'id',
+        responseKey: 'results',
+    });
+});
+</script>
+{% endblock %}

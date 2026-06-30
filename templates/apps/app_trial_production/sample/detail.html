@@ -11,8 +11,8 @@
                 <div class="page-pretitle">
                     <nav aria-label="breadcrumb">
                         <ol class="breadcrumb">
-                            <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
-                            <li class="breadcrumb-item"><a href="{% url 'trial_sample_list' %}">样品库存</a></li>
+                            <li class="breadcrumb-item"><a href="{% url module.breadcrumb_parent_url %}">{{ module.breadcrumb_parent_name }}</a></li>
+                            <li class="breadcrumb-item"><a href="{% url module.list_url %}">{{ module.list_name }}</a></li>
                             <li class="breadcrumb-item active">样品详情</li>
                         </ol>
                     </nav>
@@ -34,7 +34,7 @@
                         <i class="ti ti-injection me-1"></i>创建注塑任务
                     </a>
                     {% endif %}
-                    <a href="{% url 'trial_sample_list' %}" class="btn btn-ghost-secondary">
+                    <a href="{% url module.list_url %}" class="btn btn-ghost-secondary">
                         <i class="ti ti-arrow-left me-1"></i>返回列表
                     </a>
                 </div>
@@ -44,81 +44,42 @@
 </div>
 
 <div class="container-xl mt-3">
-
-    {# ── 快速概览卡片 ────────────────────────────────────── #}
-    <div class="row row-cards mb-3">
-        <div class="col-sm-6 col-lg-3">
-            <div class="card">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <span class="avatar rounded bg-{% if sample.is_pellet %}green{% else %}yellow{% endif %}-lt">
-                        <i class="ti ti-beaker fs-1"></i>
-                    </span>
-                    <div>
-                        <div class="subheader">样品类型</div>
-                        <div class="fw-bold">{{ sample.get_type_display }} · {{ sample.get_sub_type_display }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <span class="avatar rounded bg-primary-lt">
-                        <i class="ti ti-scale fs-1"></i>
-                    </span>
-                    <div>
-                        <div class="subheader">数量</div>
-                        <div class="fw-bold">
-                            {% if sample.is_pellet %}{{ sample.quantity|default:0 }} kg{% else %}{{ sample.specimen_count|default:0 }} 条{% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <span class="avatar rounded bg-purple-lt">
-                        <i class="ti ti-hash fs-1"></i>
-                    </span>
-                    <div>
-                        <div class="subheader">批次号</div>
-                        <div class="fw-bold">{{ sample.batch_number|default:"-" }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-sm-6 col-lg-3">
-            <div class="card">
-                <div class="card-body p-3 d-flex align-items-center gap-3">
-                    <span class="avatar rounded bg-azure-lt">
-                        <i class="ti ti-map-pin fs-1"></i>
-                    </span>
-                    <div>
-                        <div class="subheader">存放位置</div>
-                        <div class="fw-bold">{{ sample.storage_location|default:"-" }}</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row row-cards g-3">
+    <div class="row g-3">
         {# ── 左栏 ────────────────────────────────────────── #}
         <div class="col-lg-8 d-flex flex-column gap-3">
 
-            {# 基本信息 + 数量详情 #}
+            {# 基本信息 #}
             <div class="card">
-                <div class="card-header bg-primary-lt">
+                <div class="card-header">
                     <h3 class="card-title">基本信息</h3>
                 </div>
                 <div class="card-body">
+                    {# 关键指标摘要行 #}
+                    <div class="row g-3 mb-3">
+                        <div class="col-sm-3">
+                            <div class="subheader">样品类型</div>
+                            <div class="fw-bold">{{ sample.get_type_display }} · {{ sample.get_sub_type_display }}</div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="subheader">数量</div>
+                            <div class="fw-bold">
+                                {% if sample.is_pellet %}{{ sample.quantity|default:0 }} kg{% else %}{{ sample.specimen_count|default:0 }} 条{% endif %}
+                            </div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="subheader">批次号</div>
+                            <div class="fw-bold">{{ sample.batch_number|default:"-" }}</div>
+                        </div>
+                        <div class="col-sm-3">
+                            <div class="subheader">存放位置</div>
+                            <div class="fw-bold">{{ sample.storage_location|default:"-" }}</div>
+                        </div>
+                    </div>
+
                     <div class="datagrid">
                         <div class="datagrid-item">
                             <div class="datagrid-title">实验单号</div>
-                            <div class="datagrid-content">
-                                <span class="fw-bold">{{ sample.trial_code }}</span>
-                            </div>
+                            <div class="datagrid-content"><span class="fw-bold">{{ sample.trial_code }}</span></div>
                         </div>
                         <div class="datagrid-item">
                             <div class="datagrid-title">配方版本</div>
@@ -147,12 +108,8 @@
                         {% endif %}
                         {% if sample.is_specimen %}
                         <div class="datagrid-item">
-                            <div class="datagrid-title">样条数量 / 合格</div>
-                            <div class="datagrid-content">
-                                <span class="fw-bold fs-4">{{ sample.specimen_count|default:0 }}</span>
-                                <span class="text-muted"> / </span>
-                                <span class="fw-bold fs-4 text-green">{{ sample.specimen_qualified|default:0 }}</span>
-                            </div>
+                            <div class="datagrid-title">合格数量</div>
+                            <div class="datagrid-content fw-bold text-green">{{ sample.specimen_qualified|default:0 }} 条</div>
                         </div>
                         <div class="datagrid-item">
                             <div class="datagrid-title">批次标签</div>
@@ -160,14 +117,26 @@
                         </div>
                         {% else %}
                         <div class="datagrid-item">
-                            <div class="datagrid-title">颗粒数量</div>
-                            <div class="datagrid-content">
-                                <span class="fw-bold fs-4">{{ sample.quantity|default:0 }} kg</span>
-                            </div>
-                        </div>
-                        <div class="datagrid-item">
                             <div class="datagrid-title">包装说明</div>
                             <div class="datagrid-content">{{ sample.packaging_desc|default:"-" }}</div>
+                        </div>
+                        {% endif %}
+                        {% if sample.status == 'SAP_STORED' %}
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">SAP物料号</div>
+                            <div class="datagrid-content">{{ sample.sap_material_code|default:"-" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">SAP批次号</div>
+                            <div class="datagrid-content">{{ sample.sap_batch_number|default:"-" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">入库日期</div>
+                            <div class="datagrid-content">{{ sample.sap_warehouse_date|date:"Y-m-d"|default:"-" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">SAP库位</div>
+                            <div class="datagrid-content">{{ sample.sap_storage_location|default:"-" }}</div>
                         </div>
                         {% endif %}
                         <div class="datagrid-item">
@@ -184,10 +153,48 @@
                 </div>
             </div>
 
+            {# 下游注塑任务 #}
+            {% if downstream_injection %}
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="ti ti-injection me-1 text-azure"></i>
+                        {% if sample.status == 'IN_LAB' %}下游注塑任务（预留）{% else %}下游注塑任务（已消耗）{% endif %}
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">注塑任务</div>
+                            <div class="datagrid-content">
+                                <a href="{% url 'mold_injection:task_detail' downstream_injection.pk %}">
+                                    注塑任务 #{{ downstream_injection.pk }}
+                                    <i class="ti ti-external-link ms-1 small text-muted"></i>
+                                </a>
+                            </div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">当前状态</div>
+                            <div class="datagrid-content">
+                                <span class="badge {{ downstream_injection.status_css_class }}">{{ downstream_injection.get_status_display }}</span>
+                            </div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">操作员</div>
+                            <div class="datagrid-content">{{ downstream_injection.operator.realname|default:"待分配" }}</div>
+                        </div>
+                        <div class="datagrid-item">
+                            <div class="datagrid-title">创建时间</div>
+                            <div class="datagrid-content text-muted">{{ downstream_injection.created_at|date:"Y-m-d H:i" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             {# 生命周期时间线 #}
             <div class="card">
-                <div class="card-status-top {% if sample.status == 'SAP_STORED' %}bg-green{% elif sample.status == 'CONSUMED' %}bg-purple{% else %}bg-primary{% endif %}"></div>
-                <div class="card-header bg-azure-lt">
+                <div class="card-header">
                     <h3 class="card-title">
                         <i class="ti ti-timeline me-1"></i>生命周期
                     </h3>
@@ -222,54 +229,12 @@
                 </div>
             </div>
 
-            {# 下游注塑任务 #}
-            {% if downstream_injection %}
-            <div class="card">
-                <div class="card-status-top bg-{% if sample.status == 'IN_LAB' %}orange{% else %}purple{% endif %}"></div>
-                <div class="card-header bg-{% if sample.status == 'IN_LAB' %}orange{% else %}purple{% endif %}-lt">
-                    <h3 class="card-title">
-                        <i class="ti ti-arrow-big-right me-1 text-{% if sample.status == 'IN_LAB' %}orange{% else %}purple{% endif %}"></i>
-                        {% if sample.status == 'IN_LAB' %}下游注塑任务（预留）{% else %}下游注塑任务（已消耗）{% endif %}
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="datagrid">
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">注塑任务</div>
-                            <div class="datagrid-content">
-                                <a href="{% url 'mold_injection:task_detail' downstream_injection.pk %}">
-                                    注塑任务 #{{ downstream_injection.pk }}
-                                    <i class="ti ti-external-link ms-1 small text-muted"></i>
-                                </a>
-                            </div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">当前状态</div>
-                            <div class="datagrid-content">
-                                <span class="badge {{ downstream_injection.status_css_class }}">
-                                    {{ downstream_injection.get_status_display }}
-                                </span>
-                            </div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">操作员</div>
-                            <div class="datagrid-content">{{ downstream_injection.operator.realname|default:"待分配" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">创建时间</div>
-                            <div class="datagrid-content text-muted">{{ downstream_injection.created_at|date:"Y-m-d H:i" }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
         </div>
 
         {# ── 右栏 ────────────────────────────────────────── #}
         <div class="col-lg-4 d-flex flex-column gap-3">
 
-            {# 状态徽章 + 去向提示 #}
+            {# 当前状态 #}
             <div class="card">
                 <div class="card-body text-center">
                     <span class="avatar avatar-lg rounded mb-3
@@ -295,41 +260,10 @@
                 </div>
             </div>
 
-            {# SAP 入库信息 #}
-            {% if sample.status == 'SAP_STORED' %}
-            <div class="card">
-                <div class="card-header bg-green-lt">
-                    <h3 class="card-title">
-                        <i class="ti ti-building-warehouse me-1 text-green"></i>SAP入库信息
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="datagrid">
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">SAP物料号</div>
-                            <div class="datagrid-content">{{ sample.sap_material_code|default:"-" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">SAP批次号</div>
-                            <div class="datagrid-content">{{ sample.sap_batch_number|default:"-" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">入库日期</div>
-                            <div class="datagrid-content">{{ sample.sap_warehouse_date|date:"Y-m-d"|default:"-" }}</div>
-                        </div>
-                        <div class="datagrid-item">
-                            <div class="datagrid-title">SAP库位</div>
-                            <div class="datagrid-content">{{ sample.sap_storage_location|default:"-" }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
             {# 上下游链接 #}
-            {% if sample.production_order or sample.injection_task or sample.is_specimen and sample.injection_task %}
+            {% if sample.production_order or sample.injection_task %}
             <div class="card">
-                <div class="card-header bg-secondary-lt">
+                <div class="card-header">
                     <h3 class="card-title">关联信息</h3>
                 </div>
                 <div class="list-group list-group-flush">
@@ -340,6 +274,16 @@
                             <div>
                                 <div class="fw-bold small">关联工单</div>
                                 <div class="text-muted small">{{ sample.production_order.code }}</div>
+                            </div>
+                            <i class="ti ti-chevron-right ms-auto text-muted"></i>
+                        </div>
+                    </a>
+                    <a href="{% url 'trial_sample_order_detail' sample.production_order.pk %}?from={{ request.GET.from|default:'trial' }}" class="list-group-item list-group-item-action">
+                        <div class="d-flex align-items-center">
+                            <i class="ti ti-package me-2 text-green"></i>
+                            <div>
+                                <div class="fw-bold small">工单样品清单</div>
+                                <div class="text-muted small">{{ sample.production_order.trial_code }}</div>
                             </div>
                             <i class="ti ti-chevron-right ms-auto text-muted"></i>
                         </div>
@@ -357,7 +301,7 @@
                         </div>
                     </a>
                     {% endif %}
-                    {% if downstream_injection and sample.status == 'CONSUMED' %}
+                    {% if downstream_injection %}
                     <a href="{% url 'mold_injection:task_detail' downstream_injection.pk %}" class="list-group-item list-group-item-action">
                         <div class="d-flex align-items-center">
                             <i class="ti ti-arrow-big-right me-2 text-purple"></i>
@@ -373,16 +317,16 @@
             </div>
             {% endif %}
 
-            {# 关联样品（同排产工单） #}
+            {# 关联样品（同排产工单 + 同类型范围） #}
             {% if related_samples %}
             <div class="card">
-                <div class="card-header bg-purple-lt">
-                    <h3 class="card-title me-2">关联样品</h3>
-                    <span class="text-purple">-- 同排产工单: {{ sample.production_order.code|default:sample.trial_code }}</span>
+                <div class="card-header">
+                    <h3 class="card-title">关联样品</h3>
+                    <span class="text-muted small ms-2">同工单 · {{ sample.get_sub_type_display }}</span>
                 </div>
                 <div class="list-group list-group-flush" style="max-height: 400px; overflow-y: auto;">
                     {% for rs in related_samples %}
-                    <a href="{% url 'trial_sample_detail' rs.pk %}" class="list-group-item list-group-item-action">
+                    <a href="{% url 'trial_sample_detail' rs.pk %}?from={{ request.GET.from|default:'trial' }}" class="list-group-item list-group-item-action">
                         <div class="d-flex align-items-center gap-2">
                             <span class="badge avatar avatar-xs rounded
                                 {% if rs.type == 'PELLET' and rs.sub_type == 'FINISHED' %}bg-green
@@ -405,7 +349,7 @@
                 </div>
                 {% if related_has_more %}
                 <div class="card-footer text-center py-2">
-                    <a href="{% url 'trial_sample_list' %}?project={{ sample.production_order.project_id }}&q={{ sample.production_order.code }}" class="text-muted small">
+                    <a href="{% url 'trial_sample_order_detail' sample.production_order.pk %}?from={{ request.GET.from|default:'trial' }}" class="text-muted small">
                         查看全部关联样品 →
                     </a>
                 </div>

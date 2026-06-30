@@ -149,17 +149,11 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
 
 class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    """样品库存筛选器 — 完整版：全文检索 + 多维度筛选 + 排序"""
+    """样品库存筛选器 — 各模块视图 hard-code type/sub_type 范围，此处只保留通用筛选"""
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
-    # type / sub_type / status 已由三层 Tab 卡片接管 — 保留为隐藏字段
-    type = django_filters.ChoiceFilter(
-        choices=SampleInventory.Type.choices, widget=forms.HiddenInput,
-    )
-    sub_type = django_filters.ChoiceFilter(
-        choices=SampleInventory.SubType.choices, widget=forms.HiddenInput,
-    )
+    # status 保留为隐藏字段（由各模块视图的状态 Tab 控制）
     status = django_filters.ChoiceFilter(
         choices=SampleInventory.Status.choices, widget=forms.HiddenInput,
     )
@@ -196,7 +190,7 @@ class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
 
     class Meta:
         model = SampleInventory
-        fields = ['q', 'type', 'sub_type', 'status', 'project',
+        fields = ['q', 'status', 'project',
                   'storage_location', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):

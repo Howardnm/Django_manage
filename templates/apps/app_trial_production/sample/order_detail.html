@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ order.code }} 样品详情{% endblock %}
+
+{% block content %}
+{# ── Page Header ─────────────────────────────────────────── #}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url module.breadcrumb_parent_url %}">{{ module.breadcrumb_parent_name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url module.list_url %}">{{ module.list_name }}</a></li>
+                    <li class="breadcrumb-item active">{{ order.code }} 样品详情</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex align-items-center">
+            <h2 class="page-title mb-0">
+                {{ order.code }}
+                <span class="badge {{ order.status_css_class }} ms-2">{{ order.get_status_display }}</span>
+            </h2>
+            <div class="ms-auto d-flex gap-2">
+                <a href="{% url module.list_url %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>返回列表
+                </a>
+                <a href="{% url 'trial_order_detail' order.pk %}" class="btn btn-outline-primary">
+                    <i class="ti ti-file-text me-1"></i>工单详情
+                </a>
+            </div>
+        </div>
+        <div class="text-muted small mt-1">
+            <i class="ti ti-file-text me-1"></i>{{ order.trial_code|default:"-" }}
+            {% if order.project %}
+            <span class="mx-1">·</span>
+            <i class="ti ti-building me-1"></i>{{ order.project.name }}
+            {% endif %}
+            <span class="mx-1">·</span>
+            创建于 {{ order.created_at|date:"Y-m-d H:i" }}
+        </div>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+    {# ── SAP 入库操作卡片（仅排产模块可见） ─────────────── #}
+    {% if sap_eligible and formset %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-building-warehouse me-2 text-green"></i>SAP 入库操作
+            </h3>
+            <span class="badge bg-green-lt text-green ms-2">{{ sap_eligible|length }} 条可入库</span>
+        </div>
+        <div class="card-body">
+            <form method="POST" id="sap-entry-form">
+                {% csrf_token %}
+                {{ formset.management_form }}
+
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter">
+                        <thead>
+                            <tr>
+                                <th style="width: 40px;">#</th>
+                                <th>实验单号</th>
+                                <th>批次号</th>
+                                <th>配方版本</th>
+                                <th>数量(kg)</th>
+                                <th>存放位置</th>
+                                <th style="min-width: 140px;">SAP物料号</th>
+                                <th style="min-width: 130px;">SAP批次号</th>
+                                <th style="min-width: 130px;">SAP入库日期</th>
+                                <th style="min-width: 120px;">SAP库位</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for form in formset.forms %}
+                            {% with sample=form.instance %}
+                            <tr class="sap-row {% if sample.status != 'IN_LAB' %}table-secondary{% endif %}">
+                                <td>{{ forloop.counter }}</td>
+                                <td>
+                                    <span class="fw-bold">{{ sample.trial_code|default:"-" }}</span>
+                                </td>
+                                <td>
+                                    <code>{{ sample.batch_number|default:"-" }}</code>
+                                </td>
+                                <td>
+                                    {% if sample.formula %}
+                                    {{ sample.formula.name }} <span class="text-muted">v{{ sample.formula.version }}</span>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td class="fw-bold">{{ sample.quantity|default:"-" }} kg</td>
+                                <td>{{ sample.storage_location|default:"-" }}</td>
+                                <td>
+                                    {{ form.id }}
+                                    {{ form.sap_material_code }}
+                                    {% if form.sap_material_code.errors %}
+                                    <div class="text-danger small">{{ form.sap_material_code.errors }}</div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {{ form.sap_batch_number }}
+                                </td>
+                                <td>
+                                    {{ form.sap_warehouse_date }}
+                                </td>
+                                <td>
+                                    {{ form.sap_storage_location }}
+                                </td>
+                            </tr>
+                            {% endwith %}
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="d-flex align-items-center mt-3">
+                    <div class="text-muted small">
+                        <i class="ti ti-info-circle me-1"></i>
+                        仅填写了 <strong>SAP物料号</strong> 的行会被提交入库，
+                        其余行将被跳过。
+                    </div>
+                    <div class="ms-auto">
+                        <button type="submit" class="btn btn-success">
+                            <i class="ti ti-building-warehouse me-1"></i>
+                            提交入库（将入库 <span id="filled-count">{{ sap_eligible|length }}</span> 条）
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── 所有样品清单卡片 ───────────────────────────────── #}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-list me-2"></i>{{ module.list_name }}样品清单
+            </h3>
+            <span class="badge bg-secondary-lt ms-2">{{ all_samples|length }} 条</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>实验单号</th>
+                        <th>类型</th>
+                        <th>子类型</th>
+                        <th>数量</th>
+                        <th>批次号</th>
+                        <th>状态</th>
+                        <th>存放位置</th>
+                        <th>关联</th>
+                        <th style="width: 80px;">操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in all_samples %}
+                    <tr class="{% if s.status == 'SAP_STORED' %}table-success-light{% elif s.status == 'CONSUMED' %}table-secondary{% endif %}">
+                        <td>{{ forloop.counter }}</td>
+                        <td>
+                            <span class="fw-bold">{{ s.trial_code|default:"-" }}</span>
+                        </td>
+                        <td>
+                            <span class="badge {% if s.type == 'PELLET' %}bg-green-lt text-green{% else %}bg-yellow-lt text-yellow{% endif %}">
+                                {{ s.get_type_display }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if s.sub_type == 'FINISHED' %}
+                            <span class="badge bg-green-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'FOR_INJECTION' %}
+                            <span class="badge bg-orange-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'FOR_TESTING' %}
+                            <span class="badge bg-azure-lt">{{ s.get_sub_type_display }}</span>
+                            {% elif s.sub_type == 'TESTED' %}
+                            <span class="badge bg-purple-lt">{{ s.get_sub_type_display }}</span>
+                            {% else %}
+                            <span class="badge bg-secondary-lt">{{ s.get_sub_type_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="fw-bold">
+                            {% if s.is_pellet %}
+                            {{ s.quantity|default:"-" }} kg
+                            {% else %}
+                            {{ s.specimen_count|default:"-" }} 条
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if s.batch_number %}
+                            <code>{{ s.batch_number }}</code>
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span>
+                            {% if s.status == 'SAP_STORED' and s.sap_material_code %}
+                            <div class="small text-muted mt-1">{{ s.sap_material_code }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ s.storage_location|default:"-" }}</td>
+                        <td>
+                            <div class="d-flex flex-column small">
+                                {% if s.is_specimen and s.injection_task %}
+                                <span class="text-muted">
+                                    <i class="ti ti-injection me-1"></i>注塑 #{{ s.injection_task.pk }}
+                                </span>
+                                {% endif %}
+                                {% if s.mold %}
+                                <span class="text-muted">
+                                    <i class="ti ti-tool me-1"></i>{{ s.mold.name }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            <a href="{% url 'trial_sample_detail' s.pk %}?from={{ from_module }}" class="btn btn-sm btn-outline-primary" title="详情">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="text-center py-5 text-muted">
+                            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无{{ module.list_name }}记录
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+.table-success-light {
+    background-color: rgba(46, 184, 92, 0.04);
+}
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    // 统计已填 SAP 物料号的行数并更新提交按钮文案
+    const sapInputs = document.querySelectorAll('#sap-entry-form input[id$="-sap_material_code"]');
+    const filledCount = document.getElementById('filled-count');
+
+    function updateFilledCount() {
+        let count = 0;
+        sapInputs.forEach(function (input) {
+            if (input.value.trim()) count++;
+        });
+        if (filledCount) {
+            filledCount.textContent = count;
+        }
+    }
+
+    sapInputs.forEach(function (input) {
+        input.addEventListener('input', updateFilledCount);
+    });
+
+    // 初始统计
+    updateFilledCount();
+
+    // 提交前确认
+    const form = document.getElementById('sap-entry-form');
+    if (form) {
+        form.addEventListener('submit', function (e) {
+            let filled = 0;
+            sapInputs.forEach(function (input) {
+                if (input.value.trim()) filled++;
+            });
+            if (filled === 0) {
+                e.preventDefault();
+                alert('请至少填写一条 SAP 物料号后再提交');
+                return;
+            }
+            if (!confirm('确认要将 ' + filled + ' 条样品入库到 SAP 仓库吗？')) {
+                e.preventDefault();
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

@@ -2,7 +2,7 @@
 {% load static %}
 {% load project_extras %}
 
-{% block title %}成品颗粒库存{% endblock %}
+{% block title %}样品库存 — 注塑{% endblock %}
 
 {% block content %}
 {# ── Page Header ─────────────────────────────────────────── #}
@@ -12,17 +12,17 @@
             <div class="page-pretitle">
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
-                        <li class="breadcrumb-item active">成品颗粒库存</li>
+                        <li class="breadcrumb-item"><a href="{% url 'mold_injection:task_list' %}">模具注塑中心</a></li>
+                        <li class="breadcrumb-item active">样品库存</li>
                     </ol>
                 </nav>
             </div>
-            <h2 class="page-title mb-0">成品颗粒库存</h2>
+            <h2 class="page-title mb-0">待打样颗粒 / 待测试样条</h2>
         </div>
         <div class="col-auto ms-auto">
             <div class="btn-list">
-                <a href="{% url 'trial_sample_add' %}" class="btn btn-primary">
-                    <i class="ti ti-plus me-1"></i>新增成品颗粒
+                <a href="{% url 'mold_injection:sample_add' %}" class="btn btn-primary">
+                    <i class="ti ti-plus me-1"></i>新增待打样颗粒
                 </a>
             </div>
         </div>
@@ -60,9 +60,9 @@
                 </a>
             </li>
             <li class="nav-item">
-                <a class="nav-link {% if current_status == 'SAP_STORED' %}active{% endif %}"
-                   href="?{% url_replace status='SAP_STORED' page=1 %}">
-                    <i class="ti ti-building-warehouse me-1"></i>已入SAP仓库
+                <a class="nav-link {% if current_status == 'CONSUMED' %}active{% endif %}"
+                   href="?{% url_replace status='CONSUMED' page=1 %}">
+                    <i class="ti ti-check me-1"></i>已消耗
                 </a>
             </li>
             <li class="nav-item">
@@ -94,7 +94,7 @@
                             {{ field }}
                         </div>
                     </div>
-                {% elif field.name != 'status' %}
+                {% else %}
                     <div class="col-auto">{{ field }}</div>
                 {% endif %}
             {% endfor %}
@@ -103,7 +103,7 @@
                     <i class="ti ti-search"></i>
                 </button>
                 {% if request.GET %}
-                <a href="{% url 'trial_sample_list' %}" class="btn btn-ghost-danger ms-2">重置</a>
+                <a href="{% url 'mold_injection:sample_list' %}" class="btn btn-ghost-danger ms-2">重置</a>
                 {% endif %}
             </div>
         </form>
@@ -118,8 +118,8 @@
                     <th>工单号 / 实验单号</th>
                     <th>工单状态</th>
                     <th class="text-center">样品数</th>
-                    <th class="text-end">成品颗粒</th>
-                    <th class="text-center">可入SAP</th>
+                    <th class="text-end">待打样颗粒</th>
+                    <th class="text-center">待测试样条</th>
                     <th>创建时间</th>
                     <th style="width: 60px;"></th>
                 </tr>
@@ -129,7 +129,7 @@
                 {% with order=group.order summary=group.summary %}
                 <tr>
                     <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=trial" class="fw-bold text-reset">
+                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection" class="fw-bold text-reset">
                             {{ order.code }}
                         </a>
                         <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
@@ -139,18 +139,18 @@
                     </td>
                     <td class="text-center fw-bold">{{ summary.total_samples }}</td>
                     <td class="text-end">
-                        {% if summary.pellet_finished_kg %}
-                        <span class="text-green fw-bold">{{ summary.pellet_finished_kg|floatformat:1 }} kg</span>
+                        {% if summary.pellet_for_injection_kg %}
+                        <span class="text-orange fw-bold">{{ summary.pellet_for_injection_kg|floatformat:1 }} kg</span>
                         {% else %}<span class="text-muted">-</span>{% endif %}
                     </td>
                     <td class="text-center">
-                        {% if summary.pellet_finished_in_lab %}
-                        <span class="badge bg-green-lt text-green">{{ summary.pellet_finished_in_lab }}</span>
+                        {% if summary.specimen_for_testing_count %}
+                        <span class="text-azure fw-bold">{{ summary.specimen_for_testing_count }} 条</span>
                         {% else %}<span class="text-muted">-</span>{% endif %}
                     </td>
                     <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
                     <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=trial"
+                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection"
                            class="btn btn-sm btn-icon btn-ghost-primary" title="查看样品">
                             <i class="ti ti-eye"></i>
                         </a>
@@ -160,7 +160,7 @@
                 {% empty %}
                 <tr>
                     <td colspan="7" class="text-center py-5 text-muted">
-                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无成品颗粒记录
+                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
                     </td>
                 </tr>
                 {% endfor %}
@@ -168,9 +168,7 @@
                 {% if orphan_samples %}
                 <tr class="table-secondary border-top">
                     <td>
-                        <span class="fw-bold text-muted">
-                            <i class="ti ti-alien me-1"></i>独立样品
-                        </span>
+                        <span class="fw-bold text-muted"><i class="ti ti-alien me-1"></i>独立样品</span>
                         <span class="text-muted small">（未关联工单）</span>
                     </td>
                     <td><span class="text-muted">-</span></td>
@@ -197,12 +195,13 @@
             <thead>
                 <tr>
                     <th>实验单号</th>
+                    <th>类型</th>
                     <th>配方版本</th>
                     <th class="text-end">数量</th>
                     <th>批次号</th>
                     <th>状态</th>
                     <th>存放位置</th>
-                    <th>来源</th>
+                    <th>来源 · 去向</th>
                     <th style="width: 60px;"></th>
                 </tr>
             </thead>
@@ -211,11 +210,21 @@
                 <tr>
                     <td><span class="fw-bold">{{ s.trial_code|default:"-" }}</span></td>
                     <td>
+                        {% if s.is_pellet %}
+                        <span class="badge bg-green-lt text-green">待打样颗粒</span>
+                        {% else %}
+                        <span class="badge bg-azure-lt text-azure">待测试样条</span>
+                        {% endif %}
+                    </td>
+                    <td>
                         {% if s.formula %}
                         <span title="{{ s.formula.name }}">{{ s.formula.name }} <span class="text-muted">v{{ s.formula.version }}</span></span>
                         {% else %}<span class="text-muted">-</span>{% endif %}
                     </td>
-                    <td class="text-end fw-bold">{{ s.quantity|default:"-" }} kg</td>
+                    <td class="text-end fw-bold">
+                        {% if s.is_pellet %}{{ s.quantity|default:"-" }} kg
+                        {% else %}{{ s.specimen_count|default:"-" }} 条{% endif %}
+                    </td>
                     <td>
                         {% if s.batch_number %}<code>{{ s.batch_number }}</code>
                         {% else %}<span class="text-muted">-</span>{% endif %}
@@ -223,13 +232,24 @@
                     <td><span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span></td>
                     <td>{{ s.storage_location|default:"-" }}</td>
                     <td>
-                        <span class="text-muted small">
-                            {% if s.production_order %}挤出({{ s.production_order.code }})
-                            {% else %}手动创建{% endif %}
-                        </span>
+                        <div class="d-flex flex-column small">
+                            {% if s.is_pellet %}
+                            <span class="text-muted">
+                                {% if s.production_order %}挤出({{ s.production_order.code }})
+                                {% else %}手动创建{% endif %}
+                            </span>
+                            <span><i class="ti ti-injection me-1 text-orange"></i>待注塑消耗</span>
+                            {% else %}
+                            <span class="text-muted">
+                                {% if s.injection_task %}注塑 #{{ s.injection_task.pk }}
+                                {% else %}手动创建{% endif %}
+                            </span>
+                            <span><i class="ti ti-microscope me-1 text-azure"></i>待测试</span>
+                            {% endif %}
+                        </div>
                     </td>
                     <td>
-                        <a href="{% url 'trial_sample_detail' s.pk %}?from=trial"
+                        <a href="{% url 'trial_sample_detail' s.pk %}?from=mold_injection"
                            class="btn btn-sm btn-icon btn-ghost-primary" title="详情">
                             <i class="ti ti-eye"></i>
                         </a>
@@ -237,8 +257,8 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="8" class="text-center py-5 text-muted">
-                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无独立成品颗粒记录
+                    <td colspan="9" class="text-center py-5 text-muted">
+                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无独立样品记录
                     </td>
                 </tr>
                 {% endfor %}
