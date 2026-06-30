@@ -287,6 +287,23 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         if session_data.get('name'):
             initial['name'] = session_data['name']
 
+        # 根据项目关联的成品材料预填基材类型和颜色字段
+        if session_data.get('project_id'):
+            try:
+                project = Project.objects.select_related('material').only(
+                    'material__category_id',
+                    'material__material_color_name',
+                    'material__pantone_code',
+                    'material__rgb_value',
+                ).get(pk=session_data['project_id'])
+                if project.material:
+                    initial['material_type'] = initial.get('material_type') or project.material.category_id
+                    initial['material_color_name'] = initial.get('material_color_name') or project.material.material_color_name
+                    initial['pantone_code'] = initial.get('pantone_code') or project.material.pantone_code
+                    initial['rgb_value'] = initial.get('rgb_value') or project.material.rgb_value
+            except Project.DoesNotExist:
+                pass
+
         # 从导入实验单预填充基础信息（取版本号最大的配方）
         import_experiment_code = session_data.get('import_experiment_code')
         if import_experiment_code:
