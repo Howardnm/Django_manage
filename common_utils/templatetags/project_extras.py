@@ -76,6 +76,32 @@ def get_item(d, key):
         return None
 
 
+@register.filter
+def contrast_color(hex_color):
+    """
+    根据背景色 hex 值计算高对比度文字颜色（黑或白）。
+    使用 W3C 相对亮度算法：L > 0.179 返回 #000，否则返回 #fff。
+    用法：{{ mat.rgb_value|contrast_color }}
+    """
+    if not hex_color or not hex_color.startswith('#'):
+        return '#000'
+    hex_color = hex_color.lstrip('#')
+    if len(hex_color) < 6:
+        return '#000'
+    try:
+        r = int(hex_color[0:2], 16) / 255.0
+        g = int(hex_color[2:4], 16) / 255.0
+        b = int(hex_color[4:6], 16) / 255.0
+    except (ValueError, IndexError):
+        return '#000'
+
+    def linearize(c):
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    luminance = 0.2126 * linearize(r) + 0.7152 * linearize(g) + 0.0722 * linearize(b)
+    return '#000' if luminance > 0.179 else '#fff'
+
+
 @register.simple_tag(takes_context=True)
 def sort_url_multi(context, field):
     """
