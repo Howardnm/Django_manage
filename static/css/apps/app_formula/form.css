@@ -1,0 +1,98 @@
+/* ==========================================
+   配方表单样式 — app_formula/form.html
+   依赖: Tabler 1.4.0 CSS 变量, Coloris (coloris.min.css)
+   ========================================== */
+
+/* ── Coloris 色块样式（覆盖 coloris.css 默认值，恢复 Tabler 圆角方块风格）── */
+.clr-field button {
+    width: 1.5rem;
+    height: 1.5rem;
+    left: 6px;
+    right: auto;
+    border-radius: 6px;
+}
+.clr-field input {
+    padding-left: 2.5rem !important;
+}
+
+/* ── 配方表单表格紧凑样式 ── */
+#bom-formset .form-control,
+#bom-formset .form-select,
+#test-formset .form-control,
+#test-formset .form-select {
+    padding: 2px 6px;
+    font-size: 12px;
+    height: auto;
+    min-height: 28px;
+}
+#bom-formset .ts-wrapper.form-select,
+#test-formset .ts-wrapper.form-select {
+    padding: 0;
+}
+#bom-formset .ts-wrapper .ts-control,
+#test-formset .ts-wrapper .ts-control {
+    padding: 2px 6px;
+    font-size: 12px;
+    min-height: 28px;
+    height: auto;
+}
+#bom-formset .ts-wrapper,
+#test-formset .ts-wrapper {
+    vertical-align: middle;
+}
+#bom-formset td,
+#test-formset td {
+    padding: 4px 4px;
+    vertical-align: middle;
+}
+#bom-formset th,
+#test-formset th {
+    padding: 4px 6px;
+    white-space: nowrap;
+}
+
+/* 移除 is-invalid 的交叉图标，避免遮挡填写框 */
+#bom-formset .form-control.is-invalid,
+#test-formset .form-control.is-invalid,
+#bom-formset .form-select.is-invalid,
+#test-formset .form-select.is-invalid {
+    background-image: none;
+    padding-right: 6px;
+}
+#bom-formset .form-check,
+#test-formset .form-check {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+
+/* 变体列固定宽度，不被压缩 */
+.bom-percentages .percentage-col {
+    flex: 0 0 70px !important;
+    min-width: 70px !important;
+}
+.test-values .value-col {
+    flex: 0 0 105px !important;
+    min-width: 105px !important;
+}
+.bom-percentages .percentage-col input,
+.test-values .value-col input,
+.test-values .value-col select {
+    padding: 2px 4px;
+    font-size: 12px;
+    min-height: 26px;
+}
+
+/* BOM 比例总和底部栏 */
+#bom-sum-footer td {
+    padding: 6px 4px;
+    vertical-align: middle;
+    border-top: 2px solid #e6e8eb;
+    background: #fafbfc;
+}
+#bom-sum-footer .bom-sum-value {
+    display: inline-block;
+    min-width: 50px;
+    text-align: center;
+}

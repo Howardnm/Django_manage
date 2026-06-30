@@ -1,4 +1,3 @@
-import json
 from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.urls import reverse
@@ -479,7 +478,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                                     elif t.value_text:
                                         variant_map[f'test-{idx}-value_text_col{col_idx}'] = t.value_text
 
-                        context['variant_data'] = json.dumps(variant_map)
+                        context['variant_data'] = variant_map
                         context['enable_multi_column'] = True
                         context['num_columns'] = source_count
                         context['formula_columns'] = source_formulas
@@ -517,7 +516,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             if 'num_columns' not in context or context['num_columns'] == 1:
                 context['num_columns'] = int(self.request.POST.get('num_columns', 1))
             if 'variant_data' not in context:
-                context['variant_data'] = json.dumps({k: v for k, v in self.request.POST.items() if '_col' in k})
+                context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
         else:
             # 只有在没有导入数据时，才将 num_columns 重置为 1
             if 'num_columns' not in context:
@@ -818,7 +817,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                             elif t.value_text:
                                 variant_map[f"test-{idx}-value_text_col{col_idx}"] = t.value_text
 
-                context['variant_data'] = json.dumps(variant_map)
+                context['variant_data'] = variant_map
             else:
                 context['enable_multi_column'] = False
                 context['num_columns'] = 1
@@ -835,7 +834,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 context['num_columns'] = len(formula_ids)
                 context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
                 context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
-                context['variant_data'] = json.dumps({k: v for k, v in self.request.POST.items() if '_col' in k})
+                context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
                 context['formula_columns'] = LabFormula.objects.filter(
                     pk__in=formula_ids
                 ).order_by('version')
@@ -1074,7 +1073,7 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
             context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
         if self.request.POST:
             context['num_columns'] = int(self.request.POST.get('num_columns', 1))
-            context['variant_data'] = json.dumps({k: v for k, v in self.request.POST.items() if '_col' in k})
+            context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
         else:
             context['num_columns'] = 1
         context['next_url'] = self.request.GET.get(
