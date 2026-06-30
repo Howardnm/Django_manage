@@ -309,7 +309,6 @@ class MenuModule:
                 {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_EXTRUSION_OP]},
                 {"name": "挤出任务", "url_name": "trial_extrusion_task_list"},
                 {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
-                {"name": "排产配置", "url_name": "trial_config", "visible_to": IdentityConfig.RND_ONLY, "permissions": ["app_trial_production.change_trialproductionconfig"]},
             ]
         }
 
@@ -369,6 +368,7 @@ class MenuModule:
             "url_name": "project_config",
             "sub_items": [
                 {"name": "项目全局配置", "url_name": "project_config"},
+                {"name": "排产配置", "url_name": "trial_config"},
                 {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"},
                 {"name": "进入底层管理", "url_name": "admin:index"},
             ]

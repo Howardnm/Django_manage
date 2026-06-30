@@ -23,6 +23,34 @@ function initMoldMatrix() {
     }
 }
 
+/* ============ 穴数（Cavity Count）辅助函数 ============ */
+
+/**
+ * 根据行内 mold-select 的选中项，更新该行的穴数显示。
+ * @param {HTMLElement} row — .mold-row 元素
+ */
+function updateCavityCell(row) {
+    var select = row.querySelector('.mold-select');
+    var cell = row.querySelector('.cavity-cell');
+    if (!select || !cell) return;
+    var selectedOption = select.options[select.selectedIndex];
+    if (selectedOption && selectedOption.dataset.cavity) {
+        cell.textContent = selectedOption.dataset.cavity + ' 穴';
+    } else {
+        cell.textContent = '—';
+    }
+}
+
+/**
+ * 遍历所有行，刷新穴数显示（用于页面初始化）。
+ */
+function refreshAllCavityCells() {
+    var rows = document.querySelectorAll('#mold-matrix-body .mold-row');
+    for (var i = 0; i < rows.length; i++) {
+        updateCavityCell(rows[i]);
+    }
+}
+
 /* ============ Formset 模式（Django modelformset_factory） ============ */
 
 function initFormsetMode(totalForms) {
@@ -35,6 +63,17 @@ function initFormsetMode(totalForms) {
 
     var formulaPKs = JSON.parse(matrixCard.dataset.formulaPks || '[]');
     var rowHTML = rowTemplate.innerHTML;
+
+    // 穴数初始化：页面加载时为已有行填充穴数
+    refreshAllCavityCells();
+
+    // 模具切换时更新穴数（事件委托）
+    tbody.addEventListener('change', function (e) {
+        if (e.target.classList.contains('mold-select')) {
+            var row = e.target.closest('.mold-row');
+            if (row) updateCavityCell(row);
+        }
+    });
 
     // 新增行按钮
     addBtn.addEventListener('click', function () {

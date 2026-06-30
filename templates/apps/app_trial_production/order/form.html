@@ -257,6 +257,7 @@
                         <thead>
                             <tr>
                                 <th style="min-width:250px;">模具</th>
+                                <th style="min-width:80px;">穴数</th>
                                 {% for f in trial_formulas %}
                                 <th>
                                     <span class="badge bg-azure-lt">V{{ f.version }}</span>
@@ -271,6 +272,7 @@
                             <tr class="mold-row" data-row-index="{{ forloop.counter0 }}">
                                 {{ form.id }}
                                 <td>{{ form.mold }}</td>
+                                <td class="cavity-cell text-center text-muted">—</td>
                                 {% for f in trial_formulas %}
                                 {% with row_qtys=variant_qty_map|get_item:forloop.parentloop.counter0 %}
                                 <td>
@@ -307,6 +309,7 @@
                 <tr class="mold-row" data-row-index="__PREFIX__">
                     <input type="hidden" name="mold-__PREFIX__-id" id="id_mold-__PREFIX__-id">
                     <td>{{ mold_formset.empty_form.mold }}</td>
+                    <td class="cavity-cell text-center text-muted">—</td>
                     {% for f in trial_formulas %}
                     <td>
                         <input type="number"

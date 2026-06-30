@@ -117,6 +117,17 @@ PelletSplitFormSet = forms.formset_factory(
 # 后端通过 BaseMoldRequirementRowFormSet.get_variant_qtys(row_idx) 从 POST 原始数据读取
 
 
+class MoldWithCavitySelect(forms.Select):
+    """模具下拉选择控件：在每个 <option> 上附加 data-cavity 属性，供前端 JS 动态显示穴数。"""
+
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        if value:
+            cavity_map = getattr(self, 'cavity_map', {})
+            option['attrs']['data-cavity'] = str(cavity_map.get(str(value), '1'))
+        return option
+
+
 class MoldRequirementRowForm(forms.ModelForm):
     """一行对应一个模具。变体列（各配方版本注塑次数）由模板裸 <input> 渲染，不走 Django form 字段"""
 
@@ -124,12 +135,19 @@ class MoldRequirementRowForm(forms.ModelForm):
         model = MoldRequirement
         fields = ['mold']
         widgets = {
-            'mold': forms.Select(attrs={'class': 'form-select mold-select'}),
+            'mold': MoldWithCavitySelect(attrs={'class': 'form-select mold-select'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['mold'].required = True
+        # 将 queryset 中各模具的穴数注入 widget，使每个 <option> 带上 data-cavity 属性
+        mold_field = self.fields['mold']
+        if hasattr(mold_field, 'queryset'):
+            mold_field.widget.cavity_map = {
+                str(m.pk): m.cavity_count
+                for m in mold_field.queryset
+            }
 
 
 class BaseMoldRequirementRowFormSet(BaseModelFormSet):
