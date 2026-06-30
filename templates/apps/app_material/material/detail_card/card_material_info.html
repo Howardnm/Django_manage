@@ -22,6 +22,10 @@
                 <div class="datagrid-content fw-bold">{{ material.manufacturer|default:"-" }}</div>
             </div>
             <div class="datagrid-item">
+                <div class="datagrid-title">SAP编码</div>
+                <div class="datagrid-content">{{ material.sap_material_code|default:"-" }}</div>
+            </div>
+            <div class="datagrid-item">
                 <div class="datagrid-title">所属类型</div>
                 <div class="datagrid-content">
                     <span class="badge bg-green-lt">{{ material.category.name }}</span>
