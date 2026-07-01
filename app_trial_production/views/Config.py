@@ -3,13 +3,14 @@ from django.contrib import messages
 from django.urls import reverse
 from app_trial_production.mixins import TrialProductionAccessMixin
 from app_trial_production.models import TrialProductionConfig
+from app_trial_production.forms import TrialConfigForm
 from app_user.mixins import IdentityConfig
 
 
 class TrialConfigView(TrialProductionAccessMixin, UpdateView):
     """排产全局配置视图"""
     model = TrialProductionConfig
-    fields = ['workflow_definition']
+    form_class = TrialConfigForm
     template_name = 'apps/app_trial_production/config/form.html'
     identity_required = IdentityConfig.RND_ONLY
     permission_required = 'app_trial_production.change_trialproductionconfig'

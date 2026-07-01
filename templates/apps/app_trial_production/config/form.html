@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}排产配置{% endblock %}
 
@@ -23,16 +24,24 @@
     <div class="col-lg-6">
         <form method="post" class="card">
             {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger m-3 mb-0">{{ form.non_field_errors }}</div>
+            {% endif %}
+
             <div class="card-header">
                 <h3 class="card-title">审批配置</h3>
             </div>
             <div class="card-body">
                 <div class="mb-3">
-                    <label class="form-label">审批流程定义</label>
+                    <label class="form-label" for="{{ form.workflow_definition.id_for_label }}">审批流程定义</label>
                     {{ form.workflow_definition }}
-                    <small class="form-hint">
+                    {% if form.workflow_definition.errors %}
+                    <div class="invalid-feedback d-block">{{ form.workflow_definition.errors }}</div>
+                    {% endif %}
+                    <div class="form-hint">
                         排产单提交审批时使用的 BPMN 流程定义。审批通过后工单进入挤出任务。
-                    </small>
+                    </div>
                 </div>
             </div>
             <div class="card-footer text-end">

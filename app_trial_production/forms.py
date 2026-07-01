@@ -3,7 +3,7 @@ from django.forms import BaseModelFormSet, modelformset_factory, ValidationError
 from common_utils.filters import TablerFormMixin
 from .models import (
     ProductionOrder, ExtrusionTask,
-    SampleInventory,
+    SampleInventory, TrialProductionConfig,
 )
 from app_mold_injection.models import MoldRequirement
 
@@ -32,6 +32,21 @@ class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
             'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
             'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+        }
+
+
+# ---- 全局配置 ----
+
+class TrialConfigForm(TablerFormMixin, forms.ModelForm):
+    """排产全局配置表单"""
+    class Meta:
+        model = TrialProductionConfig
+        fields = ['workflow_definition']
+        widgets = {
+            'workflow_definition': forms.Select(attrs={
+                'class': 'form-select',
+                'placeholder': '选择审批流程定义',
+            }),
         }
 
 
@@ -94,7 +109,7 @@ class VersionModelChoiceField(forms.ModelChoiceField):
         return f'v{obj.version}'
 
 
-class PelletSplitForm(forms.Form):
+class PelletSplitForm(TablerFormMixin, forms.Form):
     """颗粒分拨表单（非 ModelForm，由 Service 层处理入库）"""
     formula = VersionModelChoiceField(
         queryset=None, required=False,
@@ -128,7 +143,7 @@ class MoldWithCavitySelect(forms.Select):
         return option
 
 
-class MoldRequirementRowForm(forms.ModelForm):
+class MoldRequirementRowForm(TablerFormMixin, forms.ModelForm):
     """一行对应一个模具。变体列（各配方版本注塑次数）由模板裸 <input> 渲染，不走 Django form 字段"""
 
     class Meta:
