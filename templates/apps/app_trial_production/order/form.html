@@ -252,12 +252,12 @@
 
                 {{ mold_formset.management_form }}
 
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter table-bordered mold-matrix" id="mold-matrix-table">
+                <div>
+                    <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix" id="mold-matrix-table" style="font-size: 13px; table-layout: auto;">
                         <thead>
                             <tr>
-                                <th style="min-width:250px;">模具</th>
-                                <th style="min-width:80px;">穴数</th>
+                                <th style="width: 30%; min-width: 200px;">模具</th>
+                                <th style="width: 60px;">穴数</th>
                                 {% for f in trial_formulas %}
                                 <th>
                                     <span class="badge bg-azure-lt">V{{ f.version }}</span>

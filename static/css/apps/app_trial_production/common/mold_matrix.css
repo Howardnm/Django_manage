@@ -1,19 +1,51 @@
 /* 注塑模具矩阵通用样式 —— 供 injection/form.html 与 order/create.html 共用 */
-.mold-matrix th, .mold-matrix td {
-    padding: 6px 10px;
+/* 紧凑表格风格，复刻 app_formula BOM 表格 UI */
+
+.mold-matrix td {
+    padding: 4px 4px;
     vertical-align: middle;
+}
+.mold-matrix th {
+    padding: 4px 6px;
+    white-space: nowrap;
     text-align: center;
 }
-.mold-matrix thead th {
-    text-align: center;
-}
+
+/* 表单控件紧凑化 */
 .mold-matrix .form-control,
 .mold-matrix .form-select {
     padding: 2px 6px;
-    font-size: 13px;
-    min-height: 30px;
+    font-size: 12px;
+    height: auto;
+    min-height: 28px;
 }
+
+/* 数量输入列 — 更紧凑（复刻 bom-percentages .percentage-col input） */
 .qty-input {
-    width: 80px;
+    width: 70px;
     text-align: center;
+    padding: 2px 4px !important;
+    font-size: 12px;
+    min-height: 26px;
+}
+
+/* TomSelect 在表格内的适配（复刻 app_formula BOM 表格模式） */
+.mold-matrix .ts-wrapper.form-select {
+    padding: 0;
+}
+.mold-matrix .ts-wrapper .ts-control {
+    padding: 2px 6px;
+    font-size: 12px;
+    min-height: 28px;
+    height: auto;
+}
+.mold-matrix .ts-wrapper {
+    vertical-align: middle;
+}
+
+/* 移除 is-invalid 的交叉图标，避免遮挡填写框 */
+.mold-matrix .form-control.is-invalid,
+.mold-matrix .form-select.is-invalid {
+    background-image: none;
+    padding-right: 6px;
 }

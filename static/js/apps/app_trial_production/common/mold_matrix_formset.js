@@ -67,8 +67,16 @@ function initFormsetMode(totalForms) {
     // 穴数初始化：页面加载时为已有行填充穴数
     refreshAllCavityCells();
 
-    // 模具切换时更新穴数（事件委托）
+    // TomSelect 初始化：已有行（复刻 app_formula BOM 表格模式）
+    if (window.TomSelect && typeof initLocalTomSelectAll === 'function') {
+        setTimeout(function () {
+            initLocalTomSelectAll(tbody);
+        }, 50);
+    }
+
+    // 模具切换时更新穴数（事件委托，兼容原生 select 和 TomSelect）
     tbody.addEventListener('change', function (e) {
+        // TomSelect 初始化后仍会触发原生 change 事件，e.target 是原始 <select>
         if (e.target.classList.contains('mold-select')) {
             var row = e.target.closest('.mold-row');
             if (row) updateCavityCell(row);
@@ -85,6 +93,16 @@ function initFormsetMode(totalForms) {
             .replace(/__PREFIX__/g, idx);
         tbody.insertAdjacentHTML('beforeend', newRowHTML);
         totalForms.value = idx + 1;
+
+        // 初始化新增行的 TomSelect
+        if (window.TomSelect && typeof initLocalTomSelectAll === 'function') {
+            var newRow = tbody.querySelector('.mold-row[data-row-index="' + idx + '"]');
+            if (newRow) {
+                setTimeout(function () {
+                    initLocalTomSelectAll(newRow);
+                }, 50);
+            }
+        }
     });
 
     // 删除行（事件委托）
@@ -93,6 +111,15 @@ function initFormsetMode(totalForms) {
         if (!btn) return;
         var row = btn.closest('.mold-row');
         if (!row) return;
+
+        // 销毁行内 TomSelect 实例，避免残留
+        if (window.TomSelect) {
+            var moldSelect = row.querySelector('.mold-select');
+            if (moldSelect && moldSelect.tomselect) {
+                moldSelect.tomselect.destroy();
+            }
+        }
+
         var checkbox = row.querySelector('input[type=checkbox][name$="-DELETE"]');
         if (checkbox) checkbox.checked = true;
         row.style.display = 'none';

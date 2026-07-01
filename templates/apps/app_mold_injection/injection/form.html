@@ -34,12 +34,12 @@
                 <div class="card-header bg-blue-lt">
                     <h3 class="card-title text-blue"><i class="ti ti-mold me-2"></i>模具需求（模具 x 配方矩阵）</h3>
                 </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table card-table table-vcenter mold-matrix" id="mold-matrix-table">
+                <div>
+                    <div>
+                        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix" id="mold-matrix-table" style="font-size: 13px; table-layout: auto;">
                             <thead>
                                 <tr>
-                                    <th style="width:200px;">模具</th>
+                                    <th style="width: 30%; min-width: 200px;">模具</th>
                                     {% if formulas %}
                                     {% for f in formulas %}
                                     <th>
