@@ -110,6 +110,38 @@
                                 <span class="text-muted small ms-2">({{ formulas|length }} 个配方版本)</span>
                             </td>
                         </tr>
+                        {% with first_formula=formulas.0 %}
+                        {% if first_formula.material_color_name or first_formula.pantone_code or first_formula.rgb_value %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-palette me-1"></i>配方颜色
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-3 flex-wrap">
+                                    {% if first_formula.material_color_name %}
+                                    <span>
+                                        <span class="text-muted small">颜色名称</span>
+                                        <span class="fw-bold ms-1">{{ first_formula.material_color_name }}</span>
+                                    </span>
+                                    {% endif %}
+                                    {% if first_formula.pantone_code %}
+                                    <span>
+                                        <span class="text-muted small">潘通色号</span>
+                                        <span class="badge bg-purple-lt ms-1">{{ first_formula.pantone_code }}</span>
+                                    </span>
+                                    {% endif %}
+                                    {% if first_formula.rgb_value %}
+                                    <span class="d-inline-flex align-items-center gap-1">
+                                        <span class="text-muted small">RGB</span>
+                                        <span class="badge bg-dark-lt ms-1" style="font-family: monospace;">{{ first_formula.rgb_value }}</span>
+                                        <span class="d-inline-block rounded" style="width:18px;height:18px;background-color:{{ first_formula.rgb_value }};border:1px solid #d0d5dd;"></span>
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% endwith %}
                         <tr>
                             <td class="text-muted">
                                 <i class="ti ti-building-factory me-1"></i>关联项目

@@ -38,7 +38,7 @@ class LabFormula(models.Model):
 
     # 【新增】成本字段
     cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料成本自动计算")
-    cost_actual = models.DecimalField("BOM实际成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="手动录入实际配方成本")
+    cost_actual = models.DecimalField("BOM实际成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="暂时废弃该字段，以后等原材料介入历史价格后变成动态均价")
 
     # 材料颜色信息
     material_color_name = models.CharField("材料颜色名称", max_length=100, blank=True, help_text="例如：哑光黑、亮白、透明蓝")
