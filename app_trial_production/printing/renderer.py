@@ -11,10 +11,13 @@ TrialProductionSheetRenderer:
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 from typing import Any
 
 from common_utils.printing.base import BasePrintRenderer, PrintConfig
+from app_workflow.models import ApprovalHistory
+from app_formula.models import AbstractBOMEntry
 
 
 class TrialProductionSheetRenderer(BasePrintRenderer):
@@ -29,16 +32,21 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
     template_name = 'apps/app_trial_production/order/print_sheet.html'
 
     FORMULAS_PER_PAGE = 5
-    FEEDING_PORT_ORDER = ['1_MAIN', '2_SIDE_1', '3_SIDE_2', '4_LIQUID']
+
+    # ── 喂料口标签映射（来源：AbstractBOMEntry.FEEDING_CHOICES） ──
+    # FEEDING_CHOICES 中 label 格式为「主喂料 (Main)」，stripped 后得到
+    # 短标签用于打印模板。模型层修改 choices 时此处自动同步。
+    PORT_LABELS = {
+        val: re.sub(r'\s*\(.*?\)\s*', '', label)
+        for val, label in AbstractBOMEntry.FEEDING_CHOICES
+    }
+
+    # ── 审批操作常量（来源：ApprovalHistory.ACTION_CHOICES） ──
+    # 模型层修改 approval action choices 时需同步检查此处。
+    _APPROVE_ACTION = 'APPROVE'
 
     # 公司 Logo 路径（相对于 static/ 目录）
     COMPANY_LOGO_PATH = 'images/saite.png'
-    PORT_LABELS = {
-        '1_MAIN': '主喂料',
-        '2_SIDE_1': '侧喂料1',
-        '3_SIDE_2': '侧喂料2',
-        '4_LIQUID': '液体注塑',
-    }
 
     def __init__(
         self,
@@ -185,7 +193,7 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 material.category.name
                 if material and material.category else ''
             ),
-            'material_name': getattr(material, 'grade_name', '') or getattr(material, 'name', '') if material else '',
+            'material_name': material.grade_name if material else '',
             'sap_code': order.sap_material_code or '',
             'created_date': (
                 order.created_at.strftime('%Y-%m-%d')
@@ -214,13 +222,21 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         }
 
     def _get_customer_name(self) -> str:
-        """获取客户名称 — 从项目档案的直接客户读取。"""
+        """获取客户名称 — 从项目档案的直接客户读取。
+
+        ProjectRepository.project 为 OneToOneField(related_name='repository')。
+        View 层已通过 select_related('project__repository__customer') 预加载，
+        无 ProjectRepository 时 repo 为 None。
+        """
         order = self.order
         project = order.project
-        if project and hasattr(project, 'repository'):
-            repo = project.repository
-            if repo and repo.customer:
-                return str(repo.customer)
+        if not project:
+            return ''
+        # 直接访问 OneToOneField 反向关系，related_name 变更时此处将引发
+        # AttributeError，确保模型层修改能被及时发现。
+        repo = project.repository
+        if repo is not None and repo.customer_id is not None:
+            return str(repo.customer)
         return ''
 
     def _get_creator_dept_path(self, user) -> str:
@@ -228,13 +244,16 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
 
         由于 Department 是扁平结构（无父子层级），路径格式为：
             「部门名」或「部门名 / 工作组名」
+
+        User.department → FK(Department)；User.work_groups → WorkGroup M2M 反向。
         """
         if not user:
             return ''
         parts = []
-        if getattr(user, 'department', None):
+        # department 是 User 模型实际 FK 字段，直接访问
+        if user.department_id is not None:
             parts.append(user.department.name)
-        # 取用户的主要工作组（第一个）
+        # work_groups 是 WorkGroup 的 related_name，取用户的主要工作组（第一个）
         wgs = list(user.work_groups.select_related('department')[:1])
         if wgs:
             parts.append(wgs[0].name)
@@ -322,14 +341,14 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 notes_parts.append(
                     base_line.get_weighing_scale_display()
                 )
-            if getattr(base_line, 'is_tail', False):
+            if base_line.is_tail:
                 notes_parts.append('尾料回掺')
 
             row_index += 1
             rows.append({
                 'row_index': row_index,
                 'feeding_port_label': self.PORT_LABELS.get(feeding_port, feeding_port),
-                'sap_code': getattr(raw_material, 'warehouse_code', '') or '',
+                'sap_code': raw_material.warehouse_code or '',
                 'material_name': raw_material.name,
                 'material_model': raw_material.model_name or '',
                 'weighing_scale': (
@@ -427,13 +446,12 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
             .prefetch_related('formula_details')
             .order_by('order', 'pk')
         )
-        if (
-            not mold_reqs
-            and hasattr(order, 'injection_task')
-            and order.injection_task
-        ):
+        # InjectionTask.production_order 为 OneToOneField(related_name='injection_task')，
+        # 无注塑任务时 getattr 返回 None。
+        injection_task = getattr(order, 'injection_task', None)
+        if not mold_reqs and injection_task is not None:
             mold_reqs = list(
-                order.injection_task.mold_requirements
+                injection_task.mold_requirements
                 .select_related('mold')
                 .prefetch_related('formula_details')
                 .order_by('order', 'pk')
@@ -482,14 +500,15 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
 
     @staticmethod
     def _get_user_display(user) -> str:
-        """安全获取用户显示名。"""
+        """安全获取用户显示名。
+
+        优先级：full_name → username。
+        User.get_full_name() 来自 Django AbstractUser 基类。
+        """
         if not user:
             return ''
-        return (
-            getattr(user, 'realname', '')
-            or getattr(user, 'get_full_name', lambda: '')()
-            or user.username
-        )
+        full_name = user.get_full_name()
+        return full_name or user.username
 
     def _build_signatures(self) -> dict[str, Any]:
         order = self.order
@@ -498,10 +517,10 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         # 编制人
         prepared_by = self._get_user_display(order.creator)
 
-        # 审批记录：仅 APPOVE 操作，按时间排序
+        # 审批记录：仅 APPROVE 操作，按时间排序
         approvals = []
         if wi:
-            for h in wi.history.filter(action='APPROVE').select_related('approver').order_by('timestamp'):
+            for h in wi.history.filter(action=self._APPROVE_ACTION).select_related('approver').order_by('timestamp'):
                 approvals.append({
                     'name': self._get_user_display(h.approver),
                     'date': h.timestamp.strftime('%Y-%m-%d %H:%M') if h.timestamp else '',
