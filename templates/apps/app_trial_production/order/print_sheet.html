@@ -1,0 +1,320 @@
+{% extends "printing/base_print.html" %}
+
+{% block print_title %}试验工程单 — {{ order.code|default:'' }}{% endblock %}
+
+{% block extra_css %}
+/* ── 仅保留 Tabler 无对应工具类的必要样式 ── */
+.sig-space { height: 28px; vertical-align: bottom; }
+
+/* ── 字段标题背景色 ── */
+.print-label-bg { background-color: #e4e9ef !important; }
+
+/* ── 打印表格边框：黑色虚线 ── */
+.print-page .table,
+.print-page .table th,
+.print-page .table td {
+    border-color: #808080 !important;
+}
+
+/* ── 内容列强制允许换行（覆盖 Tabler .text-nowrap 等）── */
+.print-page .table td {
+    overflow-wrap: anywhere;
+    word-break: keep-all;
+}
+{% endblock %}
+
+{% block print_content %}
+
+{% if not order or not pages %}
+<div class="print-page d-flex align-items-center justify-content-center" style="min-height:200mm;">
+    <p class="text-muted fs-3">暂无数据可打印</p>
+</div>
+{% else %}
+
+{% for page in pages %}
+<div class="print-page">
+
+    {# ── 打印时间 ── #}
+    <div class="text-muted mb-2" style="font-size:8px;">打印时间：{% now "Y-m-d H:i" %}</div>
+
+    {# ── 页眉：Logo 左 + 标题中 ── #}
+    <div class="d-flex align-items-center mb-3">
+        <div style="width:25%;">
+            {% if company_logo_url %}
+            <img src="{{ company_logo_url }}" alt="Logo" style="max-height:40px;max-width:100%;">
+            {% endif %}
+        </div>
+        <div class="flex-grow-1 text-center fs-3 fw-bold">试 验 工 程 单</div>
+        <div style="width:25%;"></div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════ #}
+    {#  头部信息表（8 列：4 组 标签 | 值）                 #}
+    {# ═══════════════════════════════════════════════════ #}
+    <table class="table table-bordered table-sm mt-3 mb-3" style="table-layout:fixed;font-size:10px;">
+        <colgroup>
+            <col style="width:9%;"><col style="width:16%;">
+            <col style="width:9%;"><col style="width:16%;">
+            <col style="width:9%;"><col style="width:16%;">
+            <col style="width:9%;"><col style="width:16%;">
+        </colgroup>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">工单编号</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.order_code }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">项目名称</td>
+            <td class="text-start ps-2">{{ header_info.project_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">创建人</td>
+            <td class="text-start ps-2">{{ header_info.creator_display }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">部门/工作组</td>
+            <td class="text-start ps-2">{{ header_info.creator_dept_path|default:'—' }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">产品大类</td>
+            <td class="text-start ps-2">{{ header_info.material_category|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">材料</td>
+            <td class="text-start ps-2">{{ header_info.material_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">SAP编码</td>
+            <td class="text-start ps-2">{{ header_info.sap_code|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">日期</td>
+            <td class="text-start ps-2">{{ header_info.created_date|default:'—' }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">客户</td>
+            <td class="text-start ps-2">{{ header_info.customer|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">项目阶段</td>
+            <td class="text-start ps-2">{{ header_info.project_stage|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">是否需要色粉</td>
+            <td class="text-start ps-2">{{ header_info.needs_color_display|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">机台</td>
+            <td class="text-start ps-2">{{ header_info.machine_name|default:'—' }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">样品总量</td>
+            <td class="text-start ps-2 fw-bold" colspan="7">
+                {{ header_info.total_planned_qty|floatformat:1 }} KG
+            </td>
+        </tr>
+    </table>
+
+    {# ═══════════════════════════════════════════════════ #}
+    {#  BOM 表（配方列）                                  #}
+    {# ═══════════════════════════════════════════════════ #}
+    <table class="table table-bordered table-sm print-sheet-table mb-3">
+        <colgroup>
+            <col style="width:1%;">
+            <col style="width:8%;">
+            <col style="width:4%;">
+            <col style="width:7%;">
+            <col style="width:3.5%;">
+            <col style="width:4.5%;">
+            {% for formula in page.formulas %}<col style="width:3%;"><col style="width:3.5%;">{% endfor %}
+        </colgroup>
+
+        {# ── 配方编号 ── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">原材料信息</td>
+            {% for formula in page.formulas %}
+            <td colspan="2" class="print-label-bg fw-bold text-center">v{{ formula.version }}</td>
+            {% endfor %}
+        </tr>
+
+        {# ── BOM 表头 ── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">#</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">SAP编码</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">原料名称</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">原料型号</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">喂料口</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">分秤</td>
+            {% for formula in page.formulas %}
+            <td class="bg-blue-lt fw-bold text-center">比例%</td>
+            <td class="text-center fw-bold">重量Kg</td>
+            {% endfor %}
+        </tr>
+
+        {# ── BOM 数据 ── #}
+        {% for row in page.bom_rows %}
+        <tr>
+            <td class="text-center small fw-bold">{{ row.row_index }}</td>
+            <td class="text-start ps-1">{{ row.sap_code|default:'' }}</td>
+            <td class="text-start ps-1">{{ row.material_name }}</td>
+            <td class="text-start ps-1">{{ row.material_model|default:'' }}</td>
+            <td class="text-start ps-1 small">{{ row.feeding_port_label }}</td>
+            <td class="text-start ps-1 small">{{ row.weighing_scale }}</td>
+            {% for fd in row.formula_data %}
+            <td class="bg-blue-lt fw-bold text-end pe-1">{{ fd.pct|default:'' }}</td>
+            <td class="text-end fw-bold pe-1">{{ fd.qty|floatformat:3 }}</td>
+            {% endfor %}
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" class="text-start ps-1 text-muted">暂无数据</td>
+            {% for f in page.formulas %}<td class="bg-blue-lt text-end pe-1"></td><td class="text-end pe-1"></td>{% endfor %}
+        </tr>
+        {% endfor %}
+
+        {# ── 总数合计 ── #}
+        <tr class="table-active fw-bold">
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">总数</td>
+            {% for tot in page.bom_totals %}
+            <td class="bg-blue-lt fw-bold text-end pe-1">{{ tot.pct_total|floatformat:1 }}</td>
+            <td class="text-end pe-1">{{ tot.kg_total|floatformat:3 }}</td>
+            {% endfor %}
+        </tr>
+
+        {# ── 色粉（每配方独立显示）── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">色粉</td>
+            {% for needs in page.formula_colors %}
+            <td colspan="2" class="text-center">
+                {{ needs|yesno:'需要,X' }}
+            </td>
+            {% endfor %}
+        </tr>
+
+    </table>
+
+    {# ═══════════════════════════════════════════════════ #}
+    {#  后处理表（加工 / 包装 / 注塑）                     #}
+    {# ═══════════════════════════════════════════════════ #}
+    <table class="table table-bordered table-sm mb-3" style="table-layout:fixed;font-size:10px;">
+
+        {# ── 加工温度 / 转速 ── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">加工温度</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.processing_temp|default:'—' }}
+            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">转速</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.screw_speed|default:'—' }}
+            </td>
+        </tr>
+
+        {# ── 说明 ── #}
+        {% if post_processing.remark %}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">说明</td>
+            <td colspan="
+                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
+            " class="text-start ps-2">
+                {{ post_processing.remark }}
+            </td>
+        </tr>
+        {% endif %}
+
+        {# ── 包装前处理 ── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3" rowspan="2">包装前处理</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                干燥温度：{{ post_processing.drying_temperature|default:'—' }}
+            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">干燥时间</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.drying_duration|default:'—' }}
+            </td>
+        </tr>
+        <tr>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                套内膜袋密封：{% if post_processing.inner_bag_sealing %}是{% else %}否{% endif %}
+            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">存放位置</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.storage_location|default:'—' }}
+            </td>
+        </tr>
+
+        {# ── 注塑温度 / 注塑前处理 ── #}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">注塑温度</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.injection_temperature|default:'—' }}
+            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">注塑前处理</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.injection_pretreatment|default:'—' }}
+            </td>
+        </tr>
+
+        {# ── 包装说明 / 存放位置 ── #}
+        {% if post_processing.packaging_desc and not post_processing.inner_bag_sealing %}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">包装/存放</td>
+            <td colspan="{{ page.formula_count|add:page.formula_count }}" class="text-start ps-2">
+                包装：{{ post_processing.packaging_desc|default:'—' }}
+                &nbsp;&nbsp;存放：{{ post_processing.storage_location|default:'—' }}
+            </td>
+        </tr>
+        {% endif %}
+
+    </table>
+
+    {# ── 注塑需求模具矩阵（独立表格，不挤压）── #}
+    {% if mold_matrix and mold_matrix.mold_rows %}
+    <div class="fw-bold text-center print-label-bg py-1" style="font-size:10px;border:1px solid #808080;border-bottom:none;">注塑需求</div>
+    <table class="table table-bordered table-sm mb-3" style="font-size:9px;">
+        <tr class="print-label-bg">
+            <td class="fw-bold text-start" style="width:12%;">模具</td>
+            <td class="fw-bold text-start" style="width:8%;">标准</td>
+            <td class="fw-bold text-center" style="width:5%;">穴数</td>
+            {% for f in formulas %}
+            <td class="fw-bold text-center">v{{ f.version }}</td>
+            {% endfor %}
+            <td class="fw-bold text-center" style="width:6%;">合计</td>
+        </tr>
+        {% for mr in mold_matrix.mold_rows %}
+        <tr>
+            <td class="text-start">{{ mr.mold_name }}</td>
+            <td class="text-start">{{ mr.standard }}</td>
+            <td class="text-center">{{ mr.cavity_count }}</td>
+            {% for cell in mr.cells %}
+            <td class="text-center">{{ cell.qty|default:'—' }}</td>
+            {% endfor %}
+            <td class="text-center fw-bold">{{ mr.row_total }}</td>
+        </tr>
+        {% endfor %}
+        {% if mold_matrix.mold_rows|length > 1 %}
+        <tr class="print-label-bg fw-bold">
+            <td colspan="3" class="text-end">合计</td>
+            {% for ft in mold_matrix.formula_totals %}
+            <td class="text-center">{{ ft }}</td>
+            {% endfor %}
+            <td class="text-center">{{ mold_matrix.grand_total }}</td>
+        </tr>
+        {% endif %}
+    </table>
+    {% endif %}
+
+    {# ── 签章区 ── #}
+    <table class="table table-bordered table-sm mb-3" style="table-layout:fixed;font-size:10px;">
+        <colgroup>
+            <col style="width:10%;"><col style="width:40%;">
+            <col style="width:10%;"><col style="width:40%;">
+        </colgroup>
+        <tr>
+            <td class="print-label-bg fw-bold text-center">审批记录</td>
+            <td class="text-start ps-2">
+                {% if signatures.approvals %}
+                    {% for a in signatures.approvals %}
+                    【同意】{{ a.name }}（{{ a.date }}）{% if not forloop.last %}；{% endif %}<br>
+                    {% endfor %}
+                {% else %}
+                    <span class="text-muted">暂无</span>
+                {% endif %}
+            </td>
+            <td class="print-label-bg fw-bold text-center">编制</td>
+            <td class="text-start ps-2">{{ signatures.prepared_by }}（{{ signatures.prepared_date }}）</td>
+        </tr>
+    </table>
+
+    {# ── 页码 ── #}
+    <div class="text-center text-muted small mt-1">
+        第 {{ forloop.counter }} 页 / 共 {{ total_pages }} 页 &nbsp;|&nbsp;
+        工单号：{{ order.code }}
+    </div>
+
+</div>
+{% endfor %}
+
+{% endif %}
+{% endblock %}

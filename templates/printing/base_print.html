@@ -1,0 +1,143 @@
+{% load static %}<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block print_title %}打印{% endblock %}</title>
+
+    {# Tabler CSS — 复用项目统一 UI 框架 #}
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}"/>
+
+    <style>
+        /* ============================================================
+           打印专用微调样式 — 仅保留 Tabler 无法覆盖的打印/纸张逻辑
+           ============================================================ */
+
+        html {
+            font-size: {{ config.font_size|default:'11px' }};
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "SimSun", "PingFang SC", Arial, sans-serif;
+        }
+
+        /* ── @page — 纸张规格 ── */
+        @page {
+            size: {{ config.page_size|default:'A4' }} {{ config.orientation|default:'portrait' }};
+            margin: {{ config.margin_top|default:'8mm' }} {{ config.margin_right|default:'6mm' }} {{ config.margin_bottom|default:'8mm' }} {{ config.margin_left|default:'6mm' }};
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           @media screen — A4 纸张模拟
+           ═══════════════════════════════════════════════════════ */
+        @media screen {
+            body {
+                background: #e8ecf1;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 24px 16px 60px;
+                min-height: 100vh;
+            }
+
+            .print-page {
+                width: 210mm;
+                min-height: 297mm;
+                background: #fff;
+                box-shadow: 0 2px 12px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+                margin-bottom: 20px;
+                padding: {{ config.margin_top|default:'8mm' }} {{ config.margin_right|default:'6mm' }} {{ config.margin_bottom|default:'8mm' }} {{ config.margin_left|default:'6mm' }};
+            }
+
+            .print-page:last-child { margin-bottom: 0; }
+        }
+
+        /* ═══════════════════════════════════════════════════════
+           @media print — 纯净打印布局
+           ═══════════════════════════════════════════════════════ */
+        @media print {
+            html, body {
+                width: auto; height: auto; overflow: hidden;
+                background: #fff; margin: 0; padding: 0;
+            }
+
+            .print-page {
+                width: auto; min-height: 0;
+                background: #fff; box-shadow: none;
+                margin: 0; padding: 0;
+            }
+
+            /* 仅第 2 页起在前面分页，尾页无 page-break-after，杜绝空白页 */
+            .print-page + .print-page {
+                page-break-before: always;
+            }
+
+            .print-float-btn,
+            .print-float-btn * {
+                display: none !important; visibility: hidden !important;
+                width: 0 !important; height: 0 !important;
+                margin: 0 !important; padding: 0 !important;
+                overflow: hidden !important;
+            }
+
+            table { page-break-inside: auto; }
+            tr { page-break-inside: avoid; page-break-after: auto; }
+            thead { display: table-header-group; }
+            tfoot { display: table-footer-group; }
+        }
+
+        /* ── 打印表格微调（Tabler 基类 + 打印专用覆盖）── */
+        .print-sheet-table {
+            width: 100%;
+            table-layout: fixed;
+            font-size: 10px;
+        }
+
+        .print-sheet-table th,
+        .print-sheet-table td {
+            padding: 4px 3px;
+            vertical-align: middle;
+            overflow-wrap: anywhere;
+            word-break: keep-all;
+        }
+
+        /* ── 签章区 ── */
+        .sig-space { height: 28px; vertical-align: bottom; }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    {# 悬浮打印按钮（position:fixed，DOM 在 print_content 之前） #}
+    <button class="print-float-btn btn btn-primary rounded-pill shadow-sm"
+            onclick="window.print()" title="打印 (Ctrl+P)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="6 9 6 2 18 2 18 9"></polyline>
+            <path d="M6 12H4a2 2 0 0 0-2 2v4a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-4a2 2 0 0 0-2-2h-2"></path>
+            <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+        <span class="ms-1">打印</span>
+    </button>
+
+    {% block print_content %}{% endblock %}
+
+    <style>
+        .print-float-btn {
+            position: fixed; top: 20px; right: 20px; z-index: 9999;
+            display: inline-flex; align-items: center;
+            padding: 10px 20px; font-size: 14px; font-weight: 600;
+            transition: transform .15s, box-shadow .15s;
+        }
+        .print-float-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 22px rgba(32,107,196,0.45), 0 3px 10px rgba(0,0,0,0.18);
+        }
+        .print-float-btn:active { transform: translateY(0); }
+    </style>
+
+</body>
+</html>

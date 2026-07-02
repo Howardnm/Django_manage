@@ -6,6 +6,7 @@ from django.forms import modelformset_factory
 from django.utils.safestring import mark_safe
 from django.views.generic import DetailView, CreateView, UpdateView, View
 from django.shortcuts import redirect, get_object_or_404
+from django.http import HttpResponse
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 
@@ -720,6 +721,43 @@ class ProductionOrderDeleteView(TrialProductionAccessMixin, View):
         order.delete()
         messages.success(request, f'草稿工单 {order_code} 已删除')
         return redirect('trial_dashboard')
+
+
+class ProductionOrderPrintView(TrialProductionAccessMixin, DetailView):
+    """排产工单打印 — 输出 A4 HTML 打印页面"""
+    model = ProductionOrder
+    template_name = 'apps/app_trial_production/order/print_sheet.html'
+    context_object_name = 'order'
+
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if qs is None:
+            qs = self.model.objects.all()
+        return qs.select_related(
+            'project__material__category',
+            'project__repository__customer',
+            'project_node',
+            'process_profile',
+            'process_profile__machine',
+            'process_profile__screw_combination',
+            'creator', 'extruder_operator', 'approved_by',
+        ).prefetch_related(
+            'formula_details__formula',
+            'mold_requirements__mold',
+            'mold_requirements__formula_details',
+            'sample_inventories',
+        )
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        from app_trial_production.printing.renderer import (
+            TrialProductionSheetRenderer,
+        )
+        renderer = TrialProductionSheetRenderer(production_order=self.object)
+        return HttpResponse(renderer.render_html())
 
 
 class ProductionOrderStartExtrusionView(RndAccessMixin, View):

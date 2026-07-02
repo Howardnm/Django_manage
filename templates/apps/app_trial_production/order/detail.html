@@ -27,6 +27,11 @@
         </div>
         <div class="col-auto ms-auto">
             <div class="btn-list">
+                <a href="{% url 'trial_order_print' order.pk %}" target="_blank"
+                   class="btn btn-outline-secondary d-print-none">
+                    <i class="ti ti-printer me-1"></i>打印工单
+                </a>
+
                 {% if order.status == 'DRAFT' %}
                 <a href="{% url 'trial_order_edit' order.pk %}" class="btn btn-outline-primary">
                     <i class="ti ti-edit me-1"></i>编辑草稿

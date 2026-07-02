@@ -3,7 +3,7 @@ from .views.ProductionOrder import (
     ProductionOrderDetailView, ProductionOrderCreateView,
     ProductionOrderUpdateView, ProductionOrderInitiateView,
     ProductionOrderStartWorkflowView, ProductionOrderStartExtrusionView,
-    ProductionOrderDeleteView,
+    ProductionOrderDeleteView, ProductionOrderPrintView,
 )
 from .views.Dashboard import TrialDashboardView
 from .views.ExtrusionBoard import ExtrusionBoardView
@@ -37,6 +37,7 @@ urlpatterns = [
     path('orders/create/', ProductionOrderCreateView.as_view(), name='trial_order_create'),
     path('orders/initiate/', ProductionOrderInitiateView.as_view(), name='trial_order_initiate'),
     path('orders/<int:pk>/', ProductionOrderDetailView.as_view(), name='trial_order_detail'),
+    path('orders/<int:pk>/print/', ProductionOrderPrintView.as_view(), name='trial_order_print'),
     path('orders/<int:pk>/edit/', ProductionOrderUpdateView.as_view(), name='trial_order_edit'),
     path('orders/<int:pk>/delete/', ProductionOrderDeleteView.as_view(), name='trial_order_delete'),
     path('orders/<int:pk>/start-workflow/', ProductionOrderStartWorkflowView.as_view(), name='trial_order_start_workflow'),
