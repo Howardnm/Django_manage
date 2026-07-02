@@ -47,8 +47,8 @@
 
             <!-- 工单信息 -->
             <div class="card mb-3">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="ti ti-file-text me-2 text-blue"></i>工单信息</h3>
+                <div class="card-header bg-blue-lt">
+                    <h3 class="card-title text-blue"><i class="ti ti-file-text me-2"></i>工单信息</h3>
                 </div>
                 <div class="card-body p-0">
                     {% if form.non_field_errors %}
@@ -76,25 +76,89 @@
 
                     <div class="card-body">
                         <div class="row g-3">
-                            <div class="col-md-6">
+                            <!-- ═══════ 基本信息 ═══════ -->
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-barcode me-1 text-muted"></i>SAP编码
+                                </label>
+                                {{ form.sap_material_code }}
+                            </div>
+                            <div class="col-lg-3 col-md-6">
                                 <label class="form-label">
                                     <i class="ti ti-cpu me-1 text-muted"></i>工艺方案
                                 </label>
                                 {{ form.process_profile }}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-lg-3 col-md-6">
                                 <label class="form-label">
                                     <i class="ti ti-package me-1 text-muted"></i>包装说明
                                 </label>
                                 {{ form.packaging_desc }}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-lg-3 col-md-6">
                                 <label class="form-label">
                                     <i class="ti ti-map-pin me-1 text-muted"></i>存放位置
                                 </label>
                                 {{ form.storage_location }}
                             </div>
-                            <div class="col-md-6">
+
+                            <!-- ═══════ 包装前处理 ═══════ -->
+                            <div class="col-12 mt-3 mb-0">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.06em;">包装前处理</span>
+                                    <span class="flex-grow-1 border-bottom border-light"></span>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-temperature me-1 text-muted"></i>{{ form.drying_temperature.label }}
+                                </label>
+                                {{ form.drying_temperature }}
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-clock me-1 text-muted"></i>{{ form.drying_duration.label }}
+                                </label>
+                                {{ form.drying_duration }}
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-box-seam me-1 text-muted"></i>{{ form.inner_bag_sealing.label }}
+                                </label>
+                                <div class="form-check form-switch mt-2">
+                                    {{ form.inner_bag_sealing }}
+                                    <span class="form-check-label ms-1">是</span>
+                                </div>
+                            </div>
+
+                            <!-- ═══════ 注塑参数 ═══════ -->
+                            <div class="col-12 mt-3 mb-0">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.06em;">注塑参数</span>
+                                    <span class="flex-grow-1 border-bottom border-light"></span>
+                                </div>
+                            </div>
+                            <div class="col-lg-3 col-md-6">
+                                <label class="form-label">
+                                    <i class="ti ti-temperature-celsius me-1 text-muted"></i>{{ form.injection_temperature.label }}
+                                </label>
+                                {{ form.injection_temperature }}
+                            </div>
+                            <div class="col-lg-9">
+                                <label class="form-label">
+                                    <i class="ti ti-tool me-1 text-muted"></i>{{ form.injection_pretreatment.label }}
+                                </label>
+                                {{ form.injection_pretreatment }}
+                            </div>
+
+                            <!-- ═══════ 备注 ═══════ -->
+                            <div class="col-12 mt-3 mb-0">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem; letter-spacing: 0.06em;">备注</span>
+                                    <span class="flex-grow-1 border-bottom border-light"></span>
+                                </div>
+                            </div>
+                            <div class="col-12">
                                 <label class="form-label">
                                     <i class="ti ti-notes me-1 text-muted"></i>{{ form.remark.label }}
                                 </label>
@@ -243,8 +307,8 @@
             <div class="card mt-3" id="mold-matrix-card"
                  data-formula-count="{{ trial_formulas|length }}"
                  data-formula-pks="[{% for f in trial_formulas %}{{ f.pk }}{% if not forloop.last %},{% endif %}{% endfor %}]">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h3 class="card-title"><i class="ti ti-mold me-2"></i>注塑需求（模具 × 配方矩阵）</h3>
+                <div class="card-header bg-purple-lt d-flex justify-content-between align-items-center">
+                    <h3 class="card-title text-purple"><i class="ti ti-mold me-2"></i>注塑需求（模具 × 配方矩阵）</h3>
                     <button type="button" class="btn btn-sm btn-outline-primary" id="add-mold-row">
                         <i class="ti ti-plus me-1"></i>新增模具
                     </button>

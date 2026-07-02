@@ -385,6 +385,7 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
         initiate_data = self.request.session.get('trial_initiate_data')
         if initiate_data:
             initial['process_profile'] = initiate_data.get('process_profile_id')
+            initial['sap_material_code'] = initiate_data.get('sap_material_code', '')
         return initial
 
     def get_context_data(self, **kwargs):
@@ -498,6 +499,7 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 process_profile_id=form.instance.process_profile_id,
                 formula_details=formula_details,
                 test_item_ids=test_item_ids,
+                sap_material_code=form.cleaned_data.get('sap_material_code', ''),
                 packaging_desc=form.cleaned_data.get('packaging_desc', ''),
                 storage_location=form.cleaned_data.get('storage_location', ''),
                 remark=form.cleaned_data.get('remark', ''),
@@ -682,6 +684,12 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
 
         first = formulas.first()
         project_name = first.project.name if first.project else ''
+
+        # 沿 配方→项目→成品材料 链查找 SAP 物料编码
+        sap_material_code = ''
+        if first.project and first.project.material:
+            sap_material_code = first.project.material.sap_material_code or ''
+
         request.session['trial_initiate_data'] = {
             'trial_code': trial_code,
             'project_id': int(project_id) if project_id else None,
@@ -690,6 +698,7 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
             'formula_name': first.name,
             'process_profile_id': first.process_id,
             'material_type_id': first.material_type_id,
+            'sap_material_code': sap_material_code,
         }
         return redirect('trial_order_create')
 

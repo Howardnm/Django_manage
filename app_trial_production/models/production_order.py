@@ -80,8 +80,18 @@ class ProductionOrder(models.Model):
     project_node = models.ForeignKey('app_project.ProjectNode', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联项目节点", related_name='production_orders')
     quantity_planned = models.DecimalField("计划产量(kg)", max_digits=10, decimal_places=2, default=25.0)
     quantity_actual = models.DecimalField("实际产量(kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    sap_material_code = models.CharField("SAP编码", max_length=50, blank=True, help_text="从关联项目成品材料的SAP物料号自动预填")
     packaging_desc = models.CharField("包装说明", max_length=100, blank=True)
     storage_location = models.CharField("存放位置", max_length=100, blank=True)
+
+    # ---- 包装前处理 ----
+    drying_temperature = models.IntegerField("干燥温度(℃)", null=True, blank=True, help_text="包装前的干燥温度")
+    drying_duration = models.DecimalField("干燥时间(h)", max_digits=5, decimal_places=1, null=True, blank=True, help_text="包装前的干燥时长")
+    inner_bag_sealing = models.BooleanField("套内膜袋密封", default=False, help_text="包装时是否套内膜袋并密封")
+
+    # ---- 注塑参数 ----
+    injection_temperature = models.IntegerField("注塑温度(℃)", null=True, blank=True, help_text="注塑时的加工温度")
+    injection_pretreatment = models.TextField("注塑前处理", blank=True, help_text="注塑前的预处理要求，如烘干条件等")
     process_profile = models.ForeignKey('app_process.ProcessProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='production_orders', verbose_name="工艺方案")
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="创建人", related_name='created_production_orders')
     extruder_operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="挤出操作员", related_name='extruder_orders')

@@ -101,6 +101,16 @@
                             </td>
                             <td class="fw-bold">{{ order.code }}</td>
                         </tr>
+                        {% if order.sap_material_code %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-barcode me-1"></i>SAP编码
+                            </td>
+                            <td>
+                                <span class="fw-bold">{{ order.sap_material_code }}</span>
+                            </td>
+                        </tr>
+                        {% endif %}
                         <tr>
                             <td class="text-muted">
                                 <i class="ti ti-flask me-1"></i>实验单号
@@ -269,6 +279,51 @@
                             </td>
                             <td>{{ order.extruder_operator.realname|default:"-" }}</td>
                         </tr>
+                        {% if order.drying_temperature or order.drying_duration or order.inner_bag_sealing %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-package me-1"></i>包装前处理
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    {% if order.drying_temperature %}
+                                    <span class="badge bg-orange-lt">
+                                        <i class="ti ti-temperature me-1"></i>干燥 {{ order.drying_temperature }}℃
+                                    </span>
+                                    {% endif %}
+                                    {% if order.drying_duration %}
+                                    <span class="badge bg-azure-lt">
+                                        <i class="ti ti-clock me-1"></i>{{ order.drying_duration }}h
+                                    </span>
+                                    {% endif %}
+                                    {% if order.inner_bag_sealing %}
+                                    <span class="badge bg-green-lt">
+                                        <i class="ti ti-box-seam me-1"></i>套内膜袋密封
+                                    </span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
+                        {% if order.injection_temperature or order.injection_pretreatment %}
+                        <tr>
+                            <td class="text-muted">
+                                <i class="ti ti-injection me-1"></i>注塑参数
+                            </td>
+                            <td>
+                                <div class="d-flex flex-wrap gap-2 align-items-center">
+                                    {% if order.injection_temperature %}
+                                    <span class="badge bg-red-lt">
+                                        <i class="ti ti-temperature-celsius me-1"></i>{{ order.injection_temperature }}℃
+                                    </span>
+                                    {% endif %}
+                                    {% if order.injection_pretreatment %}
+                                    <span class="text-muted small">{{ order.injection_pretreatment }}</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endif %}
                         {% if order.packaging_desc %}
                         <tr>
                             <td class="text-muted">

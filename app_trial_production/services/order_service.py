@@ -15,6 +15,7 @@ class ProductionOrderService:
     def create_order(user, trial_code, project_id, project_node_id=None,
                      process_profile_id=None, formula_details=None,
                      test_item_ids=None,
+                     sap_material_code='',
                      packaging_desc='', storage_location='', remark=''):
         """
         创建排产工单 — 仅创建工单本身 + 配方明细。
@@ -44,6 +45,7 @@ class ProductionOrderService:
             project_node_id=project_node_id,
             process_profile_id=process_profile_id,
             creator=user,
+            sap_material_code=sap_material_code,
             packaging_desc=packaging_desc,
             storage_location=storage_location,
             remark=remark,

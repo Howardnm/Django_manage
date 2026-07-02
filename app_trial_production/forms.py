@@ -12,10 +12,21 @@ class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
     """创建生产工单表单"""
     class Meta:
         model = ProductionOrder
-        fields = ['quantity_planned', 'process_profile', 'packaging_desc', 'storage_location', 'remark']
+        fields = [
+            'quantity_planned', 'sap_material_code', 'process_profile',
+            'drying_temperature', 'drying_duration', 'inner_bag_sealing',
+            'injection_temperature', 'injection_pretreatment',
+            'packaging_desc', 'storage_location', 'remark',
+        ]
         widgets = {
             'quantity_planned': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '自动从成品材料预填'}),
             'process_profile': forms.Select(attrs={'class': 'form-select'}),
+            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：80'}),
+            'drying_duration': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5', 'placeholder': '如：2'}),
+            'inner_bag_sealing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：230'}),
+            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '如：80℃烘干2小时'}),
             'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
             'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
@@ -26,9 +37,20 @@ class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
     """编辑生产工单"""
     class Meta:
         model = ProductionOrder
-        fields = ['process_profile', 'packaging_desc', 'storage_location', 'remark']
+        fields = [
+            'sap_material_code', 'process_profile',
+            'drying_temperature', 'drying_duration', 'inner_bag_sealing',
+            'injection_temperature', 'injection_pretreatment',
+            'packaging_desc', 'storage_location', 'remark',
+        ]
         widgets = {
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '自动从成品材料预填'}),
             'process_profile': forms.Select(attrs={'class': 'form-select'}),
+            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：80'}),
+            'drying_duration': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5', 'placeholder': '如：2'}),
+            'inner_bag_sealing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：230'}),
+            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '如：80℃烘干2小时'}),
             'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
             'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
