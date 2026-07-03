@@ -184,6 +184,10 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 if val > 0:
                     temp_values.append(val)
 
+        # ── 配方颜色字段（取自第一个配方版本）──
+        formulas = self._get_formulas()
+        first_formula = formulas[0] if formulas else None
+
         return {
             'order_code': order.code or '',
             'project_name': project.name if project else '',
@@ -205,6 +209,25 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 if order.project_node else ''
             ),
             'needs_color_display': self._format_needs_color(),
+            'material_color_name': (
+                first_formula.material_color_name
+                if first_formula else ''
+            ),
+            'pantone_code': (
+                first_formula.pantone_code
+                if first_formula else ''
+            ),
+            'rgb_value': (
+                first_formula.rgb_value
+                if first_formula else ''
+            ),
+            'has_formula_color': (
+                bool(first_formula and (
+                    first_formula.material_color_name
+                    or first_formula.pantone_code
+                    or first_formula.rgb_value
+                ))
+            ),
             'machine_name': (
                 profile.machine.name
                 if profile and profile.machine else ''

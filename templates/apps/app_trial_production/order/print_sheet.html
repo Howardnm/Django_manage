@@ -45,7 +45,11 @@
             {% endif %}
         </div>
         <div class="flex-grow-1 text-center fs-3 fw-bold">试 验 工 程 单</div>
-        <div style="width:25%;"></div>
+        <div style="width:25%;" class="text-end">
+            <span class="fw-bold" style="font-size:14px;border:1px solid #808080;padding:2px 8px;">
+                {{ forloop.counter }} / {{ total_pages }}
+            </span>
+        </div>
     </div>
 
     {# ═══════════════════════════════════════════════════ #}
@@ -83,16 +87,24 @@
             <td class="text-start ps-2">{{ header_info.customer|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">项目阶段</td>
             <td class="text-start ps-2">{{ header_info.project_stage|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">是否需要色粉</td>
-            <td class="text-start ps-2">{{ header_info.needs_color_display|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">样品总量</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.total_planned_qty|floatformat:1 }} KG</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">机台</td>
             <td class="text-start ps-2">{{ header_info.machine_name|default:'—' }}</td>
         </tr>
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center">样品总量</td>
-            <td class="text-start ps-2 fw-bold" colspan="7">
-                {{ header_info.total_planned_qty|floatformat:1 }} KG
-            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">是否需要色粉</td>
+            <td class="text-start ps-2">{{ header_info.needs_color_display|default:'—' }}</td>
+            {% if header_info.has_formula_color %}
+            <td class="print-label-bg fw-bold text-nowrap text-center">色名</td>
+            <td class="text-start ps-2">{{ header_info.material_color_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">潘通</td>
+            <td class="text-start ps-2">{{ header_info.pantone_code|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">RGB</td>
+            <td class="text-start ps-2" style="font-family:monospace;">{{ header_info.rgb_value|default:'—' }}</td>
+            {% else %}
+            <td class="text-start ps-2" colspan="6"></td>
+            {% endif %}
         </tr>
     </table>
 
