@@ -191,17 +191,27 @@
     {# ═══════════════════════════════════════════════════ #}
     <table class="table table-bordered table-sm mb-3" style="table-layout:fixed;font-size:10px;">
 
-        {# ── 加工温度 / 转速 ── #}
+        {# ── 工艺方案 ── #}
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">加工温度</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">工艺方案</td>
             <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.processing_temp|default:'—' }}
+                {{ post_processing.profile_name|default:'—' }}
             </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">转速</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">适用机台</td>
             <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.screw_speed|default:'—' }}
+                {{ post_processing.profile_machine|default:'—' }}
             </td>
         </tr>
+        {% if post_processing.profile_screw %}
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">螺杆组合</td>
+            <td colspan="
+                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
+            " class="text-start ps-2">
+                {{ post_processing.profile_screw }}
+            </td>
+        </tr>
+        {% endif %}
 
         {# ── 说明 ── #}
         {% if post_processing.remark %}
@@ -248,13 +258,16 @@
             </td>
         </tr>
 
-        {# ── 包装说明 / 存放位置 ── #}
-        {% if post_processing.packaging_desc and not post_processing.inner_bag_sealing %}
+        {# ── 包装 / 存放 ── #}
+        {% if post_processing.packaging_desc or post_processing.storage_location %}
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">包装/存放</td>
-            <td colspan="{{ page.formula_count|add:page.formula_count }}" class="text-start ps-2">
-                包装：{{ post_processing.packaging_desc|default:'—' }}
-                &nbsp;&nbsp;存放：{{ post_processing.storage_location|default:'—' }}
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">包装说明</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.packaging_desc|default:'—' }}
+            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">存放位置</td>
+            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
+                {{ post_processing.storage_location|default:'—' }}
             </td>
         </tr>
         {% endif %}

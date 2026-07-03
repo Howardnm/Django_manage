@@ -88,11 +88,28 @@
     </div>
 </div>
 
+<!-- 等待排产提示 -->
+{% if order.status == 'ACCEPTED' and not extrusion_task and not order.extrusion_scheduled_date %}
+<div class="row mb-3">
+    <div class="col-12">
+        <div class="card bg-yellow-lt">
+            <div class="card-body py-2 text-center">
+                <i class="ti ti-calendar-event fs-4 text-yellow mb-1 d-block"></i>
+                <div class="fw-bold">等待挤出操作员在排产工作台领取并开始生产</div>
+                <a href="{% url 'trial_extrusion_board' %}" class="btn btn-sm btn-outline-yellow mt-1">
+                    <i class="ti ti-arrow-right me-1"></i>前往排产工作台
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row row-cards mt-3">
     <!-- 基本信息 -->
     <div class="col-lg-6">
         <div class="card card-sm">
-            <div class="card-header">
+            <div class="card-header bg-blue-lt">
                 <h3 class="card-title">
                     <i class="ti ti-info-circle me-2 text-blue"></i>基本信息
                 </h3>
@@ -212,7 +229,7 @@
     <!-- 生产信息 -->
     <div class="col-lg-6">
         <div class="card card-sm">
-            <div class="card-header">
+            <div class="card-header bg-green-lt">
                 <h3 class="card-title">
                     <i class="ti ti-settings me-2 text-green"></i>生产信息
                 </h3>
@@ -387,34 +404,17 @@
     </div>
 </div>
 
-<!-- 子任务状态总览 -->
-{% if order.status == 'ACCEPTED' and not extrusion_task and not order.extrusion_scheduled_date %}
-<div class="row mt-3">
-    <div class="col-12">
-        <div class="card bg-yellow-lt">
-            <div class="card-body py-3 text-center">
-                <i class="ti ti-calendar-event fs-2 text-yellow mb-2 d-block"></i>
-                <div class="fw-bold">等待挤出操作员在排产工作台领取并开始生产</div>
-                <a href="{% url 'trial_extrusion_board' %}" class="btn btn-sm btn-outline-yellow mt-2">
-                    <i class="ti ti-arrow-right me-1"></i>前往排产工作台
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
 {% if extrusion_task or color_task or injection_task %}
 <div class="row mt-3">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header bg-purple-lt">
                 <h3 class="card-title"><i class="ti ti-list-check me-2"></i>子任务进度</h3>
             </div>
             <div class="card-body">
                 <div class="row g-3">
                     {% if extrusion_task %}
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card card-sm">
                             <div class="card-body py-2 d-flex align-items-center">
                                 <div>
@@ -429,8 +429,30 @@
                     </div>
                     {% endif %}
 
+                    {% if extrusion_task and extrusion_task.status == 'COMPLETED' %}
+                    <div class="col">
+                        <div class="card card-sm">
+                            <div class="card-body py-2 d-flex align-items-center">
+                                <div>
+                                    <div class="text-muted small">颗粒分拨</div>
+                                    {% if has_pellet_splits %}
+                                    <span class="badge bg-green-lt">已分拨</span>
+                                    {% else %}
+                                    <span class="badge bg-yellow-lt">待分拨</span>
+                                    {% endif %}
+                                </div>
+                                {% if not has_pellet_splits %}
+                                <a href="{% url 'trial_pellet_split' order.pk %}" class="btn btn-sm btn-outline-cyan ms-auto">
+                                    <i class="ti ti-arrow-right"></i>
+                                </a>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     {% if color_task %}
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card card-sm">
                             <div class="card-body py-2 d-flex align-items-center">
                                 <div>
@@ -446,7 +468,7 @@
                     {% endif %}
 
                     {% if injection_task %}
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card card-sm">
                             <div class="card-body py-2 d-flex align-items-center">
                                 <div>
@@ -462,7 +484,7 @@
                     {% endif %}
 
                     {% for tt in testing_tasks %}
-                    <div class="col-md-3">
+                    <div class="col">
                         <div class="card card-sm">
                             <div class="card-body py-2 d-flex align-items-center">
                                 <div>
@@ -484,100 +506,28 @@
 {% endif %}
 
 <!-- 样品库存汇总 -->
-{% if pellet_summary.finished.count or pellet_summary.for_injection.count or pellet_data.actual_qty or formula_split_summaries or specimen_summary.for_testing.count %}
+{% if formula_split_summaries %}
 <div class="row mt-3">
     <div class="col-12">
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title"><i class="ti ti-package me-2"></i>样品库存汇总</h3>
+            <div class="card-header bg-cyan-lt d-flex justify-content-between align-items-center">
+                <h3 class="card-title">
+                    <i class="ti ti-package me-2"></i>样品库存汇总
+                    {% if has_pellet_splits %}
+                    <span class="badge bg-green-lt ms-2">已分拨</span>
+                    {% else %}
+                    <span class="badge bg-secondary-lt ms-2">未分拨</span>
+                    {% endif %}
+                </h3>
                 <a href="{% url 'trial_sample_list' %}?trial_code={{ order.trial_code }}" class="btn btn-sm btn-outline-secondary">查看全部</a>
             </div>
-            <div class="card-body">
-
-                {# ── 该实验单号全部产出（跨工单汇总）── #}
-                {% if pellet_summary.finished.count or pellet_summary.for_injection.count %}
-                <div class="text-muted small fw-bold mb-2">
-                    <i class="ti ti-flask me-1"></i>实验单号 <strong>{{ order.trial_code }}</strong> 全部产出
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-sm-6 col-lg-4">
-                        <div class="card card-sm bg-green-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">颗粒成品</div>
-                                <div class="fw-bold fs-3">
-                                    {{ pellet_summary.finished.count|default:0 }} 批次 / {{ pellet_summary.finished.total_kg|default:0|floatformat:1 }} kg
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-6 col-lg-4">
-                        <div class="card card-sm bg-azure-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">待打样颗粒</div>
-                                <div class="fw-bold fs-3">
-                                    {{ pellet_summary.for_injection.count|default:0 }} 批次 / {{ pellet_summary.for_injection.total_kg|default:0|floatformat:1 }} kg
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                {# ── 当前工单挤出结果 + 颗粒分拨 ── #}
-                {% if pellet_data.actual_qty %}
-                <div class="text-muted small fw-bold mb-2">
-                    <i class="ti ti-file-invoice me-1"></i>工单 <strong>{{ order.code }}</strong> 分拨明细
-                </div>
-                <div class="row g-2 mb-3">
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">实际产量</div>
-                                <div class="fw-bold fs-3 text-green">{{ pellet_data.actual_qty|floatformat:1 }} kg</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">分拨状态</div>
-                                <div class="mt-1">
-                                    {% if pellet_data.completed %}
-                                    <span class="badge bg-green-lt fs-5"><i class="ti ti-check me-1"></i>已完成</span>
-                                    {% else %}
-                                    <span class="badge bg-secondary-lt fs-5"><i class="ti ti-clock me-1"></i>未分拨</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% if pellet_data.completed %}
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm bg-green-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">本单颗粒成品</div>
-                                <div class="fw-bold fs-3">{{ pellet_data.finished_qty|floatformat:1 }} kg</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm bg-azure-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">本单待打样颗粒</div>
-                                <div class="fw-bold fs-3">{{ pellet_data.for_injection_qty|floatformat:1 }} kg</div>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-                </div>
-                {% endif %}
+            <div class="card-body p-0">
 
                 {# ── 配方粒度分拨明细 ── #}
-                {% if formula_split_summaries %}
-                <div class="text-muted small fw-bold mb-2">
+                <div class="text-muted small fw-bold px-3 pt-3 mb-2">
                     <i class="ti ti-arrows-split me-1"></i>按配方版本
                 </div>
-                <div class="table-responsive mb-3">
+                <div class="table-responsive">
                     <table class="table table-vcenter card-table" style="font-size: 13px;">
                         <thead>
                             <tr>
@@ -624,88 +574,7 @@
                         </tbody>
                     </table>
                 </div>
-                {% endif %}
 
-                {# ── 注塑样条（下游工序）── #}
-                {% if specimen_summary.for_testing.count or specimen_summary.tested.count %}
-                <div class="text-muted small fw-bold mb-2">
-                    <i class="ti ti-injection me-1"></i>注塑样条
-                </div>
-                <div class="row g-2">
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm bg-yellow-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">待测试样条</div>
-                                <div class="fw-bold fs-3">{{ specimen_summary.for_testing.total_specimens|default:0 }} 根</div>
-                                <div class="text-muted small">{{ specimen_summary.for_testing.count|default:0 }} 条记录</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-sm-4 col-lg-3">
-                        <div class="card card-sm bg-secondary-lt">
-                            <div class="card-body py-2 text-center">
-                                <div class="text-muted small">已测试样条</div>
-                                <div class="fw-bold fs-3">{{ specimen_summary.tested.total_specimens|default:0 }} 根</div>
-                                <div class="text-muted small">{{ specimen_summary.tested.count|default:0 }} 条记录</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-            </div>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- 注塑模具需求矩阵 -->
-{% if mold_matrix %}
-<div class="row mt-3">
-    <div class="col-12">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h3 class="card-title">注塑模具需求{% if mold_matrix.is_pending %} <span class="badge bg-yellow-lt text-yellow">待触发</span>{% endif %}</h3>
-                {% if injection_task %}
-                <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue">注塑详情</a>
-                {% endif %}
-            </div>
-            <div class="table-responsive">
-                <table class="table card-table table-vcenter table-bordered bom-table text-nowrap">
-                    <thead>
-                        <tr>
-                            <th>模具</th>
-                            <th>标准</th>
-                            {% for f in mold_matrix.formulas %}
-                            <th class="text-center"><span class="badge bg-azure-lt">v{{ f.version }}</span></th>
-                            {% endfor %}
-                            <th class="text-center bg-muted-lt">合计</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in mold_matrix.mold_rows %}
-                        <tr>
-                            <td class="fw-bold">{{ row.mold.name }} <span class="text-muted small">({{ row.mold.mold_code }})</span></td>
-                            <td><span class="badge bg-secondary-lt">{{ row.mold.get_standard_display }}</span></td>
-                            {% for cell in row.cells %}
-                            <td class="text-center fw-bold">{{ cell.qty|default:"-" }}</td>
-                            {% endfor %}
-                            <td class="text-center bg-muted-lt fw-bold">{{ row.row_total }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    {% if mold_matrix.mold_rows|length > 1 %}
-                    <tfoot>
-                        <tr class="bg-green-lt">
-                            <td colspan="2" class="fw-bold text-end">合计</td>
-                            {% for ft in mold_matrix.formula_totals %}
-                            <td class="text-center fw-bold">{{ ft.total }}</td>
-                            {% endfor %}
-                            <td class="text-center fw-bold">{{ mold_matrix.grand_total }}</td>
-                        </tr>
-                    </tfoot>
-                    {% endif %}
-                </table>
             </div>
         </div>
     </div>
@@ -787,6 +656,59 @@
                             <td colspan="3"></td>
                         </tr>
                     </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- 注塑模具需求矩阵 -->
+{% if mold_matrix %}
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header bg-azure-lt d-flex justify-content-between align-items-center">
+                <h3 class="card-title">注塑模具需求{% if mold_matrix.is_pending %} <span class="badge bg-yellow-lt text-yellow">待触发</span>{% endif %}</h3>
+                {% if injection_task %}
+                <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue">注塑详情</a>
+                {% endif %}
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter table-bordered bom-table text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>模具</th>
+                            <th>标准</th>
+                            {% for f in mold_matrix.formulas %}
+                            <th class="text-center"><span class="badge bg-azure-lt">v{{ f.version }}</span></th>
+                            {% endfor %}
+                            <th class="text-center bg-muted-lt">合计</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in mold_matrix.mold_rows %}
+                        <tr>
+                            <td class="fw-bold">{{ row.mold.name }} <span class="text-muted small">({{ row.mold.mold_code }})</span></td>
+                            <td><span class="badge bg-secondary-lt">{{ row.mold.get_standard_display }}</span></td>
+                            {% for cell in row.cells %}
+                            <td class="text-center fw-bold">{{ cell.qty|default:"-" }}</td>
+                            {% endfor %}
+                            <td class="text-center bg-muted-lt fw-bold">{{ row.row_total }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if mold_matrix.mold_rows|length > 1 %}
+                    <tfoot>
+                        <tr class="bg-green-lt">
+                            <td colspan="2" class="fw-bold text-end">合计</td>
+                            {% for ft in mold_matrix.formula_totals %}
+                            <td class="text-center fw-bold">{{ ft.total }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ mold_matrix.grand_total }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
                 </table>
             </div>
         </div>

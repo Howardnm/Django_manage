@@ -177,13 +177,6 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         material = project.material if project else None
         profile = order.process_profile
 
-        temp_values = []
-        if profile:
-            for fn in profile.TEMP_FIELDS:
-                val = getattr(profile, fn, 0) or 0
-                if val > 0:
-                    temp_values.append(val)
-
         # ── 配方颜色字段（取自第一个配方版本）──
         formulas = self._get_formulas()
         first_formula = formulas[0] if formulas else None
@@ -229,19 +222,10 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 ))
             ),
             'machine_name': (
-                profile.machine.name
+                profile.machine.model_name
                 if profile and profile.machine else ''
             ),
             'total_planned_qty': float(order.quantity_planned or 0),
-            # ── 后处理引用 ──
-            'processing_temp': (
-                f'{min(temp_values)}-{max(temp_values)}℃'
-                if temp_values else ''
-            ),
-            'screw_speed': (
-                f'{profile.screw_speed}rpm'
-                if profile and profile.screw_speed else ''
-            ),
         }
 
     def _get_customer_name(self) -> str:
@@ -418,25 +402,15 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         order = self.order
         profile = order.process_profile
 
-        temp_range = ''
-        if profile:
-            temp_values = []
-            for fn in profile.TEMP_FIELDS:
-                v = getattr(profile, fn, 0) or 0
-                if v > 0:
-                    temp_values.append(v)
-            if temp_values:
-                temp_range = f'{min(temp_values)}-{max(temp_values)}℃'
-
         return {
-            'processing_temp': temp_range,
-            'screw_speed': (
-                f'{profile.screw_speed}rpm'
-                if profile and profile.screw_speed else ''
+            'profile_name': profile.name if profile else '',
+            'profile_machine': (
+                profile.machine.model_name
+                if profile and profile.machine else ''
             ),
-            'cooling_method': (
-                profile.get_cooling_method_display()
-                if profile and profile.cooling_method else ''
+            'profile_screw': (
+                profile.screw_combination.name
+                if profile and profile.screw_combination else ''
             ),
             'drying_temperature': (
                 f'{order.drying_temperature}℃'

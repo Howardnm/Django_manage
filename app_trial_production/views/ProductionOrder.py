@@ -280,25 +280,6 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
                 context['mold_matrix'] = self._build_mold_matrix(
                     plans, formulas, is_pending=True)
 
-        # 样品库存汇总 / 该实验单号的所有工单产出汇总（跨工单聚合）
-        context['pellet_summary'] = SampleInventoryService.get_pellet_summary(order.trial_code)
-
-        # 当前工单颗粒分拨明细
-        pellet_splits = SampleInventory.objects.filter(
-            production_order=order, type='PELLET',
-        ).aggregate(
-            finished_qty=Sum('quantity', filter=Q(sub_type='FINISHED')),
-            for_injection_qty=Sum('quantity', filter=Q(sub_type='FOR_INJECTION')),
-        )
-        context['pellet_data'] = {
-            'actual_qty': float(order.quantity_actual or 0),
-            'finished_qty': float(pellet_splits['finished_qty'] or 0),
-            'for_injection_qty': float(pellet_splits['for_injection_qty'] or 0),
-            'completed': ext.pellet_split_completed if ext else False,
-        }
-
-        context['specimen_summary'] = SampleInventoryService.get_specimen_summary(order.trial_code)
-
         # 是否已完成颗粒分拨（控制分拨按钮显隐 + 注塑任务触发屏障）
         context['has_pellet_splits'] = ext.pellet_split_completed if ext else False
 

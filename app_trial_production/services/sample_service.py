@@ -1,6 +1,6 @@
 import logging
 from django.db import transaction
-from django.db.models import Sum, Count
+
 from django.utils import timezone
 
 from app_trial_production.models import SampleInventory
@@ -172,67 +172,6 @@ class SampleInventoryService:
             f"(material={sample.sap_material_code}, batch={sample.sap_batch_number})"
         )
         return sample
-
-    @staticmethod
-    def get_pellet_summary(trial_code):
-        """
-        按试验单汇总颗粒样品统计。
-
-        count = 独立批次数（同一 batch_number 算 1 批）
-        total_kg = 总重量
-
-        Returns:
-            dict {
-                'finished': {'count': int, 'total_kg': Decimal},
-                'for_injection': {'count': int, 'total_kg': Decimal},
-            }
-        """
-        qs = SampleInventory.objects.filter(
-            trial_code=trial_code, type='PELLET',
-        ).exclude(status='CONSUMED')
-
-        finished = qs.filter(sub_type='FINISHED').aggregate(
-            count=Count('batch_number', distinct=True),
-            total_kg=Sum('quantity'),
-        )
-        for_injection = qs.filter(sub_type='FOR_INJECTION').aggregate(
-            count=Count('batch_number', distinct=True),
-            total_kg=Sum('quantity'),
-        )
-
-        return {
-            'finished': finished,
-            'for_injection': for_injection,
-        }
-
-    @staticmethod
-    def get_specimen_summary(trial_code):
-        """
-        按试验单汇总样条样品统计。
-
-        Returns:
-            dict {
-                'for_testing': {'count': int, 'total_specimens': int},
-                'tested': {'count': int, 'total_specimens': int},
-            }
-        """
-        qs = SampleInventory.objects.filter(
-            trial_code=trial_code, type='SPECIMEN',
-        )
-
-        for_testing = qs.filter(sub_type='FOR_TESTING').aggregate(
-            count=Count('id'),
-            total_specimens=Sum('specimen_count'),
-        )
-        tested = qs.filter(sub_type='TESTED').aggregate(
-            count=Count('id'),
-            total_specimens=Sum('specimen_count'),
-        )
-
-        return {
-            'for_testing': for_testing,
-            'tested': tested,
-        }
 
     @staticmethod
     def get_available_for_injection():
