@@ -258,16 +258,14 @@
             </td>
         </tr>
 
-        {# ── 包装 / 存放 ── #}
-        {% if post_processing.packaging_desc or post_processing.storage_location %}
+        {# ── 包装说明 ── #}
+        {% if post_processing.packaging_desc %}
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">包装说明</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.packaging_desc|default:'—' }}
-            </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">存放位置</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.storage_location|default:'—' }}
+            <td colspan="
+                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
+            " class="text-start ps-2">
+                {{ post_processing.packaging_desc }}
             </td>
         </tr>
         {% endif %}
