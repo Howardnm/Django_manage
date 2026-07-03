@@ -4,15 +4,14 @@ from django.urls import reverse
 from app_trial_production.mixins import TrialProductionAccessMixin
 from app_trial_production.models import TrialProductionConfig
 from app_trial_production.forms import TrialConfigForm
-from app_user.mixins import IdentityConfig
 
 
 class TrialConfigView(TrialProductionAccessMixin, UpdateView):
-    """排产全局配置视图"""
+    """排产全局配置视图 — 仅超级用户"""
     model = TrialProductionConfig
     form_class = TrialConfigForm
     template_name = 'apps/app_trial_production/config/form.html'
-    identity_required = IdentityConfig.RND_ONLY
+    identity_required = []  # 空列表 = 仅超级用户可访问
     permission_required = 'app_trial_production.change_trialproductionconfig'
 
     def get_object(self, queryset=None):

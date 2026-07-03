@@ -6,7 +6,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db.models import Sum
 
-from app_trial_production.mixins import SampleInventoryAccessMixin
+from app_trial_production.mixins import ExtrusionTaskAccessMixin
 from app_trial_production.models import SampleInventory
 from app_trial_production.forms import PelletSplitForm, PelletSplitFormSet
 from app_trial_production.services import SampleInventoryService
@@ -14,8 +14,8 @@ from app_trial_production.services import SampleInventoryService
 logger = logging.getLogger(__name__)
 
 
-class PelletSplitView(SampleInventoryAccessMixin, View):
-    """挤出后颗粒分拨"""
+class PelletSplitView(ExtrusionTaskAccessMixin, View):
+    """挤出后颗粒分拨 — 仅挤出操作员"""
     template_name = 'apps/app_trial_production/pellet/split.html'
 
     def _resolve_order(self):

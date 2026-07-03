@@ -252,7 +252,7 @@
     {# ── 注塑需求模具矩阵（独立表格，不挤压）── #}
     {% if mold_matrix and mold_matrix.mold_rows %}
     <div class="fw-bold text-center print-label-bg py-1" style="font-size:10px;border:1px solid #808080;border-bottom:none;">注塑需求</div>
-    <table class="table table-bordered table-sm mb-3" style="font-size:9px;">
+    <table class="table table-bordered table-sm mb-3" style="font-size:10px;">
         <tr class="print-label-bg">
             <td class="fw-bold text-start" style="width:12%;">模具</td>
             <td class="fw-bold text-start" style="width:8%;">标准</td>
@@ -264,11 +264,11 @@
         </tr>
         {% for mr in mold_matrix.mold_rows %}
         <tr>
-            <td class="text-start">{{ mr.mold_name }}</td>
+            <td class="text-start fw-bold">{{ mr.mold_name }}</td>
             <td class="text-start">{{ mr.standard }}</td>
             <td class="text-center">{{ mr.cavity_count }}</td>
             {% for cell in mr.cells %}
-            <td class="text-center">{{ cell.qty|default:'—' }}</td>
+            <td class="text-center fw-bold">{{ cell.qty|default:'—' }}</td>
             {% endfor %}
             <td class="text-center fw-bold">{{ mr.row_total }}</td>
         </tr>

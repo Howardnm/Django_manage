@@ -83,6 +83,7 @@ class MenuService:
             MenuModule.get_material(),
             MenuModule.get_formula(),
             MenuModule.get_trial_production(),
+            MenuModule.get_extrusion_production(),
             MenuModule.get_color_center(),
             MenuModule.get_mold_injection(),
             MenuModule.get_material_testing(),

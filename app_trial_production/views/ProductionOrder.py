@@ -14,14 +14,13 @@ from app_formula.models import LabFormula
 from app_material.models import TestConfig
 from app_mold_injection.models import MoldRequirement, MoldRequirementFormulaDetail, MoldType
 from app_project.models import Project
-from app_trial_production.mixins import TrialProductionAccessMixin, RndAccessMixin
+from app_trial_production.mixins import TrialProductionAccessMixin, RndAccessMixin, ExtrusionTaskAccessMixin
 from app_trial_production.models import ProductionOrder, SampleInventory, TrialProductionConfig
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
 )
 from app_trial_production.services import ProductionOrderService, SampleInventoryService
 from app_user.models import User
-from app_user.mixins import IdentityConfig
 
 logger = logging.getLogger(__name__)
 
@@ -331,11 +330,9 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             })
         context['formula_split_summaries'] = formula_split_summaries
 
-        # 操作权限
-        user = self.request.user
+        # 操作权限：仅挤出操作员可触发启动挤出
         context['can_start_extrusion'] = order.can_start_extrusion and (
-            user.user_type == User.UserType.EXTRUSION_OPERATOR
-            or user.user_type in IdentityConfig.TECH_CORE
+            self.request.user.user_type == User.UserType.EXTRUSION_OPERATOR
         )
 
         return context
@@ -760,8 +757,8 @@ class ProductionOrderPrintView(TrialProductionAccessMixin, DetailView):
         return HttpResponse(renderer.render_html())
 
 
-class ProductionOrderStartExtrusionView(RndAccessMixin, View):
-    """开始挤出 — 创建 ExtrusionTask + ColorMatchingTask，跳转挤出详情"""
+class ProductionOrderStartExtrusionView(ExtrusionTaskAccessMixin, View):
+    """开始挤出 — 创建 ExtrusionTask + ColorMatchingTask，跳转挤出详情（仅挤出操作员）"""
 
     def post(self, request, pk):
         order = get_object_or_404(ProductionOrder, pk=pk, status='ACCEPTED')

@@ -294,20 +294,34 @@ class MenuModule:
     def get_trial_production():
         """返回试验排产中心菜单定义。
 
-        模块级: TECH_CORE + 挤出操作员 + 采购。
-        配色/注塑/测试已拆分至独立菜单模块。
+        模块级: 仅研发工程师。
+        挤出排产相关子菜单已迁移至挤出排产中心。
         """
         return {
             "name": "试验排产中心",
             "icon": "ti-building-factory",
-            "visible_to": IdentityConfig.TECH_CORE + [
-                IdentityConfig.R_EXTRUSION_OP, IdentityConfig.R_PURCHASING,
-            ],
+            "visible_to": [IdentityConfig.R_ENGINEER],
             "url_name": "trial_dashboard",
             "sub_items": [
-                {"name": "排产总览", "url_name": "trial_dashboard", "visible_to": IdentityConfig.RND_ONLY},
-                {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": IdentityConfig.TECH_CORE + [IdentityConfig.R_EXTRUSION_OP]},
-                {"name": "挤出任务", "url_name": "trial_extrusion_task_list"},
+                {"name": "排产总览", "url_name": "trial_dashboard"},
+            ]
+        }
+
+    @staticmethod
+    def get_extrusion_production():
+        """返回挤出排产中心菜单定义。
+
+        模块级: 研发工程师 + 挤出操作员。
+        排产工作台、挤出任务仅限挤出操作员使用；成品颗粒库存全员可见。
+        """
+        return {
+            "name": "挤出排产中心",
+            "icon": "ti-stack",
+            "visible_to": [IdentityConfig.R_ENGINEER, IdentityConfig.R_EXTRUSION_OP],
+            "url_name": "trial_extrusion_board",
+            "sub_items": [
+                {"name": "排产工作台", "url_name": "trial_extrusion_board", "visible_to": [IdentityConfig.R_EXTRUSION_OP]},
+                {"name": "挤出任务", "url_name": "trial_extrusion_task_list", "visible_to": [IdentityConfig.R_EXTRUSION_OP]},
                 {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
             ]
         }
