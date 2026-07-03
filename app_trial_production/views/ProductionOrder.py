@@ -330,9 +330,10 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             })
         context['formula_split_summaries'] = formula_split_summaries
 
-        # 操作权限：仅挤出操作员可触发启动挤出
+        # 操作权限：挤出操作员或超级用户可触发启动挤出
         context['can_start_extrusion'] = order.can_start_extrusion and (
             self.request.user.user_type == User.UserType.EXTRUSION_OPERATOR
+            or self.request.user.is_superuser
         )
 
         return context
