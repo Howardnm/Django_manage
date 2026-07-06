@@ -1,0 +1,169 @@
+<div class="row row-cards">
+    {# ── 左侧边栏 ── #}
+    <div class="col-lg-3">
+        {# ── 卡片一：配方实验单列表 ── #}
+        <div class="card">
+            <div class="card-header bg-primary-lt d-flex justify-content-between align-items-center py-2 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ti ti-flask text-primary" style="font-size: 16px;"></i>
+                    <span class="fw-semibold text-primary" style="font-size: 14px;">配方实验单</span>
+                    <span class="badge bg-primary text-white" style="font-size: 10px;">{{ competitor_formula_items|length }}</span>
+                </div>
+            </div>
+            <div class="list-group list-group-flush" style="max-height: 35vh; overflow-y: auto;">
+                {% for item in competitor_formula_items %}
+                <a href="?tab=competitor&formula_id={{ item.pk }}"
+                   class="list-group-item list-group-item-action py-2 px-3 {% if selected_competitor_formula.pk == item.pk %}active{% endif %}">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ item.version }}</span>
+                        <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{{ item.material_type_name }}</span>
+                    </div>
+                    <div class="text-muted mt-1" style="font-size: 11px;">
+                        <i class="ti ti-file-text me-1" style="font-size: 10px;"></i>{{ item.code }}
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 11px;">
+                        <span><i class="ti ti-user me-1"></i>{{ item.creator }}</span>
+                        <span>{{ item.created_at|date:"m-d H:i" }}</span>
+                    </div>
+                </a>
+                {% empty %}
+                <div class="list-group-item text-center text-muted py-5">
+                    <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                    暂无配方实验单
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# ── 卡片二：竞品工单列表（点击跳转工单详情页）── #}
+        <div class="card mt-3">
+            <div class="card-header bg-blue-lt d-flex justify-content-between align-items-center py-2 px-3">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="ti ti-target text-blue" style="font-size: 16px;"></i>
+                    <span class="fw-semibold text-blue" style="font-size: 14px;">竞品工单</span>
+                    <span class="badge bg-blue text-white" style="font-size: 10px;">{{ competitor_order_items|length }}</span>
+                </div>
+                <a href="{% url 'project_competitor_order_create' project.pk %}"
+                   class="btn btn-sm btn-primary py-0" style="font-size: 12px;">
+                    <i class="ti ti-plus me-1"></i>新增
+                </a>
+            </div>
+            <div class="list-group list-group-flush" style="max-height: 35vh; overflow-y: auto;">
+                {% for item in competitor_order_items %}
+                <a href="{% url 'trial_order_detail' item.pk %}" target="_blank"
+                   class="list-group-item list-group-item-action py-2 px-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge badge-dot {{ item.status_dot }} me-1"></span>
+                        <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{{ item.code }}</span>
+                        <span class="badge {{ item.status_css }} flex-shrink-0" style="font-size: 10px;">{{ item.status }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 11px;">
+                        <span><i class="ti ti-user me-1"></i>{{ item.creator }}</span>
+                        <span>{{ item.created_at|date:"m-d H:i" }}</span>
+                    </div>
+                    <div class="text-muted mt-1" style="font-size: 11px;">
+                        <i class="ti ti-weight me-1"></i>{{ item.quantity_planned }} kg
+                        {% if item.trial_code %}
+                        <span class="mx-2">|</span>
+                        <i class="ti ti-file-text me-1" style="font-size: 10px;"></i>{{ item.trial_code }}
+                        {% endif %}
+                    </div>
+                </a>
+                {% empty %}
+                <div class="list-group-item text-center text-muted py-5">
+                    <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                    暂无竞品工单
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ── 右侧详情面板 ── #}
+    <div class="col-lg-9">
+        {% if selected_competitor_formula %}
+            {# ── 配方实验单详情 ── #}
+            <div class="card mb-3">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <div class="flex-fill">
+                            <h4 class="mb-1">
+                                {{ selected_competitor_formula.code }}
+                                <small class="text-muted">v{{ selected_competitor_formula.version }}</small>
+                            </h4>
+                            <div class="text-muted small">
+                                <i class="ti ti-user me-1"></i>{{ selected_competitor_formula.creator.username }}
+                                <span class="mx-2">|</span>
+                                <i class="ti ti-calendar me-1"></i>{{ selected_competitor_formula.created_at|date:"Y-m-d H:i" }}
+                                <span class="mx-2">|</span>
+                                <span class="badge bg-purple-lt">{{ selected_competitor_formula.material_type.name }}</span>
+                            </div>
+                            {% if selected_competitor_formula.description %}
+                            <div class="text-muted small mt-1">
+                                <i class="ti ti-notes me-1"></i>{{ selected_competitor_formula.description }}
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <hr>
+                    <div class="row g-2 small">
+                        <div class="col-md-6">
+                            <span class="text-muted">配方名称：</span>
+                            <strong>{{ selected_competitor_formula.name }}</strong>
+                        </div>
+                        <div class="col-md-6">
+                            <span class="text-muted">基材类型：</span>
+                            <strong>{{ selected_competitor_formula.material_type.name }}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# 关联工单列表 #}
+            {% with related_orders=selected_competitor_formula.productionorderformuladetail_set.all %}
+            {% if related_orders %}
+            <div class="card mb-3">
+                <div class="card-header bg-green-lt">
+                    <h3 class="card-title text-green"><i class="ti ti-factory me-2"></i>关联排产工单</h3>
+                    <span class="badge bg-green text-white ms-auto">{{ related_orders|length }}</span>
+                </div>
+                <div class="list-group list-group-flush">
+                    {% for fd in related_orders %}
+                    {% with o=fd.production_order %}
+                    <a href="{% url 'trial_order_detail' o.pk %}" target="_blank"
+                       class="list-group-item list-group-item-action py-2 px-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge badge-dot {{ o.status_dot_color }} me-1"></span>
+                            <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{{ o.code }}</span>
+                            <span class="badge {{ o.status_css_class }} flex-shrink-0" style="font-size: 10px;">{{ o.get_status_display }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between text-muted mt-1" style="font-size: 11px;">
+                            <span><i class="ti ti-user me-1"></i>{{ o.creator.username }}</span>
+                            <span>{{ o.created_at|date:"m-d H:i" }}</span>
+                        </div>
+                        <div class="text-muted mt-1" style="font-size: 11px;">
+                            <i class="ti ti-weight me-1"></i>{{ fd.planned_quantity }} kg
+                        </div>
+                    </a>
+                    {% endwith %}
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {# ── 测试结果（手动录入 + 各工单回写）── #}
+            {% include 'apps/app_project/detail/_test_result_tabs.html' with test_result_tabs=competitor_test_result_tabs has_test_results=competitor_has_test_results formula=selected_competitor_formula %}
+
+        {% else %}
+            {# ── 空状态 ── #}
+            <div class="card">
+                <div class="card-body text-center py-5 text-muted">
+                    <i class="ti ti-flask-off fs-1 d-block mb-3"></i>
+                    <p class="mb-1">请在左侧选择一个配方实验单查看详情</p>
+                    <p class="text-muted small mb-0">或点击「新增」按钮创建新的客户竞品工单</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>

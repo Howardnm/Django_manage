@@ -3,6 +3,10 @@
 
 {% block title %}完成注塑 - #{{ injection_task.pk }}{% endblock %}
 
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/mold_matrix.css' %}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header d-print-none">
     <div class="row align-items-center">
@@ -27,19 +31,94 @@
         <div class="col-lg-8">
             <div class="card">
                 <div class="card-header bg-green-lt">
-                    <h3 class="card-title text-green"><i class="ti ti-clipboard-check me-2"></i>样条产出记录</h3>
-                    <button type="button" class="btn btn-sm btn-outline-primary ms-auto" id="add-specimen-row">
-                        <i class="ti ti-plus"></i> 添加样条
-                    </button>
+                    <h3 class="card-title text-green"><i class="ti ti-clipboard-check me-2"></i>样条产出记录（模具 × 配方矩阵）</h3>
+                    <span class="text-muted small ms-auto">可修改实际产出数量，数量为 0 的单元格不会入库</span>
                 </div>
+                {% if has_mold_requirements %}
+                <div class="table-responsive">
+                    <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix"
+                           id="specimen-matrix">
+                        <thead>
+                            <tr>
+                                <th style="min-width: 140px;">模具</th>
+                                <th style="width: 60px;">穴数</th>
+                                {% if mold_matrix_formulas %}
+                                    {% for f in mold_matrix_formulas %}
+                                    <th colspan="2">
+                                        <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                        <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                                    </th>
+                                    {% endfor %}
+                                {% else %}
+                                    <th>产出数量</th>
+                                    <th>合格数量</th>
+                                {% endif %}
+                                <th style="width: 110px;">存放位置</th>
+                                <th style="width: 90px;">批次标签</th>
+                            </tr>
+                            {% if mold_matrix_formulas %}
+                            <tr class="sub-header">
+                                <th colspan="2"></th>
+                                {% for f in mold_matrix_formulas %}
+                                <th class="text-muted small fw-normal">产出</th>
+                                <th class="text-muted small fw-normal">合格</th>
+                                {% endfor %}
+                                <th colspan="2"></th>
+                            </tr>
+                            {% endif %}
+                        </thead>
+                        <tbody>
+                            {% for row in mold_matrix_rows %}
+                            <tr class="specimen-matrix-row" data-mold-id="{{ row.mold.pk }}">
+                                <td class="fw-bold">
+                                    {{ row.mold.name }}
+                                    <div class="text-muted small">[{{ row.mold.mold_code }}]</div>
+                                </td>
+                                <td class="text-center text-muted">{{ row.mold.cavity_count }}穴</td>
+                                {% for cell in row.cells %}
+                                <td>
+                                    <input type="number"
+                                           name="qty_{{ row.mold.pk }}_{{ cell.formula_key }}"
+                                           class="form-control qty-input specimen-qty"
+                                           value="{{ cell.planned_qty }}"
+                                           min="0" placeholder="0">
+                                </td>
+                                <td>
+                                    <input type="number"
+                                           name="qualified_{{ row.mold.pk }}_{{ cell.formula_key }}"
+                                           class="form-control qty-input specimen-qualified"
+                                           value="{{ cell.planned_qty }}" min="0" placeholder="0">
+                                </td>
+                                {% endfor %}
+                                <td>
+                                    <input type="text"
+                                           name="location_{{ row.mold.pk }}"
+                                           class="form-control form-control-sm"
+                                           style="font-size: 12px; min-height: 28px; width: 100px;"
+                                           placeholder="样条柜-">
+                                </td>
+                                <td>
+                                    <input type="text"
+                                           name="batch_{{ row.mold.pk }}"
+                                           class="form-control form-control-sm"
+                                           style="font-size: 12px; min-height: 28px; width: 80px;">
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
                 <div class="card-body">
-                    <div id="specimen-rows">
-                        {# JS 动态添加 #}
+                    <div class="text-center py-4 text-muted">
+                        <i class="ti ti-alert-circle fs-2 d-block mb-2"></i>
+                        <p>该任务暂无模具需求，无法记录样条产出。</p>
                     </div>
-                    <input type="hidden" name="specimen_count" id="specimen_count" value="0">
                 </div>
+                {% endif %}
             </div>
         </div>
+
         <div class="col-lg-4">
             <div class="card">
                 <div class="card-header">
@@ -63,41 +142,6 @@
         </div>
     </div>
 </form>
-
-{# 样条行模板 #}
-<script type="text/template" id="specimen-row-template">
-  <div class="row g-2 mb-2 specimen-row align-items-end">
-    <div class="col-md-3">
-      <label class="form-label">模具</label>
-      <select name="specimen_mold_{IDX}" class="form-select">
-        {% for req in injection_task.mold_requirements.all %}
-        <option value="{{ req.mold.pk }}">{{ req.mold.name }} [{{ req.mold.mold_code }}]</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">产出数量</label>
-      <input type="number" name="specimen_qty_{IDX}" class="form-control" value="0" min="0">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">合格数量</label>
-      <input type="number" name="specimen_qualified_{IDX}" class="form-control" value="0" min="0">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">存放位置</label>
-      <input type="text" name="specimen_location_{IDX}" class="form-control" placeholder="样条柜-">
-    </div>
-    <div class="col-md-2">
-      <label class="form-label">批次标签</label>
-      <input type="text" name="specimen_batch_{IDX}" class="form-control">
-    </div>
-    <div class="col-md-1">
-      <button type="button" class="btn btn-outline-danger btn-sm remove-specimen-row">
-        <i class="ti ti-trash"></i>
-      </button>
-    </div>
-  </div>
-</script>
 
 {% endblock %}
 

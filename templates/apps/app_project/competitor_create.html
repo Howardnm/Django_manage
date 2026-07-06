@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}新增客户竞品 — {{ project.name }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/mold_matrix.css' %}">
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/bom_table.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'project_formula_process' project.pk %}?tab=competitor">客户竞品</a></li>
+                    <li class="breadcrumb-item active">新增客户竞品</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">
+            <i class="ti ti-plus me-2"></i>新增客户竞品
+            <span class="text-muted small ms-2">（跳过挤出，审批后直达注塑）</span>
+        </h2>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+    <form method="POST" id="competitor-create-form"
+          data-api-url="{% url 'trial_api_search' %}">
+        {% csrf_token %}
+
+        {# ── Section 1: 基础信息 ── #}
+        <div class="card mb-3">
+            <div class="card-header bg-blue-lt">
+                <h3 class="card-title text-blue"><i class="ti ti-package me-2"></i>竞品工单信息</h3>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">基材类型 <span class="text-danger">*</span></label>
+                        <select name="material_type" class="form-select" required>
+                            <option value="">— 请选择基材类型 —</option>
+                            {% for mt in material_types %}
+                            <option value="{{ mt.pk }}">{{ mt.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">竞品公司</label>
+                        <input type="text" name="competitor_company" class="form-control"
+                               placeholder="如：杜邦(Dupont)">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">竞品品牌</label>
+                        <input type="text" name="competitor_brand" class="form-control"
+                               placeholder="如：Zytel">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">竞品型号/牌号</label>
+                        <input type="text" name="competitor_model" class="form-control"
+                               placeholder="如：70G33L">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">关联客户</label>
+                        <select class="form-select remote-search" name="customer_id"
+                                data-model="customer" placeholder="搜索客户...">
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">计划数量(kg) <span class="text-danger">*</span></label>
+                        <input type="number" name="quantity_planned" class="form-control"
+                               step="0.01" min="0.01" value="25" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">注塑温度(℃)</label>
+                        <input type="number" name="injection_temperature" class="form-control"
+                               placeholder="如：230">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label">注塑前处理</label>
+                        <textarea name="injection_pretreatment" class="form-control" rows="2"
+                                  placeholder="如：80℃烘干2小时"></textarea>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">包装说明</label>
+                        <input type="text" name="packaging_desc" class="form-control"
+                               placeholder="如：25kg/袋">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">存放位置</label>
+                        <input type="text" name="storage_location" class="form-control"
+                               placeholder="如：A区货架3层">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# ── Section 2: 模具需求矩阵 ── #}
+        <div class="card mt-3" id="mold-matrix-card">
+            <div class="card-header bg-purple-lt d-flex justify-content-between align-items-center">
+                <h3 class="card-title text-purple"><i class="ti ti-mold me-2"></i>注塑需求（模具 × 配方矩阵）</h3>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="add-mold-row">
+                    <i class="ti ti-plus me-1"></i>新增模具
+                </button>
+            </div>
+
+            <div>
+                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix"
+                       id="mold-matrix-table" style="font-size: 13px; table-layout: auto;">
+                    <thead>
+                        <tr>
+                            <th style="width: 40%; min-width: 220px;">模具</th>
+                            <th style="width: 60px;">穴数</th>
+                            <th>制样数量</th>
+                            <th style="width: 50px;">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="mold-matrix-body">
+                        {% for mold in preset_molds %}
+                        <tr class="mold-row" data-row-index="{{ forloop.counter0 }}">
+                            <td>
+                                <select class="form-select form-select-search mold-select"
+                                        name="mold_id_{{ forloop.counter0 }}">
+                                    <option value="">—</option>
+                                    {% for m in available_molds %}
+                                    <option value="{{ m.pk }}" data-cavity="{{ m.cavity_count }}"
+                                            {% if m.pk == mold.pk %}selected{% endif %}>
+                                        [{{ m.mold_code }}] {{ m.name }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td class="cavity-cell text-center fw-bold">{{ mold.cavity_count }} 穴</td>
+                            <td>
+                                <input type="number" name="specimen_qty_{{ forloop.counter0 }}"
+                                       class="form-control form-control-sm qty-input text-center"
+                                       min="0" value="0" placeholder="0">
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-ghost-danger delete-mold-row-btn"
+                                        title="删除此行">
+                                    <i class="ti ti-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer">
+                <div class="rounded bg-warning-lt text-warning mb-0 p-2 d-flex align-items-center gap-2">
+                    <i class="ti ti-info-circle fs-4"></i>
+                    <span>填写注塑<strong>次数</strong>（非样条数量）。实际样条数 = 注塑次数 × 模具穴数</span>
+                </div>
+            </div>
+        </div>
+        <div id="mold-error" class="text-danger small mt-1" style="display:none;"></div>
+
+        {# ── Section 3: 测试需求 ── #}
+        <div class="card mt-3">
+            <div class="card-header bg-yellow-lt">
+                <h3 class="card-title text-yellow"><i class="ti ti-test-pipe me-2"></i>测试需求</h3>
+            </div>
+            <div class="card-body">
+                {% if grouped_test_items %}
+                <div class="test-masonry">
+                    {% for group in grouped_test_items %}
+                    <div class="test-masonry-item">
+                        <div class="card card-sm">
+                            <div class="card-header bg-muted-lt py-1">
+                                <strong>{{ group.category.name }}</strong>
+                            </div>
+                            <div class="card-body py-2">
+                                {% for item in group.items %}
+                                <label class="form-check mb-1" style="cursor:pointer; font-size:13px;">
+                                    <input type="checkbox" name="test_items" value="{{ item.pk }}"
+                                           class="form-check-input">
+                                    <span class="fw-bold">{{ item.name }}</span>
+                                    <span class="text-muted small d-block">
+                                        {{ item.standard }}{% if item.condition %} / {{ item.condition }}{% endif %}
+                                        {% if item.unit %}({{ item.unit }}){% endif %}
+                                    </span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center text-muted py-3">暂无可用测试项目</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-3">
+            <a href="{% url 'project_formula_process' project.pk %}?tab=competitor" class="btn btn-link link-secondary">取消</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-check me-1"></i>创建竞品工单
+            </button>
+        </div>
+    </form>
+</div>
+
+{# ── 模具行模板（新增行使用） ── #}
+<script type="text/template" id="mold-row-template">
+    <tr class="mold-row" data-row-index="__INDEX__">
+        <td>
+            <select class="form-select form-select-search mold-select" name="mold_id___INDEX__">
+                <option value="">—</option>
+                {% for m in available_molds %}
+                <option value="{{ m.pk }}" data-cavity="{{ m.cavity_count }}">
+                    [{{ m.mold_code }}] {{ m.name }}
+                </option>
+                {% endfor %}
+            </select>
+        </td>
+        <td class="cavity-cell text-center text-muted fw-bold">—</td>
+        <td>
+            <input type="number" name="specimen_qty___INDEX__"
+                   class="form-control form-control-sm qty-input text-center"
+                   min="0" value="0" placeholder="0">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-ghost-danger delete-mold-row-btn"
+                    title="删除此行">
+                <i class="ti ti-trash"></i>
+            </button>
+        </td>
+    </tr>
+</script>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/common/tomselect_remote.js' %}"></script>
+<script>
+(function() {
+    'use strict';
+    if (!window.TomSelect) return;
+
+    var form = document.getElementById('competitor-create-form');
+    if (!form) return;
+    var API_URL = form.getAttribute('data-api-url') || '';
+
+    var moldTbody = document.getElementById('mold-matrix-body');
+    var addBtn = document.getElementById('add-mold-row');
+    var errorEl = document.getElementById('mold-error');
+    var rowTemplate = document.getElementById('mold-row-template');
+    var moldRowIndex = {{ preset_molds|length }};
+
+    // ── 穴数更新：从原生 select DOM 的 data-cavity 读取（与 mold_matrix_formset.js 一致） ──
+    function updateCavityCell(row) {
+        var select = row.querySelector('.mold-select');
+        var cell = row.querySelector('.cavity-cell');
+        if (!select || !cell) return;
+        var opt = select.options[select.selectedIndex];
+        if (opt && opt.dataset.cavity) {
+            cell.textContent = opt.dataset.cavity + ' 穴';
+            cell.classList.remove('text-muted');
+            cell.classList.add('fw-bold');
+        } else {
+            cell.textContent = '—';
+            cell.classList.add('text-muted');
+            cell.classList.remove('fw-bold');
+        }
+    }
+
+    // ── 初始化模具行 TomSelect（本地搜索） ──
+    function initMoldSelect(row) {
+        var sel = row.querySelector('.mold-select');
+        if (!sel || sel.tomselect) return;
+        window.initLocalTomSelect(sel, {
+            placeholder: '搜索模具...',
+            onChange: function() {
+                updateCavityCell(row);
+            }
+        });
+    }
+
+    // ── 新增行 ──
+    function addRow() {
+        if (!rowTemplate || !moldTbody) return;
+        var html = rowTemplate.innerHTML.replace(/__INDEX__/g, moldRowIndex);
+        var tr = document.createElement('tr');
+        tr.className = 'mold-row';
+        tr.setAttribute('data-row-index', moldRowIndex);
+        tr.innerHTML = html;
+        moldTbody.appendChild(tr);
+        initMoldSelect(tr);
+        moldRowIndex++;
+        if (errorEl) errorEl.style.display = 'none';
+    }
+
+    // ── 删除行 ──
+    function deleteRow(row) {
+        var sel = row.querySelector('.mold-select');
+        if (sel && sel.tomselect) sel.tomselect.destroy();
+        row.remove();
+    }
+
+    // ── 事件绑定 ──
+    if (moldTbody) {
+        moldTbody.addEventListener('click', function(e) {
+            var btn = e.target.closest('.delete-mold-row-btn');
+            if (btn) deleteRow(btn.closest('.mold-row'));
+        });
+    }
+    if (addBtn) addBtn.addEventListener('click', addRow);
+
+    // ── 提交验证 ──
+    if (form) {
+        form.addEventListener('submit', function(e) {
+            var rows = moldTbody.querySelectorAll('.mold-row');
+            var valid = false;
+            for (var i = 0; i < rows.length; i++) {
+                var sel = rows[i].querySelector('.mold-select');
+                var qty = rows[i].querySelector('input[name^="specimen_qty_"]');
+                var mid = sel && sel.tomselect ? sel.tomselect.getValue() : '';
+                var q = qty ? parseInt(qty.value, 10) || 0 : 0;
+                if (mid && q > 0) { valid = true; break; }
+            }
+            if (!valid) {
+                e.preventDefault();
+                if (errorEl) { errorEl.textContent = '请至少指定一个模具并填写制样数量（> 0）'; errorEl.style.display = 'block'; }
+            }
+        });
+    }
+
+    // ── 初始化：客户远程搜索 + 预设模具行本地搜索 ──
+    initRemoteTomSelectAll(form, {
+        apiUrl: API_URL,
+        valueField: 'id',
+        responseKey: 'results',
+    });
+
+    moldTbody.querySelectorAll('.mold-row').forEach(function(row) {
+        initMoldSelect(row);
+    });
+})();
+</script>
+{% endblock %}

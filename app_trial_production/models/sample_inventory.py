@@ -59,6 +59,7 @@ class SampleInventory(models.Model):
     injection_task = models.ForeignKey('app_mold_injection.InjectionTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='output_specimens', verbose_name="来源注塑任务", help_text="样条样品的来源注塑任务")
     mold = models.ForeignKey('app_mold_injection.MoldType', on_delete=models.SET_NULL, null=True, blank=True, related_name='sample_inventories_by_mold', verbose_name="对应模具", help_text="样条样品对应的模具")
     batch_label = models.CharField("批次标签", max_length=50, blank=True)
+    is_competitor_sample = models.BooleanField("竞品样品", default=False)
 
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)

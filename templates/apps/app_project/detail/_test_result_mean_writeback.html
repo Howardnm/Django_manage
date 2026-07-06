@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}均值回写 — {{ formula.code }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'project_formula_process' project.pk %}">配方过程</a></li>
+                    <li class="breadcrumb-item active">均值回写</li>
+                </ol>
+            </nav>
+        </div>
+        <h2 class="page-title">
+            <i class="ti ti-calculator me-2"></i>均值回写
+            <span class="text-muted ms-2">{{ formula.code }} v{{ formula.version }}</span>
+        </h2>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+    {# 配方 + 工单信息 #}
+    <div class="card mb-3">
+        <div class="card-body">
+            <div class="row g-2 small">
+                <div class="col-md-4">
+                    <span class="text-muted">配方名称：</span>
+                    <strong>{{ formula.name }}</strong>
+                </div>
+                <div class="col-md-4">
+                    <span class="text-muted">基材类型：</span>
+                    <strong>{{ formula.material_type.name }}</strong>
+                </div>
+                <div class="col-md-4">
+                    <span class="text-muted">汇总工单：</span>
+                    {% for code in order_codes %}
+                    <span class="badge bg-blue-lt text-blue me-1">{{ code }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="card">
+            <div class="card-header bg-purple-lt">
+                <h3 class="card-title text-purple"><i class="ti ti-table me-2"></i>汇总测试数据</h3>
+                <span class="text-muted small ms-2">数值字段为各工单均值，文本字段为最高频值 — 均可修改后提交</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-sm small">
+                    <thead>
+                        <tr>
+                            <th>分类</th>
+                            <th>测试项目</th>
+                            <th>标准</th>
+                            <th>条件</th>
+                            <th>单位</th>
+                            <th>各工单原始值</th>
+                            <th style="min-width: 160px;">汇总值（可编辑）</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in rows %}
+                        <tr>
+                            <td><span class="text-muted">{{ row.test_config.category.name }}</span></td>
+                            <td class="fw-bold">{{ row.test_config.name }}</td>
+                            <td class="text-muted">{{ row.test_config.standard }}</td>
+                            <td class="text-muted">{{ row.test_config.condition|default:"-" }}</td>
+                            <td class="text-muted">{{ row.test_config.unit }}</td>
+                            <td>
+                                {% if row.data_type == 'NUMBER' %}
+                                    {% for ov in row.order_values %}
+                                    <span class="badge bg-secondary-lt me-1 mb-1"
+                                          title="{{ ov.code }}">{{ ov.value|floatformat:2 }}</span>
+                                    {% endfor %}
+                                {% else %}
+                                    {% for ov in row.order_values %}
+                                    <span class="badge bg-secondary-lt me-1 mb-1"
+                                          title="{{ ov.code }}">{{ ov.text }}</span>
+                                    {% endfor %}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if row.data_type == 'NUMBER' %}
+                                <input type="number" step="0.001" class="form-control form-control-sm"
+                                       name="num_{{ row.test_config.pk }}"
+                                       value="{{ row.agg_value|default:'' }}">
+                                {% else %}
+                                <input type="text" class="form-control form-control-sm"
+                                       name="txt_{{ row.test_config.pk }}"
+                                       value="{{ row.agg_text }}">
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            <div class="card-footer d-flex justify-content-end gap-2">
+                <a href="{% url 'project_formula_process' project.pk %}" class="btn btn-link link-secondary">取消</a>
+                <button type="submit" class="btn btn-primary">
+                    <i class="ti ti-check me-1"></i>确认回写
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

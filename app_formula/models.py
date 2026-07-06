@@ -131,7 +131,7 @@ class LabFormula(models.Model):
         key_keywords = ['灰分', '熔融', '拉伸', '弯曲', '冲击', '热变形', '阻燃']
 
         # 预加载 test_config
-        results = self.test_results.select_related('test_config').all()
+        results = self.test_results.select_related('test_config').filter(production_order__isnull=True)
 
         for res in results:
             name = res.test_config.name

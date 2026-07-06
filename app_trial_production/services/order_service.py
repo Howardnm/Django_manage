@@ -307,3 +307,64 @@ class ProductionOrderService:
 
         logger.info(f"TestingTask {task.pk} created from pending test items for order {order.code}")
         return task
+
+    @staticmethod
+    @transaction.atomic
+    def create_competitor_order_with_formula(user, project, formula_name,
+                                              material_type_id, quantity_planned,
+                                              **order_kwargs):
+        """
+        创建客户竞品工单 + 关联的无BOM配方实验单。
+
+        Args:
+            user: 创建人
+            project: Project 实例
+            formula_name: 配方名称（如 "竞品-杜邦-Zytel-70G33L"）
+            material_type_id: 基材类型ID (MaterialType pk)
+            quantity_planned: 计划产量
+            **order_kwargs: 传递给 ProductionOrder 的额外字段
+                (competitor_company, competitor_brand, competitor_model,
+                 customer_id, injection_temperature, injection_pretreatment,
+                 packaging_desc, storage_location, creator, skip_extrusion)
+
+        Returns:
+            (order, formula) 元组
+        """
+        from app_formula.models import LabFormula
+        from app_trial_production.models import (
+            ProductionOrder, ProductionOrderFormulaDetail,
+        )
+
+        # 1) 创建配方实验单（无 BOM）
+        formula = LabFormula.objects.create(
+            name=formula_name,
+            material_type_id=material_type_id,
+            version=1,
+            project=project,
+            project_node=None,
+            creator=user,
+            description='客户竞品注塑测试（系统自动创建）',
+        )
+        # code 由 LabFormula.save() 自动生成
+
+        # 2) 创建工单
+        order = ProductionOrder.objects.create(
+            trial_code=formula.code,
+            project=project,
+            quantity_planned=quantity_planned,
+            creator=user,
+            skip_extrusion=True,
+            **order_kwargs,
+        )
+
+        # 3) 创建工单-配方关联
+        ProductionOrderFormulaDetail.objects.create(
+            production_order=order,
+            formula=formula,
+            planned_quantity=quantity_planned,
+        )
+
+        logger.info(
+            f"Competitor order {order.code} created with formula {formula.code}"
+        )
+        return order, formula

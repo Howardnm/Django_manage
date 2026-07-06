@@ -170,7 +170,8 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
                             FormulaTestResult.objects.filter(
                                 formula=OuterRef('pk'),
                                 test_config__name__icontains=keyword,
-                                test_config__standard__icontains=std
+                                test_config__standard__icontains=std,
+                                production_order__isnull=True,
                             ).values('value')[:1],
                             output_field=DecimalField()
                         )
@@ -192,8 +193,11 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
         std_query = Q()
         for k in std_keywords: std_query |= Q(test_config__standard__icontains=k)
         
-        results = FormulaTestResult.objects.filter(formula_id__in=formula_ids).filter(
-            std_query, 
+        results = FormulaTestResult.objects.filter(
+            formula_id__in=formula_ids,
+            production_order__isnull=True,
+        ).filter(
+            std_query,
             test_config__name__regex=r'(密度|灰分|熔融|拉伸|弯曲|冲击|热变形)'
         ).select_related('test_config')
         

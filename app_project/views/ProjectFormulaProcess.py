@@ -8,7 +8,7 @@ from django.db import transaction
 from django.urls import reverse
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectStage, ProjectNode
-from app_formula.models import LabFormula
+from app_formula.models import LabFormula, FormulaTestResult
 from app_trial_production.models.production_order import ProductionOrderFormulaDetail
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
     def _fetch_formulas(self, project, material):
         project_formulas = LabFormula.objects.filter(
             project=project
+        ).exclude(
+            name__startswith='竞品-'
         ).select_related(
             'project_node', 'material_type', 'creator', 'process', 'project',
         ).prefetch_related(
@@ -183,6 +185,51 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         return columns, bom_matrix, test_matrix, cpbom_matrix
 
+    @staticmethod
+    def _build_test_result_tabs(formula, tab_id_prefix='tab'):
+        """构建测试结果 Tab 数据 — 手动录入 + 各工单回写。
+        Returns: (tabs, has_results)
+        """
+        from itertools import groupby
+        tabs = []
+
+        # 手动录入
+        manual = [
+            r for r in formula.test_results.all()
+            if r.production_order_id is None
+        ]
+        manual.sort(key=lambda r: (
+            r.test_config.category.order,
+            r.test_config.order,
+        ))
+        tabs.append({
+            'label': '手动录入',
+            'tab_id': f'{tab_id_prefix}-manual',
+            'results': manual,
+            'type': 'manual',
+        })
+
+        # 各工单回写
+        order_results = [
+            r for r in formula.test_results.all()
+            if r.production_order_id is not None
+        ]
+        order_results.sort(key=lambda r: (
+            r.production_order.code,
+            r.test_config.category.order,
+            r.test_config.order,
+        ))
+        for order, items in groupby(order_results, key=lambda r: r.production_order):
+            tabs.append({
+                'label': order.code,
+                'tab_id': f'{tab_id_prefix}-order-{order.pk}',
+                'results': list(items),
+                'type': 'order',
+                'order': order,
+            })
+
+        return tabs, any(t['results'] for t in tabs)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         project = self.object
@@ -306,44 +353,9 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             ]
 
         # 测试结果 Tab 数据（手动录入 + 各工单回写）
-        test_result_tabs = []
+        test_result_tabs, has_test_results = [], False
         if selected_formula:
-            # 手动录入 tab
-            manual_results = [
-                r for r in selected_formula.test_results.all()
-                if r.production_order_id is None
-            ]
-            manual_results.sort(key=lambda r: (
-                r.test_config.category.order,
-                r.test_config.order,
-            ))
-            test_result_tabs.append({
-                'label': '手动录入',
-                'tab_id': 'tab-manual',
-                'results': manual_results,
-                'type': 'manual',
-            })
-
-            # 各工单 tab
-            order_results = [
-                r for r in selected_formula.test_results.all()
-                if r.production_order_id is not None
-            ]
-            order_results.sort(key=lambda r: (
-                r.production_order.code,
-                r.test_config.category.order,
-                r.test_config.order,
-            ))
-            for order, items in groupby(order_results, key=lambda r: r.production_order):
-                test_result_tabs.append({
-                    'label': order.code,
-                    'tab_id': f'tab-order-{order.pk}',
-                    'results': list(items),
-                    'type': 'order',
-                    'order': order,
-                })
-
-        has_test_results = any(t['results'] for t in test_result_tabs)
+            test_result_tabs, has_test_results = self._build_test_result_tabs(selected_formula)
 
         # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab)
         compare_formulas = all_stage_formulas if global_compare else active_formulas
@@ -353,21 +365,63 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         # 客户竞品 Tab
         competitor_tab_active = self.request.GET.get('tab') == 'competitor'
-        competitor_orders = []
+        competitor_formulas = []
+        competitor_formula_items = []
+        selected_competitor_formula = None
+        competitor_test_result_tabs = []
+        competitor_has_test_results = False
         competitor_order_items = []
-        selected_competitor_order = None
         if competitor_tab_active:
             from app_trial_production.models import ProductionOrder
+
+            # ── 竞品配方列表 ──
+            competitor_formulas = LabFormula.objects.filter(
+                project=project,
+                name__startswith='竞品-',
+            ).select_related('material_type', 'creator').order_by('-created_at')
+
+            for f in competitor_formulas:
+                competitor_formula_items.append({
+                    'pk': f.pk,
+                    'code': f.code,
+                    'version': f.version,
+                    'material_type_name': f.material_type.name,
+                    'creator': f.creator.username,
+                    'created_at': f.created_at,
+                })
+
+            # 选中的配方实验单
+            formula_id_str = self.request.GET.get('formula_id', '')
+            if formula_id_str:
+                try:
+                    selected_competitor_formula = LabFormula.objects.filter(
+                        pk=int(formula_id_str), project=project,
+                        name__startswith='竞品-',
+                    ).select_related('material_type', 'creator').prefetch_related(
+                        'productionorderformuladetail_set__production_order',
+                        'test_results__test_config__category',
+                        'test_results__production_order',
+                    ).first()
+                except (ValueError, TypeError):
+                    pass
+
+            # ── 竞品配方实验单的测试结果 Tab ──
+            competitor_test_result_tabs, competitor_has_test_results = [], False
+            if selected_competitor_formula:
+                competitor_test_result_tabs, competitor_has_test_results = \
+                    self._build_test_result_tabs(selected_competitor_formula, 'competitor-tab')
+
+            # ── 竞品工单列表 ──
             competitor_orders = ProductionOrder.objects.filter(
                 project=project,
                 skip_extrusion=True,
             ).select_related('creator').order_by('-created_at')
 
-            # 侧边栏列表数据
             for o in competitor_orders:
                 competitor_order_items.append({
                     'pk': o.pk,
                     'code': o.code,
+                    'trial_code': o.trial_code or '',
                     'status': o.get_status_display(),
                     'status_css': o.STATUS_CSS_MAP.get(o.status, 'bg-secondary-lt'),
                     'status_dot': o.STATUS_DOT_MAP.get(o.status, 'bg-secondary'),
@@ -375,20 +429,6 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     'created_at': o.created_at,
                     'quantity_planned': o.quantity_planned,
                 })
-
-            # 选中的竞品工单详情
-            order_id_str = self.request.GET.get('order_id', '')
-            if order_id_str:
-                try:
-                    selected_competitor_order = ProductionOrder.objects.filter(
-                        pk=int(order_id_str), project=project, skip_extrusion=True,
-                    ).select_related('creator', 'customer').prefetch_related(
-                        'mold_requirements__mold',
-                        'mold_requirements__formula_details',
-                        'test_items__category',
-                    ).first()
-                except (ValueError, TypeError):
-                    pass
 
         context.update({
             'material': material,
@@ -410,15 +450,18 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'cpbom_matrix': cpbom_matrix,
             # 客户竞品 Tab
             'competitor_tab_active': competitor_tab_active,
-            'competitor_orders': competitor_orders,
+            'competitor_formulas': competitor_formulas,
+            'competitor_formula_items': competitor_formula_items,
+            'selected_competitor_formula': selected_competitor_formula,
+            'competitor_test_result_tabs': competitor_test_result_tabs,
+            'competitor_has_test_results': competitor_has_test_results,
             'competitor_order_items': competitor_order_items,
-            'selected_competitor_order': selected_competitor_order,
         })
         return context
 
 
 class CompetitorOrderCreateView(ProjectAccessMixin, View):
-    """客户竞品工单创建 — 直接关联项目，跳过挤出环节。"""
+    """客户竞品工单创建 — 自动创建无BOM配方实验单并关联，跳过挤出环节。"""
 
     model = Project
     pk_url_kwarg = 'pk'
@@ -426,7 +469,7 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
 
     def get(self, request, pk):
         project = self.get_object_or_deny()
-        from app_material.models import TestConfig
+        from app_material.models import TestConfig, MaterialType
         from app_mold_injection.models import MoldType
         from itertools import groupby
         all_configs = TestConfig.objects.select_related('category').order_by('category__order', 'order')
@@ -437,11 +480,13 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
             status='AVAILABLE',
         ).order_by('mold_code')
         preset_molds = available_molds.filter(mold_type='TEST_SPECIMEN')
+        material_types = MaterialType.objects.order_by('name')
         context = {
             'project': project,
             'grouped_test_items': grouped_test_items,
             'available_molds': available_molds,
             'preset_molds': preset_molds,
+            'material_types': material_types,
         }
         return render(request, 'apps/app_project/competitor_create.html', context)
 
@@ -458,10 +503,28 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
         competitor_brand = request.POST.get('competitor_brand', '')
         competitor_model = request.POST.get('competitor_model', '')
         customer_id = request.POST.get('customer_id', '') or None
+        material_type_id = request.POST.get('material_type', '') or None
 
+        # ── 校验 ──
         if quantity_planned <= 0:
             messages.error(request, '计划数量必须大于 0')
             return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?tab=competitor')
+
+        if not material_type_id:
+            messages.error(request, '请选择基材类型')
+            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?tab=competitor')
+
+        # ── 构建配方名称 ──
+        formula_name_parts = ['竞品']
+        if competitor_company:
+            formula_name_parts.append(competitor_company)
+        if competitor_brand:
+            formula_name_parts.append(competitor_brand)
+        if competitor_model:
+            formula_name_parts.append(competitor_model)
+        if len(formula_name_parts) == 1:
+            formula_name_parts.append(project.name)
+        formula_name = '-'.join(formula_name_parts)[:100]
 
         # ── 解析模具行 ──
         mold_rows = self._parse_mold_rows(request.POST)
@@ -470,13 +533,16 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
         # ── 解析测试项目 ──
         test_item_ids = [int(tid) for tid in request.POST.getlist('test_items') if tid]
 
-        # ── 创建工单 ──
-        from app_trial_production.models import ProductionOrder
-        from app_mold_injection.models import MoldRequirement
+        # ── 创建工单 + 配方 ──
+        from app_trial_production.services.order_service import ProductionOrderService
+        from app_mold_injection.models import MoldRequirement, MoldRequirementFormulaDetail
 
         with transaction.atomic():
-            order = ProductionOrder.objects.create(
+            order, formula = ProductionOrderService.create_competitor_order_with_formula(
+                user=request.user,
                 project=project,
+                formula_name=formula_name,
+                material_type_id=int(material_type_id),
                 quantity_planned=quantity_planned,
                 injection_temperature=injection_temperature,
                 injection_pretreatment=injection_pretreatment,
@@ -486,22 +552,18 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
                 competitor_brand=competitor_brand,
                 competitor_model=competitor_model,
                 customer_id=customer_id,
-                skip_extrusion=True,
-                creator=request.user,
             )
 
-            # 模具需求
+            # 模具需求（formula 指向创建的配方）
             for i, (mold_id, qty) in enumerate(valid_molds):
                 mr = MoldRequirement.objects.create(
                     production_order=order,
                     mold_id=mold_id,
                     order=i,
                 )
-                # 竞品工单：每行创建一个 MoldRequirementFormulaDetail（formula=None）
-                from app_mold_injection.models import MoldRequirementFormulaDetail
                 MoldRequirementFormulaDetail.objects.create(
                     mold_requirement=mr,
-                    formula=None,
+                    formula=formula,
                     specimen_quantity=qty,
                 )
 
@@ -511,7 +573,7 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
 
         messages.success(
             request,
-            f'竞品工单 [{order.code}] 已创建'
+            f'竞品工单 [{order.code}] 已创建（配方: {formula.code}）'
             f'（{len(valid_molds)} 个模具，跳过挤出直达注塑）'
         )
         return redirect(
@@ -537,3 +599,120 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
             rows.append((mold_id, qty))
             index += 1
         return rows
+
+
+class FormulaMeanWritebackView(ProjectAccessMixin, View):
+    """从关联工单的测试结果计算均值/频次，回写到配方手动录入。"""
+
+    permission_required = 'app_project.view_project'
+
+    def _get_formula(self, pk, formula_pk):
+        project = get_object_or_404(Project, pk=pk)
+        return get_object_or_404(
+            LabFormula.objects.select_related('project', 'material_type'),
+            pk=formula_pk, project=project,
+        )
+
+    def _aggregate(self, formula):
+        """聚合关联工单的测试结果，返回 (rows, order_codes)。"""
+        from collections import defaultdict, Counter
+        from statistics import mean
+
+        results = FormulaTestResult.objects.filter(
+            formula=formula,
+            production_order__isnull=False,
+        ).select_related('test_config__category', 'production_order').order_by(
+            'test_config__category__order', 'test_config__order',
+        )
+
+        groups = defaultdict(list)
+        order_codes = []
+        seen_orders = set()
+        for r in results:
+            groups[r.test_config].append(r)
+            if r.production_order_id not in seen_orders:
+                seen_orders.add(r.production_order_id)
+                order_codes.append(r.production_order.code)
+
+        rows = []
+        for tc, items in groups.items():
+            row = {
+                'test_config': tc,
+                'data_type': tc.data_type,
+                'order_values': [
+                    {'code': r.production_order.code, 'value': r.value, 'text': r.value_text}
+                    for r in items
+                ],
+                'agg_value': None,
+                'agg_text': '',
+            }
+            if tc.data_type == 'NUMBER':
+                vals = [r.value for r in items if r.value is not None]
+                if vals:
+                    row['agg_value'] = round(mean(vals), 3)
+            else:
+                texts = [r.value_text for r in items if r.value_text]
+                if texts:
+                    row['agg_text'] = Counter(texts).most_common(1)[0][0]
+            rows.append(row)
+
+        return rows, order_codes
+
+    def get(self, request, pk, formula_pk):
+        formula = self._get_formula(pk, formula_pk)
+        rows, order_codes = self._aggregate(formula)
+
+        if not rows:
+            messages.warning(request, '该配方暂无工单回写的测试数据可汇总')
+            return redirect(self._redirect_url(pk, formula))
+
+        return render(request, 'apps/app_project/detail/_test_result_mean_writeback.html', {
+            'project': formula.project,
+            'formula': formula,
+            'rows': rows,
+            'order_codes': order_codes,
+        })
+
+    def post(self, request, pk, formula_pk):
+        formula = self._get_formula(pk, formula_pk)
+        from decimal import Decimal, InvalidOperation
+
+        with transaction.atomic():
+            # 删除现有手动录入数据
+            FormulaTestResult.objects.filter(
+                formula=formula, production_order__isnull=True,
+            ).delete()
+
+            created = 0
+            for key, val in request.POST.items():
+                if not val:
+                    continue
+                if key.startswith('num_'):
+                    tc_id = int(key[4:])
+                    try:
+                        value = Decimal(val)
+                    except InvalidOperation:
+                        continue
+                    FormulaTestResult.objects.create(
+                        formula=formula, test_config_id=tc_id,
+                        production_order=None, value=value,
+                    )
+                    created += 1
+                elif key.startswith('txt_'):
+                    tc_id = int(key[4:])
+                    FormulaTestResult.objects.create(
+                        formula=formula, test_config_id=tc_id,
+                        production_order=None, value_text=val,
+                    )
+                    created += 1
+
+        messages.success(request, f'均值回写完成，已录入 {created} 条测试数据')
+        return redirect(self._redirect_url(pk, formula))
+
+    @staticmethod
+    def _redirect_url(project_pk, formula):
+        """根据配方类型决定重定向目标。"""
+        base = reverse('project_formula_process', kwargs={'pk': project_pk})
+        if formula.name.startswith('竞品-'):
+            return f'{base}?tab=competitor&formula_id={formula.pk}'
+        return f'{base}?formula_id={formula.pk}'

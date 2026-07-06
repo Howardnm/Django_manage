@@ -1,0 +1,76 @@
+{# 测试结果（含手动录入 + 各工单回写） — 用于 _test_result_tabs.html include #}
+{% if has_test_results %}
+<div class="card mb-3">
+    <div class="card-header bg-purple-lt d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-purple mb-0"><i class="ti ti-flask me-2"></i>测试结果</h3>
+        {% if formula and test_result_tabs|length > 1 %}
+        <a href="{% url 'project_formula_mean_writeback' project.pk formula.pk %}"
+           class="btn btn-sm btn-outline-purple">
+            <i class="ti ti-calculator me-1"></i>均值回写
+        </a>
+        {% endif %}
+    </div>
+    {% if test_result_tabs|length > 1 %}
+    <ul class="nav nav-tabs px-3 pt-2" data-bs-toggle="tabs">
+            {% for tab in test_result_tabs %}
+            <li class="nav-item">
+                <a href="#{{ tab.tab_id }}" class="nav-link {% if forloop.first %}active{% endif %}" data-bs-toggle="tab">
+                    {% if tab.type == 'order' %}
+                    <span class="badge badge-dot {{ tab.order.status_dot_color }} me-1"></span>
+                    {% endif %}
+                    {% if tab.type == 'manual' %}手动录入{% else %}{{ tab.label }}{% endif %}
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+        <div class="tab-content">
+        {% for tab in test_result_tabs %}
+        <div class="tab-pane {% if forloop.first %}active show{% endif %}" id="{{ tab.tab_id }}" role="tabpanel">
+            <div class="table-responsive">
+                <table class="table table-vcenter card-table table-sm small">
+                    <thead>
+                    <tr>
+                        <th>分类</th>
+                        <th>测试项目</th>
+                        <th>标准/条件</th>
+                        <th>数值 / 结果</th>
+                        <th>测试日期</th>
+                        <th>备注</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for res in tab.results %}
+                        <tr>
+                            <td><span class="text-muted small">{{ res.test_config.category.name }}</span></td>
+                            <td class="fw-bold">{{ res.test_config.name }}</td>
+                            <td class="text-muted small">
+                                {{ res.test_config.standard }}
+                                {% if res.test_config.condition %}<br>({{ res.test_config.condition }}){% endif %}
+                            </td>
+                            <td class="fw-bold text-dark">
+                                {% if res.test_config.data_type == 'NUMBER' %}
+                                    {% if '密度' in res.test_config.name %}
+                                        {{ res.value|floatformat:3 }}
+                                    {% else %}
+                                        {{ res.value|floatformat:2 }}
+                                    {% endif %}
+                                {% else %}
+                                    {{ res.value_text }}
+                                {% endif %}
+                                <span class="text-muted fw-normal small">{{ res.test_config.unit }}</span>
+                            </td>
+                            <td class="text-muted small">{{ res.test_date|date:"Y-m-d"|default:"-" }}</td>
+                            <td class="text-muted small">{{ res.remark }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr><td colspan="6" class="text-center text-muted py-3">暂无数据</td></tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}

@@ -1,39 +1,59 @@
 /**
- * 完成注塑任务 — 样条行动态管理
- * 依赖 DOM 结构：
- *   div#specimen-rows            — 行容器
- *   script#specimen-row-template — 行模板（{IDX} 占位符）
- *   input#specimen_count         — 隐藏字段，记录当前行数
- *   button#add-specimen-row      — 新增行按钮
- *   .remove-specimen-row         — 删除行按钮（事件委托）
+ * 完成注塑任务 — 模具×配方矩阵交互
+ *
+ * DOM 依赖：
+ *   table#specimen-matrix        — 矩阵表格
+ *   input.specimen-qty           — 每单元格产出数量
+ *
+ * 功能：
+ *   - 每行实时计算产量合计（所有 .specimen-qty 之和）
+ *   - 动态追加"合计"列到表头和每行末尾
  */
 document.addEventListener('DOMContentLoaded', function () {
-    var specimenRows = document.getElementById('specimen-rows');
-    var template = document.getElementById('specimen-row-template').innerHTML;
-    var specimenCountInput = document.getElementById('specimen_count');
-    var specimenIdx = 0;
+    var matrix = document.getElementById('specimen-matrix');
+    if (!matrix) return;
 
-    function updateSpecimenCount() {
-        specimenCountInput.value = specimenRows.querySelectorAll('.specimen-row').length;
+    /**
+     * 更新指定行的合计值
+     */
+    function updateRowTotal(row, totalCell) {
+        var total = 0;
+        var qtyInputs = row.querySelectorAll('.specimen-qty');
+        for (var i = 0; i < qtyInputs.length; i++) {
+            total += parseInt(qtyInputs[i].value) || 0;
+        }
+        totalCell.textContent = total || '0';
     }
 
-    function addSpecimenRow() {
-        var html = template.replace(/{IDX}/g, specimenIdx);
-        specimenRows.insertAdjacentHTML('beforeend', html);
-        specimenIdx++;
-        updateSpecimenCount();
+    // 为表头追加"合计"列
+    var headerRows = matrix.querySelectorAll('thead tr');
+    for (var h = 0; h < headerRows.length; h++) {
+        var th = document.createElement('th');
+        if (h === 0) {
+            th.textContent = '合计';
+            th.style.width = '60px';
+        }
+        headerRows[h].appendChild(th);
     }
 
-    document.getElementById('add-specimen-row').addEventListener('click', addSpecimenRow);
+    // 为每行追加合计单元格并绑定事件
+    var rows = matrix.querySelectorAll('tbody tr.specimen-matrix-row');
+    for (var r = 0; r < rows.length; r++) {
+        var row = rows[r];
+        var totalCell = document.createElement('td');
+        totalCell.className = 'text-center fw-bold row-total-cell';
+        totalCell.style.minWidth = '50px';
+        row.appendChild(totalCell);
 
-    // 事件委托：删除行
-    specimenRows.addEventListener('click', function (e) {
-        var btn = e.target.closest('.remove-specimen-row');
-        if (!btn) return;
-        btn.closest('.specimen-row').remove();
-        updateSpecimenCount();
-    });
+        updateRowTotal(row, totalCell);
 
-    // 初始添加一行
-    addSpecimenRow();
+        // 行内 qty 输入变化时重新计算合计
+        row.addEventListener('input', function (e) {
+            if (e.target.classList.contains('specimen-qty')) {
+                var tr = e.target.closest('tr');
+                var tc = tr.querySelector('.row-total-cell');
+                if (tc) updateRowTotal(tr, tc);
+            }
+        });
+    }
 });

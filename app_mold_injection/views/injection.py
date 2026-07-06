@@ -225,21 +225,75 @@ class InjectionCompleteView(InjectionTaskAccessMixin, View):
     template_name = 'apps/app_mold_injection/injection/complete.html'
 
     @staticmethod
-    def _parse_specimen_outputs(post_data):
-        """从 POST 数据解析样条产出记录"""
+    def _build_matrix_context(task):
+        """构建模具 × 配方矩阵上下文，供 GET 和 POST(form invalid) 共用。"""
+        mold_requirements = task.mold_requirements.all()
+
+        formula_map = {}
+        for req in mold_requirements:
+            for detail in req.formula_details.all():
+                if detail.formula_id and detail.formula_id not in formula_map:
+                    formula_map[detail.formula_id] = detail.formula
+        formulas = sorted(formula_map.values(), key=lambda f: f.version)
+        is_inventory_source = (task.source == InjectionTask.Source.INVENTORY)
+
+        matrix_rows = []
+        for req in mold_requirements:
+            qty_map = {}
+            for detail in req.formula_details.all():
+                key = detail.formula_id if detail.formula_id else 'none'
+                qty_map[key] = detail.specimen_quantity
+
+            if formulas:
+                cells = [
+                    {'formula': f, 'formula_key': f.pk, 'planned_qty': qty_map.get(f.pk, 0)}
+                    for f in formulas
+                ]
+            else:
+                cells = [
+                    {'formula': None, 'formula_key': 'none', 'planned_qty': qty_map.get('none', 0)}
+                ]
+
+            matrix_rows.append({'mold': req.mold, 'cells': cells})
+
+        return {
+            'formulas': formulas,
+            'matrix_rows': matrix_rows,
+            'is_inventory_source': is_inventory_source,
+            'has_mold_requirements': mold_requirements.exists(),
+        }
+
+    @staticmethod
+    def _parse_specimen_outputs(task, post_data):
+        """从矩阵 POST 数据解析样条产出记录。
+
+        遍历 task.mold_requirements 及其 formula_details，
+        提取每个 (模具, 配方版本) 单元格的产出/合格数量，
+        结合每行的存放位置和批次标签。
+        """
         specimen_outputs = []
-        count = int(post_data.get('specimen_count', 0))
-        for i in range(count):
-            mold_id = post_data.get(f'specimen_mold_{i}')
-            qty = post_data.get(f'specimen_qty_{i}', '0')
-            if mold_id and int(qty) > 0:
+        for req in task.mold_requirements.all().select_related('mold').prefetch_related('formula_details'):
+            location = post_data.get(f'location_{req.mold_id}', '').strip()
+            batch = post_data.get(f'batch_{req.mold_id}', '').strip()
+            for detail in req.formula_details.all():
+                fid = str(detail.formula_id) if detail.formula_id else 'none'
+                try:
+                    qty = int(post_data.get(f'qty_{req.mold_id}_{fid}', '0'))
+                except (ValueError, TypeError):
+                    qty = 0
+                if qty <= 0:
+                    continue
+                try:
+                    qualified = int(post_data.get(f'qualified_{req.mold_id}_{fid}', '0'))
+                except (ValueError, TypeError):
+                    qualified = 0
                 specimen_outputs.append({
-                    'mold_id': int(mold_id),
-                    'specimen_count': int(qty),
-                    'specimen_qualified': int(post_data.get(f'specimen_qualified_{i}', '0')),
-                    'storage_location': post_data.get(f'specimen_location_{i}', ''),
-                    'batch_label': post_data.get(f'specimen_batch_{i}', ''),
-                    'formula_id': post_data.get(f'specimen_formula_{i}') or None,
+                    'mold_id': req.mold_id,
+                    'specimen_count': qty,
+                    'specimen_qualified': qualified,
+                    'storage_location': location,
+                    'batch_label': batch,
+                    'formula_id': detail.formula_id,
                 })
         return specimen_outputs
 
@@ -250,24 +304,40 @@ class InjectionCompleteView(InjectionTaskAccessMixin, View):
             ),
             pk=pk,
         )
+        matrix_ctx = self._build_matrix_context(task)
         return render(request, self.template_name, {
             'injection_task': task,
             'form': InjectionCompleteForm(instance=task),
+            'mold_matrix_formulas': matrix_ctx['formulas'],
+            'mold_matrix_rows': matrix_ctx['matrix_rows'],
+            'is_inventory_source': matrix_ctx['is_inventory_source'],
+            'has_mold_requirements': matrix_ctx['has_mold_requirements'],
         })
 
     def post(self, request, pk):
-        task = get_object_or_404(InjectionTask, pk=pk)
+        task = get_object_or_404(
+            InjectionTask.objects.prefetch_related(
+                'mold_requirements__mold', 'mold_requirements__formula_details__formula',
+            ),
+            pk=pk,
+        )
         if task.status != 'IN_PROGRESS':
             messages.warning(request, '当前任务状态不允许完成')
             return redirect('mold_injection:task_detail', pk=pk)
 
         form = InjectionCompleteForm(request.POST, instance=task)
         if not form.is_valid():
+            matrix_ctx = self._build_matrix_context(task)
             return render(request, self.template_name, {
-                'injection_task': task, 'form': form,
+                'injection_task': task,
+                'form': form,
+                'mold_matrix_formulas': matrix_ctx['formulas'],
+                'mold_matrix_rows': matrix_ctx['matrix_rows'],
+                'is_inventory_source': matrix_ctx['is_inventory_source'],
+                'has_mold_requirements': matrix_ctx['has_mold_requirements'],
             })
 
-        specimen_outputs = self._parse_specimen_outputs(request.POST)
+        specimen_outputs = self._parse_specimen_outputs(task, request.POST)
         task.remark = form.cleaned_data.get('remark', '')
         try:
             InjectionTaskService.complete_task(task, request.user, specimen_outputs)
