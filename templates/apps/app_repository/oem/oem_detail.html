@@ -164,7 +164,7 @@
                                         </div>
                                     </td>
                                     <td>{{ repo.customer.short_name|default:repo.customer.company_name }}</td>
-                                    <td>{{ repo.salesperson.get_full_name|default:repo.salesperson.username }}</td>
+                                    <td>{% if repo.salesperson %}{{ repo.salesperson.get_full_name|default:repo.salesperson.username }}{% else %}-{% endif %}</td>
                                     <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"-" }}</td>
                                 </tr>
                                 {% empty %}

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}注塑任务 #{{ injection_task.pk }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/common/mold_matrix.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -40,7 +45,7 @@
 </div>
 
 <div class="row row-cards mt-3">
-    <div class="col-lg-6">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
                 <h3 class="card-title">基本信息</h3>
@@ -110,37 +115,45 @@
         </div>
     </div>
 
-    <div class="col-lg-6">
+    <div class="col-12">
         <div class="card">
             <div class="card-header">
-                <h3 class="card-title">模具需求</h3>
+                <h3 class="card-title"><i class="ti ti-mold me-2"></i>模具需求（模具 x 配方矩阵）</h3>
             </div>
             <div class="table-responsive">
-                <table class="table card-table table-vcenter">
+                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix">
                     <thead>
                         <tr>
-                            <th>模具</th>
-                            <th>对应配方</th>
+                            <th style="min-width: 160px;">模具</th>
                             <th>标准</th>
                             <th>穴数</th>
-                            <th>计划数量</th>
+                            {% for f in mold_matrix_formulas %}
+                            <th>
+                                <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                            </th>
+                            {% endfor %}
+                            <th>合计</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for req in injection_task.mold_requirements.all %}
-                        {% for detail in req.formula_details.all %}
+                        {% for row in mold_matrix_rows %}
                         <tr>
-                            <td>{{ req.mold.name }} <span class="text-muted">[{{ req.mold.mold_code }}]</span></td>
-                            <td>
-                                <span class="badge bg-azure-lt">v{{ detail.formula.version }}</span> {{ detail.formula.name|truncatechars:20 }}
-                            </td>
-                            <td>{{ req.mold.standard }}</td>
-                            <td>{{ req.mold.cavity_count }} 穴</td>
-                            <td class="fw-bold">{{ detail.specimen_quantity }}</td>
+                            <td>{{ row.mold.name }} <span class="text-muted">[{{ row.mold.mold_code }}]</span></td>
+                            <td>{{ row.mold.standard }}</td>
+                            <td>{{ row.mold.cavity_count }} 穴</td>
+                            {% for qty in row.quantities %}
+                            <td class="text-center fw-bold">{{ qty|default:"-" }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ row.total }}</td>
                         </tr>
-                        {% endfor %}
                         {% empty %}
-                        <tr><td colspan="5" class="text-center py-3 text-muted">暂无模具需求</td></tr>
+                        <tr>
+                            <td colspan="3" class="text-center py-3 text-muted">暂无模具需求</td>
+                            {% if mold_matrix_formulas %}
+                            <td colspan="{{ mold_matrix_formulas|length|add:1 }}"></td>
+                            {% endif %}
+                        </tr>
                         {% endfor %}
                     </tbody>
                 </table>

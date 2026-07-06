@@ -1,6 +1,6 @@
 from django.urls import path
 from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView, ProjectDetailView, ProjectConfigView
-from .views.ProjectFormulaProcess import ProjectFormulaProcessView
+from .views.ProjectFormulaProcess import ProjectFormulaProcessView, CompetitorOrderCreateView
 from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
 from .views.ProjectMember import *
@@ -15,6 +15,7 @@ urlpatterns = [
     path('config/', ProjectConfigView.as_view(), name='project_config'),
     path('<int:pk>/', ProjectDetailView.as_view(), name='project_detail'),
     path('<int:pk>/formula-process/', ProjectFormulaProcessView.as_view(), name='project_formula_process'),
+    path('<int:pk>/formula-process/competitor/create/', CompetitorOrderCreateView.as_view(), name='project_competitor_order_create'),
     path('<int:pk>/edit/', ProjectUpdateView.as_view(), name='project_edit'),
     
     # 绩效相关

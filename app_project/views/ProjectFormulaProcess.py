@@ -1,10 +1,17 @@
 from collections import OrderedDict
 from itertools import groupby
-from django.views.generic import DetailView
+import logging
+from django.views.generic import DetailView, View
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.db import transaction
+from django.urls import reverse
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectStage, ProjectNode
 from app_formula.models import LabFormula
 from app_trial_production.models.production_order import ProductionOrderFormulaDetail
+
+logger = logging.getLogger(__name__)
 
 
 class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
@@ -344,6 +351,45 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         if compare_mode and compare_formulas:
             columns, bom_matrix, test_matrix, cpbom_matrix = self._build_comparison_matrices(compare_formulas, material=material)
 
+        # 客户竞品 Tab
+        competitor_tab_active = self.request.GET.get('tab') == 'competitor'
+        competitor_orders = []
+        competitor_order_items = []
+        selected_competitor_order = None
+        if competitor_tab_active:
+            from app_trial_production.models import ProductionOrder
+            competitor_orders = ProductionOrder.objects.filter(
+                project=project,
+                skip_extrusion=True,
+            ).select_related('creator').order_by('-created_at')
+
+            # 侧边栏列表数据
+            for o in competitor_orders:
+                competitor_order_items.append({
+                    'pk': o.pk,
+                    'code': o.code,
+                    'status': o.get_status_display(),
+                    'status_css': o.STATUS_CSS_MAP.get(o.status, 'bg-secondary-lt'),
+                    'status_dot': o.STATUS_DOT_MAP.get(o.status, 'bg-secondary'),
+                    'creator': o.creator.username,
+                    'created_at': o.created_at,
+                    'quantity_planned': o.quantity_planned,
+                })
+
+            # 选中的竞品工单详情
+            order_id_str = self.request.GET.get('order_id', '')
+            if order_id_str:
+                try:
+                    selected_competitor_order = ProductionOrder.objects.filter(
+                        pk=int(order_id_str), project=project, skip_extrusion=True,
+                    ).select_related('creator', 'customer').prefetch_related(
+                        'mold_requirements__mold',
+                        'mold_requirements__formula_details',
+                        'test_items__category',
+                    ).first()
+                except (ValueError, TypeError):
+                    pass
+
         context.update({
             'material': material,
             'related_orders': related_orders,
@@ -362,5 +408,132 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'bom_matrix': bom_matrix,
             'test_matrix': test_matrix,
             'cpbom_matrix': cpbom_matrix,
+            # 客户竞品 Tab
+            'competitor_tab_active': competitor_tab_active,
+            'competitor_orders': competitor_orders,
+            'competitor_order_items': competitor_order_items,
+            'selected_competitor_order': selected_competitor_order,
         })
         return context
+
+
+class CompetitorOrderCreateView(ProjectAccessMixin, View):
+    """客户竞品工单创建 — 直接关联项目，跳过挤出环节。"""
+
+    model = Project
+    pk_url_kwarg = 'pk'
+    permission_required = 'app_project.view_project'
+
+    def get(self, request, pk):
+        project = self.get_object_or_deny()
+        from app_material.models import TestConfig
+        from app_mold_injection.models import MoldType
+        from itertools import groupby
+        all_configs = TestConfig.objects.select_related('category').order_by('category__order', 'order')
+        grouped_test_items = []
+        for cat, items in groupby(all_configs, key=lambda tc: tc.category):
+            grouped_test_items.append({'category': cat, 'items': list(items)})
+        available_molds = MoldType.objects.filter(
+            status='AVAILABLE',
+        ).order_by('mold_code')
+        preset_molds = available_molds.filter(mold_type='TEST_SPECIMEN')
+        context = {
+            'project': project,
+            'grouped_test_items': grouped_test_items,
+            'available_molds': available_molds,
+            'preset_molds': preset_molds,
+        }
+        return render(request, 'apps/app_project/competitor_create.html', context)
+
+    def post(self, request, pk):
+        project = self.get_object_or_deny()
+
+        # ── 提取基础字段 ──
+        quantity_planned = float(request.POST.get('quantity_planned', 0) or 0)
+        injection_temperature = request.POST.get('injection_temperature', '') or None
+        injection_pretreatment = request.POST.get('injection_pretreatment', '')
+        packaging_desc = request.POST.get('packaging_desc', '')
+        storage_location = request.POST.get('storage_location', '')
+        competitor_company = request.POST.get('competitor_company', '')
+        competitor_brand = request.POST.get('competitor_brand', '')
+        competitor_model = request.POST.get('competitor_model', '')
+        customer_id = request.POST.get('customer_id', '') or None
+
+        if quantity_planned <= 0:
+            messages.error(request, '计划数量必须大于 0')
+            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?tab=competitor')
+
+        # ── 解析模具行 ──
+        mold_rows = self._parse_mold_rows(request.POST)
+        valid_molds = [(int(mid), int(qty)) for mid, qty in mold_rows if mid and qty > 0]
+
+        # ── 解析测试项目 ──
+        test_item_ids = [int(tid) for tid in request.POST.getlist('test_items') if tid]
+
+        # ── 创建工单 ──
+        from app_trial_production.models import ProductionOrder
+        from app_mold_injection.models import MoldRequirement
+
+        with transaction.atomic():
+            order = ProductionOrder.objects.create(
+                project=project,
+                quantity_planned=quantity_planned,
+                injection_temperature=injection_temperature,
+                injection_pretreatment=injection_pretreatment,
+                packaging_desc=packaging_desc,
+                storage_location=storage_location,
+                competitor_company=competitor_company,
+                competitor_brand=competitor_brand,
+                competitor_model=competitor_model,
+                customer_id=customer_id,
+                skip_extrusion=True,
+                creator=request.user,
+            )
+
+            # 模具需求
+            for i, (mold_id, qty) in enumerate(valid_molds):
+                mr = MoldRequirement.objects.create(
+                    production_order=order,
+                    mold_id=mold_id,
+                    order=i,
+                )
+                # 竞品工单：每行创建一个 MoldRequirementFormulaDetail（formula=None）
+                from app_mold_injection.models import MoldRequirementFormulaDetail
+                MoldRequirementFormulaDetail.objects.create(
+                    mold_requirement=mr,
+                    formula=None,
+                    specimen_quantity=qty,
+                )
+
+            # 测试项目
+            if test_item_ids:
+                order.test_items.set(test_item_ids)
+
+        messages.success(
+            request,
+            f'竞品工单 [{order.code}] 已创建'
+            f'（{len(valid_molds)} 个模具，跳过挤出直达注塑）'
+        )
+        return redirect(
+            reverse('project_formula_process', kwargs={'pk': pk})
+            + f'?tab=competitor&order_id={order.pk}'
+        )
+
+    @staticmethod
+    def _parse_mold_rows(post_data):
+        """解析 POST 中的模具行数据。"""
+        rows = []
+        index = 0
+        while True:
+            mold_key = f'mold_id_{index}'
+            if mold_key not in post_data:
+                break
+            try:
+                mold_id = int(post_data.get(mold_key, 0) or 0)
+                qty = int(post_data.get(f'specimen_qty_{index}', 0) or 0)
+            except (ValueError, TypeError):
+                mold_id = 0
+                qty = 0
+            rows.append((mold_id, qty))
+            index += 1
+        return rows

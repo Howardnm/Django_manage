@@ -12,9 +12,7 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
         query = request.GET.get('q', '').strip()
         model_name = request.GET.get('model', '')
 
-        if len(query) < 1:
-            return JsonResponse({'results': []})
-
+        # 空查询时返回前 20 条，支持 TomSelect preload: 'focus' 预加载
         results = []
         if model_name == 'formula':
             from app_formula.models import LabFormula
@@ -74,8 +72,8 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
             from app_mold_injection.models import MoldType
             qs = MoldType.objects.filter(
                 name__icontains=query, status='AVAILABLE'
-            ).values('id', 'mold_code', 'name')[:20]
-            results = [{'id': obj['id'], 'text': f"[{obj['mold_code']}] {obj['name']}"} for obj in qs]
+            ).values('id', 'mold_code', 'name', 'cavity_count')[:20]
+            results = [{'id': obj['id'], 'text': f"[{obj['mold_code']}] {obj['name']}", 'cavity_count': obj['cavity_count']} for obj in qs]
 
         elif model_name == 'test_config':
             from app_material.models import TestConfig
@@ -83,6 +81,13 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
                 name__icontains=query
             ).values('id', 'name')[:20]
             results = [{'id': obj['id'], 'text': obj['name']} for obj in qs]
+
+        elif model_name == 'customer':
+            from app_repository.models import Customer
+            qs = Customer.objects.filter(
+                Q(company_name__icontains=query) | Q(short_name__icontains=query)
+            ).values('id', 'company_name', 'short_name')[:20]
+            results = [{'id': obj['id'], 'text': obj['short_name'] or obj['company_name']} for obj in qs]
 
         elif model_name == 'sample_pellet':
             # 待打样颗粒列表（供注塑取料 autocomplete）

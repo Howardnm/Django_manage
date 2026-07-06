@@ -70,7 +70,7 @@
                         </td>
                         <td>
                             <div class="d-flex align-items-center gap-1">
-                                <span class="badge bg-blue-lt">{{ repo.project.manager.username }}</span>
+                                {% if repo.project.manager %}<span class="badge bg-blue-lt">{{ repo.project.manager.username }}</span>{% else %}<span class="badge bg-blue-lt">-</span>{% endif %}
                                 {% if repo.salesperson %}<span class="badge bg-purple-lt">{{ repo.salesperson.name }}</span>{% endif %}
                             </div>
                         </td>

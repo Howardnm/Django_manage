@@ -38,7 +38,7 @@ class AppTrialProductionConfig(AppConfig):
         StateMachine.register(ProductionOrder, {
             'DRAFT': ['WORKFLOW_RUNNING', 'CANCELED'],
             'WORKFLOW_RUNNING': ['ACCEPTED', 'DRAFT', 'CANCELED'],
-            'ACCEPTED': ['EXTRUDING'],
+            'ACCEPTED': ['EXTRUDING', 'INJECTION_MOLDING'],  # INJECTION_MOLDING for skip_extrusion orders
             'EXTRUDING': ['INJECTION_MOLDING', 'COMPLETED'],
             'INJECTION_MOLDING': ['TESTING'],
             'TESTING': ['COMPLETED'],

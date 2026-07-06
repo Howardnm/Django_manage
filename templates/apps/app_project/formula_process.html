@@ -58,9 +58,23 @@
                     </span>
                 </li>
             {% endif %}
+            {# 客户竞品 Tab #}
+            <li class="nav-item" role="presentation">
+                <a class="nav-link {% if competitor_tab_active %}active{% endif %}"
+                   href="?tab=competitor">
+                    <i class="ti ti-target me-1"></i>客户竞品
+                    {% if competitor_orders %}
+                    <span class="badge {% if competitor_tab_active %}bg-white text-primary{% else %}bg-primary-lt{% endif %} ms-1">{{ competitor_orders|length }}</span>
+                    {% endif %}
+                </a>
+            </li>
         </ul>
     </div>
 </div>
+
+{% if competitor_tab_active %}
+    {% include 'apps/app_project/_competitor_tab.html' %}
+{% else %}
 
 <div class="row row-cards">
     {% if not compare_mode %}
@@ -474,6 +488,8 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
+
 {% endblock %}
 
 {% block scripts %}

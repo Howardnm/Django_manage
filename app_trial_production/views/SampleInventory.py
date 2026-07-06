@@ -78,44 +78,6 @@ class SampleInventoryListView(SampleInventoryAccessMixin, View):
         return render(request, self.template_name, context)
 
 
-class SampleInventoryCreateView(SampleInventoryAccessMixin, View):
-    """独立成品颗粒创建 — 不关联任何工单，type/sub_type 固定为 PELLET+FINISHED"""
-
-    template_name = 'apps/app_trial_production/sample/create.html'
-
-    def get(self, request):
-        from app_trial_production.forms import StandaloneSampleForm
-        form = StandaloneSampleForm(initial={
-            'type': 'PELLET',
-            'sub_type': 'FINISHED',
-        })
-        return render(request, self.template_name, {'form': form})
-
-    def post(self, request):
-        from app_trial_production.forms import StandaloneSampleForm
-
-        form = StandaloneSampleForm(request.POST)
-        if form.is_valid():
-            data = {
-                'type': 'PELLET',
-                'sub_type': 'FINISHED',
-                'formula_id': form.cleaned_data.get('formula'),
-                'trial_code': form.cleaned_data.get('trial_code', ''),
-                'quantity': form.cleaned_data.get('quantity'),
-                'specimen_count': form.cleaned_data.get('specimen_count'),
-                'specimen_qualified': form.cleaned_data.get('specimen_qualified') or 0,
-                'storage_location': form.cleaned_data.get('storage_location', ''),
-                'packaging_desc': form.cleaned_data.get('packaging_desc', ''),
-                'mold_id': form.cleaned_data.get('mold'),
-                'batch_label': form.cleaned_data.get('batch_label', ''),
-            }
-            sample = SampleInventoryService.create_standalone_sample(data)
-            messages.success(request, f'样品 [{sample.trial_code or sample.pk}] 已创建')
-            return redirect('trial_sample_list')
-
-        return render(request, self.template_name, {'form': form})
-
-
 class OrderSampleDetailView(SampleInventoryAccessMixin, View):
     """工单维度样品详情页 — 按模块来源过滤样品范围 + 表格批量 SAP 入库（仅排产模块）。"""
 

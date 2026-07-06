@@ -88,6 +88,13 @@ class ProductionOrder(models.Model):
     drying_temperature = models.IntegerField("干燥温度(℃)", null=True, blank=True, help_text="包装前的干燥温度")
     drying_duration = models.DecimalField("干燥时间(h)", max_digits=5, decimal_places=1, null=True, blank=True, help_text="包装前的干燥时长")
     inner_bag_sealing = models.BooleanField("套内膜袋密封", default=False, help_text="包装时是否套内膜袋并密封")
+    skip_extrusion = models.BooleanField("跳过挤出", default=False, help_text="客户竞品工单无需挤出环节，审批通过后直接进入注塑")
+
+    # ---- 竞品信息（仅 skip_extrusion=True 时使用） ----
+    competitor_company = models.CharField("竞品公司", max_length=200, blank=True)
+    competitor_brand = models.CharField("竞品品牌", max_length=200, blank=True)
+    competitor_model = models.CharField("竞品型号/牌号", max_length=200, blank=True)
+    customer = models.ForeignKey('app_repository.Customer', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联客户", related_name='competitor_orders')
 
     # ---- 注塑参数 ----
     injection_temperature = models.IntegerField("注塑温度(℃)", null=True, blank=True, help_text="注塑时的加工温度")

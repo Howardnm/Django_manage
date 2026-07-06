@@ -95,16 +95,12 @@
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center">是否需要色粉</td>
             <td class="text-start ps-2">{{ header_info.needs_color_display|default:'—' }}</td>
-            {% if header_info.has_formula_color %}
             <td class="print-label-bg fw-bold text-nowrap text-center">色名</td>
             <td class="text-start ps-2">{{ header_info.material_color_name|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">潘通</td>
             <td class="text-start ps-2">{{ header_info.pantone_code|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">RGB</td>
             <td class="text-start ps-2" style="font-family:monospace;">{{ header_info.rgb_value|default:'—' }}</td>
-            {% else %}
-            <td class="text-start ps-2" colspan="6"></td>
-            {% endif %}
         </tr>
     </table>
 
@@ -202,28 +198,24 @@
                 {{ post_processing.profile_machine|default:'—' }}
             </td>
         </tr>
-        {% if post_processing.profile_screw %}
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">螺杆组合</td>
             <td colspan="
                 {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
             " class="text-start ps-2">
-                {{ post_processing.profile_screw }}
+                {{ post_processing.profile_screw|default:'—' }}
             </td>
         </tr>
-        {% endif %}
 
         {# ── 说明 ── #}
-        {% if post_processing.remark %}
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">说明</td>
             <td colspan="
                 {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
             " class="text-start ps-2">
-                {{ post_processing.remark }}
+                {{ post_processing.remark|default:'—' }}
             </td>
         </tr>
-        {% endif %}
 
         {# ── 包装前处理 ── #}
         <tr>
@@ -259,16 +251,14 @@
         </tr>
 
         {# ── 包装说明 ── #}
-        {% if post_processing.packaging_desc %}
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">包装说明</td>
             <td colspan="
                 {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
             " class="text-start ps-2">
-                {{ post_processing.packaging_desc }}
+                {{ post_processing.packaging_desc|default:'—' }}
             </td>
         </tr>
-        {% endif %}
 
     </table>
 

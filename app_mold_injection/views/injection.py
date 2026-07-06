@@ -163,6 +163,38 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
     def get_context_data(self, **kwargs):
         ctx = super().get_context_data(**kwargs)
         task = self.object
+
+        # --- 构建模具 x 配方矩阵 ---
+        mold_requirements = task.mold_requirements.all()
+
+        # 收集所有不重复的配方版本（排序列）
+        formula_map = {}  # formula_id -> formula
+        for req in mold_requirements:
+            for detail in req.formula_details.all():
+                if detail.formula_id and detail.formula_id not in formula_map:
+                    formula_map[detail.formula_id] = detail.formula
+        formulas = sorted(formula_map.values(), key=lambda f: f.version)
+
+        # 构建每行的数量映射
+        matrix_rows = []
+        for req in mold_requirements:
+            qty_map = {}
+            row_total = 0
+            for detail in req.formula_details.all():
+                if detail.formula_id:
+                    qty_map[detail.formula_id] = detail.specimen_quantity
+                row_total += detail.specimen_quantity
+
+            matrix_rows.append({
+                'mold': req.mold,
+                'quantities': [qty_map.get(f.pk, 0) for f in formulas],
+                'total': row_total,
+            })
+
+        ctx['mold_matrix_formulas'] = formulas
+        ctx['mold_matrix_rows'] = matrix_rows
+        ctx['has_mold_requirements'] = len(matrix_rows) > 0
+
         ctx['show_start_btn'] = task.status == 'PENDING'
         ctx['show_complete_btn'] = task.status == 'IN_PROGRESS'
         ctx['has_output_specimens'] = task.output_specimens.exists()

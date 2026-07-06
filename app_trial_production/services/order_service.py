@@ -113,35 +113,69 @@ class ProductionOrderService:
     @staticmethod
     @transaction.atomic
     def accept_order(order, user=None):
-        """审批通过后接单 — 仅变更状态，不创建子任务。任务在操作员开始生产时创建。"""
+        """审批通过后接单 — 变更状态并创建下游任务。
+
+        正常流程：ACCEPTED → 创建 ExtrusionTask(PENDING)
+        竞品工单（skip_extrusion=True）：ACCEPTED → 直接创建 InjectionTask → INJECTION_MOLDING
+        """
+        from app_trial_production.models import ExtrusionTask
+
         StateMachine.transition(order, 'ACCEPTED', user)
-        logger.info(f"Order {order.code} accepted")
+
+        if order.skip_extrusion:
+            # 竞品工单：跳过挤出，直接创建注塑任务
+            from app_mold_injection.models import MoldRequirement
+            # 确保模具需求已关联到工单
+            has_mold = order.mold_requirements.filter(
+                injection_task__isnull=True
+            ).exists()
+            if has_mold:
+                ProductionOrderService._create_injection_from_pending(order)
+            StateMachine.transition(order, 'INJECTION_MOLDING', user)
+            logger.info(f"Order {order.code} accepted → INJECTION_MOLDING (skip_extrusion)")
+        else:
+            # 正常流程：创建待生产挤出任务
+            ExtrusionTask.objects.get_or_create(
+                production_order=order,
+                defaults={'status': 'PENDING'},
+            )
+            logger.info(f"Order {order.code} accepted → EXTRUDING pending")
+
         return order
 
     @staticmethod
     @transaction.atomic
     def start_extrusion(order, user):
         """
-        开始挤出生产 — 创建 ExtrusionTask + ColorMatchingTask，推进工单状态。
-        仅在 order.status == ACCEPTED 时允许调用。
+        开始挤出生产 — 将已有 PENDING ExtrusionTask 推进到 IN_PROGRESS，
+        并创建 ColorMatchingTask。仅在 order.status == ACCEPTED 时允许调用。
         """
         from app_trial_production.models import ExtrusionTask
         from app_color_center.models import ColorMatchingTask
 
-        # 创建挤出任务（直接进入 IN_PROGRESS）
-        extrusion_task = ExtrusionTask.objects.create(
+        # 获取已有挤出任务（accept_order 已创建 PENDING），推进到 IN_PROGRESS
+        extrusion_task, _ = ExtrusionTask.objects.get_or_create(
             production_order=order,
-            operator=user,
-            status='IN_PROGRESS',
+            defaults={'status': 'PENDING'},
         )
+        if extrusion_task.status == 'PENDING':
+            extrusion_task.operator = user
+            StateMachine.transition(extrusion_task, 'IN_PROGRESS', user)
+        elif extrusion_task.status == 'IN_PROGRESS':
+            # 操作员可能不同，更新为当前操作员
+            if extrusion_task.operator_id != user.pk:
+                extrusion_task.operator = user
+                extrusion_task.save(update_fields=['operator'])
 
         # 创建配色任务
         needs_color = order.formula_details.filter(
             needs_color_matching=True).exists()
-        ColorMatchingTask.objects.create(
+        ColorMatchingTask.objects.get_or_create(
             production_order=order,
-            operator=None,
-            status='PENDING' if needs_color else 'NOT_REQUIRED',
+            defaults={
+                'operator': None,
+                'status': 'PENDING' if needs_color else 'NOT_REQUIRED',
+            },
         )
 
         # 推进工单状态: ACCEPTED → EXTRUDING

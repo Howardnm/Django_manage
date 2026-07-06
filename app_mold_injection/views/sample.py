@@ -82,39 +82,3 @@ class MoldSampleListView(InjectionTaskAccessMixin, View):
         return render(request, self.template_name, context)
 
 
-class MoldSampleCreateView(InjectionTaskAccessMixin, View):
-    """创建独立待打样颗粒 — type/sub_type 固定为 PELLET + FOR_INJECTION"""
-
-    template_name = 'apps/app_mold_injection/sample/create.html'
-
-    def get(self, request):
-        from app_trial_production.forms import StandaloneSampleForm
-        form = StandaloneSampleForm(initial={
-            'type': 'PELLET',
-            'sub_type': 'FOR_INJECTION',
-        })
-        return render(request, self.template_name, {'form': form})
-
-    def post(self, request):
-        from app_trial_production.forms import StandaloneSampleForm
-
-        form = StandaloneSampleForm(request.POST)
-        if form.is_valid():
-            data = {
-                'type': 'PELLET',
-                'sub_type': 'FOR_INJECTION',
-                'formula_id': form.cleaned_data.get('formula'),
-                'trial_code': form.cleaned_data.get('trial_code', ''),
-                'quantity': form.cleaned_data.get('quantity'),
-                'specimen_count': form.cleaned_data.get('specimen_count'),
-                'specimen_qualified': form.cleaned_data.get('specimen_qualified') or 0,
-                'storage_location': form.cleaned_data.get('storage_location', ''),
-                'packaging_desc': form.cleaned_data.get('packaging_desc', ''),
-                'mold_id': form.cleaned_data.get('mold'),
-                'batch_label': form.cleaned_data.get('batch_label', ''),
-            }
-            sample = SampleInventoryService.create_standalone_sample(data)
-            messages.success(request, f'待打样颗粒 [{sample.trial_code or sample.pk}] 已创建')
-            return redirect('mold_injection:sample_list')
-
-        return render(request, self.template_name, {'form': form})
