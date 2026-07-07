@@ -27,6 +27,11 @@ class ExtrusionTaskListView(ExtrusionTaskAccessMixin, ListView):
         qs = qs.select_related(
             'production_order', 'production_order__project',
             'operator',
+        ).filter(
+            production_order__extrusion_scheduled_date__isnull=False,
+            production_order__status__in=[
+                'ACCEPTED', 'EXTRUDING', 'INJECTION_MOLDING', 'TESTING', 'COMPLETED',
+            ],
         ).order_by('-created_at')
 
         self.filter = ExtrusionTaskFilter(self.request.GET, queryset=qs)

@@ -62,7 +62,7 @@
             <div class="card-body">
                 <dl class="row mb-0">
                     <dt class="col-5 text-muted">操作员</dt>
-                    <dd class="col-7">{{ task.operator.realname|default:task.operator.username|default:"未分配" }}</dd>
+                    <dd class="col-7">{% if task.operator %}{{ task.operator.realname|default:task.operator.username }}{% else %}未分配{% endif %}</dd>
 
                     <dt class="col-5 text-muted">关联工单</dt>
                     <dd class="col-7">
