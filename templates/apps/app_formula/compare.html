@@ -58,7 +58,7 @@
                         
                         <!-- 动态生成列头 -->
                         {% for col in columns %}
-                            <th class="align-middle" style="width: 180px; min-width: 180px;">
+                            <th class="align-middle" style="width: 100px; min-width: 100px;">
                                 {% if col.type == 'material' %}
                                     <div class="badge bg-blue-lt mb-2">基准材料</div>
                                     <div class="fw-bold fs-4 text-wrap">
@@ -75,8 +75,11 @@
                                     <div class="badge bg-purple-lt mb-2">
                                         {% if not material and forloop.first %}基准配方{% else %}配方 {{ forloop.counter }}{% endif %}
                                     </div>
-                                    <div class="fw-bold fs-4"><a href="{% url 'formula_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.code }}</a></div>
-                                    <div class="small text-muted text-truncate" title="{{ col.obj.name }}">{{ col.obj.name }}</div>
+                                    {% if col.obj.project_node %}
+                                    <div class="fw-bold text-primary text-wrap small">{{ col.obj.project_node.get_stage_display }} 第{{ col.obj.project_node.round }}轮</div>
+                                    {% endif %}
+                                    <div class="fw-bold fs-4 text-wrap"><a href="{% url 'formula_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.code }}</a></div>
+                                    <div class="small text-muted text-wrap" title="{{ col.obj.name }}">{{ col.obj.name }}</div>
                                 {% endif %}
                             </th>
                         {% endfor %}
