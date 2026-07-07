@@ -49,22 +49,47 @@
                                         </div>
                                     </div>
 
-                                    <!-- 右侧：数值 (高亮加粗) -->
+                                    <!-- 右侧：数值 + 范围 (高亮加粗) -->
                                     <div class="text-end lh-1 ms-1" style="min-width: 30%;">
-                                        <div class="fw-bolder fs-4 text-{{ theme_color }}">
-                                            {% if prop.test_config.data_type == 'NUMBER' %}
+                                        {% if prop.test_config.data_type == 'NUMBER' %}
+                                            <div class="fw-bolder fs-4 text-{{ theme_color }}">
                                                 {% if "密度" in prop.test_config.name or "比重" in prop.test_config.name %}
                                                     {{ prop.value|floatformat:3 }}
                                                 {% else %}
                                                     {{ prop.value|floatformat:2 }}
                                                 {% endif %}
-                                            {% else %}
-                                                <!-- 文本或选择类型，显示 value_text -->
+                                            </div>
+                                        {% else %}
+                                            <div class="fw-bolder fs-4 text-{{ theme_color }}">
                                                 {{ prop.value_text }}
+                                            </div>
+                                        {% endif %}
+                                        {% if prop.test_config.data_type == 'NUMBER' %}
+                                            {% if prop.min_value is not None or prop.max_value is not None or prop.test_config.unit %}
+                                                <div class="text-muted small" style="font-size: 9px;">
+                                                    {% if prop.min_value is not None and prop.max_value is not None %}
+                                                        [{{ prop.min_value|floatformat:2 }} ~ {{ prop.max_value|floatformat:2 }}]
+                                                    {% elif prop.min_value is not None %}
+                                                        [≥ {{ prop.min_value|floatformat:2 }}]
+                                                    {% elif prop.max_value is not None %}
+                                                        [≤ {{ prop.max_value|floatformat:2 }}]
+                                                    {% endif %}
+                                                    {% if prop.test_config.unit %}{{ prop.test_config.unit }}{% endif %}
+                                                </div>
                                             {% endif %}
-                                        </div>
-                                        {% if prop.test_config.unit %}
-                                            <div class="text-muted small text-truncate" style="font-size: 9px;">{{ prop.test_config.unit }}</div>
+                                        {% else %}
+                                            {% if prop.min_value_text or prop.max_value_text or prop.test_config.unit %}
+                                                <div class="text-muted small" style="font-size: 9px;">
+                                                    {% if prop.min_value_text and prop.max_value_text %}
+                                                        [{{ prop.min_value_text }} ~ {{ prop.max_value_text }}]
+                                                    {% elif prop.min_value_text %}
+                                                        [≥ {{ prop.min_value_text }}]
+                                                    {% elif prop.max_value_text %}
+                                                        [≤ {{ prop.max_value_text }}]
+                                                    {% endif %}
+                                                    {% if prop.test_config.unit %}{{ prop.test_config.unit }}{% endif %}
+                                                </div>
+                                            {% endif %}
                                         {% endif %}
                                     </div>
 

@@ -161,7 +161,26 @@ class MaterialDataPoint(models.Model):
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
     value = models.DecimalField("测试数值", max_digits=10, decimal_places=3, null=True, blank=True)
     value_text = models.CharField("文本结果", max_length=50, blank=True)
+    min_value = models.DecimalField("最小值", max_digits=10, decimal_places=3, null=True, blank=True,
+                                    help_text="允许范围下限（含），数值类型使用")
+    max_value = models.DecimalField("最大值", max_digits=10, decimal_places=3, null=True, blank=True,
+                                    help_text="允许范围上限（含），数值类型使用")
+    min_value_text = models.CharField("最小值(文本)", max_length=50, blank=True,
+                                      help_text="文本/选择类型的最小值")
+    max_value_text = models.CharField("最大值(文本)", max_length=50, blank=True,
+                                      help_text="文本/选择类型的最大值")
     remark = models.CharField("备注", max_length=50, blank=True)
+
+    @property
+    def in_range(self):
+        """实测值是否在允许范围内。返回 True/False/None"""
+        if self.value is None:
+            return None
+        lo, hi = self.min_value, self.max_value
+        if lo is None and hi is None:
+            return None
+        return (lo is None or self.value >= lo) and (hi is None or self.value <= hi)
+
     class Meta:
         verbose_name = "性能数据"
         unique_together = ('material', 'test_config')

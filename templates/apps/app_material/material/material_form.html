@@ -84,6 +84,20 @@
                 {% endif %}
             </td>
 
+            <!-- 2b. 最小值 -->
+            <td>
+                {{ data_formset.empty_form.min_value }}
+                {{ data_formset.empty_form.min_value_text }}
+                {{ data_formset.empty_form.min_value_select }}
+            </td>
+
+            <!-- 2c. 最大值 -->
+            <td>
+                {{ data_formset.empty_form.max_value }}
+                {{ data_formset.empty_form.max_value_text }}
+                {{ data_formset.empty_form.max_value_select }}
+            </td>
+
             <!-- 3. 备注 -->
             <td>
                 {{ data_formset.empty_form.remark }}
