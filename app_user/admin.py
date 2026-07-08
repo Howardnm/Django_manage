@@ -6,7 +6,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
-from .models import User, Department, ReviewGroup, WorkGroup, PermissionGroup
+from .models import User, Department, Subsidiary, ReviewGroup, WorkGroup, PermissionGroup
 
 admin.site.unregister(Group)
 
@@ -25,6 +25,14 @@ class DepartmentAdmin(admin.ModelAdmin):
     ordering = ('name',)
 
 
+@admin.register(Subsidiary)
+class SubsidiaryAdmin(admin.ModelAdmin):
+    """Subsidiary 的 Admin 配置：列表显示 name/code/description/created_at，支持搜索和排序。"""
+    list_display = ('name', 'code', 'description', 'created_at')
+    search_fields = ('name', 'code')
+    ordering = ('name',)
+
+
 @admin.register(User)
 class MyUserAdmin(UserAdmin):
     """自定义 User Admin。展示 L1~L5 五层权限字段，按权限模型分层组织 fieldsets。"""
@@ -34,16 +42,17 @@ class MyUserAdmin(UserAdmin):
         'user_type',           # L1: 角色白名单
         'user_level',          # L2: 用户等级
         'get_groups',          # L3: Django 权限组（权限码容器）
+        'subsidiary',          # 子公司/基地归属
         'department',          # L4: 部门数据隔离
         'get_work_groups',     # L5: 工作组数据隔离
         'phone', 'is_staff',
     )
-    list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_active', 'department')
+    list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_active', 'subsidiary', 'department')
     
     # 在详情页管理 5D 权限和公司归属
     fieldsets = UserAdmin.fieldsets + (
         ('权限层级配置 (L1 角色 / L2 等级 / L4 部门)', {
-            'fields': ('user_type', 'user_level', 'department'),
+            'fields': ('user_type', 'user_level', 'subsidiary', 'department'),
         }),
         ('业务归属 (External)', {
             'fields': ('associated_customer', 'associated_oem', 'member_token'),
@@ -56,7 +65,7 @@ class MyUserAdmin(UserAdmin):
     # 账号创建时的快捷字段
     add_fieldsets = UserAdmin.add_fieldsets + (
         ('初始业务分配', {
-            'fields': ('user_type', 'department', 'phone'),
+            'fields': ('user_type', 'subsidiary', 'department', 'phone'),
         }),
     )
 

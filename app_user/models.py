@@ -1,6 +1,6 @@
-"""app_user 数据模型。定义 User、Department、WorkGroup、ReviewGroup、PermissionGroup。
+"""app_user 数据模型。定义 User、Department、Subsidiary、WorkGroup、ReviewGroup、PermissionGroup。
 
-导出: PermissionGroup, Department, ReviewGroup, WorkGroup, User。"""
+导出: PermissionGroup, Subsidiary, Department, ReviewGroup, WorkGroup, User。"""
 
 import uuid
 from django.db import models
@@ -14,6 +14,23 @@ class PermissionGroup(AuthGroup):
         app_label = 'app_user'
         verbose_name = '[L3 权限容器] 权限角色组'
         verbose_name_plural = '[L3 权限容器] 权限角色组'
+
+
+class Subsidiary(models.Model):
+    """子公司/基地模型。用于标识员工所属的法人实体或办公基地，便于按子公司维度统计。"""
+    name = models.CharField("子公司名称", max_length=50, unique=True)
+    code = models.CharField("子公司编码", max_length=20, blank=True, help_text="用于系统内部逻辑识别")
+    description = models.TextField("描述", blank=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "子公司/基地"
+        verbose_name_plural = "子公司/基地"
+        ordering = ['name']
+
+    def __str__(self):
+        """返回子公司名称。"""
+        return self.name
 
 
 class Department(models.Model):
@@ -119,7 +136,15 @@ class User(AbstractUser):
     user_type = models.CharField("用户角色", max_length=20, choices=UserType.choices, default=UserType.ENGINEER)
     user_level = models.PositiveIntegerField("用户等级", default=1)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所属部门")
-    
+    subsidiary = models.ForeignKey(
+        'Subsidiary',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        verbose_name="所属子公司/基地",
+        help_text="员工所在的子公司或办公基地（仅用于统计，不影响权限）",
+    )
+
     # --- 外部系统核心识别码 (从业务表迁移至此) ---
     member_token = models.UUIDField("外部唯一令牌", default=uuid.uuid4, editable=False, unique=True)
 
