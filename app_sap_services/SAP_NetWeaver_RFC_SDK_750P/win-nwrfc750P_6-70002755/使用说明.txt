@@ -1,0 +1,2 @@
+添加系统环境变量（建议使用绝对路径）：
+Path=%SAP_SDK%\win-nwrfc750P_6-70002755\nwrfcsdk\lib

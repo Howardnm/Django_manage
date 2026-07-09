@@ -7,13 +7,18 @@ FROM python:3.13-slim-bookworm AS builder
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1
 
-# 安装系统构建依赖 (编译 mysqlclient/lxml 需要)
+# 安装系统构建依赖 (编译 mysqlclient/lxml/pyrfc 需要)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     pkg-config \
     default-libmysqlclient-dev \
     libxml2-dev \
     libxslt1-dev
+
+# 复制 SAP NetWeaver RFC SDK 并设置环境变量
+# pyrfc 编译时需要 SAPNWRFC_HOME 指向 SDK 根目录
+COPY app_sap_services/SAP_NetWeaver_RFC_SDK_750P/linux-nwrfc750P_5-70002752/nwrfcsdk /opt/sap_nwrfcsdk
+ENV SAPNWRFC_HOME=/opt/sap_nwrfcsdk
 
 # 创建并激活虚拟环境
 # 我们将环境安装在 /opt/venv 下
@@ -55,6 +60,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 5. 【核心优化】从 Builder 阶段直接复制整个虚拟环境
 # 这样 Final 镜像里连构建工具产生的垃圾都没有，只有纯粹的库
 COPY --from=builder --chown=django-user:django /opt/venv /opt/venv
+
+# 5.5 复制 SAP NW RFC SDK 运行时库 (pyrfc 运行时依赖)
+COPY --from=builder --chown=django-user:django /opt/sap_nwrfcsdk/lib /opt/sap_nwrfcsdk/lib
+ENV SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib \
+    LD_LIBRARY_PATH=/opt/sap_nwrfcsdk/lib:$LD_LIBRARY_PATH
 
 # 6. 复制项目代码 (使用 --chown 避免双倍体积)
 COPY --chown=django-user:django . .

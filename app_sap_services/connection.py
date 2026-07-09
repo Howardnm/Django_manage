@@ -46,8 +46,15 @@ def _bootstrap_pyrfc(sap_lib_path: str):
                 f"请在 Django settings 中检查 SAP_SERVICES_CONFIG['sap_lib_path']"
             )
 
-        os.add_dll_directory(sap_lib_path)
-        os.environ['PATH'] = sap_lib_path + os.pathsep + os.environ.get('PATH', '')
+        if os.name == 'nt':
+            # Windows: DLL 目录注册 + PATH 追加，解决 ICU 依赖查找问题
+            os.add_dll_directory(sap_lib_path)
+            os.environ['PATH'] = sap_lib_path + os.pathsep + os.environ.get('PATH', '')
+        else:
+            # Linux: LD_LIBRARY_PATH 由 Dockerfile 设置，此处仅校验路径
+            os.environ['LD_LIBRARY_PATH'] = (
+                sap_lib_path + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
+            )
         _pyrfc_bootstrapped = True
         logger.info(f"SAP NW RFC SDK 初始化完成: {sap_lib_path}")
 

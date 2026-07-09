@@ -253,7 +253,11 @@ if not os.path.exists(LOG_DIR):
 # ==============================================================================
 SAP_SERVICES_CONFIG = {
     # SAP NW RFC SDK lib 目录的绝对路径（必须存在）
-    'sap_lib_path': r"D:\SAP_SDK\win-nwrfc750P_6-70002755\nwrfcsdk\lib",
+    # Linux/Docker 通过环境变量 SAP_LIB_PATH 覆盖，Windows 使用本地路径
+    'sap_lib_path': os.environ.get(
+        'SAP_LIB_PATH',
+        r"D:\SAP_SDK\win-nwrfc750P_6-70002755\nwrfcsdk\lib"
+    ),
 
     # SAP 连接参数
     'connection': {
