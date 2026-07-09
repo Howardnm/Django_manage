@@ -1,0 +1,207 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}组织架构总览 — 角色指派矩阵{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .matrix-container {
+    overflow-x: auto;
+    margin: 0 0 32px 0;
+  }
+  .matrix-table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 400px;
+    font-size: 13px;
+  }
+  .matrix-table th, .matrix-table td {
+    border: 1px solid #ddd;
+    padding: 8px 12px;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  .matrix-table thead th {
+    background: #f8f9fa;
+    font-weight: 600;
+  }
+  .matrix-table .role-header {
+    background: #e9ecef;
+    font-weight: 600;
+    text-align: left;
+    min-width: 120px;
+  }
+  .matrix-table .role-header .escalation-on {
+    color: #28a745;
+    font-size: 11px;
+  }
+  .matrix-table .role-header .escalation-off {
+    color: #dc3545;
+    font-size: 11px;
+  }
+  .scope-section-title {
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+    margin: 28px 0 10px 0;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #dee2e6;
+  }
+  .scope-section-title.subsidiary { border-color: #ffc107; }
+  .scope-section-title.department { border-color: #007bff; }
+  .scope-section-title.workgroup  { border-color: #6c757d; }
+  .cell-assigned {
+    color: #28a745;
+    font-weight: 500;
+  }
+  .cell-empty {
+    color: #ccc;
+    font-style: italic;
+  }
+  .col-header-subsidiary { background: #fff9e6 !important; }
+  .col-header-department { background: #e8f0fe !important; }
+  .col-header-workgroup  { background: #fafafa !important; }
+  .matrix-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .matrix-stat {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: 6px;
+    padding: 14px 20px;
+    flex: 1;
+  }
+  .matrix-stat .stat-number {
+    font-size: 24px;
+    font-weight: 700;
+    color: #495057;
+  }
+  .matrix-stat .stat-label {
+    font-size: 12px;
+    color: #6c757d;
+    margin-top: 2px;
+  }
+  .empty-section {
+    text-align: center;
+    padding: 30px 0;
+    color: #999;
+    font-size: 14px;
+  }
+</style>
+{% endblock %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+  <a href="{% url 'admin:index' %}">首页</a>
+  &rsaquo; <a href="{% url 'admin:app_list' app_label='app_user' %}">App_User</a>
+  &rsaquo; <a href="{% url 'admin:app_user_orgrole_changelist' %}">组织角色</a>
+  &rsaquo; 组织架构总览
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+
+  <p style="color:#6c757d;margin-bottom:20px;">
+    按作用域分段展示。每个角色只显示与其作用域匹配的组织单元，点击单元格可编辑指派。
+  </p>
+
+  <!-- 统计卡片 -->
+  <div class="matrix-stats">
+    <div class="matrix-stat">
+      <div class="stat-number">{{ stats.total_roles }}</div>
+      <div class="stat-label">组织角色</div>
+    </div>
+    <div class="matrix-stat">
+      <div class="stat-number">{{ stats.total_assignments }}</div>
+      <div class="stat-label">已指派</div>
+    </div>
+    <div class="matrix-stat">
+      <div class="stat-number">{{ stats.total_units }}</div>
+      <div class="stat-label">组织单元</div>
+    </div>
+    <div class="matrix-stat">
+      <div class="stat-number">{{ stats.coverage }}%</div>
+      <div class="stat-label">覆盖率</div>
+    </div>
+  </div>
+
+  {% for cfg in scope_configs %}
+
+    <!-- 作用域区块标题 -->
+    <div class="scope-section-title {{ cfg.scope }}">
+      {{ cfg.label }}
+      <span style="font-weight:400;font-size:13px;color:#999;margin-left:8px;">
+        {{ cfg.roles|length }} 个角色 · {{ cfg.units|length }} 个组织单元
+      </span>
+    </div>
+
+    {% if cfg.has_data %}
+    <div class="matrix-container">
+      <table class="matrix-table">
+        <thead>
+          <tr>
+            <th style="min-width:120px;">角色</th>
+            {% for unit in cfg.units %}
+              <th class="
+                {% if unit.type == 'subsidiary' %}col-header-subsidiary{% endif %}
+                {% if unit.type == 'department' %}col-header-department{% endif %}
+                {% if unit.type == 'workgroup' %}col-header-workgroup{% endif %}
+              " title="{{ unit.full_path }}">
+                {{ unit.name }}
+                <div style="font-size:10px;font-weight:400;color:#999;">{{ unit.get_type_display }}</div>
+              </th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in cfg.rows %}
+          <tr>
+            <td class="role-header">
+              {{ row.name }}
+              {% if row.scope == 'workgroup' and row.allow_escalation %}
+                <span class="escalation-on" title="未找到时自动向上回退">↑回退</span>
+              {% endif %}
+            </td>
+            {% for cell in row.cells %}
+              <td>
+                {% if cell.assignment %}
+                  <a href="{% url 'admin:app_user_orgroleassignment_change' cell.assignment.id %}"
+                     class="cell-assigned" title="编辑指派：{{ cell.assignment.user.username }}">
+                    {{ cell.assignment.user.username }}
+                  </a>
+                  {% if not cell.assignment.is_primary %}
+                    <span style="font-size:10px;color:#999;">(副)</span>
+                  {% endif %}
+                {% else %}
+                  <span class="cell-empty">—</span>
+                {% endif %}
+              </td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="empty-section">
+      {% if not cfg.roles %}
+        暂无该作用域的角色 —
+        <a href="{% url 'admin:app_user_orgrole_add' %}">创建组织角色</a>
+      {% else %}
+        暂未创建该作用域的组织单元 —
+        <a href="{% url 'admin:app_user_subsidiary_add' %}">创建子公司</a> ·
+        <a href="{% url 'admin:app_user_department_add' %}">创建部门</a> ·
+        <a href="{% url 'admin:app_user_workgroup_add' %}">创建工作组</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  {% endfor %}
+
+</div>
+{% endblock %}

@@ -1,12 +1,13 @@
-"""Django Admin 配置。注册 User、Department、ReviewGroup、WorkGroup、PermissionGroup 的管理界面。
+"""Django Admin 配置。注册 User、Department、Subsidiary、OrgRole、OrgRoleAssignment、ReviewGroup、WorkGroup、PermissionGroup 的管理界面。
 
-导出: PermissionGroupAdmin, DepartmentAdmin, MyUserAdmin, ReviewGroupAdmin, WorkGroupAdmin。
+导出: PermissionGroupAdmin, DepartmentAdmin, SubsidiaryAdmin, OrgRoleAdmin, OrgRoleAssignmentAdmin, MyUserAdmin, ReviewGroupAdmin, WorkGroupAdmin。
 """
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
-from .models import User, Department, Subsidiary, ReviewGroup, WorkGroup, PermissionGroup
+from django.shortcuts import render
+from .models import User, Department, Subsidiary, OrgRole, OrgRoleAssignment, ReviewGroup, WorkGroup, PermissionGroup
 
 admin.site.unregister(Group)
 
@@ -31,6 +32,212 @@ class SubsidiaryAdmin(admin.ModelAdmin):
     list_display = ('name', 'code', 'description', 'created_at')
     search_fields = ('name', 'code')
     ordering = ('name',)
+    fieldsets = (
+        (None, {
+            'fields': ('name', 'code', 'description'),
+        }),
+    )
+
+
+class OrgRoleAssignmentInline(admin.TabularInline):
+    """OrgRole 的内联指派编辑器。在角色详情页直接管理所有指派。"""
+    model = OrgRoleAssignment
+    extra = 1
+    fields = ('user', 'workgroup', 'department', 'subsidiary', 'is_primary')
+    autocomplete_fields = ('user',)
+    verbose_name = "角色人员指派"
+    verbose_name_plural = "角色人员指派（在此直接添加/编辑该角色在各组织单元中的负责人）"
+
+
+@admin.register(OrgRole)
+class OrgRoleAdmin(admin.ModelAdmin):
+    """OrgRole 的 Admin 配置。支持内联编辑角色指派 + 组织架构总览矩阵。
+
+    操作指引：
+        第一步：在此创建组织角色（如「组长」「部门经理」）
+        第二步：在下方 inline 表格中将人员指派到具体的组织单元
+        第三步：到 app_workflow →「Task 节点配置」中关联 task_id 与组织角色
+        第四步：点击右上角「组织架构总览」查看完整的指派矩阵
+    """
+    list_display = ('code', 'name', 'scope', 'allow_escalation', 'description', 'created_at')
+    list_filter = ('scope',)
+    search_fields = ('code', 'name')
+    ordering = ('scope', 'name')
+    inlines = [OrgRoleAssignmentInline]
+    fieldsets = (
+        ('角色基本信息', {
+            'fields': ('code', 'name', 'scope', 'allow_escalation'),
+        }),
+        ('补充说明', {
+            'fields': ('description',),
+        }),
+    )
+
+    # ── 自定义 URL ──────────────────────────────────────────
+
+    def get_urls(self):
+        """注入自定义 URL：组织架构总览矩阵页面。"""
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('org-matrix/', self.admin_site.admin_view(self.org_structure_matrix_view),
+                 name='app_user_org_structure_matrix'),
+        ]
+        return custom_urls + urls
+
+    def org_structure_matrix_view(self, request):
+        """组织架构总览矩阵视图 — 按作用域分段展示。
+
+        三个独立区块：
+            — 子公司/基地级角色 × 子公司列
+            — 部门级角色 × 部门列
+            — 工作组级角色 × 工作组列
+        每个角色只展示其作用域匹配的组织单元，不会出现无关列。
+        """
+        # ── 预加载所有指派 ──
+        all_assignments = list(OrgRoleAssignment.objects.select_related(
+            'role', 'user', 'subsidiary', 'department', 'workgroup',
+        ))
+        assignment_map = {}
+        for a in all_assignments:
+            if a.subsidiary:
+                assignment_map[(a.role.code, 'subsidiary', a.subsidiary_id)] = a
+            if a.department:
+                assignment_map[(a.role.code, 'department', a.department_id)] = a
+            if a.workgroup:
+                assignment_map[(a.role.code, 'workgroup', a.workgroup_id)] = a
+
+        # ── 构建三个作用域的独立数据 ──
+        scope_configs = [
+            {
+                'scope': 'subsidiary',
+                'label': '子公司 / 基地级角色',
+                'units': [
+                    {'type': 'subsidiary', 'name': s.name, 'id': s.id,
+                     'full_path': str(s), 'get_type_display': '子公司/基地'}
+                    for s in Subsidiary.objects.all().order_by('name')
+                ],
+            },
+            {
+                'scope': 'department',
+                'label': '部门级角色',
+                'units': [
+                    {'type': 'department', 'name': d.name, 'id': d.id,
+                     'full_path': str(d), 'get_type_display': '部门'}
+                    for d in Department.objects.all().order_by('name')
+                ],
+            },
+            {
+                'scope': 'workgroup',
+                'label': '工作组级角色',
+                'units': [
+                    {'type': 'workgroup', 'name': wg.name, 'id': wg.id,
+                     'full_path': f'{wg.department.name} ＞ {wg.name}',
+                     'get_type_display': '工作组'}
+                    for wg in WorkGroup.objects.filter(is_active=True)
+                    .select_related('department').order_by('department__name', 'name')
+                ],
+            },
+        ]
+
+        # ── 为每个作用域构建角色行 ──
+        total_assignments = 0
+        total_cells = 0
+        assigned_cells = 0
+
+        for cfg in scope_configs:
+            roles = list(OrgRole.objects.filter(scope=cfg['scope']).order_by('name'))
+            cfg['roles'] = roles
+            cfg['has_data'] = len(roles) > 0 and len(cfg['units']) > 0
+            cfg['rows'] = []
+
+            for role in roles:
+                cells = []
+                for unit in cfg['units']:
+                    key = (role.code, unit['type'], unit['id'])
+                    assignment = assignment_map.get(key)
+                    cells.append({'assignment': assignment})
+                    total_cells += 1
+                    if assignment:
+                        assigned_cells += 1
+
+                cfg['rows'].append({
+                    'name': role.name,
+                    'code': role.code,
+                    'scope': role.scope,
+                    'allow_escalation': role.allow_escalation,
+                    'get_scope_display': role.get_scope_display(),
+                    'cells': cells,
+                    'columns': cfg['units'],
+                })
+                total_assignments += OrgRoleAssignment.objects.filter(role=role).count()
+
+        # ── 统计 ──
+        stats = {
+            'total_roles': OrgRole.objects.count(),
+            'total_assignments': OrgRoleAssignment.objects.count(),
+            'total_units': sum(len(c['units']) for c in scope_configs),
+            'coverage': round(assigned_cells / max(total_cells, 1) * 100),
+        }
+
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '组织架构总览 — 角色指派矩阵',
+            'scope_configs': scope_configs,
+            'stats': stats,
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/app_user/org_structure_matrix.html', context)
+
+    # ── Changelist 入口按钮 ──────────────────────────────────
+
+    def changelist_view(self, request, extra_context=None):
+        """在列表页顶部注入「组织架构总览」快捷入口。"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        extra_context = extra_context or {}
+        matrix_url = reverse('admin:app_user_org_structure_matrix')
+        extra_context['matrix_url'] = matrix_url
+        # 通过 messages 提示或直接在页面顶部添加导航
+        self.message_user(
+            request,
+            format_html(
+                '💡 <a href="{}" style="font-weight:600;">点击查看「组织架构总览」矩阵视图</a>',
+                matrix_url,
+            ),
+            level='info',
+        )
+        return super().changelist_view(request, extra_context)
+
+
+@admin.register(OrgRoleAssignment)
+class OrgRoleAssignmentAdmin(admin.ModelAdmin):
+    """OrgRoleAssignment 的 Admin 配置。列表显示角色-用户-组织单元映射。
+
+    操作指引：
+        在此将具体用户指派为某个组织单元的某个角色负责人。
+        例如：张三 在「配方组」担任「组长」；李四 在「研发中心」担任「部门经理」。
+    """
+    list_display = ('role', 'user', 'get_org_unit', 'is_primary', 'created_at')
+    list_filter = ('role', 'is_primary')
+    search_fields = ('user__username', 'role__name', 'role__code')
+    autocomplete_fields = ('user',)
+    fieldsets = (
+        ('角色与人员', {
+            'fields': ('role', 'user'),
+        }),
+        ('组织单元归属', {
+            'fields': ('subsidiary', 'department', 'workgroup'),
+        }),
+        ('指派属性', {
+            'fields': ('is_primary',),
+        }),
+    )
+
+    @admin.display(description='组织单元')
+    def get_org_unit(self, obj):
+        """返回该指派关联的组织单元名称。"""
+        return str(obj.workgroup or obj.department or obj.subsidiary or '—')
 
 
 @admin.register(User)

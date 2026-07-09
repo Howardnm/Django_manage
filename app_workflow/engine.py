@@ -124,7 +124,7 @@ class WorkflowEngine:
     def resolve_assignee(self, spiff_task, workflow: BpmnWorkflow,
                          instance) -> tuple:
         """解析任务指派人。
-        优先级: assignee_map > camunda BPMN 属性 > 单人候选自动指派 > 流程发起人
+        优先级: assignee_map > 组织角色自动解析 > camunda BPMN 属性 > 单人候选自动指派 > 流程发起人
         返回 (assigned_to_user, candidate_users_list, candidate_groups_list)
         """
         assigned_to_user = None
@@ -133,6 +133,14 @@ class WorkflowEngine:
 
         st_bpmn_id = getattr(spiff_task.task_spec, 'bpmn_id', None)
 
+        # 0. 提前解析 camunda 扩展属性并缓存（供后续步骤和 sync_tasks 读取 form_step 等字段）
+        camunda_cache = None
+        if st_bpmn_id:
+            camunda_cache = workflow.data.get('_camunda_assignments')
+            if camunda_cache is None:
+                camunda_cache = self.parse_camunda_assignments(self.definition.bpmn_xml)
+                workflow.data['_camunda_assignments'] = camunda_cache
+
         # 1. workflow.data 中的 assignee_map (动态指派, 优先级最高)
         assignee_map = workflow.data.get('assignee_map', {})
         if st_bpmn_id and assignee_map.get(st_bpmn_id):
@@ -140,13 +148,28 @@ class WorkflowEngine:
             if assigned_to_user:
                 return assigned_to_user, [], []
 
-        # 2. BPMN XML camunda 扩展属性 (延迟解析, 缓存到 workflow.data)
+        # 2. 组织角色自动解析 (WorkflowTaskConfig → OrgRoleResolver)
         if st_bpmn_id:
-            camunda_cache = workflow.data.get('_camunda_assignments')
-            if camunda_cache is None:
-                camunda_cache = self.parse_camunda_assignments(self.definition.bpmn_xml)
-                workflow.data['_camunda_assignments'] = camunda_cache
+            from app_workflow.models import WorkflowTaskConfig
+            task_config = WorkflowTaskConfig.objects.filter(
+                task_id=st_bpmn_id, is_active=True,
+            ).first()
 
+            if task_config and task_config.resolution_mode == 'org_role' and task_config.org_role:
+                from app_workflow.resolver import OrgRoleResolver
+                resolver = OrgRoleResolver(initiator=instance.started_by)
+                assigned_to_user = resolver.resolve(task_config.org_role.code)
+                if assigned_to_user:
+                    return assigned_to_user, [], []
+
+            if task_config and task_config.resolution_mode == 'static_group' and task_config.review_group:
+                return None, [], [task_config.review_group.name]
+
+            if task_config and task_config.resolution_mode == 'static_user' and task_config.static_assignee:
+                return task_config.static_assignee, [], []
+
+        # 3. BPMN XML camunda 扩展属性 (使用步骤0已生成的缓存)
+        if st_bpmn_id and camunda_cache:
             camunda_info = camunda_cache.get(st_bpmn_id, {})
             if camunda_info:
                 if camunda_info.get('assignee'):
@@ -163,12 +186,12 @@ class WorkflowEngine:
                         is_active=True,
                     ).values_list('name', flat=True))
 
-        # 3. 单人候选自动指派
+        # 4. 单人候选自动指派
         if not assigned_to_user and len(candidate_users_list) == 1 and not candidate_groups_list:
             assigned_to_user = candidate_users_list[0]
             candidate_users_list = []
 
-        # 4. 最终回退: 流程发起人
+        # 5. 最终回退: 流程发起人
         if not assigned_to_user and not candidate_users_list and not candidate_groups_list:
             assigned_to_user = instance.started_by
 

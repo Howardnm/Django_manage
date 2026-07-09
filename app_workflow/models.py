@@ -297,3 +297,108 @@ class ApprovalHistory(models.Model):
 
     def __str__(self):
         return f"{self.instance.definition.name} - {self.get_action_display()} by {self.approver.username}"
+
+
+class WorkflowTaskConfig(models.Model):
+    """BPMN userTask 节点配置注册表。关联 task_id 与组织角色，实现审批人自动解析。
+
+    所有字段在 Admin 中均可自由编辑。task_id 是用户自主命名的标识符，
+    需要在 BPMN XML 的 userTask id 属性中保持一致。
+
+    完整配置流程：
+        ① 先在 app_user →「组织角色」中定义角色（如：组长、部门经理）
+        ② 再到 app_user →「组织角色指派」中将人员指派到具体组织单元
+        ③ 最后在此处创建 Task 节点配置，关联 task_id 与组织角色
+        ④ 在 BPMN 编辑器中将 userTask 的 id 设为相同的 task_id
+    """
+
+    class ResolutionMode(models.TextChoices):
+        ASSIGNEE_MAP = 'assignee_map', '① 动态指派 — 由代码层在启动流程时传入具体审批人'
+        ORG_ROLE = 'org_role', '② 按组织角色自动查找 — 根据发起人的工作组/部门/子公司自动匹配'
+        STATIC_GROUP = 'static_group', '③ 静态候选组 — 使用固定的审核组，组成员签收任务'
+        STATIC_USER = 'static_user', '④ 静态指派用户 — 指定固定的审批人（与组织架构无关）'
+
+    task_id = models.CharField(
+        "Task ID", max_length=100, unique=True,
+        help_text=(
+            "① 自由命名的节点标识符，用于关联 BPMN XML 中的 userTask。\n"
+            "② #命名建议：使用有意义的英文标识，如 'Task_group_leader_approval'、'Task_dept_manager_review'。\n"
+            "③ 修改此字段后，请同步更新 BPMN XML 中对应 userTask 的 id 属性。\n"
+            "④ #操作指引：先在纸上规划好审批链中每个节点的名称，再逐个在此创建配置。"
+        ))
+    display_name = models.CharField(
+        "显示名称", max_length=100,
+        help_text=(
+            "① 在 Admin 列表和任务详情中展示的可读名称。\n"
+            "② 例如：'组长审批'、'部门经理审批'、'基地总经理审批'。"
+        ))
+    resolution_mode = models.CharField(
+        "审批人解析模式", max_length=20,
+        choices=ResolutionMode.choices, default=ResolutionMode.ORG_ROLE,
+        help_text=(
+            "① 决定引擎如何为这个节点查找审批人。\n"
+            "② ★ 推荐：'按组织角色自动查找' — 零代码，人员变动只需修改组织角色指派。\n"
+            "③ '静态候选组' — 适合固定审核组场景（如法务审核组、财务审核组）。\n"
+            "④ '动态指派' — 适合审批人需要由业务代码动态计算的场景。"
+        ))
+
+    # org_role 模式专属
+    org_role = models.ForeignKey(
+        'app_user.OrgRole', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="绑定的组织角色",
+        help_text=(
+            "① ★ 当解析模式为「按组织角色自动查找」时必填。\n"
+            "② 选择该节点对应的组织角色（如：组长、部门经理）。\n"
+            "③ 引擎运行时会根据发起人的组织归属，自动查找该角色在对应层级中的负责人。\n"
+            "④ #操作指引：先在 app_user →「组织角色」中创建角色，再回到此处选择。"
+        ))
+
+    # static_group 模式专属
+    review_group = models.ForeignKey(
+        'app_user.ReviewGroup', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="候选审核组",
+        help_text=(
+            "① 当解析模式为「静态候选组」时必填。\n"
+            "② 选择固定的审核组。该组成员将收到候选任务，需要主动签收。\n"
+            "③ #操作指引：先在 app_user →「[审批] 审核组」中创建审核组并添加成员。"
+        ))
+
+    # static_user 模式专属
+    static_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="固定审批人",
+        help_text=(
+            "① 当解析模式为「静态指派用户」时必填。\n"
+            "② 选择一个固定用户作为该节点的审批人，与发起人的组织归属无关。\n"
+            "③ #适用场景：某个审批节点永远由同一个人处理（如总经理最终审批）。\n"
+            "④ #操作指引：只有在审批人绝对固定、不随组织架构变化时才使用此模式。"
+        ))
+
+    # 关联的工作流定义
+    workflow_definitions = models.ManyToManyField(
+        'WorkflowDefinition', blank=True, verbose_name="所属流程定义",
+        help_text=(
+            "① 可选。关联此 task_id 被哪些流程定义使用。\n"
+            "② 用于在 Admin 中快速查看某个流程包含哪些审批节点。\n"
+            "③ 不填不影响引擎运行（引擎只按 task_id 精确匹配）。"
+        ))
+
+    description = models.TextField(
+        "说明", blank=True,
+        help_text="可选。详细描述该节点的审批职责、审批要点或注意事项。")
+    is_active = models.BooleanField(
+        "启用", default=True,
+        help_text=(
+            "① 取消勾选后，该配置将不再生效，引擎会跳过此模式回退到 BPMN 属性解析。\n"
+            "② 用于临时禁用某个节点的组织角色配置，而非直接删除。"
+        ))
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
+
+    class Meta:
+        verbose_name = "Task 节点配置"
+        verbose_name_plural = "Task 节点配置"
+        ordering = ['task_id']
+
+    def __str__(self):
+        return f"{self.task_id} — {self.display_name}"

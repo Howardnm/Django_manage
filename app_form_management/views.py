@@ -373,6 +373,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
         can_edit_step = False
         editable_step_label = ''
         active_step_index = 0
+        current_task_form_step = None
         is_workflow_completed = False
 
         if submission.workflow_instance_id:
@@ -387,6 +388,19 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             }
             is_workflow_completed = wi.status == 'COMPLETED'
 
+            # ── 计算当前激活步骤（不限用户，只看流程进度）──
+            if template.is_multi_step and not is_workflow_completed:
+                # 取所有待处理任务中最小的 form_step 作为当前激活步骤
+                pending_step_task = WorkflowTask.objects.filter(
+                    instance=wi, status='PENDING', form_step__isnull=False,
+                ).order_by('form_step').first()
+                if pending_step_task:
+                    active_step_index = next(
+                        (i for i, g in enumerate(template.step_groups)
+                         if g['step'] == pending_step_task.form_step), 0
+                    )
+
+            # ── 当前用户的审批任务（控制编辑权限）──
             current_task = WorkflowTask.objects.filter(
                 instance=wi, assigned_to=request.user, status='PENDING'
             ).first()
@@ -398,13 +412,14 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                 if current_task.form_step and template.is_multi_step:
                     can_edit_step = True
                     form_step = current_task.form_step
+                    current_task_form_step = form_step
                     for g in template.step_groups:
                         if g['step'] == form_step:
                             editable_step_label = g['label']
                             break
                     if not editable_step_label:
                         editable_step_label = f'第{form_step}步'
-                    # 计算步骤进度高亮索引
+                    # 用当前用户的任务步骤更新进度（更精确）
                     active_step_index = next(
                         (i for i, g in enumerate(template.step_groups) if g['step'] == form_step), 0
                     )
@@ -427,7 +442,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'editable_step_label': editable_step_label,
             'active_step_index': active_step_index,
             'is_workflow_completed': is_workflow_completed,
-            'current_task_form_step': current_task.form_step if (current_task and current_task.form_step) else None,
+            'current_task_form_step': current_task_form_step,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),

@@ -1,6 +1,6 @@
-"""app_user 数据模型。定义 User、Department、Subsidiary、WorkGroup、ReviewGroup、PermissionGroup。
+"""app_user 数据模型。定义 User、Department、Subsidiary、OrgRole、OrgRoleAssignment、WorkGroup、ReviewGroup、PermissionGroup。
 
-导出: PermissionGroup, Subsidiary, Department, ReviewGroup, WorkGroup, User。"""
+导出: PermissionGroup, Subsidiary, Department, OrgRole, OrgRoleAssignment, ReviewGroup, WorkGroup, User。"""
 
 import uuid
 from django.db import models
@@ -50,6 +50,147 @@ class Department(models.Model):
     class Meta:
         verbose_name = "[L4] 部门"
         verbose_name_plural = "[L4] 部门"
+
+
+class OrgRole(models.Model):
+    """组织角色定义。定义"组长"、"部门经理"、"基地总经理"等角色及其查找作用域。
+    BPMN 工作流通过 WorkflowTaskConfig 关联到此处定义的角色编码。"""
+
+    class Scope(models.TextChoices):
+        WORKGROUP = 'workgroup', '工作组级 — 在发起人的工作组中查找该角色'
+        DEPARTMENT = 'department', '部门级 — 在发起人的部门中查找该角色'
+        SUBSIDIARY = 'subsidiary', '子公司/基地级 — 在发起人的子公司中查找该角色'
+
+    code = models.CharField(
+        "角色编码", max_length=50, unique=True,
+        help_text=(
+            "① 全局唯一标识符，建议用小写英文下划线命名。"
+            "② 例如：'group_leader'（组长）、'dept_manager'（部门经理）、'subsidiary_gm'（基地总经理）。"
+            "③ 此编码将在 WorkflowTaskConfig 中被引用，请保持稳定不变。"
+        ))
+    name = models.CharField(
+        "角色名称", max_length=50,
+        help_text=(
+            "① 显示用中文名称。"
+            "② 例如：'组长'、'部门经理'、'基地总经理'。"
+            "③ 此名称会出现在 Admin 下拉框和列表页中。"
+        ))
+    scope = models.CharField(
+        "查找作用域", max_length=20, choices=Scope.choices,
+        help_text=(
+            "① 决定引擎在哪个组织层级查找该角色的负责人。\n"
+            "② 工作组级：在工作流发起人所属的工作组中查找。\n"
+            "③ 部门级：在发起人所属的部门中查找。\n"
+            "④ 子公司级：在发起人所属的子公司/基地中查找。\n"
+            "⑤ #操作指引：创建角色时，先想清楚这个角色的审批范围是什么层级。"
+        ))
+    allow_escalation = models.BooleanField(
+        "允许逐级向上回退", default=True,
+        help_text=(
+            "① 开启后，如果在当前作用域找不到指派人，引擎会自动向上一级查找。\n"
+            "② 回退链路：工作组 → 部门 → 子公司。\n"
+            "③ 例如：「组长」scope=工作组级，某工作组未指派组长时 → 自动在部门级查找 → 仍未找到则在子公司级查找。\n"
+            "④ 关闭后，找不到即返回空，走后续的 BPMN 属性 / 发起人兜底逻辑。\n"
+            "⑤ #建议：一般保持开启，避免因某个组织单元漏配而导致审批中断。"
+        ))
+    description = models.TextField(
+        "描述", blank=True,
+        help_text="可选。补充说明该角色的审批职责和适用范围。")
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "组织角色"
+        verbose_name_plural = "组织角色"
+        ordering = ['scope', 'name']
+
+    def __str__(self):
+        """返回 '[作用域] 角色名称' 格式。"""
+        return f"[{self.get_scope_display()}] {self.name}"
+
+
+class OrgRoleAssignment(models.Model):
+    """用户在特定组织单元中的角色指派。
+    例如: 张三 在 配方组 担任 组长；李四 在 研发中心 担任 部门经理。"""
+
+    role = models.ForeignKey(
+        OrgRole, on_delete=models.CASCADE, verbose_name="角色",
+        help_text=(
+            "① 选择要指派的组织角色。\n"
+            "② 所选角色的「查找作用域」决定了你需要填写下方哪个组织单元字段。\n"
+            "③ #操作指引：先在上方「组织角色」中定义好角色，再来这里做人员指派。"
+        ))
+    user = models.ForeignKey(
+        'User', on_delete=models.CASCADE,
+        related_name='org_role_assignments', verbose_name="用户",
+        help_text="被指派为该角色负责人的用户。")
+
+    # 三级作用域 — 根据 role.scope 决定填写哪个字段
+    subsidiary = models.ForeignKey(
+        'Subsidiary', on_delete=models.CASCADE,
+        null=True, blank=True, verbose_name="所属子公司",
+        help_text=(
+            "① 仅当角色的「查找作用域」为「子公司级」时需要填写。\n"
+            "② 例如：角色=基地总经理，此处选择「上海总部」。\n"
+            "③ #操作指引：先在下方「子公司/基地」管理中创建子公司记录。"
+        ))
+    department = models.ForeignKey(
+        'Department', on_delete=models.CASCADE,
+        null=True, blank=True, verbose_name="所属部门",
+        help_text=(
+            "① 仅当角色的「查找作用域」为「部门级」时需要填写。\n"
+            "② 例如：角色=部门经理，此处选择「研发中心」。\n"
+            "③ #操作指引：先在下方「[L4] 部门」管理中创建部门记录。"
+        ))
+    workgroup = models.ForeignKey(
+        'WorkGroup', on_delete=models.CASCADE,
+        null=True, blank=True, verbose_name="所属工作组",
+        help_text=(
+            "① 仅当角色的「查找作用域」为「工作组级」时需要填写。\n"
+            "② 例如：角色=组长，此处选择「配方组」。\n"
+            "③ #操作指引：先在下方「[L5] 工作组」管理中创建工作组记录。"
+        ))
+
+    is_primary = models.BooleanField(
+        "主负责人", default=True,
+        help_text=(
+            "① 同一角色在同一组织单元可以有多个指派（如正副职）。\n"
+            "② 勾选「主负责人」的用户会优先被引擎匹配。\n"
+            "③ 如果该角色只需要一个人，保持勾选即可。"
+        ))
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "组织角色指派"
+        verbose_name_plural = "组织角色指派"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['role', 'user', 'subsidiary'],
+                name='unique_role_user_subsidiary',
+                condition=models.Q(subsidiary__isnull=False)),
+            models.UniqueConstraint(
+                fields=['role', 'user', 'department'],
+                name='unique_role_user_department',
+                condition=models.Q(department__isnull=False)),
+            models.UniqueConstraint(
+                fields=['role', 'user', 'workgroup'],
+                name='unique_role_user_workgroup',
+                condition=models.Q(workgroup__isnull=False)),
+        ]
+
+    def clean(self):
+        """校验：填写的组织单元层级必须匹配 role.scope。"""
+        from django.core.exceptions import ValidationError
+        if self.role.scope == 'workgroup' and not self.workgroup:
+            raise ValidationError("工作组级角色必须指定 workgroup")
+        if self.role.scope == 'department' and not self.department:
+            raise ValidationError("部门级角色必须指定 department")
+        if self.role.scope == 'subsidiary' and not self.subsidiary:
+            raise ValidationError("子公司级角色必须指定 subsidiary")
+
+    def __str__(self):
+        """返回 '组织单元 → 角色: 用户名' 格式。"""
+        unit = self.workgroup or self.department or self.subsidiary
+        return f"{unit} → {self.role.name}: {self.user.username}"
 
 
 class ReviewGroup(models.Model):
