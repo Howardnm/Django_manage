@@ -41,7 +41,8 @@ FROM python:3.13-slim-bookworm
 # 1. 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH"
+    PATH="/opt/venv/bin:$PATH" \
+    UVICORN_LIFESPAN=off
 
 # 2. 设置工作目录
 WORKDIR /app
