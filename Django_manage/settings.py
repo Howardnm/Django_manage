@@ -7,28 +7,43 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+
+# ==============================================================================
+# 核心安全配置
+# ==============================================================================
+
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-)e+q_t^)%a1(&zrgpj=hgz6aeuj-(4edq4tgod(*s8e^(qwvcv'
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
-
 # 允许所有ip访问
 ALLOWED_HOSTS = ['*']
 
-# 跨域受信域名
+
+# ==============================================================================
+# CSRF / 跨域受信域名
+# ==============================================================================
+
+# 默认值始终生效，环境变量 CSRF_TRUSTED_ORIGINS 逗号分隔追加
+# 示例：export CSRF_TRUSTED_ORIGINS="http://192.168.5.10:8080,https://your-domain.com"
 CSRF_TRUSTED_ORIGINS = [
-    'http://192.168.123.18:8080',  # 你的域名（http协议）
-    'https://www.yourdomain.com',  # 若开启了HTTPS，必须添加对应https域名
-    'http://你的服务器公网IP',  # 若用IP访问，也需添加
+    'http://192.168.123.18:8080',
+    'https://www.yourdomain.com', # 若开启了HTTPS，必须添加对应https域名
 ]
 
-# Secure settings for HTTPS
+_csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+if _csrf_env:
+    CSRF_TRUSTED_ORIGINS.extend(origin.strip() for origin in _csrf_env.split(',') if origin.strip())
+
+# HTTPS 反向代理配置
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
-# Application definition
+
+# ==============================================================================
+# Application 注册 & 中间件
+# ==============================================================================
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -42,7 +57,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'django_filters',
     'django_cleanup.apps.CleanupConfig',  # 删除数据库记录时，自动删除物理文件。
-    'axes', 
+    'axes',
     'app_attachment.apps.AppAttachmentConfig',  # 附件管理（须在业务app之前）
     'app_panel.apps.AppPanelConfig',
     'app_project.apps.AppProjectConfig',
@@ -94,9 +109,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                # 新增：通知上下文处理器
                 'app_notification.context_processors.notifications',
-                # 核心：侧边栏权限处理器 (新路径)
                 'app_user.context_processors.menu_processor.sidebar_menu_permissions',
             ],
         },
@@ -105,7 +118,11 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Django_manage.wsgi.application'
 
-# Database
+
+# ==============================================================================
+# 数据库配置
+# ==============================================================================
+
 # DATABASES = {
 #     'default': {
 #         'ENGINE': 'django.db.backends.sqlite3',
@@ -117,13 +134,14 @@ WSGI_APPLICATION = 'Django_manage.wsgi.application'
 #     "default": {
 #         "ENGINE": "django.db.backends.mysql",
 #         "NAME": "django_manage",
-#         "USER": "root",  # django_manage
-#         "PASSWORD": "123456",  # 6THtw4rFdHpmZ3Ze
+#         "USER": "root",
+#         "PASSWORD": "123456",
 #         "HOST": "127.0.0.1",
 #         "PORT": "3306",
 #     }
 # }
 
+# 默认 PostgreSQL，通过环境变量可覆盖为 MySQL
 DATABASES = {
     'default': {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
@@ -135,7 +153,11 @@ DATABASES = {
     }
 }
 
-# 自定义用户模型
+
+# ==============================================================================
+# 用户认证
+# ==============================================================================
+
 AUTH_USER_MODEL = 'app_user.User'
 
 # Password validation
@@ -146,73 +168,101 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-# Internationalization
-LANGUAGE_CODE = 'zh-hans'
-TIME_ZONE = 'Asia/Shanghai'
-USE_I18N = True
-USE_TZ = True
-
-# Static files
-STATIC_URL = 'static/'
-# MEDIA_URL = 'images/'
-
-# STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成staticfiles文件夹，把各个app下的静态文件收集到这个目录下。
-# 1.在Django中setting.py文件中加入
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
-
-# 【新增配置】登录/注销后的跳转地址
-LOGIN_URL = 'login'  # 没登录时自动跳到这里
-LOGIN_REDIRECT_URL = 'panel_home'  # 登录成功后跳到这里
-LOGOUT_REDIRECT_URL = 'login'  # 注销后跳到这里
-
-# 当用户已登录但没有所需权限时，PermissionRequiredMixin 会重定向到此 URL
-PERM_DENIED_URL = '/permission-denied/'
-ADMIN_URL = '/admin'
-
-# 这是debug_toolbar的配置
-INTERNAL_IPS = [
-    "127.0.0.1",
-]
-
-
-# 注册页面邀请码（当注释掉邀请码时，自动关闭注册入口）
-# REGISTER_INVITE_CODE = '888888'
-
-# 自定义认证后端 (支持邮箱登录)
 AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend', # django-axes 认证后端
     # 'app_user.backends.EmailBackend', # 移除邮箱登录
     'django.contrib.auth.backends.ModelBackend',
 ]
 
+# 注册页面邀请码（当注释掉邀请码时，自动关闭注册入口）
+REGISTER_INVITE_CODE = '888888'
+
+# ==============================================================================
+# 国际化 & 时区
+# ==============================================================================
+
+LANGUAGE_CODE = 'zh-hans'
+TIME_ZONE = 'Asia/Shanghai'
+USE_I18N = True
+USE_TZ = True
+
+
+# ==============================================================================
+# 静态文件 & 媒体文件
+# ==============================================================================
+
+STATIC_URL = 'static/'
+
+# STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成staticfiles文件夹，把各个app下的静态文件收集到这个目录下。
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = (os.path.join(BASE_DIR, 'static'),)
+
+
+# ==============================================================================
+# 登录 / 权限 / URL 跳转
+# ==============================================================================
+
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'panel_home'
+LOGOUT_REDIRECT_URL = 'login'
+PERM_DENIED_URL = '/permission-denied/'
+ADMIN_URL = '/admin'
+
+
+# ==============================================================================
+# Debug Toolbar
+# ==============================================================================
+
+INTERNAL_IPS = [
+    "127.0.0.1",
+]
+
+
+# ==============================================================================
+# 邮件配置
+# ==============================================================================
+
 # 邮件配置 (使用163邮箱作为示例，请替换为实际配置)
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.163.com'  # SMTP服务器地址
-EMAIL_PORT = 994  # SMTP端口
-EMAIL_USE_SSL = True  # 使用SSL
-EMAIL_HOST_USER = 'bueess@163.com'  # 发件人邮箱
-EMAIL_HOST_PASSWORD = 'DXHZGGWTFIIQAHCV'  # 邮箱授权码 (非登录密码)
+EMAIL_HOST = 'smtp.163.com'
+EMAIL_PORT = 994
+EMAIL_USE_SSL = True
+EMAIL_HOST_USER = 'bueess@163.com'
+EMAIL_HOST_PASSWORD = 'DXHZGGWTFIIQAHCV'
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # 默认发件人
 
-# django-axes 配置
+
+# ==============================================================================
+# django-axes（防暴力破解）
+# ==============================================================================
+
 AXES_FAILURE_LIMIT = 5  # 允许失败的次数
-AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），0.0833小时约等于5分钟
+AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），约5分钟
 AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
 
+
+# ==============================================================================
 # Session 配置
+# ==============================================================================
+
 SESSION_COOKIE_AGE = 36000  # 保持登录10小时 (10 * 60 * 60)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登录 (除非勾选"保持登录")
 
 
-# --- REST FRAMEWORK ---
+# ==============================================================================
+# Django REST Framework
+# ==============================================================================
+
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
 }
 
-# --- 内部集成安全性与同步配置 ---
+
+# ==============================================================================
+# 内部集成 — API Token & Webhook
+# ==============================================================================
 # 通信安全 Token (必须与主系统 INTERNAL_API_TOKEN 保持一致)
 INTERNAL_API_TOKEN = 'catalog-portal-secure-token-2024'
 # Webhook 校验密钥 (必须与主系统 WEBHOOK_SECRET_KEY 保持一致)
@@ -221,7 +271,11 @@ CATALOG_WEBHOOK_URL = 'http://127.0.0.1:8001/catalog/api/webhook/material/'
 # 主系统 API 的基础地址 (结尾需带斜杠)
 REMOTE_API_BASE_URL = 'http://127.0.0.1:8000/api/material/'
 
-# --- 日志配置 ---
+
+# ==============================================================================
+# 日志配置
+# ==============================================================================
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -247,9 +301,11 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 os.makedirs(LOG_DIR, exist_ok=True)
 
+
 # ==============================================================================
 # SAP RFC 服务配置
 # ==============================================================================
+
 SAP_SERVICES_CONFIG = {
     # SAP NW RFC SDK lib 目录的绝对路径（必须存在）
     # Linux/Docker 通过环境变量 SAP_LIB_PATH 覆盖，Windows 使用本地路径
@@ -274,7 +330,7 @@ SAP_SERVICES_CONFIG = {
     'retry_delay': 1.0,       # 重试初始间隔（秒），每次重试翻倍
 }
 
-# SAP 日志配置
+# SAP 日志
 LOGGING['loggers']['sap'] = {
     'handlers': ['file', 'console'],
     'level': 'INFO',

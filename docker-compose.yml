@@ -29,6 +29,7 @@ services:
         condition: service_healthy
     environment:
       - SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
       - MCP_API_KEY=${MCP_API_KEY:-}
       - DB_ENGINE=django.db.backends.postgresql
       - DB_HOST=db
