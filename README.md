@@ -79,12 +79,32 @@ python manage.py runserver
 
 ### 方式一：Docker
 
+**单容器启动**：
+
 ```bash
 docker build -t django-manage .
 docker run -d --name django-manage -p 8000:8000 \
   -e SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib \
   django-manage
 ```
+
+**docker-compose 一键启动（推荐）**：
+
+```bash
+cp .env.example .env
+# 编辑 .env 设置 DB_PASSWORD 和 MCP_API_KEY
+docker compose up -d
+```
+
+docker-compose 包含 4 个服务：
+
+| 服务 | 镜像 | 说明 |
+|---|---|---|
+| `db` | `pgvector/pgvector:pg16` | PostgreSQL 16 + pgvector 向量扩展 |
+| `web` | 本地构建（Dockerfile） | Django ASGI (gunicorn + uvicorn) |
+| `nginx` | `nginx:1.27-alpine` | 反向代理 + 静态文件 + MCP SSE |
+
+启动时自动执行：等待数据库就绪 → migrate → collectstatic → 启动服务。
 
 **镜像分层**：Builder 阶段编译 pyrfc + pip install → Final 阶段仅复制 venv + .so 库 + 代码，无编译残留。
 
