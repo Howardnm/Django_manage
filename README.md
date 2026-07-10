@@ -79,34 +79,43 @@ python manage.py runserver
 
 ### 方式一：Docker
 
-**单容器启动**：
+项目镜像由 GitHub Actions 自动构建并推送至 Docker Hub，可直接拉取使用，也可本地构建。
+
+**拉取预构建镜像**（无需本地编译）：
 
 ```bash
-docker build -t django-manage .
+docker pull {DOCKERHUB_USERNAME}/django-manage:latest
 docker run -d --name django-manage -p 8000:8000 \
   -e SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib \
-  django-manage
+  {DOCKERHUB_USERNAME}/django-manage:latest
 ```
 
-**docker-compose 一键启动（推荐）**：
+**docker-compose 部署**：
 
 ```bash
 cp .env.example .env
-# 编辑 .env 设置 DB_PASSWORD 和 MCP_API_KEY
+# 编辑 .env 设置 DB_PASSWORD、MCP_API_KEY 和 DOCKERHUB_USERNAME
 docker compose up -d
 ```
-
-docker-compose 包含 4 个服务：
 
 | 服务 | 镜像 | 说明 |
 |---|---|---|
 | `db` | `pgvector/pgvector:pg16` | PostgreSQL 16 + pgvector 向量扩展 |
-| `web` | 本地构建（Dockerfile） | Django ASGI (gunicorn + uvicorn) |
+| `web` | `${DOCKERHUB_USERNAME}/django-manage:latest` | Django ASGI（预构建镜像） |
 | `nginx` | `nginx:1.27-alpine` | 反向代理 + 静态文件 + MCP SSE |
+
+> 未配置 `DOCKERHUB_USERNAME` 时 docker-compose 会回退到本地构建。
 
 启动时自动执行：等待数据库就绪 → migrate → collectstatic → 启动服务。
 
-**镜像分层**：Builder 阶段编译 pyrfc + pip install → Final 阶段仅复制 venv + .so 库 + 代码，无编译残留。
+**本地构建**（开发/自定义镜像）：
+
+```bash
+docker build -t django-manage .
+docker run -d --name django-manage -p 8000:8000 django-manage
+```
+
+镜像分层：Builder 阶段编译 pyrfc + pip install → Final 阶段仅复制 venv + .so 库 + 代码，无编译残留。
 
 ### 方式二：源码部署（Linux）
 

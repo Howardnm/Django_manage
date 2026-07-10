@@ -20,6 +20,7 @@ services:
 
   # ── Django 应用 ──
   web:
+    image: ${DOCKERHUB_USERNAME:-django-manage}/django-manage:latest
     build: .
     container_name: django-web
     restart: unless-stopped
