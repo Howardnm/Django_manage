@@ -64,13 +64,13 @@ COPY --from=builder --chown=django-user:django /opt/venv /opt/venv
 # 5.5 复制 SAP NW RFC SDK 运行时库 (pyrfc 运行时依赖)
 COPY --from=builder --chown=django-user:django /opt/sap_nwrfcsdk/lib /opt/sap_nwrfcsdk/lib
 ENV SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib \
-    LD_LIBRARY_PATH=/opt/sap_nwrfcsdk/lib:$LD_LIBRARY_PATH
+    LD_LIBRARY_PATH=/opt/sap_nwrfcsdk/lib
 
 # 6. 复制项目代码 (使用 --chown 避免双倍体积)
 COPY --chown=django-user:django . .
 
-# 7. 准备静态文件目录 (避免权限问题)
-RUN mkdir -p staticfiles && chown django-user:django staticfiles
+# 7. 准备运行时需要的可写目录 (静态文件 + 日志)
+RUN mkdir -p staticfiles logs && chown django-user:django staticfiles logs
 
 # 切换用户
 USER django-user
@@ -82,5 +82,10 @@ RUN python manage.py collectstatic --noinput
 # 暴露端口
 EXPOSE 8000
 
-# 启动命令
-CMD ["gunicorn", "Django_manage.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2"]
+# 启动命令 (ASGI 模式：gunicorn + uvicorn worker)
+CMD ["gunicorn", "Django_manage.asgi:application", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "3", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--timeout", "120", \
+     "--max-requests", "1000"]
