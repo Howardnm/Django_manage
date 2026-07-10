@@ -36,6 +36,9 @@ services:
       - DB_NAME=django_manage
       - DB_USER=postgres
       - DB_PASSWORD=${DB_PASSWORD:-django_manage_secret}
+      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
+      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
+      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-admin123}
     volumes:
       - staticfiles:/app/staticfiles
       - logs:/app/logs
