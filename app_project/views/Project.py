@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 
-from app_project.forms import ProjectForm
+from app_project.forms import ProjectForm, ProjectConfigForm
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectConfig, ProjectNode
 from app_project.utils.calculate_project_gantt import get_project_gantt_data
@@ -168,33 +168,19 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 # ==========================================
 # 4. 项目全局配置（仅超级管理员）
 # ==========================================
-class ProjectConfigView(ProjectAccessMixin, View):
+class ProjectConfigView(ProjectAccessMixin, UpdateView):
     """项目全局配置：设置默认审批流程等。仅超级管理员可访问。"""
+    model = ProjectConfig
+    form_class = ProjectConfigForm
+    template_name = 'apps/app_project/config.html'
     permission_required = 'app_project.change_projectconfig'
 
-    def get(self, request):
-        if not request.user.is_superuser:
-            messages.error(request, "您的账号权限不足，无法访问该页面。")
-            return redirect(getattr(settings, 'PERM_DENIED_URL', 'panel_home'))
+    def get_object(self, queryset=None):
+        return ProjectConfig.get()
 
-        from app_workflow.models import WorkflowDefinition
-        config = ProjectConfig.get()
-        workflows = WorkflowDefinition.objects.filter(is_active=True).order_by('name')
-        return render(request, 'apps/app_project/config.html', {
-            'config': config,
-            'workflows': workflows,
-        })
+    def form_valid(self, form):
+        messages.success(self.request, '项目配置已保存')
+        return super().form_valid(form)
 
-    def post(self, request):
-        if not request.user.is_superuser:
-            return JsonResponse({'status': 'error', 'message': '仅超级管理员可修改项目配置。'}, status=403)
-
-        try:
-            data = json.loads(request.body)
-        except json.JSONDecodeError:
-            return JsonResponse({'status': 'error', 'message': '无效的JSON数据。'}, status=400)
-
-        config = ProjectConfig.get()
-        config.default_approval_workflow_id = data.get('workflow_id') or None
-        config.save()
-        return JsonResponse({'status': 'success'})
+    def get_success_url(self):
+        return reverse('project_config')

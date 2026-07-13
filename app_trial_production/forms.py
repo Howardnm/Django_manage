@@ -67,7 +67,6 @@ class TrialConfigForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             'workflow_definition': forms.Select(attrs={
                 'class': 'form-select',
-                'placeholder': '选择审批流程定义',
             }),
         }
 

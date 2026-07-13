@@ -1,5 +1,5 @@
 from django import forms
-from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember
+from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember, ProjectConfig
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -130,4 +130,18 @@ class NodeScoreRuleForm(TablerFormMixin, forms.ModelForm):
         fields = ['name', 'score_value', 'rule_type', 'trigger_stage', 'trigger_status', 'is_multiple_rounds', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+# ---- 全局配置 ----
+
+class ProjectConfigForm(TablerFormMixin, forms.ModelForm):
+    """项目全局配置表单"""
+    class Meta:
+        model = ProjectConfig
+        fields = ['default_approval_workflow']
+        widgets = {
+            'default_approval_workflow': forms.Select(attrs={
+                'class': 'form-select',
+            }),
         }
