@@ -71,7 +71,7 @@ def run(ctx: FakeContext) -> None:
             version=1,
             creator=pick_one(ctx.rnd_users),
             cost_predicted=rand_decimal(10, 50, 2),
-            cost_actual=rand_decimal(12, 55, 2) if random.random() < 0.4 else None,
+            unit_cost=rand_decimal(12, 55, 2) if random.random() < 0.4 else None,
             material_color_name=random.choice(color_names),
             pantone_code=random.choice(pantone_codes),
             rgb_value=random.choice(rgb_values),

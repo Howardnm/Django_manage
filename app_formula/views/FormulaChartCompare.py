@@ -37,7 +37,10 @@ class FormulaChartCompareView(FormulaAccessMixin, TemplateView):
         )
         context['test_configs'] = test_configs
         
+        from app_raw_material.models import PriceAvgConfig
+
         context['page_title'] = "配方图表对比分析"
+        context['avg_months'] = PriceAvgConfig.get().months
         return context
 
 

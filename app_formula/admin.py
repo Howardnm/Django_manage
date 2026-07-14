@@ -18,7 +18,7 @@ class FormulaTestResultInline(admin.TabularInline):
 # 3. 实验配方主表 Admin
 @admin.register(LabFormula)
 class LabFormulaAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'material_type', 'creator', 'cost_predicted', 'cost_actual', 'created_at')
+    list_display = ('code', 'name', 'material_type', 'creator', 'cost_predicted', 'unit_cost', 'created_at')
     list_filter = ('material_type', 'creator', 'created_at')
     search_fields = ('code', 'name', 'description', 'creator__username')
     readonly_fields = ('code', 'created_at', 'cost_predicted')
@@ -31,8 +31,9 @@ class LabFormulaAdmin(admin.ModelAdmin):
         ('关联信息', {
             'fields': ('research_projects',)
         }),
-        ('成本信息', {
-            'fields': ('cost_predicted', 'cost_actual')
+        ('价格成本', {
+            'fields': ('cost_predicted', 'unit_cost'),
+            'description': 'cost_predicted=最新单价加权, unit_cost=近N月均价加权'
         }),
     )
     

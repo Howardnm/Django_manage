@@ -91,7 +91,7 @@
             </div>
             
             <!-- 测试结果 -->
-            <div class="card">
+            <div class="card mb-3">
                 <div class="card-header bg-purple-lt">
                     <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                 </div>
@@ -139,6 +139,16 @@
                     </table>
                 </div>
             </div>
+
+            <!-- 配方价格走势 -->
+            {% if has_trend %}
+            <div class="card">
+                <div class="card-header bg-green-lt">
+                    <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>配方价格走势</h3>
+                </div>
+                <div id="formula-price-trend-chart" style="height: 400px; width: 100%;"></div>
+            </div>
+            {% endif %}
         </div>
 
         <!-- 右侧：基础信息 -->
@@ -218,9 +228,9 @@
                         <span class="fw-bold text-orange">¥{{ formula.cost_predicted }}</span>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <span>实际成本</span>
+                        <span>近{{ avg_months }}月均价</span>
                         <span class="fw-bold text-green">
-                            {% if formula.cost_actual %}¥{{ formula.cost_actual }}{% else %}-{% endif %}
+                            {% if formula.unit_cost %}¥{{ formula.unit_cost }}{% else %}-{% endif %}
                         </span>
                     </div>
                 </div>
@@ -327,4 +337,65 @@
             });
         }
     </script>
+{% endblock %}
+
+{% block extra_js %}
+{% load static %}
+{% if has_trend %}
+<script src="{% static 'highcharts/core-12.5.0/highstock.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var trendData = {{ price_trend_json|safe }};
+
+    Highcharts.stockChart('formula-price-trend-chart', {
+
+        rangeSelector: {
+            selected: 4,
+            buttons: [{
+                type: 'month',
+                count: 1,
+                text: '1月'
+            }, {
+                type: 'month',
+                count: 3,
+                text: '3月'
+            }, {
+                type: 'month',
+                count: 6,
+                text: '6月'
+            }, {
+                type: 'year',
+                count: 1,
+                text: '1年'
+            }, {
+                type: 'all',
+                text: '全部'
+            }]
+        },
+
+        title: {
+            text: null
+        },
+
+        plotOptions: {
+            spline: {
+                dataLabels: {
+                    enabled: true
+                },
+            }
+        },
+
+        series: [{
+            name: '配方单位成本',
+            data: trendData,
+            type: 'spline',
+            tooltip: {
+                valueDecimals: 2,
+                pointFormat: '<b>¥{point.y:.2f}/kg</b>'
+            }
+        }],
+    });
+});
+</script>
+{% endif %}
 {% endblock %}

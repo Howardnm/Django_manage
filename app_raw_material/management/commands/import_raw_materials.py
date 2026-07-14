@@ -2,7 +2,7 @@ import os
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.db import transaction
-from app_raw_material.models import RawMaterial, Supplier, RawMaterialType
+from app_raw_material.models import RawMaterial, RawMaterialPriceRecord, Supplier, RawMaterialType
 
 try:
     import openpyxl
@@ -43,7 +43,7 @@ class Command(BaseCommand):
                     continue
 
                 try:
-                    purchase_date, supplier_name, warehouse_code, name, model_name_raw, category_name, _, cost_price = row
+                    purchase_date, supplier_name, warehouse_code, name, model_name_raw, category_name, _, latest_price = row
                     
                     # --- 数据清洗和验证 ---
                     supplier_name = str(supplier_name).strip() if supplier_name else None
@@ -79,7 +79,7 @@ class Command(BaseCommand):
                         'model_name': model_name,
                         'category': category,
                         'supplier': supplier,
-                        'cost_price': cost_price if cost_price is not None else 0,
+                        '_latest_price': latest_price if latest_price is not None else 0,
                         'purchase_date': purchase_date,
                     }
 
@@ -102,6 +102,18 @@ class Command(BaseCommand):
                         created_count += 1
                     else:
                         updated_count += 1
+
+                    # --- 导入历史价格记录 ---
+                    if latest_price and purchase_date:
+                        try:
+                            RawMaterialPriceRecord.objects.get_or_create(
+                                raw_material=obj,
+                                date=purchase_date,
+                                price=latest_price,
+                                defaults={'source': 'Excel批量导入'}
+                            )
+                        except Exception:
+                            pass  # 价格记录导入失败不影响原材料导入
                         
                 except Exception as e:
                     self.stdout.write(self.style.ERROR(f'  [!] 处理第 {row_idx} 行时出错: {e}'))

@@ -9,7 +9,7 @@ class ProductionOrder(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'DRAFT', '草稿'
         WORKFLOW_RUNNING = 'WORKFLOW_RUNNING', '流程中'
-        ACCEPTED = 'ACCEPTED', '已接单'
+        ACCEPTED = 'ACCEPTED', '已发单'
         EXTRUDING = 'EXTRUDING', '挤出中'
         INJECTION_MOLDING = 'INJECTION_MOLDING', '注塑中'
         TESTING = 'TESTING', '测试中'
@@ -158,7 +158,7 @@ class ProductionOrder(models.Model):
 
     @property
     def can_start_extrusion(self):
-        """已排产（有挤出计划时间）的已接单工单才能开始挤出"""
+        """已排产（有挤出计划时间）的已发单工单才能开始挤出"""
         return self.status == self.Status.ACCEPTED and self.extrusion_scheduled_date is not None
 
     @property
@@ -199,7 +199,7 @@ class ProductionOrder(models.Model):
 
     @property
     def is_extrusion_readonly(self):
-        """挤出日历中是否只读（已接单后才可拖拽排期）"""
+        """挤出日历中是否只读（已发单后才可拖拽排期）"""
         return self.status != self.Status.ACCEPTED
 
     @property

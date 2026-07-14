@@ -406,15 +406,15 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
             if col['type'] == 'formula':
                  pred_cost_row.append(col['obj'].cost_predicted)
             elif col['type'] == 'raw_material':
-                 pred_cost_row.append(col['obj'].cost_price or "-")
+                 pred_cost_row.append(col['obj'].latest_price or "-")
             else:
                  pred_cost_row.append("-")
         ws.append(pred_cost_row)
         
-        act_cost_row = ["实际成本", "-", "元/kg"]
+        act_cost_row = ["近N月均价", "-", "元/kg"]
         for col in columns:
             if col['type'] == 'formula':
-                 act_cost_row.append(col['obj'].cost_actual or "-")
+                 act_cost_row.append(col['obj'].unit_cost or "-")
             else:
                  act_cost_row.append("-")
         ws.append(act_cost_row)

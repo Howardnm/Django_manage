@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+import calendar
 from decimal import Decimal
 from django.utils import timezone
 from app_material.models import MaterialType, TestConfig, MaterialLibrary
@@ -37,8 +38,32 @@ class LabFormula(models.Model):
     version = models.PositiveIntegerField("版本号", default=1, help_text="同一项目+节点的配方版本序号")
 
     # 【新增】成本字段
-    cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料成本自动计算")
-    cost_actual = models.DecimalField("BOM实际成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True, help_text="暂时废弃该字段，以后等原材料介入历史价格后变成动态均价")
+    cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料最新单价自动计算")
+    _unit_cost = models.DecimalField(
+        "近N月均价成本 (元/kg)", max_digits=10, decimal_places=2,
+        null=True, blank=True,
+        help_text="根据原材料近N月均价计算"
+    )
+
+    @property
+    def unit_cost(self):
+        """近N月均价成本 — 用原材料的 avg_price 计算加权平均"""
+        if self.pk is None:
+            return self._unit_cost
+        total_amount = Decimal('0.00')
+        total_parts = Decimal('0.00')
+        for line in self.bom_lines.select_related('raw_material').all():
+            total_parts += line.percentage
+            price = line.raw_material.avg_price or line.raw_material.latest_price
+            if price:
+                total_amount += price * line.percentage
+        if total_parts > 0:
+            return (total_amount / total_parts).quantize(Decimal('0.01'))
+        return self._unit_cost
+
+    @unit_cost.setter
+    def unit_cost(self, value):
+        self._unit_cost = value
 
     # 材料颜色信息
     material_color_name = models.CharField("材料颜色名称", max_length=100, blank=True, help_text="例如：哑光黑、亮白、透明蓝")
@@ -102,8 +127,8 @@ class LabFormula(models.Model):
             total_parts += line.percentage
 
             # 如果原材料有成本价，则累加金额
-            if line.raw_material.cost_price:
-                amount = line.raw_material.cost_price * line.percentage
+            if line.raw_material.latest_price:
+                amount = line.raw_material.latest_price * line.percentage
                 total_amount += amount
 
         # 计算加权平均单价
@@ -116,6 +141,60 @@ class LabFormula(models.Model):
         self.cost_predicted = avg_cost
         self.save(update_fields=['cost_predicted'])
         return avg_cost
+
+    def get_price_trend(self):
+        """
+        构建配方单位成本时间线（LOCF 算法）。
+
+        返回: [[timestamp_ms, unit_cost], ...]  按日期升序排列
+        任一原材料在某个日期前无价格记录 → 该日期不输出。
+        """
+        bom_lines = list(self.bom_lines.select_related('raw_material').all())
+        if not bom_lines:
+            return []
+
+        # 1. 收集所有原材料的价格记录日期
+        all_dates = set()
+        for line in bom_lines:
+            for record in line.raw_material.price_records.all():
+                all_dates.add(record.date)
+
+        if not all_dates:
+            return []
+
+        sorted_dates = sorted(all_dates)
+
+        # 2. 对每个日期，用 LOCF 计算配方成本
+        records_by_line = [
+            sorted(line.raw_material.price_records.all(), key=lambda r: r.date)
+            for line in bom_lines
+        ]
+
+        trend = []
+        for d in sorted_dates:
+            total_amount = Decimal('0.00')
+            total_parts = Decimal('0.00')
+            skip = False
+            for i, line in enumerate(bom_lines):
+                total_parts += line.percentage
+                price = None
+                for record in records_by_line[i]:
+                    if record.date <= d:
+                        price = record.price
+                    else:
+                        break
+                if price is None:
+                    skip = True
+                    break
+                total_amount += price * line.percentage
+            if not skip and total_parts > 0:
+                cost = total_amount / total_parts
+                trend.append([
+                    calendar.timegm(d.timetuple()) * 1000,
+                    float(cost.quantize(Decimal('0.01')))
+                ])
+
+        return trend
 
     # 【新增】获取关键物性指标字典 (用于列表展示)
     def get_key_properties(self):
@@ -273,8 +352,8 @@ class ColorPowderBOM(models.Model):
             return None
         total = 0
         for e in self.entries.select_related('raw_material').all():
-            if e.percentage and e.raw_material.cost_price:
-                total += float(e.percentage) * float(e.raw_material.cost_price)
+            if e.percentage and e.raw_material.latest_price:
+                total += float(e.percentage) * float(e.raw_material.latest_price)
         return round(total / 100, 2) if total > 0 else None
 
 

@@ -112,6 +112,8 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
         project = self.object
         current_std = self.request.GET.get('std', 'ISO')
 
+        from app_raw_material.models import PriceAvgConfig
+
         # 挂载配方物性 (逻辑保持不变)
         related_formulas = project.formulas.all().order_by('-created_at')
         for f in related_formulas:
@@ -135,6 +137,7 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
             'related_formulas': related_formulas,
             'current_std': current_std,
             'cart_formula_ids': self.request.session.get('compare_cart', {}).get('formula', []),
+            'avg_months': PriceAvgConfig.get().months,
         })
         return context
 

@@ -69,8 +69,8 @@
                         </td>
                         <td>
                             <div class="fw-bold text-orange">¥{{ f.cost_predicted }}</div>
-                            {% if f.cost_actual %}
-                                <div class="fw-bold text-green" title="实际成本">¥{{ f.cost_actual }}</div>
+                            {% if f.unit_cost %}
+                                <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ f.unit_cost }}</div>
                             {% endif %}
                         </td>
 

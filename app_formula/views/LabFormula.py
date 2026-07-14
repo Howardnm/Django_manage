@@ -143,7 +143,7 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
         base_qs = super().get_queryset().select_related(
             'material_type', 'creator', 'process',
             'project__material', 'project_node__project__material'
-        ).prefetch_related('research_projects')
+        ).prefetch_related('research_projects', 'bom_lines__raw_material__price_records')
         
         # 2. 动态指标排序逻辑 (保持原有功能)
         sort_params = self.request.GET.getlist('sort')
@@ -220,11 +220,14 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
             if f.pk in data_map:
                 for key, val in data_map[f.pk].items(): setattr(f, key, val)
 
+        from app_raw_material.models import PriceAvgConfig
+
         context.update({
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),
             'filter': self.filterset,
             'current_std': current_std,
             'current_sort': self.request.GET.get('sort', ''),
+            'avg_months': PriceAvgConfig.get().months,
         })
         return context
 
@@ -246,16 +249,27 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
             'project_node', 'project_node__project__material'
         ).prefetch_related(
             'bom_lines__raw_material__category',
+            'bom_lines__raw_material__price_records',
             'test_results__test_config',
             'research_projects'
         )
-    
+
     def get_context_data(self, **kwargs):
+        import json
+
         context = super().get_context_data(**kwargs)
         sorted_results = self.object.test_results.filter(production_order__isnull=True).select_related('test_config', 'test_config__category').order_by(
             'test_config__category__order', 'test_config__order'
         )
         context['sorted_test_results'] = sorted_results
+
+        from app_raw_material.models import PriceAvgConfig
+
+        trend = self.object.get_price_trend()
+        context['has_trend'] = len(trend) >= 2
+        context['price_trend_json'] = json.dumps(trend)
+        context['avg_months'] = PriceAvgConfig.get().months
+
         return context
 
 

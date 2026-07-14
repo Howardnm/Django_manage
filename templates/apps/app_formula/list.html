@@ -186,8 +186,8 @@
                         <!-- 4. 成本 -->
                         <td>
                             <div class="fw-bold text-orange">¥{{ formula.cost_predicted }}</div>
-                            {% if formula.cost_actual %}
-                                <div class="fw-bold text-green" title="实际成本">¥{{ formula.cost_actual }}</div>
+                            {% if formula.unit_cost %}
+                                <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ formula.unit_cost }}</div>
                             {% endif %}
                         </td>
 

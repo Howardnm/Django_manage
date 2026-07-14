@@ -114,16 +114,16 @@
                             {% if col.type == 'material' %}
                                 <td class="align-middle">-</td>
                             {% elif col.type == 'raw_material' %}
-                                <td class="fw-bold text-green align-middle">{{ col.obj.cost_price|default:"-" }}</td>
+                                <td class="fw-bold text-green align-middle">{{ col.obj.latest_price|default:"-" }}</td>
                             {% else %}
                                 <td class="fw-bold text-green align-middle">{{ col.obj.cost_predicted }}</td>
                             {% endif %}
                         {% endfor %}
                     </tr>
 
-                    <!-- 2. 实际成本 -->
+                    <!-- 2. 近{{ avg_months }}月均价 -->
                     <tr>
-                        <td class="text-start bg-light fw-bold text-orange align-middle"><i class="ti ti-currency-yen me-1"></i>实际成本</td>
+                        <td class="text-start bg-light fw-bold text-orange align-middle"><i class="ti ti-currency-yen me-1"></i>近{{ avg_months }}月均价</td>
                         <td class="align-middle">-</td>
                         <td class="text-muted align-middle">元/kg</td>
                         
@@ -132,8 +132,8 @@
                                 <td class="align-middle">-</td>
                             {% else %}
                                 <td class="fw-bold text-orange align-middle">
-                                    {% if col.obj.cost_actual %}
-                                        {{ col.obj.cost_actual }}
+                                    {% if col.obj.unit_cost %}
+                                        {{ col.obj.unit_cost }}
                                     {% else %}
                                         <span class="text-muted text-opacity-25">-</span>
                                     {% endif %}

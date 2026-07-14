@@ -128,7 +128,7 @@
                     <th><a href="?{% url_replace sort='model_name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">型号/供应商</a></th>
                     <th><a href="?{% url_replace sort='category'|sort_toggle:current_sort %}" class="table-sort-header text-reset">类型</a></th>
                     <th>适用体系</th>
-                    <th><a href="?{% url_replace sort='cost_price'|sort_toggle:current_sort %}" class="table-sort-header text-reset">成本</a></th>
+                    <th><a href="?{% url_replace sort='latest_price'|sort_toggle:current_sort %}" class="table-sort-header text-reset">成本</a></th>
                     
                     <!-- 动态性能指标列 -->
                     <th style="width: 60px;"><a href="?{% url_replace sort='density'|sort_toggle:current_sort %}" class="table-sort-header text-reset">密度</a></th>
@@ -179,7 +179,7 @@
                         </td>
                         
                         <td class="text-orange fw-bold">
-                            {% if material.cost_price %}¥{{ material.cost_price }}{% else %}-{% endif %}
+                            {% if material.latest_price %}¥{{ material.latest_price }}{% else %}-{% endif %}
                         </td>
                         
                         <!-- === 动态数据列 (val_xxx) === -->

@@ -7,8 +7,8 @@ from django.db import transaction
 from django.shortcuts import redirect
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 
-from app_raw_material.models import RawMaterial, RawMaterialProperty, Supplier
-from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
+from app_raw_material.models import PriceAvgConfig, RawMaterial, RawMaterialPriceRecord, RawMaterialProperty, Supplier
+from app_raw_material.forms import RawMaterialForm, RawMaterialPriceRecordForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 from app_raw_material.mixins import RawMaterialAccessMixin
 
@@ -100,10 +100,36 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
     context_object_name = 'material'
 
     def get_queryset(self):
-        return super().get_queryset().select_related('category', 'supplier').prefetch_related('properties__test_config')
+        return super().get_queryset().select_related('category', 'supplier').prefetch_related(
+            'properties__test_config', 'price_records'
+        )
 
     def get_object(self, queryset=None):
         return self.get_object_or_deny()
+
+    def get_context_data(self, **kwargs):
+        import calendar
+        import json
+
+        context = super().get_context_data(**kwargs)
+        material = self.object
+
+        price_records = material.price_records.order_by('date')
+        context['price_records'] = price_records
+        context['recent_records'] = material.price_records.order_by('-date')[:5]
+        context['avg_months'] = PriceAvgConfig.get().months
+
+        chart_data = [
+            {
+                'x': calendar.timegm(record.date.timetuple()) * 1000,
+                'y': float(record.price),
+                'source': record.source or '',
+            }
+            for record in price_records
+        ]
+        context['price_records_json'] = json.dumps(chart_data)
+        context['price_record_form'] = RawMaterialPriceRecordForm()
+        return context
 
 class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
     """创建：需 add_rawmaterial 权限，主要供采购/技术经理使用"""
@@ -181,7 +207,7 @@ class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
             'category': self.original_material.category,
             'supplier': self.original_material.supplier,
             'usage_method': self.original_material.usage_method,
-            'cost_price': self.original_material.cost_price,
+            'latest_price': self.original_material.latest_price,
             'purchase_date': self.original_material.purchase_date,
             'suitable_materials': self.original_material.suitable_materials.all(),
         })
@@ -236,6 +262,37 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
 
     def get_success_url(self):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
+
+
+class RawMaterialPriceRecordCreateView(RawMaterialAccessMixin, CreateView):
+    """添加价格记录"""
+    permission_required = 'app_raw_material.add_rawmaterial'
+    model = RawMaterialPriceRecord
+    form_class = RawMaterialPriceRecordForm
+
+    def form_valid(self, form):
+        raw_material = RawMaterial.objects.get(pk=self.kwargs['pk'])
+        date = form.cleaned_data['date']
+        price = form.cleaned_data['price']
+        source = form.cleaned_data.get('source', '')
+
+        obj, created = RawMaterialPriceRecord.objects.update_or_create(
+            raw_material=raw_material,
+            date=date,
+            defaults={'price': price, 'source': source}
+        )
+        if created:
+            messages.success(self.request, "价格记录已添加")
+        else:
+            messages.success(self.request, f"已覆盖 {date} 的价格记录")
+        return redirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        messages.error(self.request, "请检查输入内容")
+        return redirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('raw_material_detail', kwargs={'pk': self.kwargs['pk']})
 
 
 class RawMaterialAutocompleteView(RawMaterialAccessMixin, View):

@@ -78,14 +78,14 @@
                 {% endfor %}
             </tr>
 
-            <!-- 2. 实际成本 -->
+            <!-- 2. 近{{ avg_months }}月均价 -->
             <tr>
-                <td class="text-start bg-light fw-bold text-orange align-middle"><i class="ti ti-currency-yen me-1"></i>实际成本</td>
+                <td class="text-start bg-light fw-bold text-orange align-middle"><i class="ti ti-currency-yen me-1"></i>近{{ avg_months }}月均价</td>
                 <td class="align-middle">-</td>
                 <td class="text-muted align-middle">元/kg</td>
                 {% for col in columns %}
                     <td class="fw-bold text-orange align-middle">
-                        {% if col.type == 'material' %}<span class="text-muted text-opacity-25">-</span>{% elif col.obj.cost_actual %}{{ col.obj.cost_actual }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
+                        {% if col.type == 'material' %}<span class="text-muted text-opacity-25">-</span>{% elif col.obj.unit_cost %}{{ col.obj.unit_cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
                     </td>
                 {% endfor %}
             </tr>

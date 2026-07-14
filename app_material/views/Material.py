@@ -237,10 +237,13 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
                 'impact': f.val_impact, 'hdt': f.val_hdt,
             }
             
+        from app_raw_material.models import PriceAvgConfig
+
         context.update({
             'related_formulas': formulas,
             'current_std': current_std,
-            'cart_formula_ids': self.request.session.get('cart_formulas_v2', [])
+            'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),
+            'avg_months': PriceAvgConfig.get().months,
         })
         return context
 

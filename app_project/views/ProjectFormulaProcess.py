@@ -232,6 +232,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        from app_raw_material.models import PriceAvgConfig
+
         project = self.object
         material = project.material
 
@@ -456,6 +458,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'competitor_test_result_tabs': competitor_test_result_tabs,
             'competitor_has_test_results': competitor_has_test_results,
             'competitor_order_items': competitor_order_items,
+            'avg_months': PriceAvgConfig.get().months,
         })
         return context
 
