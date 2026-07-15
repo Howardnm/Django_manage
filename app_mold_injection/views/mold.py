@@ -11,6 +11,7 @@ class MoldTypeListView(MoldManageAccessMixin, ListView):
     model = MoldType
     template_name = 'apps/app_mold_injection/mold/list.html'
     context_object_name = 'molds'
+    paginate_by = 20
     enforce_dept_isolation = False
 
 

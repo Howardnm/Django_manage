@@ -3,8 +3,13 @@ from django.db import transaction
 from django.utils import timezone
 
 from common_utils.state_machine import StateMachine
+from app_trial_production.models import ProductionOrder
 
 logger = logging.getLogger(__name__)
+
+# NOTE: 方法体内的 lazy import（如 from app_mold_injection.models import InjectionTask）
+# 是有意为之的 Django 循环导入规避模式。各 app 的 services 和 models 之间存在相互引用，
+# 将跨模块导入延迟到方法调用时执行可避免 AppConfig.ready() 阶段的 import 错误。
 
 
 class ProductionOrderService:
@@ -117,29 +122,29 @@ class ProductionOrderService:
 
         正常流程：ACCEPTED → 创建 ExtrusionTask(PENDING)
         竞品工单（skip_extrusion=True）：ACCEPTED → 直接创建 InjectionTask → INJECTION_MOLDING
+        正常流程：ACCEPTED → 等待排产 → 排产时自动创建 ExtrusionTask(PENDING)
         """
-        from app_trial_production.models import ExtrusionTask
-
         StateMachine.transition(order, 'ACCEPTED', user)
 
         if order.skip_extrusion:
-            # 竞品工单：跳过挤出，直接创建注塑任务
-            from app_mold_injection.models import MoldRequirement
-            # 确保模具需求已关联到工单
+            # 竞品工单：跳过挤出，根据模具/测试项配置决定目标状态
             has_mold = order.mold_requirements.filter(
                 injection_task__isnull=True
             ).exists()
             if has_mold:
                 ProductionOrderService._create_injection_from_pending(order)
-            StateMachine.transition(order, 'INJECTION_MOLDING', user)
-            logger.info(f"Order {order.code} accepted → INJECTION_MOLDING (skip_extrusion)")
+                StateMachine.transition(order, 'INJECTION_MOLDING', user)
+                logger.info(f"Order {order.code} accepted → INJECTION_MOLDING (skip_extrusion)")
+            elif order.test_items.exists():
+                ProductionOrderService._create_testing_from_pending(order)
+                StateMachine.transition(order, 'TESTING', user)
+                logger.info(f"Order {order.code} accepted → TESTING (skip_extrusion, no mold)")
+            else:
+                StateMachine.transition(order, 'COMPLETED', user)
+                logger.info(f"Order {order.code} accepted → COMPLETED (skip_extrusion, no tasks)")
         else:
-            # 正常流程：创建待生产挤出任务
-            ExtrusionTask.objects.get_or_create(
-                production_order=order,
-                defaults={'status': 'PENDING'},
-            )
-            logger.info(f"Order {order.code} accepted → EXTRUDING pending")
+            # 正常流程：等待挤出操作员排产，排产时自动创建 ExtrusionTask
+            logger.info(f"Order {order.code} accepted, waiting for extrusion scheduling")
 
         return order
 
@@ -186,12 +191,26 @@ class ProductionOrderService:
 
     @staticmethod
     def schedule_extrusion(order, scheduled_dt, scheduled_end=None):
-        """设置/更新工单的挤出排产时间（scheduled_dt=None 表示取消排期）"""
+        """设置/更新工单的挤出排产时间。排产时创建 ExtrusionTask，取消排产时删除未开始的挤出任务。"""
+        from app_trial_production.models import ExtrusionTask
         order.extrusion_scheduled_date = scheduled_dt
         order.extrusion_scheduled_end = scheduled_end
         order.save(update_fields=[
             'extrusion_scheduled_date', 'extrusion_scheduled_end', 'updated_at',
         ])
+        if scheduled_dt is not None:
+            # 排产：创建挤出任务
+            ExtrusionTask.objects.get_or_create(
+                production_order=order,
+                defaults={'status': 'PENDING'},
+            )
+        else:
+            # 取消排产：删除未开始的挤出任务
+            deleted, _ = ExtrusionTask.objects.filter(
+                production_order=order, status='PENDING',
+            ).delete()
+            if deleted:
+                logger.info(f"Order {order.code} unscheduled, deleted PENDING extrusion task")
 
     @staticmethod
     def check_and_advance(order):
@@ -203,10 +222,10 @@ class ProductionOrderService:
         - 挤出完成       → 触发注塑任务（如有模具配置，配色任务独立并行不阻塞）
         - 注塑完成       → 触发测试任务（如有测试项目）
         """
-        if order.status == 'COMPLETED':
+        if order.status == ProductionOrder.Status.COMPLETED:
             return
 
-        if order.status == 'EXTRUDING':
+        if order.status == ProductionOrder.Status.EXTRUDING:
             # 挤出完成 + 颗粒分拨完成 → 触发下游任务
             # 配色任务独立并行，不构成屏障
             ext = getattr(order, 'extrusion_task', None)
@@ -225,15 +244,49 @@ class ProductionOrderService:
                 logger.info(f"Order {order.code} advanced to INJECTION_MOLDING (injection created)")
             elif order.test_items.exists():
                 # 无注塑，直接触发测试任务 → 推进到测试阶段
+                # 此路径无注塑任务，FOR_INJECTION 颗粒不会被消耗，标记为已消耗
+                from app_trial_production.models import SampleInventory
+                cleaned = SampleInventory.objects.filter(
+                    production_order=order,
+                    type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
+                ).update(status='CONSUMED', updated_at=timezone.now())
+                if cleaned:
+                    logger.info(
+                        f"Order {order.code} advancing to TESTING without injection: "
+                        f"marked {cleaned} FOR_INJECTION pellets as CONSUMED"
+                    )
+                # 跳过注塑 → 配色任务无需继续
+                from app_color_center.models import ColorMatchingTask
+                ColorMatchingTask.objects.filter(
+                    production_order=order,
+                    status__in=['PENDING', 'IN_PROGRESS'],
+                ).update(status='NOT_REQUIRED')
                 ProductionOrderService._create_testing_from_pending(order)
                 StateMachine.transition(order, 'TESTING')
                 logger.info(f"Order {order.code} advanced to TESTING (testing created, skip injection)")
             else:
                 # 无后续任务 → 直接完成
                 StateMachine.transition(order, 'COMPLETED')
+                # 无注塑环节 → 遗留的 FOR_INJECTION 颗粒标记为已消耗
+                from app_trial_production.models import SampleInventory
+                cleaned = SampleInventory.objects.filter(
+                    production_order=order,
+                    type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
+                ).update(status='CONSUMED', updated_at=timezone.now())
+                if cleaned:
+                    logger.info(
+                        f"Order {order.code} completed without injection: "
+                        f"marked {cleaned} FOR_INJECTION pellets as CONSUMED"
+                    )
+                # 跳过注塑 → 配色任务无需继续
+                from app_color_center.models import ColorMatchingTask
+                ColorMatchingTask.objects.filter(
+                    production_order=order,
+                    status__in=['PENDING', 'IN_PROGRESS'],
+                ).update(status='NOT_REQUIRED')
                 logger.info(f"Order {order.code} advanced to COMPLETED (no pending tasks)")
 
-        elif order.status == 'INJECTION_MOLDING':
+        elif order.status == ProductionOrder.Status.INJECTION_MOLDING:
             # 注塑任务完成 → 触发测试任务或完成
             injection = getattr(order, 'injection_task', None)
             if injection and injection.status == 'COMPLETED':
@@ -243,9 +296,20 @@ class ProductionOrderService:
                     logger.info(f"Order {order.code} advanced to TESTING (testing created)")
                 else:
                     StateMachine.transition(order, 'COMPLETED')
+                    # 无测试环节 → 注塑产出的样条直接标记为已消耗
+                    from app_trial_production.models import SampleInventory
+                    cleaned = SampleInventory.objects.filter(
+                        production_order=order,
+                        type='SPECIMEN', status='IN_LAB',
+                    ).update(status='CONSUMED', updated_at=timezone.now())
+                    if cleaned:
+                        logger.info(
+                            f"Order {order.code} completed without testing: "
+                            f"marked {cleaned} specimens as CONSUMED"
+                        )
                     logger.info(f"Order {order.code} advanced to COMPLETED (no testing needed)")
 
-        elif order.status == 'TESTING':
+        elif order.status == ProductionOrder.Status.TESTING:
             # 测试任务回写完成 → 完成工单
             testing_tasks = order.testing_tasks.all()
             all_written = testing_tasks.exists() and all(
@@ -282,7 +346,7 @@ class ProductionOrderService:
             sub_type='FOR_INJECTION',
             status='IN_LAB',
             injection_task__isnull=True,
-        ).update(injection_task=task)
+        ).update(injection_task=task, updated_at=timezone.now())
         if linked:
             logger.info(
                 f"Linked {linked} FOR_INJECTION samples to InjectionTask {task.pk}"

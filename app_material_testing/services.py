@@ -2,6 +2,7 @@ import logging
 from django.db import transaction
 
 from common_utils.state_machine import StateMachine
+from app_material_testing.models import TestingTask
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,8 @@ class TestingTaskService:
             result.save()
 
         # 首次填写时自动转为测试中
-        if task.status == 'PENDING':
-            StateMachine.transition(task, 'IN_PROGRESS', user)
+        if task.status == TestingTask.Status.PENDING:
+            StateMachine.transition(task, TestingTask.Status.IN_PROGRESS, user)
 
         logger.info(f"TestingTask {task.pk} results filled ({len(results_matrix)} entries)")
 
@@ -54,7 +55,7 @@ class TestingTaskService:
         """
         from app_formula.models import FormulaTestResult
 
-        if task.status == 'RESULTS_WRITTEN_BACK':
+        if task.status == TestingTask.Status.RESULTS_WRITTEN_BACK:
             return 0
 
         written = 0
@@ -74,9 +75,25 @@ class TestingTaskService:
                 written += 1
 
         if written:
-            if task.status != 'COMPLETED':
-                StateMachine.transition(task, 'COMPLETED')
-            StateMachine.transition(task, 'RESULTS_WRITTEN_BACK')
+            if task.status != TestingTask.Status.COMPLETED:
+                StateMachine.transition(task, TestingTask.Status.COMPLETED)
+            StateMachine.transition(task, TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+            # 工单关联的所有待测试样条统一标记为已消耗
+            from app_trial_production.models import SampleInventory
+            from django.utils import timezone as tz
+
+            consumed = SampleInventory.objects.filter(
+                production_order=task.production_order,
+                type='SPECIMEN',
+                sub_type='FOR_TESTING',
+                status='IN_LAB',
+            ).update(status='CONSUMED', updated_at=tz.now())
+            if consumed:
+                logger.info(
+                    f"Marked {consumed} specimens as CONSUMED "
+                    f"for order {task.production_order.code}"
+                )
 
             # 检查是否可以完成工单
             from app_trial_production.services.order_service import ProductionOrderService

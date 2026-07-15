@@ -13,6 +13,7 @@ from app_project.models import ProjectStage
 from app_formula.models import LabFormula, ColorPowderBOM
 from app_color_center.forms import ColorPowderBOMForm, ColorPowderBOMEntryFormSet
 from app_color_center.services import ColorMatchingTaskService
+from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
 
@@ -22,15 +23,29 @@ class ColorMatchingListView(ColorCenterAccessMixin, ListView):
     model = ProductionOrder
     template_name = 'apps/app_color_center/list.html'
     context_object_name = 'orders'
+    paginate_by = 20
 
     def get_queryset(self):
+        from app_color_center.filters import ColorMatchingListFilter
         qs = super().get_queryset()
         if qs is None:
-            return self.model.objects.all()
-        return qs.filter(
+            qs = self.model.objects.all()
+        qs = qs.filter(
             formula_details__needs_color_matching=True,
-            status__in=['EXTRUDING', 'INJECTION_MOLDING', 'TESTING'],
-        ).select_related('project').distinct().order_by('-created_at')
+            status__in=[ProductionOrder.Status.EXTRUDING,
+                        ProductionOrder.Status.INJECTION_MOLDING,
+                        ProductionOrder.Status.TESTING],
+        ).select_related('project').distinct()
+        self.filter = ColorMatchingListFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+        if not self.request.GET.get('sort'):
+            qs = qs.order_by('-created_at')
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = getattr(self, 'filter', None)
+        return context
 
 
 class ColorTaskDetailView(ColorCenterAccessMixin, View):
@@ -61,9 +76,9 @@ class ColorTaskStartView(ColorCenterAccessMixin, View):
         try:
             ColorMatchingTaskService.start_task(task, request.user)
             messages.success(request, '配色任务已开始')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Color task start failed: order_pk={order_pk}")
-            messages.error(request, '系统错误，请稍后重试')
+            messages.error(request, f'配色任务启动失败：{e}')
         return redirect('color_center:fill', order_pk=order_pk)
 
 
@@ -315,19 +330,40 @@ class ColorBOMFillView(ColorCenterAccessMixin, View):
             messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
             return redirect(f'{request.path}?formula_id={selected_formula.pk}')
 
-        # POST 失败：复用 _build_base_context 重建上下文
+        # POST 失败：完整重建上下文，保留阶段/轮次导航和已有 BOM 数据
         ctx = self._build_base_context()
+        stage_round_items = ctx['stage_round_items']
         all_stage_formulas = ctx['all_stage_formulas']
+
+        # 尝试恢复用户之前选择的 stage/round（从 POST 数据或默认值）
+        active_stage = request.POST.get('active_stage', self.STAGE_ORDER[0])
+        try:
+            active_round = int(request.POST.get('active_round')) if request.POST.get('active_round') else None
+        except (ValueError, TypeError):
+            active_round = None
+
+        # 定位活跃阶段/轮次的公式列表
         active_formulas = all_stage_formulas
+        for item in stage_round_items:
+            if item['stage'] == active_stage and (active_round is None or item['round'] == active_round):
+                active_formulas = item['formulas']
+                break
+
         formula_groups = self._build_formula_groups(active_formulas, selected_formula)
+
+        # 已有的 BOM entries（从已保存的 BOM 读取）
+        existing_bom = getattr(selected_formula, 'color_powder_bom', None)
+        bom_entries = None
+        if existing_bom:
+            bom_entries = existing_bom.entries.select_related('raw_material__category').order_by('id')
 
         return render(request, self.template_name, {
             'production_order': ctx['production_order'],
             'project': ctx['project'],
             'material': ctx['material'],
-            'stage_round_items': [],
-            'active_stage': self.STAGE_ORDER[0],
-            'active_round': None,
+            'stage_round_items': stage_round_items,
+            'active_stage': active_stage,
+            'active_round': active_round,
             'active_formulas': active_formulas,
             'formula_groups': formula_groups,
             'total_formula_count': len(all_stage_formulas),
@@ -338,7 +374,7 @@ class ColorBOMFillView(ColorCenterAccessMixin, View):
             'cpbom_matrix': [],
             'bom_form': bom_form,
             'entry_formset': entry_formset,
-            'bom_entries': None,
+            'bom_entries': bom_entries,
             'readonly': False,
         })
 
@@ -355,7 +391,7 @@ class ColorTaskCompleteView(ColorCenterAccessMixin, View):
         try:
             ColorMatchingTaskService.complete_task(task, request.user)
             messages.success(request, '配色任务已完成')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Color task complete failed: order_pk={order_pk}")
-            messages.error(request, '系统错误，请稍后重试')
+            messages.error(request, f'配色任务完成失败：{e}')
         return redirect('trial_order_detail', pk=order_pk)

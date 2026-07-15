@@ -21,6 +21,7 @@ from app_trial_production.forms import (
 )
 from app_trial_production.services import ProductionOrderService, SampleInventoryService
 from app_user.models import User
+from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +77,11 @@ def _build_merged_bom(formulas, details_map=None):
 
 
 def _build_bom_data(formulas):
-    """构建供前端JS动态计算配料表的Python字典（由模板 json_script 序列化）"""
+    """构建供前端JS动态计算配料表的Python字典（由模板 json_script 序列化）。
+
+    与 _build_merged_bom() 遍历相同的 BOM lines，但输出格式为前端 JS 优化。
+    两者之间的 BOM line 遍历逻辑有重合，保持分离以避免 HTML 渲染数据过于复杂。
+    """
     if not formulas:
         return {'formulas': [], 'rows': []}
     rows = []
@@ -403,7 +408,8 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 )
             else:
                 initial = [{'mold': m} for m in test_molds]
-                # 动态构建 formset class（extra=预填模具数），每次新建 class，避免线程安全问题
+                # Django modelformset 的 initial 分配给 extra 表单，
+                # 因此 extra 必须 ≥ len(initial) 才能让预填行显示。
                 from app_trial_production.forms import (
                     BaseMoldRequirementRowFormSet, MoldRequirementRowForm,
                 )
@@ -635,9 +641,9 @@ class ProductionOrderStartWorkflowView(RndAccessMixin, View):
         try:
             ProductionOrderService.start_workflow(order, config.workflow_definition, request.user)
             messages.success(request, '审批流程已启动')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Workflow start failed for order {order.code}")
-            messages.error(request, '启动审批流程时发生错误，请稍后重试')
+            messages.error(request, f'启动审批流程失败：{e}')
         return redirect('trial_order_detail', pk=order.pk)
 
 
@@ -747,7 +753,7 @@ class ProductionOrderStartExtrusionView(ExtrusionTaskAccessMixin, View):
         try:
             ProductionOrderService.start_extrusion(order, request.user)
             messages.success(request, f'工单 {order.code} 已开始挤出生产')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Failed to start extrusion for order {order.pk}")
-            messages.error(request, '开始挤出失败，请稍后重试')
+            messages.error(request, f'开始挤出失败：{e}')
         return redirect('trial_order_detail', pk=pk)

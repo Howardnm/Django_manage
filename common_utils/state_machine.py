@@ -48,9 +48,11 @@ class StateMachine:
 
     # model_class.__name__ → {from_status: [allowed_to_statuses]}
     _TRANSITIONS_MAP = {}
+    # model_class.__name__ → {started: 'field_name', completed: 'field_name'}
+    _TIMESTAMP_FIELDS = {}
 
     @classmethod
-    def register(cls, model_class, transitions):
+    def register(cls, model_class, transitions, timestamp_fields=None):
         """
         注册模型的状态转换规则。
 
@@ -58,8 +60,13 @@ class StateMachine:
             model_class: Django Model 类
             transitions: dict of {from_status: [allowed_to_statuses]}
                          例如: {'PENDING': ['IN_PROGRESS'], 'IN_PROGRESS': ['COMPLETED'], 'COMPLETED': []}
+            timestamp_fields: dict of {started: 'field_name', completed: 'field_name'}
+                         可选，默认 {'started': 'started_at', 'completed': 'completed_at'}
         """
         cls._TRANSITIONS_MAP[model_class.__name__] = transitions
+        cls._TIMESTAMP_FIELDS[model_class.__name__] = timestamp_fields or {
+            'started': 'started_at', 'completed': 'completed_at',
+        }
         logger.info(f"[StateMachine] Registered {model_class.__name__} with {len(transitions)} states")
 
     @classmethod
@@ -91,12 +98,18 @@ class StateMachine:
         old_status = obj.status
         obj.status = target_status
 
-        # 更新时间戳
-        if target_status == 'COMPLETED' and hasattr(obj, 'completed_at'):
-            obj.completed_at = timezone.now()
-        if target_status in ('IN_PROGRESS',) and hasattr(obj, 'started_at'):
-            if obj.started_at is None:
-                obj.started_at = timezone.now()
+        # 更新时间戳（使用注册时配置的字段名）
+        tsf = cls._TIMESTAMP_FIELDS.get(model_name, {
+            'started': 'started_at', 'completed': 'completed_at',
+        })
+        if target_status == 'COMPLETED':
+            completed_field = tsf.get('completed', 'completed_at')
+            if hasattr(obj, completed_field):
+                setattr(obj, completed_field, timezone.now())
+        if target_status in ('IN_PROGRESS',):
+            started_field = tsf.get('started', 'started_at')
+            if hasattr(obj, started_field) and getattr(obj, started_field) is None:
+                setattr(obj, started_field, timezone.now())
 
         obj.save()
 

@@ -1,36 +1,6 @@
 from django import forms
 from common_utils.filters import TablerFormMixin
-from app_mold_injection.models import InjectionTask, MoldRequirement, MoldType
-
-
-# ---- 注塑任务 ----
-
-class MoldRequirementForm(TablerFormMixin, forms.ModelForm):
-    """模具需求明细 — 仅选择模具，各配方版本注塑次数由模板裸 <input> 渲染"""
-    class Meta:
-        model = MoldRequirement
-        fields = ['mold']
-        widgets = {
-            'mold': forms.Select(attrs={'class': 'form-select'}),
-        }
-
-
-MoldRequirementFormSet = forms.inlineformset_factory(
-    InjectionTask, MoldRequirement,
-    form=MoldRequirementForm,
-    extra=3, can_delete=True
-)
-
-
-class InjectionTaskForm(TablerFormMixin, forms.ModelForm):
-    """注塑任务表单"""
-    class Meta:
-        model = InjectionTask
-        fields = ['injection_params_note', 'operator']
-        widgets = {
-            'injection_params_note': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-            'operator': forms.Select(attrs={'class': 'form-select'}),
-        }
+from app_mold_injection.models import InjectionTask, MoldType
 
 
 class InjectionCompleteForm(TablerFormMixin, forms.ModelForm):

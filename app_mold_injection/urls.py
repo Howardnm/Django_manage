@@ -1,7 +1,6 @@
 from django.urls import path
 from app_mold_injection.views.injection import (
-    InjectionTaskListView, InjectionCreateView,
-    InjectionCreateFromInventoryView, InjectionDetailView,
+    InjectionTaskListView, InjectionDetailView,
     InjectionStartView, InjectionCompleteView,
 )
 from app_mold_injection.views.mold import (
@@ -14,8 +13,6 @@ app_name = 'mold_injection'
 urlpatterns = [
     # Injection tasks
     path('tasks/', InjectionTaskListView.as_view(), name='task_list'),
-    path('tasks/<int:order_pk>/create/', InjectionCreateView.as_view(), name='task_create'),
-    path('tasks/create-from-inventory/', InjectionCreateFromInventoryView.as_view(), name='task_create_from_inventory'),
     path('tasks/<int:pk>/', InjectionDetailView.as_view(), name='task_detail'),
     path('tasks/<int:pk>/start/', InjectionStartView.as_view(), name='task_start'),
     path('tasks/<int:pk>/complete/', InjectionCompleteView.as_view(), name='task_complete'),

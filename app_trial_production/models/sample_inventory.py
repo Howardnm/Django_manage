@@ -3,7 +3,12 @@ from django.db import models
 
 class SampleInventory(models.Model):
     """
-    统一样品库存 — 通过 type + sub_type 区分颗粒样品和样条样品。
+    统一样品库存 — 通过 type + sub_type 区分颗粒样品和样条样品，status 跟踪生命周期。
+
+    流转模型：
+        PELLET + FINISHED       : IN_LAB ──→ SAP_STORED   (SAP入库)
+        PELLET + FOR_INJECTION  : IN_LAB ──→ CONSUMED     (注塑消耗)
+        SPECIMEN + FOR_TESTING  : IN_LAB ──→ CONSUMED     (测试完成消耗)
 
     颗粒样品 (PELLET)：
       - FINISHED: 颗粒成品，已满足交付标准，可入SAP仓库
@@ -11,7 +16,7 @@ class SampleInventory(models.Model):
 
     样条样品 (SPECIMEN)：
       - FOR_TESTING: 待测试样条，注塑产出后入样品库
-      - TESTED: 已测试样条
+      - TESTED: 已测试样条（保留选项，实际流转由 status=CONSUMED 驱动）
     """
 
     class Type(models.TextChoices):

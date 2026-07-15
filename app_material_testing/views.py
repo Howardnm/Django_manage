@@ -7,6 +7,7 @@ from django.db.models import Count
 from app_material_testing.mixins import TestingAccessMixin
 from app_material_testing.models import TestingTask, TrialTestResult
 from app_material_testing.services import TestingTaskService
+from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
 
@@ -20,14 +21,25 @@ class TestingTaskListView(TestingAccessMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
+        from app_material_testing.filters import TestingTaskFilter
         qs = super().get_queryset()
         if qs is None:
             return self.model.objects.all()
-        return qs.select_related(
+        qs = qs.select_related(
             'production_order', 'assigned_to',
         ).prefetch_related('test_items').annotate(
             test_item_count=Count('test_items'),
-        ).order_by('-created_at')
+        )
+        self.filter = TestingTaskFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+        if not self.request.GET.get('sort'):
+            qs = qs.order_by('-created_at')
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = getattr(self, 'filter', None)
+        return context
 
 
 class TestingTaskDetailView(TestingAccessMixin, DetailView):
@@ -134,21 +146,24 @@ class FillResultsView(TestingAccessMixin, View):
         ).order_by('version'))
 
     def _build_matrix(self, task):
-        """Build read-only matrix for GET display."""
+        """Build read-only matrix for GET display — single bulk query, no N+1."""
         formulas = self._get_formulas(task)
+        # Batch fetch all results, index by (test_config_id, formula_id)
+        all_results = TrialTestResult.objects.filter(testing_task=task)
+        results_dict = {(r.test_config_id, r.formula_id): r for r in all_results}
+
         matrix = []
         for item in task.test_items.all():
             row = {'test_config': item, 'formula_results': [], 'test_date': None, 'remark': ''}
             for f in formulas:
-                try:
-                    result = TrialTestResult.objects.get(
-                        testing_task=task, test_config=item, formula=f)
-                except TrialTestResult.DoesNotExist:
+                result = results_dict.get((item.pk, f.pk))
+                if result is None:
                     result = TrialTestResult(
                         testing_task=task, test_config=item, formula=f)
                 row['formula_results'].append({'formula': f, 'result': result})
-                row['test_date'] = result.test_date
-                row['remark'] = result.remark
+                if result:
+                    row['test_date'] = result.test_date
+                    row['remark'] = result.remark
             matrix.append(row)
         return matrix, formulas
 
@@ -164,29 +179,27 @@ class FillResultsView(TestingAccessMixin, View):
 
     def post(self, request, pk):
         task = self._get_task()
-        if task.status == 'RESULTS_WRITTEN_BACK':
+        if task.status == TestingTask.Status.RESULTS_WRITTEN_BACK:
             messages.warning(request, '测试结果已回写，无法再修改')
             return redirect('material_testing:detail', pk=pk)
 
-        # Build results matrix from POST data
-        formulas = self._get_formulas(task)
-        results_matrix = []
-        for item in task.test_items.all():
-            test_date = request.POST.get(f'test_date_{item.pk}') or None
-            remark = request.POST.get(f'remark_{item.pk}', '')
-            for f in formulas:
-                value = request.POST.get(f'value_{item.pk}_{f.pk}') or None
-                value_text = request.POST.get(f'value_text_{item.pk}_{f.pk}', '')
-                if value or value_text:
-                    results_matrix.append({
-                        'test_config_id': item.pk,
-                        'formula_id': f.pk,
-                        'value': value,
-                        'value_text': value_text,
-                        'test_date': test_date,
-                        'remark': remark,
-                    })
+        from app_material_testing.forms import TestResultMatrixForm
+        form = TestResultMatrixForm(request.POST, testing_task=task)
+        if not form.is_valid():
+            for error in form.errors.get('__all__', []):
+                messages.error(request, str(error))
+            # Rebuild GET-like context on validation failure
+            matrix, formulas = self._build_matrix(task)
+            return render(request, self.template_name, {
+                'testing_task': task,
+                'results_matrix': matrix,
+                'formulas': formulas,
+            })
 
+        # NOTE: test_date 和 remark 按测试项行（per test_config）解析，同一测试项的
+        # 所有配方版本共享相同的测试日期和备注。TrialTestResult 模型中这些字段是 per-cell，
+        # 但实际使用场景中同一测试项的日期/备注通常相同，此设计为有意的 UI 简化。
+        results_matrix = form.cleaned_data['results_matrix']
         from app_material_testing.services import TestingTaskService
         TestingTaskService.fill_results(task, results_matrix, request.user)
         messages.success(request, '测试结果已保存')
@@ -209,9 +222,9 @@ class WriteBackView(TestingAccessMixin, View):
                 messages.success(request, f'已将 {written} 条测试结果回写到配方')
             else:
                 messages.warning(request, '没有可回写的测试结果')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Write-back failed for task {task.pk}")
-            messages.error(request, '回写测试结果时发生错误，请稍后重试')
+            messages.error(request, f'回写测试结果失败：{e}')
         return redirect('material_testing:detail', pk=pk)
 
 
@@ -237,18 +250,16 @@ class TestingSampleListView(TestingAccessMixin, View):
 
         # Hard-code 范围：所有样条
         qs = qs.filter(type='SPECIMEN')
-        # 排除已消耗
-        qs = qs.exclude(status='CONSUMED')
 
         self.filter = SampleInventoryFilter(request.GET, queryset=qs)
         qs = self.filter.qs
 
-        # 子类型筛选（默认全部样条）
+        # 子类型/状态筛选（默认全部样条）
         sub_type_param = request.GET.get('sub_type', '')
         if sub_type_param == 'FOR_TESTING':
-            qs = qs.filter(sub_type='FOR_TESTING')
-        elif sub_type_param == 'TESTED':
-            qs = qs.filter(sub_type='TESTED')
+            qs = qs.filter(sub_type='FOR_TESTING', status='IN_LAB')
+        elif sub_type_param == 'CONSUMED':
+            qs = qs.filter(status='CONSUMED')
 
         return qs.order_by('-created_at')
 

@@ -174,17 +174,6 @@ class SampleInventoryService:
         return sample
 
     @staticmethod
-    def get_available_for_injection():
-        """获取所有可用的待打样颗粒（供注塑取料列表）"""
-        return SampleInventory.objects.filter(
-            type='PELLET',
-            sub_type='FOR_INJECTION',
-            status='IN_LAB',
-        ).select_related(
-            'production_order', 'formula',
-        ).order_by('-created_at')
-
-    @staticmethod
     def get_lifecycle(sample):
         """构建单个样品的生命周期事件时间线。
 
@@ -289,11 +278,11 @@ class SampleInventoryService:
                 'icon': 'ti ti-clipboard',
             })
 
-            # 3) 测试完成
-            if sample.sub_type == SampleInventory.SubType.TESTED:
+            # 3) 测试消耗（测试回写完成后样条标记为 CONSUMED）
+            if sample.status == SampleInventory.Status.CONSUMED:
                 events.append({
-                    'label': '测试完成',
-                    'description': '已测试样条',
+                    'label': '测试消耗',
+                    'description': '工单测试完成，样条已消耗',
                     'timestamp': sample.updated_at,
                     'is_current': True,
                     'icon': 'ti ti-microscope',
@@ -344,7 +333,7 @@ class SampleInventoryService:
             'pellet_for_injection_count': 0,
             'pellet_for_injection_kg': 0.0,
             'specimen_for_testing_count': 0,
-            'specimen_tested_count': 0,
+            'specimen_consumed_count': 0,
         }
         for s in orphan_samples:
             if s.type == 'PELLET':
@@ -358,10 +347,10 @@ class SampleInventoryService:
                     summary['pellet_for_injection_count'] += 1
                     summary['pellet_for_injection_kg'] += qty
             elif s.type == 'SPECIMEN':
-                if s.sub_type == 'FOR_TESTING':
+                if s.status == 'CONSUMED':
+                    summary['specimen_consumed_count'] += 1
+                else:
                     summary['specimen_for_testing_count'] += 1
-                elif s.sub_type == 'TESTED':
-                    summary['specimen_tested_count'] += 1
         return summary
 
     @staticmethod
@@ -378,8 +367,8 @@ class SampleInventoryService:
                 'pellet_finished_kg': Decimal,
                 'pellet_for_injection_kg': Decimal,
                 'specimen_for_testing_count': int,
-                'specimen_tested_count': int,
-                'active_status': str,  # 该工单组中最多见的非CONSUMED状态
+                'specimen_consumed_count': int,
+                'active_status': str,  # 该工单组中最多见的状态
             }}
         """
         from collections import Counter
@@ -401,7 +390,7 @@ class SampleInventoryService:
                     'pellet_finished_kg': 0,
                     'pellet_for_injection_kg': 0,
                     'specimen_for_testing_count': 0,
-                    'specimen_tested_count': 0,
+                    'specimen_consumed_count': 0,
                     'pellet_finished_sap': 0,   # 已入SAP的成品颗粒数
                     'pellet_finished_in_lab': 0,  # 仍在实验房的成品颗粒数
                 }
@@ -422,10 +411,11 @@ class SampleInventoryService:
                 elif sample.sub_type == 'FOR_INJECTION':
                     s['pellet_for_injection_kg'] += qty
             elif sample.type == 'SPECIMEN':
-                if sample.sub_type == 'FOR_TESTING':
+                qty = float(sample.quantity or 0)
+                if sample.status == 'CONSUMED':
+                    s['specimen_consumed_count'] += 1
+                else:
                     s['specimen_for_testing_count'] += 1
-                elif sample.sub_type == 'TESTED':
-                    s['specimen_tested_count'] += 1
 
         for oid, counter in status_counter.items():
             # 优先 IN_LAB > SAP_STORED > 其他，取最活跃的状态

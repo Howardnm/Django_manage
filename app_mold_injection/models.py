@@ -43,6 +43,14 @@ class MoldType(models.Model):
     def __str__(self):
         return f"{self.mold_code} — {self.name}"
 
+    @property
+    def status_css_class(self):
+        return {
+            self.Status.AVAILABLE: 'bg-green-lt',
+            self.Status.MAINTENANCE: 'bg-yellow-lt',
+            self.Status.RETIRED: 'bg-secondary-lt',
+        }.get(self.status, 'bg-secondary-lt')
+
 
 class InjectionTask(models.Model):
     """

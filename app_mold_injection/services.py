@@ -11,112 +11,6 @@ class InjectionTaskService:
 
     @staticmethod
     @transaction.atomic
-    def create_from_order(production_order, operator_id=None,
-                          injection_params_note='', mold_requirements=None):
-        """
-        渠道A：从排产工单创建注塑任务。
-
-        Args:
-            production_order: ProductionOrder 实例
-            operator_id: 注塑操作员ID (User pk or None)
-            injection_params_note: 注塑工艺备注
-            mold_requirements: list of dict {mold_id, formula_id, specimen_quantity}
-        """
-        from django.contrib.auth import get_user_model
-        from app_mold_injection.models import InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
-
-        User = get_user_model()
-        operator = User.objects.get(pk=operator_id) if operator_id else None
-
-        task = InjectionTask.objects.create(
-            production_order=production_order,
-            source='ORDER',
-            operator=operator,
-            injection_params_note=injection_params_note,
-            status='PENDING',
-        )
-
-        if mold_requirements:
-            for req in mold_requirements:
-                if req.get('specimen_quantity', 0) > 0:
-                    mr = MoldRequirement.objects.create(
-                        injection_task=task,
-                        mold_id=req['mold_id'],
-                    )
-                    MoldRequirementFormulaDetail.objects.create(
-                        mold_requirement=mr,
-                        formula_id=req.get('formula_id'),
-                        specimen_quantity=req['specimen_quantity'],
-                    )
-
-        # 将工单下未关联的 FOR_INJECTION 颗粒链接到该注塑任务
-        from app_trial_production.models import SampleInventory
-        linked = SampleInventory.objects.filter(
-            production_order=production_order,
-            type='PELLET',
-            sub_type='FOR_INJECTION',
-            status='IN_LAB',
-            injection_task__isnull=True,
-        ).update(injection_task=task)
-        if linked:
-            logger.info(
-                f"Linked {linked} FOR_INJECTION samples to InjectionTask {task.pk}"
-            )
-
-        logger.info(f"InjectionTask created from order {production_order.code}")
-        return task
-
-    @staticmethod
-    @transaction.atomic
-    def create_from_inventory(sample_inventory, project=None, operator_id=None,
-                              injection_params_note='', mold_requirements=None):
-        """
-        渠道B：从样品库取料创建独立注塑任务。
-
-        Args:
-            sample_inventory: SampleInventory 实例（待打样颗粒）
-            project: 关联项目（用于后期关联测试结果）
-            operator_id: 注塑操作员ID (User pk or None)
-            injection_params_note: 注塑工艺备注
-            mold_requirements: list of dict {mold_id, formula_id, specimen_quantity}
-        """
-        from django.contrib.auth import get_user_model
-        from app_mold_injection.models import InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
-
-        User = get_user_model()
-        operator = User.objects.get(pk=operator_id) if operator_id else None
-
-        task = InjectionTask.objects.create(
-            source='INVENTORY',
-            sample_inventory=sample_inventory,
-            source_project=project,
-            operator=operator,
-            injection_params_note=injection_params_note,
-            status='PENDING',
-        )
-
-        # 标记样品为已消耗
-        sample_inventory.status = 'CONSUMED'
-        sample_inventory.save(update_fields=['status', 'updated_at'])
-
-        if mold_requirements:
-            for req in mold_requirements:
-                if req.get('specimen_quantity', 0) > 0:
-                    mr = MoldRequirement.objects.create(
-                        injection_task=task,
-                        mold_id=req['mold_id'],
-                    )
-                    MoldRequirementFormulaDetail.objects.create(
-                        mold_requirement=mr,
-                        formula_id=req.get('formula_id'),
-                        specimen_quantity=req['specimen_quantity'],
-                    )
-
-        logger.info(f"InjectionTask created from inventory {sample_inventory}")
-        return task
-
-    @staticmethod
-    @transaction.atomic
     def start_task(task, user):
         """开始注塑任务"""
         if not task.operator_id:
@@ -147,12 +41,13 @@ class InjectionTaskService:
 
         # 将关联的 FOR_INJECTION 颗粒标记为已消耗
         from app_trial_production.models import SampleInventory
+        from django.utils import timezone as tz
         consumed = SampleInventory.objects.filter(
             injection_task=task,
             type='PELLET',
             sub_type='FOR_INJECTION',
             status='IN_LAB',
-        ).update(status='CONSUMED')
+        ).update(status='CONSUMED', updated_at=tz.now())
         if consumed:
             logger.info(
                 f"Marked {consumed} FOR_INJECTION samples as CONSUMED "

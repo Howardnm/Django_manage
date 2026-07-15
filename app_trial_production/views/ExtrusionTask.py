@@ -10,6 +10,8 @@ from app_trial_production.filters import ExtrusionTaskFilter
 from app_trial_production.forms import ExtrusionRecordForm
 from app_trial_production.services import ExtrusionTaskService
 
+from common_utils.state_machine import InvalidStateTransition
+
 logger = logging.getLogger(__name__)
 
 
@@ -106,9 +108,9 @@ class ExtrusionTaskStartView(ExtrusionTaskAccessMixin, View):
         try:
             ExtrusionTaskService.start_task(task, request.user)
             messages.success(request, '挤出任务已开始')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Extrusion start failed: pk={pk}")
-            messages.error(request, '系统错误，请稍后重试')
+            messages.error(request, f'启动挤出任务失败：{e}')
         return redirect('trial_extrusion_record', pk=pk)
 
 
@@ -148,9 +150,9 @@ class ExtrusionRecordFormView(ExtrusionTaskAccessMixin, View):
             try:
                 ExtrusionTaskService.save_record(task, form.cleaned_data, request.user)
                 messages.success(request, '挤出生产记录已保存')
-            except Exception:
+            except InvalidStateTransition as e:
                 logger.exception(f"Extrusion record save failed: pk={pk}")
-                messages.error(request, '系统错误，请稍后重试')
+                messages.error(request, f'保存挤出记录失败：{e}')
             return redirect('trial_extrusion_detail', pk=pk)
 
         return render(request, self.template_name, {
@@ -176,7 +178,7 @@ class ExtrusionTaskCompleteView(ExtrusionTaskAccessMixin, View):
         try:
             ExtrusionTaskService.complete_task(task, request.user)
             messages.success(request, '挤出任务已完成')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Extrusion complete failed: pk={pk}")
-            messages.error(request, '系统错误，请稍后重试')
+            messages.error(request, f'完成挤出任务失败：{e}')
         return redirect('trial_order_detail', pk=pk)

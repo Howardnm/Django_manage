@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from django.utils.functional import cached_property
 
 
 class ColorMatchingTask(models.Model):
@@ -50,9 +51,9 @@ class ColorMatchingTask(models.Model):
     def status_label(self):
         return self.Status(self.status).label
 
-    @property
+    @cached_property
     def needs_color_matching(self):
-        """从工单配方明细中判断是否需要配色"""
+        """从工单配方明细中判断是否需要配色（缓存，实例生命周期内只查一次）"""
         return self.production_order.formula_details.filter(
             needs_color_matching=True).exists()
 

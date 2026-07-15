@@ -13,6 +13,7 @@ from app_trial_production.models import ProductionOrder
 from app_trial_production.filters import PendingOrderFilter
 from app_trial_production.services import ProductionOrderService
 from app_trial_production.utils.extrusion import is_all_day_event
+from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
 
@@ -193,9 +194,9 @@ class ExtrusionStartApiView(ExtrusionTaskAccessMixin, View):
         try:
             ProductionOrderService.start_extrusion(order, request.user)
             messages.success(request, f'工单 {order.code} 已开始挤出生产')
-        except Exception:
+        except InvalidStateTransition as e:
             logger.exception(f"Failed to start extrusion for order {order.pk}")
-            messages.error(request, '开始生产时发生错误，请稍后重试')
+            messages.error(request, f'开始生产失败：{e}')
 
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 

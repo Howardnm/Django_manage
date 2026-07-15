@@ -149,9 +149,9 @@ class PelletSplitView(ExtrusionTaskAccessMixin, View):
                 try:
                     SampleInventoryService.create_pellet_batch(order, splits)
                     messages.success(request, f'已创建 {len(splits)} 条颗粒样品入库记录')
-                except Exception:
+                except ValueError as e:
                     logger.exception(f"Pellet split failed for order {order.code}")
-                    messages.error(request, '分拨操作失败，请稍后重试')
+                    messages.error(request, f'分拨操作失败：{e}')
             return redirect('trial_order_detail', pk=pk)
 
         # 校验失败：重新渲染，注入 row_label 供模板使用

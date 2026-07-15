@@ -17,11 +17,6 @@
             <h2 class="page-title">注塑任务列表</h2>
             <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
         </div>
-        <div class="col-auto">
-            <a href="{% url 'mold_injection:task_create_from_inventory' %}" class="btn btn-outline-primary">
-                <i class="ti ti-plus me-1"></i>从样品库创建
-            </a>
-        </div>
     </div>
 </div>
 

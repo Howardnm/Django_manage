@@ -163,30 +163,58 @@
         {% if has_output_specimens %}
         <div class="card mt-3">
             <div class="card-header">
-                <h3 class="card-title">样条产出</h3>
+                <h3 class="card-title"><i class="ti ti-clipboard me-2"></i>样条产出（实际产出矩阵）</h3>
             </div>
             <div class="table-responsive">
-                <table class="table card-table table-vcenter">
+                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix">
                     <thead>
                         <tr>
-                            <th>模具</th>
-                            <th>样条数量</th>
-                            <th>合格数量</th>
-                            <th>状态</th>
-                            <th>位置/批次</th>
+                            <th rowspan="2" style="min-width: 150px;">模具</th>
+                            <th rowspan="2">存放位置</th>
+                            <th rowspan="2">批次标签</th>
+                            {% for f in out_formulas %}
+                            <th colspan="2" class="text-center">
+                                <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                            </th>
+                            {% endfor %}
+                            <th colspan="2" class="text-center">合计</th>
+                        </tr>
+                        <tr>
+                            {% for f in out_formulas %}
+                            <th class="text-center small">产出</th>
+                            <th class="text-center small">合格</th>
+                            {% endfor %}
+                            <th class="text-center small">产出</th>
+                            <th class="text-center small">合格</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for sp in injection_task.output_specimens.all %}
+                        {% for row in out_matrix_rows %}
                         <tr>
-                            <td>{{ sp.mold.name|default:"-" }}</td>
-                            <td>{{ sp.specimen_count|default:"-" }}</td>
-                            <td class="fw-bold">{{ sp.specimen_qualified|default:"-" }}</td>
-                            <td><span class="badge {{ sp.status_css_class }}">{{ sp.get_status_display }}</span></td>
-                            <td>{{ sp.storage_location|default:"-" }} / {{ sp.batch_label|default:"-" }}</td>
+                            <td>{{ row.mold.name }} <span class="text-muted">[{{ row.mold.mold_code }}]</span></td>
+                            <td>{{ row.storage_location|default:"-" }}</td>
+                            <td>{{ row.batch_label|default:"-" }}</td>
+                            {% for cell in row.cells %}
+                            <td class="text-center bg-blue-lt fw-bold">{{ cell.count|default:"-" }}</td>
+                            <td class="text-center bg-green-lt fw-bold">{{ cell.qualified|default:"-" }}</td>
+                            {% endfor %}
+                            <td class="text-center bg-blue-lt fw-bold">{{ row.row_total_count }}</td>
+                            <td class="text-center bg-green-lt fw-bold">{{ row.row_total_qualified }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>
+                    <tfoot>
+                        <tr class="bg-light">
+                            <td colspan="3" class="text-end fw-bold">合计</td>
+                            {% for ft in out_formula_totals %}
+                            <td class="text-center bg-blue-lt fw-bold">{{ ft.count }}</td>
+                            <td class="text-center bg-green-lt fw-bold">{{ ft.qualified }}</td>
+                            {% endfor %}
+                            <td class="text-center bg-blue-lt fw-bold">{{ out_grand_total_count }}</td>
+                            <td class="text-center bg-green-lt fw-bold">{{ out_grand_total_qualified }}</td>
+                        </tr>
+                    </tfoot>
                 </table>
             </div>
         </div>

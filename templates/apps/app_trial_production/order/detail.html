@@ -78,11 +78,6 @@
                 </a>
                 {% endif %}
 
-                {% if order.status == 'INJECTION_MOLDING' and not injection_task %}
-                <a href="{% url 'mold_injection:task_create' order_pk=order.pk %}" class="btn btn-outline-blue">
-                    <i class="ti ti-plus me-1"></i>创建注塑任务
-                </a>
-                {% endif %}
             </div>
         </div>
     </div>
@@ -107,7 +102,7 @@
 
 <div class="row row-cards mt-3">
     <!-- 基本信息 -->
-    <div class="col-lg-6">
+    <div class="col-lg-4">
         <div class="card card-sm">
             <div class="card-header bg-blue-lt">
                 <h3 class="card-title">
@@ -227,7 +222,7 @@
     </div>
 
     <!-- 生产信息 -->
-    <div class="col-lg-6">
+    <div class="col-lg-4">
         <div class="card card-sm">
             <div class="card-header bg-green-lt">
                 <h3 class="card-title">
@@ -401,185 +396,150 @@
                 </table>
             </div>
         </div>
-    </div>
-</div>
 
-{% if extrusion_task or color_task or injection_task %}
-<div class="row mt-3">
-    <div class="col-12">
-        <div class="card">
+        {# ── 子任务进度（生产信息下方堆叠） ── #}
+        {% if extrusion_task or color_task or injection_task %}
+        <div class="card card-sm mt-3">
             <div class="card-header bg-purple-lt">
                 <h3 class="card-title"><i class="ti ti-list-check me-2"></i>子任务进度</h3>
             </div>
-            <div class="card-body">
-                <div class="row g-3">
-                    {% if extrusion_task %}
-                    <div class="col">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 d-flex align-items-center">
-                                <div>
-                                    <div class="text-muted small">挤出任务</div>
-                                    <span class="badge {{ extrusion_task.status_css_class }}">{{ extrusion_task.get_status_display }}</span>
-                                </div>
-                                <a href="{% url 'trial_extrusion_detail' order.pk %}" class="btn btn-sm btn-outline-primary ms-auto">
-                                    <i class="ti ti-arrow-right"></i>
-                                </a>
-                            </div>
+            <div class="card-body p-2">
+                {% if extrusion_task %}
+                <div class="card card-sm border mb-1">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">挤出任务</div>
+                            <span class="badge {{ extrusion_task.status_css_class }}">{{ extrusion_task.get_status_display }}</span>
                         </div>
+                        <a href="{% url 'trial_extrusion_detail' order.pk %}" class="btn btn-sm btn-outline-primary ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
                     </div>
-                    {% endif %}
-
-                    {% if extrusion_task and extrusion_task.status == 'COMPLETED' %}
-                    <div class="col">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 d-flex align-items-center">
-                                <div>
-                                    <div class="text-muted small">颗粒分拨</div>
-                                    {% if has_pellet_splits %}
-                                    <span class="badge bg-green-lt">已分拨</span>
-                                    {% else %}
-                                    <span class="badge bg-yellow-lt">待分拨</span>
-                                    {% endif %}
-                                </div>
-                                {% if not has_pellet_splits %}
-                                <a href="{% url 'trial_pellet_split' order.pk %}" class="btn btn-sm btn-outline-cyan ms-auto">
-                                    <i class="ti ti-arrow-right"></i>
-                                </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if color_task %}
-                    <div class="col">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 d-flex align-items-center">
-                                <div>
-                                    <div class="text-muted small">配色任务</div>
-                                    <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
-                                </div>
-                                <a href="{% url 'color_center:detail' order.pk %}" class="btn btn-sm btn-outline-orange ms-auto">
-                                    <i class="ti ti-arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% if injection_task %}
-                    <div class="col">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 d-flex align-items-center">
-                                <div>
-                                    <div class="text-muted small">注塑任务</div>
-                                    <span class="badge {{ injection_task.status_css_class }}">{{ injection_task.get_status_display }}</span>
-                                </div>
-                                <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue ms-auto">
-                                    <i class="ti ti-arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    {% for tt in testing_tasks %}
-                    <div class="col">
-                        <div class="card card-sm">
-                            <div class="card-body py-2 d-flex align-items-center">
-                                <div>
-                                    <div class="text-muted small">测试任务</div>
-                                    <span class="badge {{ tt.status_css_class }}">{{ tt.get_status_display }}</span>
-                                </div>
-                                <a href="{% url 'material_testing:detail' tt.pk %}" class="btn btn-sm btn-outline-yellow ms-auto">
-                                    <i class="ti ti-arrow-right"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    {% endfor %}
                 </div>
+                {% endif %}
+
+                {% if extrusion_task and extrusion_task.status == 'COMPLETED' %}
+                <div class="card card-sm border mb-1">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">颗粒分拨</div>
+                            {% if has_pellet_splits %}
+                            <span class="badge bg-green-lt">已分拨</span>
+                            {% else %}
+                            <span class="badge bg-yellow-lt">待分拨</span>
+                            {% endif %}
+                        </div>
+                        {% if not has_pellet_splits %}
+                        <a href="{% url 'trial_pellet_split' order.pk %}" class="btn btn-sm btn-outline-cyan ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if color_task %}
+                <div class="card card-sm border mb-1">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">配色任务</div>
+                            <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'color_center:detail' order.pk %}" class="btn btn-sm btn-outline-orange ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% if injection_task %}
+                <div class="card card-sm border mb-1">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">注塑任务</div>
+                            <span class="badge {{ injection_task.status_css_class }}">{{ injection_task.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endif %}
+
+                {% for tt in testing_tasks %}
+                <div class="card card-sm border mb-1">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">测试任务</div>
+                            <span class="badge {{ tt.status_css_class }}">{{ tt.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'material_testing:detail' tt.pk %}" class="btn btn-sm btn-outline-yellow ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         </div>
+        {% endif %}
     </div>
-</div>
-{% endif %}
 
-<!-- 样品库存汇总 -->
-{% if formula_split_summaries %}
-<div class="row mt-3">
-    <div class="col-12">
-        <div class="card">
+    {# ── 样品库存汇总（第三列） ── #}
+    {% if formula_split_summaries %}
+    <div class="col-lg-4">
+        <div class="card card-sm">
             <div class="card-header bg-cyan-lt d-flex justify-content-between align-items-center">
                 <h3 class="card-title">
                     <i class="ti ti-package me-2"></i>样品库存汇总
                     {% if has_pellet_splits %}
-                    <span class="badge bg-green-lt ms-2">已分拨</span>
+                    <span class="badge bg-green-lt ms-1">已分拨</span>
                     {% else %}
-                    <span class="badge bg-secondary-lt ms-2">未分拨</span>
+                    <span class="badge bg-secondary-lt ms-1">未分拨</span>
                     {% endif %}
                 </h3>
-                <a href="{% url 'trial_sample_list' %}?trial_code={{ order.trial_code }}" class="btn btn-sm btn-outline-secondary">查看全部</a>
+                <a href="{% url 'trial_sample_list' %}?trial_code={{ order.trial_code }}" class="btn btn-sm btn-ghost-secondary">查看全部</a>
             </div>
-            <div class="card-body p-0">
-
-                {# ── 配方粒度分拨明细 ── #}
-                <div class="text-muted small fw-bold px-3 pt-3 mb-2">
-                    <i class="ti ti-arrows-split me-1"></i>按配方版本
+            <div class="card-body p-2">
+                {% for fs in formula_split_summaries %}
+                <div class="border rounded p-2 mb-2 {% if forloop.last %}mb-0{% endif %}">
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <span class="badge bg-azure-lt">v{{ fs.formula.version }}</span>
+                        <span class="small fw-bold">{{ fs.formula.name|truncatechars:20 }}</span>
+                        {% if fs.batch_number %}
+                        <span class="badge bg-purple-lt ms-auto">{{ fs.batch_number }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex gap-2 text-center small">
+                        <div class="flex-1 bg-light rounded p-1">
+                            <div class="text-muted">计划</div>
+                            <div class="fw-bold">{{ fs.planned_qty|floatformat:1 }} kg</div>
+                        </div>
+                        <div class="flex-1 bg-blue-lt rounded p-1">
+                            <div class="text-muted">成品</div>
+                            <div class="fw-bold text-green">{{ fs.finished_qty|floatformat:1 }} kg</div>
+                        </div>
+                        <div class="flex-1 bg-orange-lt rounded p-1">
+                            <div class="text-muted">待打样</div>
+                            <div class="fw-bold text-orange">{{ fs.for_injection_qty|floatformat:1 }} kg</div>
+                        </div>
+                        <div class="flex-1 bg-light rounded p-1">
+                            <div class="text-muted">合计</div>
+                            <div class="fw-bold">{{ fs.total_split|floatformat:1 }} kg</div>
+                        </div>
+                    </div>
+                    {% if fs.planned_qty > 0 %}
+                    <div class="progress progress-sm mt-1" style="height: 3px;">
+                        <div class="progress-bar {% if fs.total_split > fs.planned_qty %}bg-danger{% else %}bg-primary{% endif %}"
+                             style="width: {% widthratio fs.total_split|floatformat:1 fs.planned_qty|floatformat:1 100 %}%"></div>
+                    </div>
+                    {% endif %}
                 </div>
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table" style="font-size: 13px;">
-                        <thead>
-                            <tr>
-                                <th>配方</th>
-                                <th>批次号</th>
-                                <th class="text-end">计划 (kg)</th>
-                                <th class="text-end" style="width: 100px">颗粒成品</th>
-                                <th class="text-end" style="width: 100px">待打样</th>
-                                <th class="text-end" style="width: 100px">合计</th>
-                                <th>进度</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for fs in formula_split_summaries %}
-                            <tr>
-                                <td>
-                                    <span class="badge bg-azure-lt me-1">v{{ fs.formula.version }}</span>
-                                    <span class="small">{{ fs.formula.name|truncatechars:24 }}</span>
-                                </td>
-                                <td>
-                                    {% if fs.batch_number %}
-                                    <span class="badge bg-purple-lt">{{ fs.batch_number }}</span>
-                                    {% else %}
-                                    <span class="text-muted">-</span>
-                                    {% endif %}
-                                </td>
-                                <td class="text-end fw-bold">{{ fs.planned_qty|floatformat:1 }}</td>
-                                <td class="text-end text-green">{{ fs.finished_qty|floatformat:1 }}</td>
-                                <td class="text-end text-orange">{{ fs.for_injection_qty|floatformat:1 }}</td>
-                                <td class="text-end fw-bold">{{ fs.total_split|floatformat:1 }}</td>
-                                <td>
-                                    {% if fs.planned_qty > 0 %}
-                                    <div class="d-flex align-items-center gap-2">
-                                        <div class="progress progress-sm flex-grow-1" style="height: 4px;">
-                                            <div class="progress-bar {% if fs.total_split > fs.planned_qty %}bg-danger{% else %}bg-primary{% endif %}"
-                                                 style="width: {% widthratio fs.total_split|floatformat:1 fs.planned_qty|floatformat:1 100 %}%"></div>
-                                        </div>
-                                        <span class="small text-muted" style="min-width: 45px;">{% widthratio fs.total_split|floatformat:1 fs.planned_qty|floatformat:1 100 %}%</span>
-                                    </div>
-                                    {% endif %}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-
+                {% endfor %}
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
-{% endif %}
 
 <!-- BOM明细 & 配料表 -->
 {% if merged_bom_rows %}

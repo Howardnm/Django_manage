@@ -236,7 +236,7 @@ class OrderSampleDetailView(SampleInventoryAccessMixin, View):
                         sample, form.cleaned_data, request.user,
                     )
                     success += 1
-                except Exception:
+                except ValueError as e:
                     logger.exception(
                         f"Order SAP entry failed for sample {sample.pk}"
                     )
@@ -407,9 +407,9 @@ class SapEntryView(SampleInventoryAccessMixin, View):
                 )
                 messages.success(request, f'样品 [{sample.trial_code}] 已入SAP仓库')
                 return redirect('trial_sample_detail', pk=pk)
-            except Exception:
+            except ValueError as e:
                 logger.exception(f"SAP entry failed for sample {sample.pk}")
-                messages.error(request, 'SAP入库操作失败，请稍后重试')
+                messages.error(request, f'SAP入库操作失败：{e}')
 
         return render(request, self.template_name, {
             'samples': [sample],
@@ -486,7 +486,7 @@ class SapEntryView(SampleInventoryAccessMixin, View):
                     sample, form.cleaned_data, request.user,
                 )
                 success += 1
-            except Exception:
+            except ValueError as e:
                 logger.exception(f"Batch SAP entry failed for sample {sample.pk}")
                 failed += 1
 
@@ -501,10 +501,9 @@ class SapEntryView(SampleInventoryAccessMixin, View):
 
     @staticmethod
     def _lookup_sap_code(sample):
-        """沿 formula→project→material 链查找 SAP 物料号，找不到返回空字符串"""
-        if sample.formula and sample.formula.project and sample.formula.project.material:
-            return sample.formula.project.material.sap_material_code or ''
-        return ''
+        """沿 formula→project→material 链查找 SAP 物料号（委托 Service 层统一逻辑）"""
+        return SampleInventoryService.get_order_sap_material_code(
+            sample.production_order) if sample.production_order else ''
 
     @staticmethod
     def _parse_ids(request):
