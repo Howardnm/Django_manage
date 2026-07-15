@@ -121,9 +121,11 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
                     out_formula_map[sp.formula_id] = sp.formula
             out_formulas = sorted(out_formula_map.values(), key=lambda f: f.version)
 
-            # 按模具分组，构建矩阵行
+            # 按模具分组，构建矩阵行（跳过 mold_id 为空的无效数据）
             mold_specimens = {}
             for sp in specimens:
+                if not sp.mold_id or not sp.mold:
+                    continue
                 mold_key = sp.mold_id
                 if mold_key not in mold_specimens:
                     mold_specimens[mold_key] = {

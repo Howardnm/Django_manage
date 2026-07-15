@@ -1,4 +1,4 @@
-<form method="post">
+<form method="post" id="bom-form">
     {% csrf_token %}
     <input type="hidden" name="formula_id" value="{{ selected_formula.pk }}">
     <div class="card mb-3">
@@ -7,7 +7,7 @@
                 <i class="ti ti-palette me-2"></i>色粉配比BOM
             </h3>
         </div>
-        <div class="table-responsive">
+        <div>
             <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                 <thead>
                 <tr>
@@ -76,12 +76,78 @@
     </div>
     <div class="card mb-3">
         <div class="card-body">
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="ti ti-check me-1"></i>保存色粉BOM
-            </button>
+            <div class="row g-2">
+                <div class="col">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="ti ti-check me-1"></i>保存
+                    </button>
+                </div>
+                <div class="col">
+                    <button type="button" class="btn btn-purple w-100" data-bs-toggle="modal" data-bs-target="#batchSaveModal">
+                        <i class="ti ti-copy me-1"></i>批量保存
+                    </button>
+                </div>
+                <div class="col">
+                    <button type="button" class="btn btn-red w-100" data-bs-toggle="modal" data-bs-target="#batchOverwriteModal">
+                        <i class="ti ti-refresh me-1"></i>覆盖保存
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
+
+    {# 批量保存模态框（跳过已有BOM） #}
+    <div class="modal modal-blur fade" id="batchSaveModal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="ti ti-copy me-2"></i>批量保存</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1">将当前配方的色粉BOM复制到<strong>同实验单号</strong>下其他需要配色的配方版本。</p>
+                    <p class="text-muted small mb-0">已填写BOM的配方将被<strong>跳过</strong>。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-purple" onclick="submitBatch('save')">
+                        <i class="ti ti-copy me-1"></i>确认批量保存
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# 批量覆盖模态框（覆盖已有BOM） #}
+    <div class="modal modal-blur fade" id="batchOverwriteModal" tabindex="-1">
+        <div class="modal-dialog modal-sm modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header bg-red-lt">
+                    <h5 class="modal-title"><i class="ti ti-alert-triangle me-2 text-red"></i>批量覆盖保存</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-1">将当前配方的色粉BOM<strong>强制覆盖</strong>到同实验单号下其他需要配色的配方版本。</p>
+                    <p class="text-red small mb-0"><i class="ti ti-alert-circle me-1"></i>已有BOM的配方将被<strong>覆盖</strong>，不可撤销。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-red" onclick="submitBatch('overwrite')">
+                        <i class="ti ti-refresh me-1"></i>确认覆盖
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="hidden" name="batch_save_mode" id="batchSaveMode" value="">
 </form>
+<script>
+function submitBatch(mode) {
+    document.getElementById('batchSaveMode').value = mode;
+    document.getElementById('bom-form').submit();
+}
+</script>
 
 <script type="text/template" id="entries-empty-form">
     <tr>

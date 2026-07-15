@@ -18,7 +18,7 @@ class AppRawMaterialConfig(AppConfig):
             lambda q: RawMaterial.objects.select_related('category').only(
                 'pk', 'name', 'model_name', 'category__name'
             ).filter(Q(name__icontains=q) | Q(model_name__icontains=q)),
-            lambda r: {'value': r.pk, 'text': f'{r.name} {r.model_name or ""} ({r.category.name})'},
+            lambda r: {'value': r.pk, 'text': f'{r.name} {r.model_name or ""} ({r.category.name})', 'category_name': r.category.name},
             'raw_material_detail',
             access_filter=make_autocomplete_access_filter(RawMaterialAccessMixin),
         )

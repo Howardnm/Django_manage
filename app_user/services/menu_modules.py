@@ -336,6 +336,7 @@ class MenuModule:
             "url_name": "color_center:list",
             "sub_items": [
                 {"name": "配色任务", "url_name": "color_center:list"},
+                {"name": "产品项目", "url_name": "color_center:project_list"},
             ]
         }
 

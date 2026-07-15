@@ -6,6 +6,9 @@ function initColorBom() {
     /* 初始化远程搜索控件 — 复用通用函数 tomselect_remote.js（base.html 已加载） */
     initRemoteTomSelectAll(document, {apiUrl: BOM_TS_API_URL});
 
+    /* 原材料选择后自动更新原材料类型列 */
+    attachCategoryUpdate();
+
     /* ---- Formset 动态新增行 ---- */
     var addBtn = document.getElementById('add-entry-row');
     if (addBtn) {
@@ -23,9 +26,39 @@ function initColorBom() {
 
                 var newRowEl = container.lastElementChild;
                 initRemoteTomSelectAll(newRowEl, {apiUrl: BOM_TS_API_URL});
+                attachCategoryUpdate();
             });
         }
     }
+}
+
+/* 监听 raw_material 的 TomSelect 变化，更新原材料类型列 */
+function attachCategoryUpdate() {
+    document.querySelectorAll('select[data-model="raw_material"]').forEach(function(el) {
+        if (!el.tomselect) return;
+        // 移除旧监听，避免重复绑定
+        el.tomselect.off('item_add', el._catHandler);
+        el._catHandler = function(value, item) {
+            var row = el.closest('tr');
+            if (!row) return;
+            // 原材料类型在第3列（第1列是隐藏的 id input，第2列是喂料口）
+            var catCell = row.querySelector('td:nth-child(3)');
+            if (!catCell) return;
+            var data = el.tomselect.options[value];
+            if (data && data.category_name) {
+                catCell.innerHTML = '<span class="badge bg-blue-lt">' + escapeHtml(data.category_name) + '</span>';
+            } else {
+                catCell.innerHTML = '<span class="text-muted">-</span>';
+            }
+        };
+        el.tomselect.on('item_add', el._catHandler);
+    });
+}
+
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
 }
 
 /* 脚本在 extra_js 块加载时 DOM 已就绪，直接执行；否则等待事件 */

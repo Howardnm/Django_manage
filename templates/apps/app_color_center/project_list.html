@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block title %}配色项目列表{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">配色项目</h2>
+            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
+        </div>
+    </div>
+</div>
+<div class="card mt-3">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
+                <thead>
+                <tr>
+                    <th>项目名称</th>
+                    <th>成品材料</th>
+                    <th>负责人</th>
+                    <th class="text-center">配方配色进度</th>
+                    <th>操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for p in page_obj %}
+                    {% with stats=project_stats|get_item:p.pk %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'color_center:project' p.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ p.name }}">
+                                {{ p.name }}
+                            </a>
+                            <div class="text-muted small mt-1">
+                                <i class="ti ti-calendar-event me-1"></i>{{ p.created_at|date:"Y-m-d" }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if p.material %}
+                            <span class="text-reset">{{ p.material.grade_name }}</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>{{ p.manager.realname|default:p.manager.username }}</td>
+                        <td class="text-center">
+                            {% if stats %}
+                            <span class="badge {% if stats.done == stats.total %}bg-green-lt{% else %}bg-yellow-lt{% endif %}">
+                                {{ stats.done }}/{{ stats.total }}
+                            </span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'color_center:project' p.pk %}" class="btn btn-sm btn-outline-orange">
+                                填写配色
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-palette-off fs-1 opacity-25"></i></div>
+                                <p class="empty-title">暂无配色项目</p>
+                                <p class="empty-subtitle text-muted">当前没有需要配色的活跃项目</p>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
+{% endblock %}

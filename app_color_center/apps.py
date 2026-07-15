@@ -17,5 +17,5 @@ class AppColorCenterConfig(AppConfig):
             'PENDING': ['IN_PROGRESS', 'NOT_REQUIRED'],
             'IN_PROGRESS': ['COMPLETED'],
             'COMPLETED': [],
-            'NOT_REQUIRED': [],
+            'NOT_REQUIRED': ['IN_PROGRESS'],
         })

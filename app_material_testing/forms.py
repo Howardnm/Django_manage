@@ -33,80 +33,106 @@ class TestResultMatrixForm(TablerFormMixin, forms.Form):
             ).values_list('pk', flat=True)
         )
 
+    def _parse_cell_key(self, key):
+        """解析 POST 字段名，提取 (tc_id, f_id, field_type)。
+
+        支持两种格式：
+          value_{tc}_{f}       → NUMBER 类型
+          value_text_{tc}_{f}  → TEXT/SELECT 类型
+
+        Returns (tc_id, f_id, 'number'|'text') 或 (None, None, None)。
+        """
+        if key.startswith('value_text_'):
+            suffix = key[len('value_text_'):]
+            field_type = 'text'
+        elif key.startswith('value_'):
+            suffix = key[len('value_'):]
+            field_type = 'number'
+        else:
+            return None, None, None
+
+        # suffix 格式: "{tc_id}_{f_id}"
+        try:
+            sep = suffix.rfind('_')
+            if sep < 0:
+                return None, None, None
+            tc_id = int(suffix[:sep])
+            f_id = int(suffix[sep + 1:])
+        except (ValueError, TypeError):
+            return None, None, None
+
+        return tc_id, f_id, field_type
+
     def clean(self):
         cleaned = super().clean()
         if not self.testing_task:
             raise ValidationError('缺少关联测试任务')
 
-        results = []
+        # 按 (tc_id, f_id) 聚合单元格数据
+        cells = {}
         errors = []
 
-        # 扫描 POST 数据中所有的 value_{test_config_id}_{formula_id} 键
         for key in self.data:
-            if not key.startswith('value_'):
-                continue
-            parts = key.split('_', 2)  # ['value', 'testConfigPk', 'formulaPk']
-            if len(parts) < 3:
-                continue
-            try:
-                tc_id = int(parts[1])
-                f_id = int(parts[2])
-            except (ValueError, TypeError):
-                errors.append(ValidationError(f'无效的字段名格式: {key}'))
+            tc_id, f_id, field_type = self._parse_cell_key(key)
+            if tc_id is None:
                 continue
 
             if tc_id not in self._valid_test_item_ids:
                 errors.append(ValidationError(
-                    f'测试项目 ID={tc_id} 不属于当前测试任务'
-                ))
+                    f'测试项目 ID={tc_id} 不属于当前测试任务'))
                 continue
-
             if f_id not in self._valid_formula_ids:
                 errors.append(ValidationError(
-                    f'配方 ID={f_id} 不属于当前工单的实验单号'
-                ))
+                    f'配方 ID={f_id} 不属于当前工单的实验单号'))
                 continue
 
+            cell_key = (tc_id, f_id)
+            if cell_key not in cells:
+                cells[cell_key] = {'value': None, 'value_text': ''}
+            if field_type == 'number':
+                cells[cell_key]['value'] = self.data.get(key) or None
+            else:
+                cells[cell_key]['value_text'] = self.data.get(key, '')
+
+        # 数据校验 + 构建结果列表
+        results = []
+        from decimal import Decimal, InvalidOperation
+        for (tc_id, f_id), cell in cells.items():
             tc = self._test_configs.get(tc_id)
-            value = self.data.get(key)
-            value_text = self.data.get(f'value_text_{tc_id}_{f_id}', '')
+            value = cell['value']
+            value_text = cell['value_text']
 
-            # 数据类型校验
-            if tc and tc.data_type == 'NUMBER' and value:
-                try:
-                    from decimal import Decimal, InvalidOperation
-                    Decimal(value)
-                except (InvalidOperation, ValueError):
-                    errors.append(ValidationError(
-                        f'"{tc.name}" 要求输入数值，当前值为 "{value}"'
-                    ))
+            if not value and not value_text:
+                continue
 
-            if tc and tc.data_type == 'SELECT' and value_text:
-                valid_options = tc.get_options_list()
-                if valid_options and value_text not in valid_options:
-                    errors.append(ValidationError(
-                        f'"{tc.name}" 的值 "{value_text}" 不在可选项 {valid_options} 中'
-                    ))
+            if tc:
+                if tc.data_type == 'NUMBER' and value:
+                    try:
+                        Decimal(value)
+                    except (InvalidOperation, ValueError):
+                        errors.append(ValidationError(
+                            f'"{tc.name}" 要求输入数值，当前值为 "{value}"'))
+                elif tc.data_type == 'SELECT' and value_text:
+                    valid_options = tc.get_options_list()
+                    if valid_options and value_text not in valid_options:
+                        errors.append(ValidationError(
+                            f'"{tc.name}" 的值 "{value_text}" 不在可选项 {valid_options} 中'))
+                elif tc.data_type == 'TEXT' and value_text:
+                    if len(value_text) > 50:
+                        errors.append(ValidationError(
+                            f'"{tc.name}" 的文本结果超过50字符限制'))
 
-            if tc and tc.data_type == 'TEXT' and value_text:
-                if len(value_text) > 50:
-                    errors.append(ValidationError(
-                        f'"{tc.name}" 的文本结果超过50字符限制'
-                    ))
-
-            if value or value_text:
-                results.append({
-                    'test_config_id': tc_id,
-                    'formula_id': f_id,
-                    'value': value or None,
-                    'value_text': value_text,
-                    'test_date': self.data.get(f'test_date_{tc_id}') or None,
-                    'remark': self.data.get(f'remark_{tc_id}', ''),
-                })
+            results.append({
+                'test_config_id': tc_id,
+                'formula_id': f_id,
+                'value': value,
+                'value_text': value_text,
+                'test_date': self.data.get(f'test_date_{tc_id}') or None,
+                'remark': self.data.get(f'remark_{tc_id}', ''),
+            })
 
         if errors:
             raise ValidationError(errors)
 
-        # 将解析结果存到 cleaned_data 供视图使用
         cleaned['results_matrix'] = results
         return cleaned

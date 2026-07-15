@@ -117,7 +117,7 @@
                     <th>工单状态</th>
                     <th class="text-center">样品数</th>
                     <th class="text-center">待测试样条</th>
-                    <th class="text-center">已测试样条</th>
+                    <th class="text-center">已消耗</th>
                     <th>创建时间</th>
                     <th style="width: 60px;"></th>
                 </tr>
@@ -142,8 +142,8 @@
                         {% else %}<span class="text-muted">-</span>{% endif %}
                     </td>
                     <td class="text-center">
-                        {% if summary.specimen_tested_count %}
-                        <span class="text-purple fw-bold">{{ summary.specimen_tested_count }} 条</span>
+                        {% if summary.specimen_consumed_count %}
+                        <span class="text-purple fw-bold">{{ summary.specimen_consumed_count }} 条</span>
                         {% else %}<span class="text-muted">-</span>{% endif %}
                     </td>
                     <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>

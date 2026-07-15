@@ -72,6 +72,16 @@
                                     {% else %}
                                     <span class="badge bg-yellow-lt text-yellow flex-shrink-0" style="font-size: 10px;" title="来源: {{ f.project.name }}">史</span>
                                     {% endif %}
+                                    {# BOM 状态指示 — 仅对需要配色的配方显示 #}
+                                    {% if f.pk in color_formula_ids %}
+                                    {% with bom=f.color_powder_bom %}
+                                    {% if bom and bom.entries.exists %}
+                                    <span class="badge bg-green-lt flex-shrink-0" style="font-size: 10px; min-width: 16px;" title="色粉BOM已完成">&#10003;</span>
+                                    {% else %}
+                                    <span class="badge bg-red-lt flex-shrink-0" style="font-size: 10px; min-width: 16px;" title="色粉BOM待填写">&#9679;</span>
+                                    {% endif %}
+                                    {% endwith %}
+                                    {% endif %}
                                 </div>
                             </a>
                             {% endfor %}

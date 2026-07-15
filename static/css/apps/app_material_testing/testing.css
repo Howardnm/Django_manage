@@ -27,3 +27,16 @@
 .formula-col {
     width: 120px;
 }
+/* TomSelect 在表格内的紧凑样式 */
+.matrix-table .ts-wrapper .ts-control {
+    padding: 2px 6px;
+    font-size: 12px;
+    min-height: 28px;
+    height: auto;
+}
+.matrix-table .ts-wrapper.form-select {
+    padding: 0;
+}
+.matrix-table .ts-wrapper {
+    vertical-align: middle;
+}

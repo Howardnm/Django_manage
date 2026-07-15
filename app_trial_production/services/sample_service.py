@@ -121,6 +121,11 @@ class SampleInventoryService:
         for output in specimen_outputs:
             if not output.get('specimen_count') or int(output['specimen_count']) <= 0:
                 continue
+            if not output.get('mold_id'):
+                logger.warning(
+                    f"Skipping specimen output with missing mold_id: {output}"
+                )
+                continue
 
             sample = SampleInventory.objects.create(
                 type='SPECIMEN',
@@ -134,7 +139,7 @@ class SampleInventoryService:
                 storage_location=output.get('storage_location', ''),
                 batch_label=output.get('batch_label', ''),
                 injection_task=injection_task,
-                mold_id=output.get('mold_id'),
+                mold_id=output['mold_id'],
             )
             samples.append(sample)
 
