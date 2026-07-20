@@ -8,8 +8,17 @@
     <div class="modal-body">
         <p class="text-secondary">确认【 {{ node.get_stage_display }} 】异常吗？这将触发新一轮节点迭代。</p>
         <div class="mb-3">
-            <label class="form-label">异常原因</label>
-            <textarea name="remark" class="form-control" rows="3" required placeholder="可填：配方调整计划、客户试模异常分析"></textarea>
+            <label class="form-label">不合格原因</label>
+            <select name="failure_reason_id" class="form-select">
+                <option value="">-- 请选择原因类型 --</option>
+                {% for reason in reasons %}
+                <option value="{{ reason.pk }}">{{ reason.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">补充说明</label>
+            <textarea name="remark" class="form-control" rows="3" placeholder="可选：补充具体异常情况..."></textarea>
         </div>
     </div>
     <div class="modal-footer">

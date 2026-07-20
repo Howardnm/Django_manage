@@ -3,7 +3,8 @@ from django.utils.html import format_html
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from .models import (
-    OEM, Customer, ProjectRepository, ExternalMemberActivity, GradeFactor
+    OEM, Customer, ProjectRepository, ProjectRepositoryFieldChange,
+    ExternalMemberActivity, GradeFactor
 )
 
 User = get_user_model()
@@ -100,12 +101,51 @@ class CustomerAdmin(admin.ModelAdmin):
 # ==========================================
 @admin.register(ProjectRepository)
 class ProjectRepositoryAdmin(admin.ModelAdmin):
-    list_display = ('project', 'customer', 'oem', 'salesperson', 'updated_at')
+    list_display = ('project', 'customer', 'oem', 'salesperson',
+                    'target_cost', 'competitor_price', 'estimated_order_volume',
+                    'approval_status', 'updated_at')
     search_fields = ('project__name', 'customer__company_name', 'oem__name', 'product_name')
     list_filter = ('salesperson', 'updated_at')
     autocomplete_fields = ['project', 'customer', 'oem', 'salesperson']
+    readonly_fields = ('approval_status',)
+
+    def approval_status(self, obj):
+        if obj.workflow_instance and obj.workflow_instance.status == 'RUNNING':
+            return format_html(
+                '<span class="badge bg-purple-lt">审批中</span>'
+            )
+        return '-'
+    approval_status.short_description = '审批状态'
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser: return qs
         return qs.filter(salesperson=request.user)
+
+
+# ==========================================
+# 4.1 档案字段变更记录
+# ==========================================
+@admin.register(ProjectRepositoryFieldChange)
+class ProjectRepositoryFieldChangeAdmin(admin.ModelAdmin):
+    list_display = ('repository', 'status_badge', 'submitted_by',
+                    'customer', 'oem', 'product_name',
+                    'target_cost', 'competitor_price', 'estimated_order_volume',
+                    'created_at', 'resolved_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('repository__project__name', 'submitted_by__username',
+                     'submission_comment', 'product_name',
+                     'customer__company_name', 'oem__name')
+    readonly_fields = ('created_at', 'resolved_at')
+    autocomplete_fields = ['repository', 'submitted_by', 'customer', 'oem', 'salesperson']
+
+    def status_badge(self, obj):
+        css = {
+            'PENDING': 'bg-purple-lt',
+            'APPROVED': 'bg-green-lt',
+            'REJECTED': 'bg-red-lt',
+        }.get(obj.status, 'bg-secondary-lt')
+        return format_html(
+            '<span class="badge {}">{}</span>', css, obj.get_status_display()
+        )
+    status_badge.short_description = '状态'

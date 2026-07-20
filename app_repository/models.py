@@ -92,6 +92,10 @@ class ProjectRepository(models.Model):
 
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # 活跃审批追踪
+    workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="活跃审批流程", help_text="当前正在进行的档案变更审批")
 
     updated_at = models.DateTimeField("最后更新", auto_now=True)
 
@@ -100,6 +104,59 @@ class ProjectRepository(models.Model):
         verbose_name = "项目档案"
         verbose_name_plural = "3. 项目商务档案"
         ordering = ['-updated_at']
+
+
+# ==========================================
+# 3.1 档案字段变更记录 — 审批申请 & 历史追踪
+# ==========================================
+class ProjectRepositoryFieldChange(models.Model):
+    """项目档案财务字段变更记录 — 既是审批申请，也是历史记录"""
+
+    STATUS_CHOICES = [
+        ('PENDING', '待审批'),
+        ('APPROVED', '已通过'),
+        ('REJECTED', '已拒绝'),
+    ]
+
+    repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='field_changes', verbose_name="关联档案")
+
+    # 变更字段（新值快照）— 商业关系
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户")
+    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="主机厂")
+    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='repo_change_salespersons', verbose_name="业务员")
+
+    # 变更字段（新值快照）— 产品信息
+    product_name = models.CharField("客户产品名称", max_length=100, blank=True)
+    product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
+
+    # 变更字段（新值快照）— 销售指标
+    target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
+    estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # 提交信息
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='repo_field_changes', verbose_name="提交人")
+    submission_comment = models.TextField("提交意见", help_text="请说明编辑档案的原因")
+
+    # 审批追踪
+    status = models.CharField("状态", max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联审批流程")
+
+    # 时间戳
+    created_at = models.DateTimeField("提交时间", auto_now_add=True)
+    resolved_at = models.DateTimeField("处理时间", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "档案字段变更记录"
+        verbose_name_plural = verbose_name
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['repository', '-created_at']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"{self.repository} — {self.get_status_display()} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
 
 
 # 外部行为回流记录

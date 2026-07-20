@@ -25,52 +25,56 @@
                 <li class="step-item {{ node.row_active_class }} {% if node.is_feedback_stage %}step-item-warning{% endif %}">
 
                     <div class="h4 m-0 d-flex align-items-center justify-content-between">
-                            <span>
-                                <!-- 使用 models 中的 title_status_css_class -->
-                                <span class="{{ node.title_status_css_class }}">
-                                    {{ forloop.counter }}、{{ node.get_stage_display }}
-                                </span>
-                                {% if node.round > 1 %}
-                                    <span class="badge bg-secondary-lt">第{{ node.round }}轮</span>
-                                {% endif %}
-
-                                <!-- 绩效评分展示：当节点已有最终判定得分时显示 -->
-                                {% if node.final_score > 0 %}
-                                    <span class="badge bg-yellow-lt ms-2" title="研发得分">
-                                        <i class="ti ti-star-filled me-1"></i>研发: {{ node.final_score|floatformat:0 }}
-                                    </span>
-                                {% endif %}
-                                {% if node.sales_final_score > 0 %}
-                                    <span class="badge bg-green-lt ms-2" title="销售得分">
-                                        <i class="ti ti-star-filled me-1"></i>销售: {{ node.sales_final_score|floatformat:0 }}
-                                    </span>
-                                {% endif %}
-
-                                <!-- 【联动工作流】显示审批链接 -->
-                                {% if node.workflow_instance %}
-                                    <a href="{% url 'workflow_instance_detail' pk=node.workflow_instance.pk %}" class="badge bg-purple-lt ms-2" title="点击查看审批详情">
-                                        <i class="ti ti-git-pull-request me-1"></i>审批记录
-                                    </a>
-                                {% endif %}
+                        <span>
+                            <!-- 使用 models 中的 title_status_css_class -->
+                            <span class="{{ node.title_status_css_class }}">
+                                {{ forloop.counter }}、{{ node.get_stage_display }}
                             </span>
+                            {% if node.round > 1 %}
+                                <span class="badge bg-secondary-lt">第{{ node.round }}轮</span>
+                            {% endif %}
 
-                        <!-- 【优化】直接调用 Model 属性获取样式类 -->
-                        <span class="badge {{ node.status_css_class }}">
+                            <!-- 绩效评分展示：当节点已有最终判定得分时显示 -->
+                            {% if node.final_score > 0 %}
+                                <span class="badge bg-yellow-lt ms-2" title="研发得分">
+                                    <i class="ti ti-star-filled me-1"></i>研发: {{ node.final_score|floatformat:0 }}
+                                </span>
+                            {% endif %}
+                            {% if node.sales_final_score > 0 %}
+                                <span class="badge bg-green-lt ms-2" title="销售得分">
+                                    <i class="ti ti-star-filled me-1"></i>销售: {{ node.sales_final_score|floatformat:0 }}
+                                </span>
+                            {% endif %}
+
+                            <!-- 【联动工作流】显示审批链接 -->
+                            {% if node.workflow_instance %}
+                                <a href="{% url 'workflow_instance_detail' pk=node.workflow_instance.pk %}" class="badge bg-purple-lt ms-2" title="点击查看审批详情">
+                                    <i class="ti ti-git-pull-request me-1"></i>审批记录
+                                </a>
+                            {% endif %}
+                        </span>
+
+                        <span class="d-flex align-items-center">
+                            <!-- 不合格原因 / 客户意见类型 -->
+                            {% if node.failure_reason %}
+                                <span class="badge bg-red-lt me-2">{{ node.failure_reason.name }}</span>
+                            {% endif %}
+                            {% if node.feedback_type %}
+                                <span class="badge bg-yellow-lt me-2">{{ node.feedback_type.name }}</span>
+                            {% endif %}
+                            <!-- 【优化】直接调用 Model 属性获取样式类 -->
+                            <span class="badge {{ node.status_css_class }}">
                                 {{ node.get_status_display }}
                             </span>
+                        </span>
                     </div>
 
-                    <!-- 备注区域：使用 Tabler 的 card 或 alert 样式美化 -->
+                    <!-- 备注区域 -->
                     {% if node.remark %}
                         <div class="mt-2">
-                            <div class="card card-sm border-0 bg-muted-lt">
+                            <div class="card bg-secondary-lt">
                                 <div class="card-body p-2">
-                                    <div class="d-flex align-items-start">
-                                        <div class="me-2 text-secondary">
-                                            <i class="ti ti-note"></i>
-                                        </div>
-                                        <div class="text-secondary small" style="white-space: pre-wrap; line-height: 1.5;">{{ node.remark|linebreaksbr }}</div>
-                                    </div>
+                                    <p class="small">{{ node.remark|linebreaksbr }}</p>
                                 </div>
                             </div>
                         </div>

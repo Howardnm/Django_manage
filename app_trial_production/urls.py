@@ -23,13 +23,9 @@ from .views.SampleInventory import (
     OrderSampleDetailView,
 )
 from .views.PelletSplit import PelletSplitView
-from .views.Config import TrialConfigView
 from .views.Autocomplete import TrialAutocompleteView
 
 urlpatterns = [
-    # Config
-    path('config/', TrialConfigView.as_view(), name='trial_config'),
-
     # Dashboard
     path('', TrialDashboardView.as_view(), name='trial_dashboard'),
 

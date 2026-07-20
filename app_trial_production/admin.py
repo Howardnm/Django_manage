@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import (
     ProductionOrder, ProductionOrderFormulaDetail,
     ExtrusionTask,
@@ -36,4 +38,21 @@ class SampleInventoryAdmin(admin.ModelAdmin):
 
 @admin.register(TrialProductionConfig)
 class TrialProductionConfigAdmin(admin.ModelAdmin):
-    list_display = ['pk', 'workflow_definition', 'updated_at']
+    list_display = ['__str__', 'workflow_display', 'updated_at']
+
+    def has_add_permission(self, request):
+        """禁止新增（单例模式）"""
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        """禁止删除"""
+        return False
+
+    def workflow_display(self, obj):
+        if obj.workflow_definition:
+            return format_html(
+                '<span class="badge bg-blue-lt">{}</span>',
+                obj.workflow_definition.name
+            )
+        return mark_safe('<span class="badge bg-secondary-lt">未配置（排产单无需审批）</span>')
+    workflow_display.short_description = '审批流程'

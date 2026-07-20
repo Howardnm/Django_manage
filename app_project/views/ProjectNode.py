@@ -6,7 +6,7 @@ from django.contrib import messages
 
 from app_project.forms import ProjectNodeUpdateForm
 from app_project.mixins import ProjectAccessMixin
-from app_project.models import ProjectNode
+from app_project.models import ProjectNode, FailureReason, FeedbackType
 from app_workflow.services import WorkflowService
 
 
@@ -117,14 +117,20 @@ class NodeFailedView(ProjectAccessMixin, View):
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(node.project)
-        return render(request, self.template_name, {'node': node})
+        reasons = FailureReason.objects.filter(is_active=True).order_by('order', 'name')
+        return render(request, self.template_name, {'node': node, 'reasons': reasons})
 
     def post(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(node.project)
 
+        failure_reason_id = request.POST.get('failure_reason_id')
+        failure_reason = None
+        if failure_reason_id:
+            failure_reason = get_object_or_404(FailureReason, pk=failure_reason_id, is_active=True)
+
         remark = request.POST.get('remark', '测试不通过，需返工')
-        node.perform_failure_logic(remark)
+        node.perform_failure_logic(remark, failure_reason=failure_reason)
 
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
 
@@ -140,16 +146,19 @@ class InsertFeedbackView(ProjectAccessMixin, View):
     def get(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(node.project)
-        return render(request, self.template_name, {'node': node})
+        feedback_types = FeedbackType.objects.filter(is_active=True).order_by('order', 'name')
+        return render(request, self.template_name, {'node': node, 'feedback_types': feedback_types})
 
     def post(self, request, pk):
         current_node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(current_node.project)
 
+        feedback_type_id = request.POST.get('feedback_type_id')
         current_node.project.handle_customer_feedback(
             current_node=current_node,
             feedback_type=request.POST.get('feedback_type'),
-            content=request.POST.get('remark')
+            content=request.POST.get('remark'),
+            feedback_type_obj_id=feedback_type_id or None,
         )
 
         return HttpResponse(status=204, headers={'HX-Refresh': 'true'})

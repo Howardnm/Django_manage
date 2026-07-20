@@ -10,6 +10,25 @@ class AppRepositoryConfig(AppConfig):
         # 导入信号，使其生效
         import app_repository.utils.signals
 
+        # 注册工作流关联对象路由 & 功能开关
+        from django.urls import reverse
+        from app_workflow.utils import related_object_router, workflow_feature_registry
+        from app_repository.models import ProjectRepositoryFieldChange
+
+        related_object_router.register(
+            ProjectRepositoryFieldChange,
+            url_resolver=lambda obj: reverse(
+                'project_detail', kwargs={'pk': obj.repository.project_id}
+            ),
+            display_name_resolver=lambda obj: (
+                f"{obj.repository.project.name} 档案变更"
+            ),
+            person_resolver=lambda obj: obj.submitted_by,
+        )
+        workflow_feature_registry.register(
+            ProjectRepositoryFieldChange, allow_return=False
+        )
+
         # 注册附件配置
         from app_attachment.registry import register_attachment
         from app_attachment.configs import AttachmentConfig

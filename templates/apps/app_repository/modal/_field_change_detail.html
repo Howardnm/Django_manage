@@ -1,0 +1,82 @@
+<div class="modal-header">
+    <h5 class="modal-title">
+        <i class="ti ti-history me-2"></i>档案变更详情
+    </h5>
+    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+</div>
+
+<div class="modal-body">
+    <!-- 状态 & 提交人 -->
+    <div class="d-flex align-items-center mb-3">
+        <span class="badge bg-{% if change.status == 'APPROVED' %}green{% elif change.status == 'REJECTED' %}red{% else %}purple{% endif %}-lt me-2">
+            {{ change.get_status_display }}
+        </span>
+        <span class="text-muted small">
+            {{ change.submitted_by.username|default:"系统" }} 提交于 {{ change.created_at|date:"Y-m-d H:i" }}
+        </span>
+    </div>
+
+    <!-- 提交意见 -->
+    {% if change.submission_comment %}
+    <div class="mb-3">
+        <div class="small fw-bold text-muted mb-1">提交意见</div>
+        <div class="card card-active">
+            <div class="card-body">
+                <p class="mb-0">{{ change.submission_comment|linebreaksbr }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 变更对比表 -->
+    <div class="table-responsive">
+        <table class="table table-sm table-vcenter">
+            <thead>
+                <tr>
+                    <th class="text-muted small">字段</th>
+                    <th class="text-muted small">变更后值</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="text-muted small">直接客户</td>
+                    <td>{{ change.customer.company_name|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">主机厂</td>
+                    <td>{{ change.oem.name|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">业务员</td>
+                    <td>{{ change.salesperson.username|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">产品名称</td>
+                    <td>{{ change.product_name|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">产品代码</td>
+                    <td>{{ change.product_code|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">目标成本</td>
+                    <td>{% if change.target_cost %}¥{{ change.target_cost }}/kg{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">竞品售价</td>
+                    <td>{% if change.competitor_price %}¥{{ change.competitor_price }}/kg{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">预估订单用量</td>
+                    <td>{% if change.estimated_order_volume %}{{ change.estimated_order_volume }} kg/年{% else %}—{% endif %}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+
+    {% if change.resolved_at %}
+    <div class="text-muted small mt-2">
+        <i class="ti ti-clock me-1"></i>{{ change.get_status_display }}于 {{ change.resolved_at|date:"Y-m-d H:i" }}
+    </div>
+    {% endif %}
+</div>

@@ -3,7 +3,7 @@ from django.forms import BaseModelFormSet, modelformset_factory, ValidationError
 from common_utils.filters import TablerFormMixin
 from .models import (
     ProductionOrder, ExtrusionTask,
-    SampleInventory, TrialProductionConfig,
+    SampleInventory,
 )
 from app_mold_injection.models import MoldRequirement
 
@@ -54,20 +54,6 @@ class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
             'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
             'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
             'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
-        }
-
-
-# ---- 全局配置 ----
-
-class TrialConfigForm(TablerFormMixin, forms.ModelForm):
-    """排产全局配置表单"""
-    class Meta:
-        model = TrialProductionConfig
-        fields = ['workflow_definition']
-        widgets = {
-            'workflow_definition': forms.Select(attrs={
-                'class': 'form-select',
-            }),
         }
 
 

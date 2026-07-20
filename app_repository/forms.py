@@ -47,9 +47,19 @@ class OEMForm(TablerFormMixin, forms.ModelForm):
 # 3. 项目商务档案表单
 # ==========================================
 class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
+    submission_comment = forms.CharField(
+        label="提交意见",
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': '请说明本次编辑档案的原因（如：客户压价、新材料替换、用量变更等）',
+        }),
+        required=True,
+        help_text="编辑档案信息需填写变更原因并提交审批，审批通过后生效"
+    )
+
     class Meta:
         model = ProjectRepository
-        exclude = ['project', 'updated_at']
+        exclude = ['project', 'updated_at', 'workflow_instance']
         widgets = {
             'customer': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'}),
             'oem': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'oem'}),

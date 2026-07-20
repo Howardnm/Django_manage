@@ -23,6 +23,7 @@ class ProjectStage(models.TextChoices):
 # 2. 项目主体模型
 class Project(models.Model):
     name = models.CharField("项目名称", max_length=100)
+    code = models.CharField("项目编码", max_length=50, unique=True, blank=True, help_text="唯一项目编码，留空则自动生成")
     manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="项目负责人")
     description = models.TextField("项目描述", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
@@ -124,7 +125,7 @@ class Project(models.Model):
                 remark=f"第 {new_round} 轮调整：\n"
             )
 
-    def handle_customer_feedback(self, current_node, feedback_type, content):
+    def handle_customer_feedback(self, current_node, feedback_type, content, feedback_type_obj_id=None):
         with transaction.atomic():
             if feedback_type == 'STOP':
                 current_node.status = 'TERMINATED'
@@ -136,6 +137,8 @@ class Project(models.Model):
                 if feedback_node:
                     feedback_node.status = 'FEEDBACK'
                     feedback_node.remark = content
+                    if feedback_type_obj_id:
+                        feedback_node.feedback_type_id = feedback_type_obj_id
                     feedback_node.save()
 
     def terminate_project(self, current_node_order, reason):
@@ -178,6 +181,12 @@ class ProjectNode(models.Model):
 
     # 【联动工作流】关联审批实例
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联审批流程")
+
+    # 不合格原因关联
+    failure_reason = models.ForeignKey('FailureReason', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="不合格原因", help_text="申报异常时选择的不合格原因类型")
+
+    # 客户意见类型关联
+    feedback_type = models.ForeignKey('FeedbackType', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="客户意见类型", help_text="客户反馈时选择的意见分类")
 
     class Meta:
         verbose_name = "项目进度节点"
@@ -287,10 +296,12 @@ class ProjectNode(models.Model):
             return f'{self.project.name} — 量产成熟配方'
         return f'{self.project.name} — {self.get_stage_display()} 第{self.round}轮'
 
-    def perform_failure_logic(self, reason):
+    def perform_failure_logic(self, reason, failure_reason=None):
         with transaction.atomic():
             self.status = 'FAILED'
             self.remark = reason
+            if failure_reason:
+                self.failure_reason = failure_reason
             self.save()
         project = self.project
         if self.stage in ['RND', 'PILOT', 'MID_TEST']:
@@ -338,7 +349,8 @@ class ProjectSalesMember(models.Model):
 # 5. 项目全局配置（单例）
 class ProjectConfig(models.Model):
     """项目全局配置，仅允许超级管理员修改。"""
-    default_approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition',on_delete=models.SET_NULL,null=True, blank=True,verbose_name='默认审批流程')
+    default_approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='默认审批流程（项目节点）')
+    default_repository_approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='默认审批流程（项目档案）', related_name='repo_configs', help_text='编辑项目档案时使用的审批流程，留空则编辑直接生效')
 
     class Meta:
         verbose_name = "项目全局配置"
@@ -353,7 +365,43 @@ class ProjectConfig(models.Model):
         return obj
 
 
-# 6. 评分规则配置模型
+# 6. 不合格原因库（lookup 模型）
+class FailureReason(models.Model):
+    """预定义的不合格原因类型，供节点申报异常时选择关联"""
+    name = models.CharField("原因名称", max_length=50, unique=True)
+    code = models.CharField("原因编码", max_length=20, blank=True, help_text="如：FORMULA_FAIL, COLOR_DEVIATION")
+    order = models.PositiveIntegerField("排序权重", default=0, help_text="数字越小越靠前")
+    description = models.TextField("原因说明", blank=True, help_text="详细说明该不合格原因的含义")
+    is_active = models.BooleanField("是否启用", default=True)
+
+    class Meta:
+        verbose_name = "不合格原因"
+        verbose_name_plural = "不合格原因库"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+# 6.1 客户意见类型库（lookup 模型）
+class FeedbackType(models.Model):
+    """预定义的客户意见类型，供节点客户反馈时选择关联"""
+    name = models.CharField("意见类型名称", max_length=50, unique=True)
+    code = models.CharField("类型编码", max_length=20, blank=True, help_text="如：COLOR_ADJUST, PERF_CHANGE")
+    order = models.PositiveIntegerField("排序权重", default=0, help_text="数字越小越靠前")
+    description = models.TextField("类型说明", blank=True, help_text="详细说明该意见类型的使用场景")
+    is_active = models.BooleanField("是否启用", default=True)
+
+    class Meta:
+        verbose_name = "客户意见类型"
+        verbose_name_plural = "客户意见类型库"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+# 7. 评分规则配置模型
 class NodeScoreRule(models.Model):
     RULE_TYPES = [('RD', '研发'), ('SALES', '销售')]
 

@@ -1,18 +1,19 @@
 from django.urls import path
-from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView, ProjectDetailView, ProjectConfigView
+from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView, ProjectDetailView
 from .views.ProjectFormulaProcess import ProjectFormulaProcessView, CompetitorOrderCreateView, FormulaMeanWritebackView
 from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
 from .views.ProjectMember import *
 from .views.ProjectSalesMember import *
 from .views.PerformanceRule import *
+from .views.FailureReason import *
+from .views.FeedbackType import *
 from app_panel.views.PerformanceView import UserPerformanceListView, UserPerformanceDetailView
 from app_form_management.views import ProjectFormListView
 
 urlpatterns = [
     path('list/', ProjectListView.as_view(), name='project_list'),
     path('create/', ProjectCreateView.as_view(), name='project_create'),
-    path('config/', ProjectConfigView.as_view(), name='project_config'),
     path('<int:pk>/', ProjectDetailView.as_view(), name='project_detail'),
     path('<int:pk>/formula-process/', ProjectFormulaProcessView.as_view(), name='project_formula_process'),
     path('<int:pk>/formula-process/competitor/create/', CompetitorOrderCreateView.as_view(), name='project_competitor_order_create'),
@@ -42,4 +43,16 @@ urlpatterns = [
     # 项目销售成员管理
     path('<int:pk>/sales-member/manage/', ProjectSalesMemberManageView.as_view(), name='project_sales_member_manage'),
     path('sales-member/<int:pk>/delete/', ProjectSalesMemberDeleteView.as_view(), name='project_sales_member_delete'),
+
+    # 不合格原因管理
+    path('failure-reasons/', FailureReasonListView.as_view(), name='failure_reason_list'),
+    path('failure-reasons/create/', FailureReasonCreateView.as_view(), name='failure_reason_create'),
+    path('failure-reasons/<int:pk>/edit/', FailureReasonUpdateView.as_view(), name='failure_reason_edit'),
+    path('failure-reasons/<int:pk>/delete/', FailureReasonDeleteView.as_view(), name='failure_reason_delete'),
+
+    # 客户意见类型管理
+    path('feedback-types/', FeedbackTypeListView.as_view(), name='feedback_type_list'),
+    path('feedback-types/create/', FeedbackTypeCreateView.as_view(), name='feedback_type_create'),
+    path('feedback-types/<int:pk>/edit/', FeedbackTypeUpdateView.as_view(), name='feedback_type_edit'),
+    path('feedback-types/<int:pk>/delete/', FeedbackTypeDeleteView.as_view(), name='feedback_type_delete'),
 ]

@@ -17,6 +17,7 @@ urlpatterns = [
     # 项目档案 (核心业务)
     path('project/<int:project_id>/edit/', ProjectRepositoryUpdateView.as_view(), name='repo_project_edit'),
     path('project/repo/<int:pk>/detail/', ProjectFileDetailView.as_view(), name='repo_project_file_detail'),
+    path('change/<int:pk>/detail/', RepoFieldChangeModalView.as_view(), name='repo_field_change_detail'),
     path('api/search/', RepoAutocompleteView.as_view(), name='repo_api_search'),
 
     # 主机厂 (OEM 用户画像管理)

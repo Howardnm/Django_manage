@@ -267,7 +267,7 @@ class User(AbstractUser):
         PURCHASING = 'PURCHASING', '采购专员'
         CUSTOMER = 'CUSTOMER', '外部客户'
         OEM = 'OEM', '主机厂成员'
-        ADMIN = 'ADMIN', '系统管理员'
+        ADMIN = 'ADMIN', '项目管理文员'
         EXTRUSION_OPERATOR = 'EXTRUSION_OPERATOR', '挤出操作员'
         COLOR_OPERATOR = 'COLOR_OPERATOR', '配色员'
         INJECTION_OPERATOR = 'INJECTION_OPERATOR', '注塑操作员'

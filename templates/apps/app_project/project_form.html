@@ -53,6 +53,16 @@
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
 
+                <!-- 项目编码 -->
+                <div class="mb-3">
+                    <label class="form-label">项目编码</label>
+                    {{ form.code }}
+                    <small class="form-hint">唯一项目编码，用于快速检索，留空则自动生成。</small>
+                    {% if form.code.errors %}
+                        <div class="invalid-feedback d-block">{{ form.code.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
                 <!-- 项目名称 -->
                 <div class="mb-3">
                     <label class="form-label required">项目名称</label>

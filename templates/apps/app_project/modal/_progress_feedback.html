@@ -10,7 +10,18 @@
     {% csrf_token %}
     <div class="modal-body">
 
-        <!-- 1. 干预类型选择 (单选框组) -->
+        <!-- 1. 意见分类选择 -->
+        <div class="mb-3">
+            <label class="form-label">意见分类</label>
+            <select name="feedback_type_id" class="form-select" required>
+                <option value="">-- 请选择意见分类 --</option>
+                {% for ft in feedback_types %}
+                <option value="{{ ft.pk }}">{{ ft.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- 2. 干预类型选择 (单选框组) -->
         <div class="mb-3">
             <label class="form-label">意见类型</label>
             <div class="form-selectgroup">

@@ -38,14 +38,7 @@
 
         <div class="mb-3">
             <label class="form-label required">选择成员</label>
-            <select name="user" class="form-select" required>
-                <option value="">请选择系统用户...</option>
-                {% for choice in form.fields.user.queryset %}
-                    <option value="{{ choice.id }}" {% if form.user.value|add:0 == choice.id %}selected{% endif %}>
-                        {{ choice.username }}
-                    </option>
-                {% endfor %}
-            </select>
+            {{ form.user }}
         </div>
 
         <div class="row">

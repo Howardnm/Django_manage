@@ -39,6 +39,11 @@
             <div class="text-secondary small d-flex align-items-center">
                 <i class="ti ti-user me-1"></i>
                 负责人：<span class="fw-medium">{{ project.manager.username }}</span>
+                {% if project.code %}
+                <span class="text-muted mx-2">|</span>
+                <i class="ti ti-hash me-1"></i>
+                编码：<span class="fw-medium">{{ project.code }}</span>
+                {% endif %}
             </div>
         </div>
 
@@ -66,7 +71,7 @@
         <div class="row g-0">
             <div class="col-6 border-end p-2 text-center">
                 <div class="text-uppercase text-muted small fw-bold mb-1" style="font-size: 10px;">创建时间</div>
-                <div class="text-dark">{{ project.created_at|date:"Y-m-d" }}</div>
+                <div class="text-primary fw-bold">{{ project.created_at|date:"Y-m-d H:i" }}</div>
             </div>
             <div class="col-6 p-2 text-center">
                 <div class="text-uppercase text-muted small fw-bold mb-1" style="font-size: 10px;">当前阶段</div>

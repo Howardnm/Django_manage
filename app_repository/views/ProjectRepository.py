@@ -9,9 +9,10 @@ from django.contrib.auth import get_user_model
 from app_repository.forms import ProjectRepositoryForm
 from app_repository.utils.filters import ProjectRepositoryFilter
 from app_project.models import Project
-from app_repository.models import ProjectRepository, Customer, OEM
+from app_repository.models import ProjectRepository, ProjectRepositoryFieldChange, Customer, OEM
 from app_repository.mixins import RepositoryAccessMixin
 from app_material.models.material import ApplicationScenario, MaterialCharacteristic
+from app_workflow.services import WorkflowService
 
 User = get_user_model()
 
@@ -35,8 +36,78 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
         return repo
 
     def form_valid(self, form):
-        messages.success(self.request, "项目档案基础信息已更新")
-        return super().form_valid(form)
+        repo = self.object
+        project = repo.project
+
+        # 读取档案审批流程配置
+        from app_project.models import ProjectConfig
+        repo_workflow = ProjectConfig.get().default_repository_approval_workflow
+
+        # 防御：清除已失效的 workflow_instance 引用（回调异常时可能残留）
+        if repo.workflow_instance_id and repo.workflow_instance.status != 'RUNNING':
+            repo.workflow_instance = None
+            repo.save(update_fields=['workflow_instance'])
+
+        # 无审批流程配置 → 直接保存
+        if not repo_workflow:
+            form.save()
+            messages.success(self.request, "项目档案已更新")
+            return redirect(self.get_success_url())
+
+        # 检查是否已有进行中的审批（双重校验）
+        if repo.workflow_instance_id or ProjectRepositoryFieldChange.objects.filter(
+            repository=repo, status='PENDING'
+        ).exists():
+            messages.warning(self.request, "已有待审批的档案变更，请等待审批完成后再提交")
+            return redirect(self.get_success_url())
+
+        # 创建全字段变更记录 — Repository 原值保持不变，等待审批
+        change = ProjectRepositoryFieldChange.objects.create(
+            repository=repo,
+            customer=form.cleaned_data.get('customer'),
+            oem=form.cleaned_data.get('oem'),
+            salesperson=form.cleaned_data.get('salesperson'),
+            product_name=form.cleaned_data.get('product_name', ''),
+            product_code=form.cleaned_data.get('product_code', ''),
+            target_cost=form.cleaned_data.get('target_cost'),
+            competitor_price=form.cleaned_data.get('competitor_price'),
+            estimated_order_volume=form.cleaned_data.get('estimated_order_volume'),
+            submitted_by=self.request.user,
+            submission_comment=form.cleaned_data.get('submission_comment', ''),
+        )
+
+        # 启动审批流程
+        user = self.request.user
+        context_data = {
+            'change_id': change.pk,
+            'project_name': project.name,
+            'submission_comment': change.submission_comment,
+            'submitted_by': user.username,
+            'applicant_username': user.username,
+            'department_name': user.department.name if user.department else "未知部门",
+        }
+
+        callback_config = {
+            'handler': 'app_repository.workflow_handlers.handle_repo_change_callback',
+            'args': {'change_id': change.pk},
+        }
+
+        instance = WorkflowService.start(
+            definition=repo_workflow,
+            started_by=user,
+            related_object=change,
+            context_data=context_data,
+            callback_config=callback_config,
+        )
+
+        change.workflow_instance = instance
+        change.save(update_fields=['workflow_instance'])
+
+        repo.workflow_instance = instance
+        repo.save(update_fields=['workflow_instance'])
+
+        messages.success(self.request, "档案变更已提交审批，请等待审批结果")
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse('project_detail', kwargs={'pk': self.object.project.id})
@@ -44,6 +115,11 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['project'] = self.object.project
+        context['repo'] = self.object
+        from app_project.models import ProjectConfig
+        context['repo_workflow_configured'] = bool(
+            ProjectConfig.get().default_repository_approval_workflow_id
+        )
         return context
 
 
@@ -100,6 +176,23 @@ class ProjectFileDetailView(RepositoryAccessMixin, DetailView):
             'active_node_id': active_node_id,
         })
         return context
+
+
+class RepoFieldChangeModalView(RepositoryAccessMixin, View):
+    """变更记录详情模态框"""
+    permission_required = 'app_repository.view_projectrepository'
+    template_name = 'apps/app_repository/modal/_field_change_detail.html'
+
+    def get(self, request, pk):
+        change = get_object_or_404(
+            ProjectRepositoryFieldChange.objects.select_related(
+                'repository__project', 'submitted_by',
+                'customer', 'oem', 'salesperson',
+            ),
+            pk=pk
+        )
+        self.check_object_permission(change.repository)
+        return render(request, self.template_name, {'change': change})
 
 
 class RepoAutocompleteView(RepositoryAccessMixin, View):

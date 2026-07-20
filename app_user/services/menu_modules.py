@@ -129,6 +129,8 @@ class MenuModule:
                 {"name": "成员绩效看板", "url_name": "project_performance_list", "permissions": ["app_project.view_project"]},
                 # 仅高等级管理人员可见（对齐 PerformanceManagementMixin.min_level_required=15）
                 {"name": "项目评分规则", "url_name": "project_score_rule_list", "min_level": 15, "permissions": ["app_project.change_project"]},
+                {"name": "不合格原因", "url_name": "failure_reason_list", "min_level": 15, "permissions": ["app_project.change_project"]},
+                {"name": "客户意见类型", "url_name": "feedback_type_list", "min_level": 15, "permissions": ["app_project.change_project"]},
             ]
         }
 
@@ -380,10 +382,10 @@ class MenuModule:
             "name": "系统管理设置",
             "icon": "ti-settings",
             "visible_to": [IdentityConfig.R_ADMIN],
-            "url_name": "project_config",
+            "url_name": "admin:index",
             "sub_items": [
-                {"name": "项目全局配置", "url_name": "project_config"},
-                {"name": "排产配置", "url_name": "trial_config"},
+                {"name": "项目全局配置", "url_name": "admin:app_project_projectconfig_changelist"},
+                {"name": "排产配置", "url_name": "admin:app_trial_production_trialproductionconfig_changelist"},
                 {"name": "项目等级因子设置", "url_name": "repo_grade_factor_list"},
                 {"name": "进入底层管理", "url_name": "admin:index"},
             ]

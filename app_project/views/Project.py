@@ -9,7 +9,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 
-from app_project.forms import ProjectForm, ProjectConfigForm
+from app_project.forms import ProjectForm
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectConfig, ProjectNode
 from app_project.utils.calculate_project_gantt import get_project_gantt_data
@@ -70,6 +70,18 @@ class ProjectCreateView(ProjectAccessMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.manager = self.request.user
+
+        # 自动生成项目编码（如果未填写）
+        if not form.instance.code:
+            from django.utils import timezone
+            today = timezone.localdate()
+            date_prefix = today.strftime('%Y%m%d')
+            # 统计当天已创建的项目数，用于生成序号
+            count_today = Project.objects.filter(
+                created_at__date=today
+            ).count() + 1
+            form.instance.code = f'PRJ-{date_prefix}-{count_today:03d}'
+
         config = ProjectConfig.get()
         if config.default_approval_workflow_id:
             form.instance.approval_workflow = config.default_approval_workflow
@@ -110,7 +122,8 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
 
     queryset = Project.objects.select_related(
         'manager', 'repository', 'repository__customer', 'repository__oem',
-        'repository__salesperson', 'material', 'material__category',
+        'repository__salesperson', 'repository__workflow_instance__started_by',
+        'material', 'material__category',
     ).prefetch_related(
         'nodes', 'material__scenarios'
     )
@@ -165,22 +178,3 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
         return context
 
 
-# ==========================================
-# 4. 项目全局配置（仅超级管理员）
-# ==========================================
-class ProjectConfigView(ProjectAccessMixin, UpdateView):
-    """项目全局配置：设置默认审批流程等。仅超级管理员可访问。"""
-    model = ProjectConfig
-    form_class = ProjectConfigForm
-    template_name = 'apps/app_project/config.html'
-    permission_required = 'app_project.change_projectconfig'
-
-    def get_object(self, queryset=None):
-        return ProjectConfig.get()
-
-    def form_valid(self, form):
-        messages.success(self.request, '项目配置已保存')
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('project_config')

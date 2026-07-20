@@ -1,16 +1,19 @@
 from django import forms
-from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember, ProjectConfig
+from django.core.exceptions import ValidationError
+from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember, FailureReason, FeedbackType
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
+from common_utils.forms import UserPickerWidget
 
 User = get_user_model()
 
 class ProjectForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Project
-        fields = ['name', 'grade', 'material', 'description']
+        fields = ['code', 'name', 'grade', 'material', 'description']
         widgets = {
+            'code': forms.TextInput(attrs={'placeholder': '请输入项目编码，留空则自动生成'}),
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
             'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
@@ -47,22 +50,35 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
 
 # 【新增】项目成员管理表单
 class ProjectMemberForm(TablerFormMixin, forms.ModelForm):
+    user = forms.CharField(
+        widget=UserPickerWidget(multi=False, title='选择协同成员'),
+        required=True,
+    )
+
     class Meta:
         model = ProjectMember
         fields = ['user', 'role', 'workload_share']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-select-search'}),
             'workload_share': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'max': '1.0'}),
         }
 
     def __init__(self, *args, **kwargs):
         self.project = kwargs.pop('project', None)
         super().__init__(*args, **kwargs)
-        self.fields['user'].queryset = User.objects.filter(is_active=True).order_by('username')
 
         # 【修改】显式设置工作量权重的初始值为 0.00
         if not self.instance.pk:
             self.initial['workload_share'] = 0.00
+
+    def clean_user(self):
+        """将 UserPickerWidget 返回的用户 ID 字符串转为 User 实例"""
+        user_id = self.cleaned_data.get('user')
+        if not user_id:
+            raise ValidationError('请选择一位成员')
+        try:
+            return User.objects.get(pk=int(user_id), is_active=True)
+        except (ValueError, TypeError, User.DoesNotExist):
+            raise ValidationError('所选用户不存在或已禁用')
 
     def clean_workload_share(self):
         workload = self.cleaned_data.get('workload_share')
@@ -89,20 +105,33 @@ class ProjectMemberForm(TablerFormMixin, forms.ModelForm):
 
 # 【新增】销售成员表单
 class ProjectSalesMemberForm(TablerFormMixin, forms.ModelForm):
+    user = forms.CharField(
+        widget=UserPickerWidget(multi=False, title='选择销售成员'),
+        required=True,
+    )
+
     class Meta:
         model = ProjectSalesMember
         fields = ['user', 'workload_share']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-select-search'}),
             'workload_share': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'max': '1.0'}),
         }
 
     def __init__(self, *args, **kwargs):
         self.project = kwargs.pop('project', None)
         super().__init__(*args, **kwargs)
-        self.fields['user'].queryset = User.objects.filter(is_active=True).order_by('username')
         if not self.instance.pk:
             self.initial['workload_share'] = 0.00
+
+    def clean_user(self):
+        """将 UserPickerWidget 返回的用户 ID 字符串转为 User 实例"""
+        user_id = self.cleaned_data.get('user')
+        if not user_id:
+            raise ValidationError('请选择一位成员')
+        try:
+            return User.objects.get(pk=int(user_id), is_active=True)
+        except (ValueError, TypeError, User.DoesNotExist):
+            raise ValidationError('所选用户不存在或已禁用')
 
     def clean_workload_share(self):
         workload = self.cleaned_data.get('workload_share')
@@ -133,15 +162,25 @@ class NodeScoreRuleForm(TablerFormMixin, forms.ModelForm):
         }
 
 
-# ---- 全局配置 ----
+# ---- 不合格原因管理 ----
 
-class ProjectConfigForm(TablerFormMixin, forms.ModelForm):
-    """项目全局配置表单"""
+class FailureReasonForm(TablerFormMixin, forms.ModelForm):
+    """不合格原因管理表单"""
     class Meta:
-        model = ProjectConfig
-        fields = ['default_approval_workflow']
+        model = FailureReason
+        fields = ['name', 'code', 'order', 'is_active', 'description']
         widgets = {
-            'default_approval_workflow': forms.Select(attrs={
-                'class': 'form-select',
-            }),
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+# ---- 客户意见类型管理 ----
+
+class FeedbackTypeForm(TablerFormMixin, forms.ModelForm):
+    """客户意见类型管理表单"""
+    class Meta:
+        model = FeedbackType
+        fields = ['name', 'code', 'order', 'is_active', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
         }
