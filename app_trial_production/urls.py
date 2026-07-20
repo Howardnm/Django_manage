@@ -8,7 +8,7 @@ from .views.ProductionOrder import (
 from .views.Dashboard import TrialDashboardView
 from .views.ExtrusionBoard import ExtrusionBoardView
 from .views.ExtrusionBoardApi import (
-    ExtrusionScheduleApiView, ExtrusionStartApiView,
+    ExtrusionScheduleApiView,
     ExtrusionUnscheduleApiView, ExtrusionEventsApiView,
     ExtrusionStatsApiView, PendingOrdersCardView,
 )
@@ -19,7 +19,7 @@ from .views.ExtrusionTask import (
 )
 from .views.SampleInventory import (
     SampleInventoryListView, SampleInventoryDetailView,
-    SapEntryView, SampleInventoryApiView,
+    SapEntryView,
     OrderSampleDetailView,
 )
 from .views.PelletSplit import PelletSplitView
@@ -49,7 +49,6 @@ urlpatterns = [
     path('extrusion-board/pending-card/', PendingOrdersCardView.as_view(), name='trial_extrusion_board_pending_card'),
     path('extrusion-board/stats/', ExtrusionStatsApiView.as_view(), name='trial_extrusion_board_stats'),
     path('extrusion-board/schedule/', ExtrusionScheduleApiView.as_view(), name='trial_extrusion_schedule'),
-    path('extrusion-board/<int:pk>/start/', ExtrusionStartApiView.as_view(), name='trial_extrusion_board_start'),
     path('extrusion-board/<int:pk>/unschedule/', ExtrusionUnscheduleApiView.as_view(), name='trial_extrusion_board_unschedule'),
 
     # Extrusion Task
@@ -66,8 +65,6 @@ urlpatterns = [
     path('samples/', SampleInventoryListView.as_view(), name='trial_sample_list'),
 
     path('samples/order/<int:order_pk>/', OrderSampleDetailView.as_view(), name='trial_sample_order_detail'),
-    path('samples/batch/sap-entry/', SapEntryView.as_view(), name='trial_sample_sap_entry_batch'),
-    path('samples/api/search/', SampleInventoryApiView.as_view(), name='trial_sample_api_search'),
     path('samples/<int:pk>/', SampleInventoryDetailView.as_view(), name='trial_sample_detail'),
     path('samples/<int:pk>/sap-entry/', SapEntryView.as_view(), name='trial_sample_sap_entry'),
 

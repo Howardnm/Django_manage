@@ -61,6 +61,25 @@ class TestingTaskService:
         written = 0
         for trial_result in task.test_results.filter(is_written_back=False):
             if (trial_result.value is not None or trial_result.value_text) and trial_result.formula:
+                # 检测是否覆盖已有的回写结果，记录新旧值差异
+                existing = FormulaTestResult.objects.filter(
+                    formula=trial_result.formula,
+                    test_config=trial_result.test_config,
+                    production_order=task.production_order,
+                ).first()
+                if existing and (
+                    existing.value != trial_result.value
+                    or existing.value_text != trial_result.value_text
+                ):
+                    logger.info(
+                        f"[write_back] Overwriting FormulaTestResult: "
+                        f"formula_id={trial_result.formula_id}, "
+                        f"test_config={trial_result.test_config.name}, "
+                        f"order={task.production_order.code}, "
+                        f"old=({existing.value}, '{existing.value_text}'), "
+                        f"new=({trial_result.value}, '{trial_result.value_text}')"
+                    )
+
                 FormulaTestResult.objects.update_or_create(
                     formula=trial_result.formula,
                     test_config=trial_result.test_config,

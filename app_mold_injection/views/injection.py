@@ -5,11 +5,9 @@ from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from app_mold_injection.mixins import InjectionTaskAccessMixin
-from app_trial_production.mixins import RndAccessMixin
-from app_mold_injection.models import InjectionTask, MoldType
+from app_mold_injection.models import InjectionTask
 from app_mold_injection.forms import InjectionCompleteForm
 from app_mold_injection.services import InjectionTaskService
-from app_trial_production.models import ProductionOrder
 from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
@@ -72,6 +70,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter'] = getattr(self, 'filter', None)
+        context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
 
@@ -223,40 +222,6 @@ class InjectionCompleteView(InjectionTaskAccessMixin, View):
             'has_mold_requirements': len(matrix_rows) > 0,
         }
 
-    @staticmethod
-    def _parse_specimen_outputs(task, post_data):
-        """从矩阵 POST 数据解析样条产出记录。
-
-        遍历 task.mold_requirements 及其 formula_details，
-        提取每个 (模具, 配方版本) 单元格的产出/合格数量，
-        结合每行的存放位置和批次标签。
-        """
-        specimen_outputs = []
-        for req in task.mold_requirements.all().select_related('mold').prefetch_related('formula_details'):
-            location = post_data.get(f'location_{req.mold_id}', '').strip()
-            batch = post_data.get(f'batch_{req.mold_id}', '').strip()
-            for detail in req.formula_details.all():
-                fid = str(detail.formula_id) if detail.formula_id else 'none'
-                try:
-                    qty = int(post_data.get(f'qty_{req.mold_id}_{fid}', '0'))
-                except (ValueError, TypeError):
-                    qty = 0
-                if qty <= 0:
-                    continue
-                try:
-                    qualified = int(post_data.get(f'qualified_{req.mold_id}_{fid}', '0'))
-                except (ValueError, TypeError):
-                    qualified = 0
-                specimen_outputs.append({
-                    'mold_id': req.mold_id,
-                    'specimen_count': qty,
-                    'specimen_qualified': qualified,
-                    'storage_location': location,
-                    'batch_label': batch,
-                    'formula_id': detail.formula_id,
-                })
-        return specimen_outputs
-
     def get(self, request, pk):
         task = get_object_or_404(
             InjectionTask.objects.prefetch_related(
@@ -297,7 +262,7 @@ class InjectionCompleteView(InjectionTaskAccessMixin, View):
                 'has_mold_requirements': matrix_ctx['has_mold_requirements'],
             })
 
-        specimen_outputs = self._parse_specimen_outputs(task, request.POST)
+        specimen_outputs = InjectionTaskService.parse_specimen_outputs(task, request.POST)
         task.remark = form.cleaned_data.get('remark', '')
         try:
             InjectionTaskService.complete_task(task, request.user, specimen_outputs)

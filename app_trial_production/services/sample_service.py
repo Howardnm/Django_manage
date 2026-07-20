@@ -321,44 +321,6 @@ class SampleInventoryService:
         return ''
 
     @staticmethod
-    def compute_orphan_summary(orphan_samples):
-        """计算独立样品的汇总统计。
-
-        Args:
-            orphan_samples: list of SampleInventory
-
-        Returns:
-            dict with pellet/kg and specimen counts
-        """
-        summary = {
-            'total': len(orphan_samples),
-            'pellet_finished_count': 0,
-            'pellet_finished_kg': 0.0,
-            'pellet_finished_in_lab': 0,
-            'pellet_for_injection_count': 0,
-            'pellet_for_injection_kg': 0.0,
-            'specimen_for_testing_count': 0,
-            'specimen_consumed_count': 0,
-        }
-        for s in orphan_samples:
-            if s.type == 'PELLET':
-                qty = float(s.quantity or 0)
-                if s.sub_type == 'FINISHED':
-                    summary['pellet_finished_count'] += 1
-                    summary['pellet_finished_kg'] += qty
-                    if s.status == 'IN_LAB':
-                        summary['pellet_finished_in_lab'] += 1
-                elif s.sub_type == 'FOR_INJECTION':
-                    summary['pellet_for_injection_count'] += 1
-                    summary['pellet_for_injection_kg'] += qty
-            elif s.type == 'SPECIMEN':
-                if s.status == 'CONSUMED':
-                    summary['specimen_consumed_count'] += 1
-                else:
-                    summary['specimen_for_testing_count'] += 1
-        return summary
-
-    @staticmethod
     def get_order_sample_summaries(production_order_ids, sample_qs):
         """按工单汇总已筛选样品的统计信息。
 
@@ -430,6 +392,15 @@ class SampleInventoryService:
                 )
             )
             summaries[oid]['active_status'] = active
+            summaries[oid]['active_status_label'] = (
+                dict(SampleInventory.Status.choices).get(active, active)
+            )
+            _css_map = {
+                'IN_LAB': 'bg-green-lt',
+                'SAP_STORED': 'bg-blue-lt',
+                'CONSUMED': 'bg-secondary-lt',
+            }
+            summaries[oid]['active_status_css'] = _css_map.get(active, 'bg-secondary-lt')
 
         return summaries
 
@@ -437,23 +408,20 @@ class SampleInventoryService:
     def build_order_groups(samples_qs):
         """按 production_order 分组样品 + 计算汇总统计（供列表页复用）。
 
-        将已筛选的 SampleInventory QuerySet 分为两组：
-        - 关联工单的样品 → 按工单分组，每组附带汇总统计
-        - 独立样品（无工单关联）→ 平铺列表
+        所有样品必须以工单为主导，不再支持无工单的孤儿样品。
 
         Args:
             samples_qs: QuerySet[SampleInventory] — 已应用筛选条件的样品
 
         Returns:
-            (groups, orphan_samples)
+            (groups, [])
             groups: list[dict] — [{'order': ProductionOrder, 'samples': [...], 'summary': {...}, 'samples_count': int}, ...]
-            orphan_samples: list[SampleInventory] — production_order=None 的样品
+            第二个元素始终为空列表（保持接口兼容）。
         """
         from collections import OrderedDict
         from app_trial_production.models import ProductionOrder
 
         order_samples = OrderedDict()
-        orphan = []
         for s in samples_qs:
             if s.production_order_id:
                 key = s.production_order_id
@@ -461,7 +429,10 @@ class SampleInventoryService:
                     order_samples[key] = []
                 order_samples[key].append(s)
             else:
-                orphan.append(s)
+                logger.warning(
+                    f"Skipping orphan sample {s.pk}: "
+                    f"type={s.type}, sub_type={s.sub_type}, trial_code={s.trial_code}"
+                )
 
         order_ids = list(order_samples.keys())
         orders_map = {}
@@ -480,7 +451,9 @@ class SampleInventoryService:
         for oid, samples in order_samples.items():
             order = orders_map.get(oid)
             if not order:
-                orphan.extend(samples)
+                logger.warning(
+                    f"Skipping {len(samples)} samples for deleted order {oid}"
+                )
                 continue
             summary = summaries.get(oid, {})
             groups.append({
@@ -491,40 +464,5 @@ class SampleInventoryService:
             })
 
         groups.sort(key=lambda g: g['order'].code or '', reverse=True)
-        return groups, orphan
+        return groups, []
 
-    @staticmethod
-    @transaction.atomic
-    def create_standalone_sample(data):
-        """创建不关联工单的独立样品。
-
-        用于样品库手动新增场景，不绑定任何 ProductionOrder。
-
-        Args:
-            data: dict with keys matching SampleInventory fields:
-                type, sub_type, formula_id (optional), trial_code (optional),
-                quantity (for PELLET), specimen_count/specimen_qualified (for SPECIMEN),
-                storage_location, packaging_desc, mold_id (optional), batch_label (optional)
-
-        Returns:
-            SampleInventory 实例
-        """
-        sample = SampleInventory.objects.create(
-            type=data['type'],
-            sub_type=data['sub_type'],
-            status='IN_LAB',
-            production_order=None,
-            formula_id=data.get('formula_id'),
-            trial_code=data.get('trial_code', ''),
-            quantity=data.get('quantity'),
-            specimen_count=data.get('specimen_count'),
-            specimen_qualified=data.get('specimen_qualified'),
-            storage_location=data.get('storage_location', ''),
-            packaging_desc=data.get('packaging_desc', ''),
-            mold_id=data.get('mold_id'),
-            batch_label=data.get('batch_label', ''),
-            batch_number=data.get('batch_label', ''),  # 独立样品用 batch_label 作为批次号
-        )
-
-        logger.info(f"Standalone sample {sample.pk} created (type={sample.type}, sub_type={sample.sub_type})")
-        return sample

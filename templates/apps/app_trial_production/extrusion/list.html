@@ -87,8 +87,8 @@
                         <td class="text-muted small">{{ task.completed_at|date:"m-d H:i"|default:"-" }}</td>
                         <td class="text-muted small">{{ task.created_at|date:"Y-m-d H:i" }}</td>
                         <td>
-                            <a href="{% url 'trial_extrusion_detail' task.production_order.pk %}"
-                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
+                            <a href="{% url 'trial_order_detail' task.production_order.pk %}"
+                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看工单详情">
                                 <i class="ti ti-eye"></i>
                             </a>
                         </td>

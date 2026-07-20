@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.db.models import Q, CheckConstraint
 
 
 class MoldType(models.Model):
@@ -167,6 +169,20 @@ class MoldRequirement(models.Model):
         verbose_name = "模具需求"
         verbose_name_plural = "模具需求"
         ordering = ['order']
+        constraints = [
+            CheckConstraint(
+                condition=Q(production_order__isnull=False),
+                name='mold_req_has_production_order',
+            ),
+        ]
+
+    def clean(self):
+        super().clean()
+        # production_order 在 _save_mold_matrix() 保存时设置，表单验证阶段尚未关联；
+        # 数据库级 CheckConstraint(mold_req_has_production_order) 确保不会出现无工单的记录。
+        # 此处仅做跨字段一致性校验：injection_task 存在时 production_order 必须存在。
+        if self.injection_task_id and not self.production_order_id:
+            raise ValidationError('关联注塑任务时，工单不能为空')
 
     def __str__(self):
         total = sum(

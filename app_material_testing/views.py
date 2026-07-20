@@ -39,6 +39,7 @@ class TestingTaskListView(TestingAccessMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['filter'] = getattr(self, 'filter', None)
+        context['current_sort'] = self.request.GET.get('sort', '')
         return context
 
 
@@ -170,7 +171,6 @@ class FillResultsView(TestingAccessMixin, View):
     def get(self, request, pk):
         task = self._get_task()
         matrix, formulas = self._build_matrix(task)
-        from django.shortcuts import render
         return render(request, self.template_name, {
             'testing_task': task,
             'results_matrix': matrix,
@@ -212,7 +212,7 @@ class WriteBackView(TestingAccessMixin, View):
 
     def post(self, request, pk):
         task = get_object_or_404(TestingTask, pk=pk)
-        if task.status == 'RESULTS_WRITTEN_BACK':
+        if task.status == TestingTask.Status.RESULTS_WRITTEN_BACK:
             messages.warning(request, '测试结果已回写，无需重复操作')
             return redirect('material_testing:detail', pk=pk)
 
@@ -231,7 +231,15 @@ class WriteBackView(TestingAccessMixin, View):
 # ── 样条库存（测试中心管辖） ──────────────────────────────────────────
 
 class TestingSampleListView(TestingAccessMixin, View):
-    """测试中心样条库存列表 — 全部样条（FOR_TESTING + TESTED），按工单分组表格呈现。"""
+    """
+    测试中心样条库存列表 — 全部样条（FOR_TESTING + TESTED），按工单分组表格呈现。
+
+    设计说明: 此视图位于 app_material_testing 而非 app_trial_production，因为:
+    1. 它服务于测试团队的工作流（测试人员查看待测试样条）
+    2. 权限模型使用 TestingAccessMixin (identity_required=TESTING_TEAM)
+    3. 底层数据模型(SampleInventory)属于排产模块，通过服务层调用实现数据访问
+    4. 子类型筛选(FOR_TESTING/CONSUMED)体现测试领域的关注点
+    """
 
     template_name = 'apps/app_material_testing/specimens.html'
     paginate_by = 20
@@ -268,28 +276,17 @@ class TestingSampleListView(TestingAccessMixin, View):
         from app_trial_production.services import SampleInventoryService
 
         samples_qs = self._get_filtered_qs(request)
-        order_groups, orphan_samples = SampleInventoryService.build_order_groups(samples_qs)
-
-        has_order = request.GET.get('has_order', '')
-        show_orphan_only = (has_order == 'false')
+        order_groups, _ = SampleInventoryService.build_order_groups(samples_qs)
 
         page_num = int(request.GET.get('page', 1))
-
-        if show_orphan_only:
-            paginator = Paginator(orphan_samples, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
-        else:
-            paginator = Paginator(order_groups, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
+        paginator = Paginator(order_groups, self.paginate_by)
+        page_obj = paginator.get_page(page_num)
 
         context = {
             'order_groups': order_groups,
-            'orphan_samples': orphan_samples,
             'page_obj': page_obj,
             'paginator': paginator,
             'filter': self.filter,
             'current_sub_type': request.GET.get('sub_type', ''),
-            'show_orphan_only': show_orphan_only,
-            'orphan_count': len(orphan_samples),
         }
         return render(request, self.template_name, context)

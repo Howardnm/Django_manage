@@ -8,7 +8,7 @@ from django.db.models import Sum
 
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
 from app_trial_production.models import SampleInventory
-from app_trial_production.forms import PelletSplitForm, PelletSplitFormSet
+from app_trial_production.forms import PelletSplitForm
 from app_trial_production.services import SampleInventoryService
 
 logger = logging.getLogger(__name__)

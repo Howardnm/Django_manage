@@ -184,23 +184,6 @@ class ExtrusionScheduleApiView(ExtrusionTaskAccessMixin, View):
         })
 
 
-class ExtrusionStartApiView(ExtrusionTaskAccessMixin, View):
-    """POST: 开始挤出生产（创建 ExtrusionTask + ColorMatchingTask）"""
-    enforce_dept_isolation = False
-
-    def post(self, request, pk):
-        order = get_object_or_404(ProductionOrder, pk=pk, status='ACCEPTED')
-
-        try:
-            ProductionOrderService.start_extrusion(order, request.user)
-            messages.success(request, f'工单 {order.code} 已开始挤出生产')
-        except InvalidStateTransition as e:
-            logger.exception(f"Failed to start extrusion for order {order.pk}")
-            messages.error(request, f'开始生产失败：{e}')
-
-        return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
-
-
 class ExtrusionUnscheduleApiView(ExtrusionTaskAccessMixin, View):
     """POST: 取消排期（将工单退回待排产池）"""
     enforce_dept_isolation = False
@@ -226,13 +209,13 @@ class ExtrusionStatsApiView(ExtrusionTaskAccessMixin, View):
 
     def get(self, request):
         pending_count = ProductionOrder.objects.filter(
-            status='ACCEPTED', extrusion_scheduled_date__isnull=True,
+            status=ProductionOrder.Status.ACCEPTED, extrusion_scheduled_date__isnull=True,
         ).count()
         scheduled_count = ProductionOrder.objects.filter(
-            status='ACCEPTED', extrusion_scheduled_date__isnull=False,
+            status=ProductionOrder.Status.ACCEPTED, extrusion_scheduled_date__isnull=False,
         ).count()
         in_progress_count = ProductionOrder.objects.filter(
-            status='EXTRUDING',
+            status=ProductionOrder.Status.EXTRUDING,
         ).count()
 
         return JsonResponse({

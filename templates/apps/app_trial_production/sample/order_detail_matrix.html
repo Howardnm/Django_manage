@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ order.code }} 样品详情{% endblock %}
+
+{% block content %}
+{# ── Page Header ─────────────────────────────────────────── #}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url module.breadcrumb_parent_url %}">{{ module.breadcrumb_parent_name }}</a></li>
+                    <li class="breadcrumb-item"><a href="{% url module.list_url %}">{{ module.list_name }}</a></li>
+                    <li class="breadcrumb-item active">{{ order.code }} 样品详情</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="d-flex align-items-center">
+            <h2 class="page-title mb-0">
+                {{ order.code }}
+                <span class="badge {{ order.status_css_class }} ms-2">{{ order.get_status_display }}</span>
+            </h2>
+            <div class="ms-auto d-flex gap-2">
+                <a href="{% url module.list_url %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>返回列表
+                </a>
+                <a href="{% url 'trial_order_detail' order.pk %}" class="btn btn-outline-primary">
+                    <i class="ti ti-file-text me-1"></i>工单详情
+                </a>
+            </div>
+        </div>
+        <div class="text-muted small mt-1">
+            <i class="ti ti-file-text me-1"></i>{{ order.trial_code|default:"-" }}
+            {% if order.project %}
+            <span class="mx-1">·</span>
+            <i class="ti ti-building me-1"></i>{{ order.project.name }}
+            {% endif %}
+            <span class="mx-1">·</span>
+            创建于 {{ order.created_at|date:"Y-m-d H:i" }}
+        </div>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+
+    {# ── 颗粒汇总 ──────────────────────────────────────── #}
+    {% if pellet_samples %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-package me-2 text-green"></i>待打样颗粒
+            </h3>
+            <span class="badge bg-green-lt ms-2">{{ pellet_samples|length }} 条</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter table-hover mb-0" style="font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>配方版本</th>
+                        <th class="text-end">重量(kg)</th>
+                        <th>批次号</th>
+                        <th>存放位置</th>
+                        <th>状态</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in pellet_samples %}
+                    <tr>
+                        <td class="text-muted small">{{ forloop.counter }}</td>
+                        <td>
+                            {% if s.formula %}
+                            <span class="fw-bold">{{ s.formula.name }}</span>
+                            <span class="text-muted small ms-1">v{{ s.formula.version }}</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-end fw-bold">{{ s.quantity|default:"-" }} kg</td>
+                        <td>
+                            {% if s.batch_number %}<code class="small">{{ s.batch_number }}</code>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ s.storage_location|default:"-" }}</td>
+                        <td>
+                            <span class="badge {{ s.status_css_class }}">{{ s.get_status_display }}</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
+
+    {# ── 样条矩阵 ──────────────────────────────────────── #}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="ti ti-layout-grid me-2 text-azure"></i>样条产出矩阵
+            </h3>
+            <span class="text-muted small">
+                {{ specimen_matrix|length }} 模具 × {{ specimen_formulas|length }} 配方
+            </span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-bordered card-table mb-0 text-center align-middle"
+                   style="font-size: 13px; table-layout: auto;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-start bg-white align-bottom" style="min-width: 120px;">模具</th>
+                        {% for f in specimen_formulas %}
+                        <th class="bg-azure-lt" colspan="3">
+                            <div class="fw-bold small">{{ f.name }}</div>
+                            <div class="text-muted" style="font-size: 11px;">v{{ f.version }}</div>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                    <tr>
+                        <th class="bg-white border-top-0"></th>
+                        {% for f in specimen_formulas %}
+                        <th class="bg-azure-lt text-muted" style="font-size: 11px; width: 55px;">条数</th>
+                        <th class="bg-azure-lt text-muted" style="font-size: 11px; width: 55px;">合格</th>
+                        <th class="bg-azure-lt text-muted" style="font-size: 11px; width: 55px;">状态</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in specimen_matrix %}
+                    <tr>
+                        <td class="text-start bg-light fw-bold" style="min-width: 120px;">
+                            <div>{{ row.mold.name }}</div>
+                            <div class="text-muted small" style="font-size: 11px;">{{ row.mold.mold_code }}</div>
+                        </td>
+
+                        {% for cell in row.cells %}
+                            {% if cell.count > 0 %}
+                            <td class="fw-bold">{{ cell.count }}</td>
+                            <td>{{ cell.qualified }}</td>
+                            <td>
+                                {% if cell.any_consumed %}
+                                <span class="text-muted small">已消耗</span>
+                                {% else %}
+                                <span class="text-green small">在库</span>
+                                {% endif %}
+                            </td>
+                            {% else %}
+                            <td class="text-muted">—</td>
+                            <td class="text-muted">—</td>
+                            <td class="text-muted">—</td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="{{ matrix_colspan }}" class="text-center py-5 text-muted">
+                            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样条记录
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

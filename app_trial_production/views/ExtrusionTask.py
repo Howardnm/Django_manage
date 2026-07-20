@@ -5,7 +5,7 @@ from django.shortcuts import redirect, get_object_or_404, render
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
-from app_trial_production.models import ExtrusionTask, ProductionOrder
+from app_trial_production.models import ExtrusionTask
 from app_trial_production.filters import ExtrusionTaskFilter
 from app_trial_production.forms import ExtrusionRecordForm
 from app_trial_production.services import ExtrusionTaskService

@@ -1,7 +1,5 @@
 import logging
 
-from django.db.models import Q
-from django.http import JsonResponse
 from django.views.generic import DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -41,39 +39,29 @@ class SampleInventoryListView(SampleInventoryAccessMixin, View):
         # 首页默认：在实验房
         status_param = request.GET.get('status', '')
         if status_param == 'ALL':
-            pass  # 显示全部状态（含 SAP_STORED）
-        elif not status_param:
+            pass  # 显示全部状态
+        elif status_param:
+            qs = qs.filter(status=status_param)
+        else:
             qs = qs.filter(status=SampleInventory.Status.IN_LAB)
 
         return qs.order_by('-created_at')
 
     def get(self, request):
         samples_qs = self._get_filtered_qs(request)
-        order_groups, orphan_samples = SampleInventoryService.build_order_groups(samples_qs)
-
-        # 当前激活的数据集：独立样品 Tab 时显示孤儿样品，否则显示工单分组
-        has_order = request.GET.get('has_order', '')
-        show_orphan_only = (has_order == 'false')
+        order_groups, _ = SampleInventoryService.build_order_groups(samples_qs)
 
         from django.core.paginator import Paginator
         page_num = int(request.GET.get('page', 1))
-
-        if show_orphan_only:
-            paginator = Paginator(orphan_samples, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
-        else:
-            paginator = Paginator(order_groups, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
+        paginator = Paginator(order_groups, self.paginate_by)
+        page_obj = paginator.get_page(page_num)
 
         context = {
             'order_groups': order_groups,
-            'orphan_samples': orphan_samples,
             'page_obj': page_obj,
             'paginator': paginator,
             'filter': self.filter,
             'current_status': request.GET.get('status', 'IN_LAB'),
-            'show_orphan_only': show_orphan_only,
-            'orphan_count': len(orphan_samples),
         }
         return render(request, self.template_name, context)
 
@@ -161,13 +149,67 @@ class OrderSampleDetailView(SampleInventoryAccessMixin, View):
             ]
 
         sap_material_code = SampleInventoryService.get_order_sap_material_code(order)
+        module_ctx = self._get_module_context(from_module)
 
+        # ── 注塑 / 测试模块：颗粒汇总 + 样条矩阵 ──
+        if from_module in ('mold_injection', 'material_testing'):
+            pellets = [s for s in all_samples if s.type == 'PELLET']
+            specimens = [s for s in all_samples if s.type == 'SPECIMEN']
+
+            # 收集唯一模具和配方
+            mold_map = {}
+            formula_map = {}
+            for s in specimens:
+                if s.mold_id and s.mold_id not in mold_map:
+                    mold_map[s.mold_id] = s.mold
+                if s.formula_id and s.formula_id not in formula_map:
+                    formula_map[s.formula_id] = s.formula
+
+            mold_list = sorted(mold_map.values(), key=lambda m: m.name)
+            formula_list = sorted(formula_map.values(), key=lambda f: f.version)
+
+            # 构建样条矩阵: {(mold_id, formula_id): {count, qualified, any_consumed}}
+            cell_map = {}
+            for s in specimens:
+                key = (s.mold_id, s.formula_id)
+                if key not in cell_map:
+                    cell_map[key] = {'count': 0, 'qualified': 0, 'any_consumed': False}
+                cell_map[key]['count'] += s.specimen_count or 0
+                cell_map[key]['qualified'] += s.specimen_qualified or 0
+                if s.status == 'CONSUMED':
+                    cell_map[key]['any_consumed'] = True
+
+            matrix_rows = []
+            for mold in mold_list:
+                cells = []
+                for f in formula_list:
+                    c = cell_map.get((mold.pk, f.pk),
+                                     {'count': 0, 'qualified': 0, 'any_consumed': False})
+                    cells.append(c)
+                all_consumed = all(c['any_consumed'] for c in cells) if cells else False
+                matrix_rows.append({
+                    'mold': mold, 'cells': cells, 'all_consumed': all_consumed,
+                })
+
+            context = {
+                'order': order,
+                'pellet_samples': pellets,
+                'specimen_formulas': formula_list,
+                'specimen_matrix': matrix_rows,
+                'matrix_colspan': len(formula_list) * 3 + 1,
+                'module': module_ctx,
+                'from_module': from_module,
+            }
+            return render(request, 'apps/app_trial_production/sample/order_detail_matrix.html',
+                          context)
+
+        # ── 排产模块：SAP 入库 + 平铺清单 ──
         context = {
             'order': order,
             'all_samples': all_samples,
             'sap_eligible': sap_eligible,
             'sap_material_code': sap_material_code,
-            'module': self._get_module_context(from_module),
+            'module': module_ctx,
             'from_module': from_module,
         }
 
@@ -222,33 +264,49 @@ class OrderSampleDetailView(SampleInventoryAccessMixin, View):
         )
 
         if formset.is_valid():
-            success = 0
-            failed = 0
+            sap_done = 0
+            sap_failed = 0
+            consumed = 0
+
             for form in formset.forms:
                 if form.cleaned_data.get('DELETE', False):
                     continue
+                sample = form.instance
+                action = request.POST.get(f'sap_action_{sample.pk}', 'sap')
+
+                if action == 'consume':
+                    sample.status = SampleInventory.Status.CONSUMED
+                    sample.save(update_fields=['status', 'updated_at'])
+                    consumed += 1
+                    continue
+
+                # 入库SAP：需要填写物料号
                 sap_code = form.cleaned_data.get('sap_material_code', '')
                 if not sap_code:
                     continue
-                sample = form.instance
                 try:
                     SampleInventoryService.sap_warehouse_entry(
                         sample, form.cleaned_data, request.user,
                     )
-                    success += 1
-                except ValueError as e:
+                    sap_done += 1
+                except ValueError:
                     logger.exception(
                         f"Order SAP entry failed for sample {sample.pk}"
                     )
-                    failed += 1
+                    sap_failed += 1
 
-            if success:
+            if sap_done or consumed:
+                parts = []
+                if sap_done:
+                    parts.append(f'{sap_done} 条入库SAP')
+                if consumed:
+                    parts.append(f'{consumed} 条标记消耗')
                 messages.success(
                     request,
-                    f'工单 [{order.code}] 已成功入库 {success} 条样品',
+                    f'工单 [{order.code}] ' + '，'.join(parts),
                 )
-            if failed:
-                messages.error(request, f'{failed} 条样品入库失败，请检查后重试')
+            if sap_failed:
+                messages.error(request, f'{sap_failed} 条样品入库失败，请检查后重试')
 
             return redirect(f'{request.path}?from={from_module}')
 
@@ -528,42 +586,3 @@ class SapEntryView(SampleInventoryAccessMixin, View):
             return self._post_single(request, pk)
         return self._post_batch(request)
 
-
-class SampleInventoryApiView(SampleInventoryAccessMixin, View):
-    """
-    JSON API — 供 TomSelect 远程搜索 + 检查批量操作可行性。
-
-    ?q=xxx      全文检索（trial_code / batch_number）
-    ?action=    可选: 'check_batch' 检查指定 IDs 的可操作状态
-    """
-
-    def get(self, request):
-        q = request.GET.get('q', '').strip()
-        action = request.GET.get('action', '')
-
-        if action == 'check_batch':
-            ids_raw = request.GET.get('ids', '')
-            try:
-                ids = [int(x) for x in ids_raw.split(',') if x.strip()]
-            except (ValueError, TypeError):
-                return JsonResponse({'valid': False, 'count': 0})
-
-            # 仅成品颗粒允许入SAP
-            count = SampleInventory.objects.filter(
-                pk__in=ids,
-                type=SampleInventory.Type.PELLET,
-                sub_type=SampleInventory.SubType.FINISHED,
-                status=SampleInventory.Status.IN_LAB,
-            ).count()
-            return JsonResponse({'valid': count > 0, 'count': count})
-
-        # 默认：TomSelect 搜索
-        if not q:
-            return JsonResponse({'results': []})
-
-        results = SampleInventory.objects.filter(
-            Q(trial_code__icontains=q) |
-            Q(batch_number__icontains=q)
-        ).values('id', 'trial_code', 'batch_number', 'type', 'sub_type')[:20]
-
-        return JsonResponse({'results': list(results)})

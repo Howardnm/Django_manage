@@ -24,6 +24,7 @@ class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         fields=(
             ('created_at', 'created_at'),
             ('status', 'status'),
+            ('production_order__code', 'production_order__code'),
         ),
         widget=forms.HiddenInput,
     )
@@ -42,5 +43,6 @@ class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
             return queryset
         return queryset.filter(
             Q(production_order__code__icontains=value) |
-            Q(production_order__trial_code__icontains=value)
+            Q(production_order__trial_code__icontains=value) |
+            Q(production_order__project__name__icontains=value)
         )

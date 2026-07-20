@@ -8,9 +8,7 @@ import logging
 
 from django.db.models import Q
 from django.views.generic import View
-from django.shortcuts import render, redirect
-from django.contrib import messages
-
+from django.shortcuts import render
 from app_mold_injection.mixins import InjectionTaskAccessMixin
 from app_trial_production.models import SampleInventory
 from app_trial_production.filters import SampleInventoryFilter
@@ -54,30 +52,19 @@ class MoldSampleListView(InjectionTaskAccessMixin, View):
 
     def get(self, request):
         samples_qs = self._get_filtered_qs(request)
-        order_groups, orphan_samples = SampleInventoryService.build_order_groups(samples_qs)
-
-        has_order = request.GET.get('has_order', '')
-        show_orphan_only = (has_order == 'false')
+        order_groups, _ = SampleInventoryService.build_order_groups(samples_qs)
 
         from django.core.paginator import Paginator
         page_num = int(request.GET.get('page', 1))
-
-        if show_orphan_only:
-            paginator = Paginator(orphan_samples, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
-        else:
-            paginator = Paginator(order_groups, self.paginate_by)
-            page_obj = paginator.get_page(page_num)
+        paginator = Paginator(order_groups, self.paginate_by)
+        page_obj = paginator.get_page(page_num)
 
         context = {
             'order_groups': order_groups,
-            'orphan_samples': orphan_samples,
             'page_obj': page_obj,
             'paginator': paginator,
             'filter': self.filter,
             'current_status': request.GET.get('status', 'IN_LAB'),
-            'show_orphan_only': show_orphan_only,
-            'orphan_count': len(orphan_samples),
         }
         return render(request, self.template_name, context)
 

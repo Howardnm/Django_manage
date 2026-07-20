@@ -47,22 +47,23 @@
     {% if sap_eligible and formset %}
     <div class="card mb-3">
         <div class="card-header">
-            <h3 class="card-title">
-                <i class="ti ti-building-warehouse me-2 text-green"></i>SAP 入库操作
-            </h3>
-            <span class="badge bg-green-lt text-green ms-2">{{ sap_eligible|length }} 条可入库</span>
+            <div class="d-flex align-items-center">
+                <div>
+                    <h3 class="card-title mb-0">
+                        <i class="ti ti-building-warehouse me-2 text-green"></i>SAP 入库操作
+                    </h3>
+                    <span class="badge bg-green-lt text-green ms-2">{{ sap_eligible|length }} 条可入库</span>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <form method="POST" id="sap-entry-form">
-                {% csrf_token %}
-                {{ formset.management_form }}
-
-                <div class="table-responsive">
-                    <table class="table card-table table-vcenter">
+        <form method="POST" id="sap-entry-form">
+            {% csrf_token %}
+            {{ formset.management_form }}
+            <div>
+                <table class="table card-table table-vcenter mb-0">
                         <thead>
                             <tr>
                                 <th style="width: 40px;">#</th>
-                                <th>实验单号</th>
                                 <th>批次号</th>
                                 <th>配方版本</th>
                                 <th>数量(kg)</th>
@@ -71,41 +72,45 @@
                                 <th style="min-width: 130px;">SAP批次号</th>
                                 <th style="min-width: 130px;">SAP入库日期</th>
                                 <th style="min-width: 120px;">SAP库位</th>
+                                <th style="width: 100px;">操作</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for form in formset.forms %}
                             {% with sample=form.instance %}
-                            <tr class="sap-row {% if sample.status != 'IN_LAB' %}table-secondary{% endif %}">
-                                <td>{{ forloop.counter }}</td>
-                                <td>
-                                    <span class="fw-bold">{{ sample.trial_code|default:"-" }}</span>
-                                </td>
-                                <td>
-                                    <code>{{ sample.batch_number|default:"-" }}</code>
+                            <tr class="sap-row">
+                                <td><span class="badge bg-info-lt">{{ forloop.counter }}</span></td>
+                                <td class="text-nowrap">
+                                    <span class="badge bg-purple-lt">{{ sample.batch_number|default:"-" }}</span>
                                 </td>
                                 <td>
                                     {% if sample.formula %}
-                                    {{ sample.formula.name }} <span class="text-muted">v{{ sample.formula.version }}</span>
-                                    {% else %}-{% endif %}
+                                    <span class="badge bg-blue-lt">v{{ sample.formula.version }}</span>
+                                    {% else %}<span class="text-muted">-</span>{% endif %}
                                 </td>
-                                <td class="fw-bold">{{ sample.quantity|default:"-" }} kg</td>
+                                <td class="fw-bold">{{ sample.quantity|default:"-" }}</td>
                                 <td>{{ sample.storage_location|default:"-" }}</td>
-                                <td>
+                                <td class="sap-field-cell">
                                     {{ form.id }}
                                     {{ form.sap_material_code }}
                                     {% if form.sap_material_code.errors %}
                                     <div class="text-danger small">{{ form.sap_material_code.errors }}</div>
                                     {% endif %}
                                 </td>
-                                <td>
+                                <td class="sap-field-cell">
                                     {{ form.sap_batch_number }}
                                 </td>
-                                <td>
+                                <td class="sap-field-cell">
                                     {{ form.sap_warehouse_date }}
                                 </td>
-                                <td>
+                                <td class="sap-field-cell">
                                     {{ form.sap_storage_location }}
+                                </td>
+                                <td class="text-nowrap">
+                                    <select name="sap_action_{{ sample.pk }}" class="form-select form-select-search sap-action">
+                                        <option value="sap">入库SAP</option>
+                                        <option value="consume">消耗</option>
+                                    </select>
                                 </td>
                             </tr>
                             {% endwith %}
@@ -113,22 +118,21 @@
                         </tbody>
                     </table>
                 </div>
-
-                <div class="d-flex align-items-center mt-3">
-                    <div class="text-muted small">
-                        <i class="ti ti-info-circle me-1"></i>
-                        仅填写了 <strong>SAP物料号</strong> 的行会被提交入库，
-                        其余行将被跳过。
-                    </div>
-                    <div class="ms-auto">
-                        <button type="submit" class="btn btn-success">
-                            <i class="ti ti-building-warehouse me-1"></i>
-                            提交入库（将入库 <span id="filled-count">{{ sap_eligible|length }}</span> 条）
-                        </button>
-                    </div>
+        <div class="card-footer">
+            <div class="d-flex align-items-center">
+                <div class="text-muted small">
+                    <i class="ti ti-info-circle me-1"></i>
+                    选择 <strong>入库SAP</strong> 需填写 SAP 字段；
+                    选择 <strong>消耗</strong> 则直接标记为已消耗。
                 </div>
-            </form>
+                <div class="ms-auto">
+                    <button type="submit" class="btn btn-success">
+                        <i class="ti ti-building-warehouse me-1"></i>提交
+                    </button>
+                </div>
+            </div>
         </div>
+    </form>
     </div>
     {% endif %}
 
@@ -243,41 +247,57 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    // 统计已填 SAP 物料号的行数并更新提交按钮文案
-    const sapInputs = document.querySelectorAll('#sap-entry-form input[id$="-sap_material_code"]');
-    const filledCount = document.getElementById('filled-count');
+    const rows = document.querySelectorAll('#sap-entry-form tr.sap-row');
 
-    function updateFilledCount() {
-        let count = 0;
-        sapInputs.forEach(function (input) {
-            if (input.value.trim()) count++;
+    function toggleRowFields(row) {
+        const select = row.querySelector('.sap-action');
+        const sapCells = row.querySelectorAll('.sap-field-cell');
+        if (!select || !sapCells.length) return;
+        const isConsume = select.value === 'consume';
+        sapCells.forEach(function (cell) {
+            cell.style.opacity = isConsume ? '0.3' : '1';
+            cell.querySelectorAll('input, select').forEach(function (el) {
+                el.readOnly = isConsume;
+                el.tabIndex = isConsume ? -1 : 0;
+                if (isConsume) {
+                    el.setAttribute('readonly', '');
+                } else {
+                    el.removeAttribute('readonly');
+                }
+            });
         });
-        if (filledCount) {
-            filledCount.textContent = count;
-        }
     }
 
-    sapInputs.forEach(function (input) {
-        input.addEventListener('input', updateFilledCount);
+    rows.forEach(function (row) {
+        const select = row.querySelector('.sap-action');
+        if (select) {
+            select.addEventListener('change', function () { toggleRowFields(row); });
+            toggleRowFields(row);
+        }
+        // SAP入库日期自动填充今天
+        const dateInput = row.querySelector('input[type="date"]');
+        if (dateInput && !dateInput.value) {
+            dateInput.value = new Date().toISOString().split('T')[0];
+        }
     });
-
-    // 初始统计
-    updateFilledCount();
 
     // 提交前确认
     const form = document.getElementById('sap-entry-form');
     if (form) {
         form.addEventListener('submit', function (e) {
-            let filled = 0;
-            sapInputs.forEach(function (input) {
-                if (input.value.trim()) filled++;
+            const rows = form.querySelectorAll('tr.sap-row');
+            let sapCount = 0, consumeCount = 0;
+            rows.forEach(function (row) {
+                const sel = row.querySelector('.sap-action');
+                if (!sel) return;
+                if (sel.value === 'sap') sapCount++;
+                else consumeCount++;
             });
-            if (filled === 0) {
-                e.preventDefault();
-                alert('请至少填写一条 SAP 物料号后再提交');
-                return;
-            }
-            if (!confirm('确认要将 ' + filled + ' 条样品入库到 SAP 仓库吗？')) {
+            if (sapCount + consumeCount === 0) return;
+            var msg = '';
+            if (sapCount > 0) msg += sapCount + ' 条入库SAP';
+            if (consumeCount > 0) msg += (msg ? '，' : '') + consumeCount + ' 条标记消耗';
+            if (!confirm('确认提交：' + msg + '？')) {
                 e.preventDefault();
             }
         });

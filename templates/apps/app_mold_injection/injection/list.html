@@ -1,68 +1,109 @@
 {% extends "base.html" %}
+{% load project_extras %}
 
 {% block title %}注塑任务{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
-    <div class="row align-items-center">
-        <div class="col">
-            <div class="page-pretitle">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
-                        <li class="breadcrumb-item active">注塑任务</li>
-                    </ol>
-                </nav>
+    <div class="container-xl">
+        <div class="page-pretitle">
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
+                    <li class="breadcrumb-item active">注塑任务</li>
+                </ol>
+            </nav>
+        </div>
+        <div class="row align-items-center">
+            <div class="col">
+                <h2 class="page-title">
+                    <i class="ti ti-injection me-2 text-blue"></i>注塑任务列表
+                </h2>
             </div>
-            <h2 class="page-title">注塑任务列表</h2>
-            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
         </div>
     </div>
 </div>
 
-<div class="card mt-3">
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap datatable">
-            <thead>
-                <tr>
-                    <th>排产单</th>
-                    <th>实验单号</th>
-                    <th>来源</th>
-                    <th>模具数</th>
-                    <th>操作员</th>
-                    <th>状态</th>
-                    <th>创建时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for obj in injection_tasks %}
-                <tr>
-                    <td class="fw-bold">{{ obj.production_order.code|default:"独立注塑" }}</td>
-                    <td>{{ obj.production_order.trial_code|default:"-" }}</td>
-                    <td>
-                        {% if obj.source == 'INVENTORY' %}
-                        <span class="badge bg-purple-lt">样品库</span>
-                        {% else %}
-                        <span class="badge bg-cyan-lt">排产产出</span>
-                        {% endif %}
-                    </td>
-                    <td>{{ obj.mold_count }}</td>
-                    <td>{{ obj.operator.realname|default:"-" }}</td>
-                    <td>
-                        <span class="badge {{ obj.status_css_class }}">{{ obj.get_status_display }}</span>
-                    </td>
-                    <td>{{ obj.created_at|date:"Y-m-d H:i" }}</td>
-                    <td>
-                        <a href="{% url 'mold_injection:task_detail' obj.pk %}" class="btn btn-sm btn-outline-primary">查看</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8" class="text-center py-4 text-muted">暂无注塑任务</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="container-xl mt-3">
+    <div class="card">
+        {% include 'apps/list_modules/tools_search_filter.html' %}
+
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+                <thead>
+                    <tr>
+                        <th>状态</th>
+                        <th>
+                            <a href="?{% url_replace sort='production_order__code'|sort_toggle:current_sort %}"
+                               class="table-sort-header text-reset">排产单</a>
+                        </th>
+                        <th>实验单号</th>
+                        <th>来源</th>
+                        <th>模具数</th>
+                        <th>操作员</th>
+                        <th>
+                            <a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}"
+                               class="table-sort-header text-reset">创建时间</a>
+                        </th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for obj in injection_tasks %}
+                    <tr>
+                        <td>
+                            <span class="badge {{ obj.status_css_class }}">{{ obj.get_status_display }}</span>
+                        </td>
+                        <td class="fw-bold">
+                            {% if obj.production_order %}
+                            <a href="{% url 'mold_injection:task_detail' obj.pk %}" class="text-reset">
+                                {{ obj.production_order.code }}
+                            </a>
+                            {% else %}
+                            独立注塑
+                            {% endif %}
+                        </td>
+                        <td class="text-muted">{{ obj.production_order.trial_code|default:"-" }}</td>
+                        <td>
+                            {% if obj.source == 'INVENTORY' %}
+                            <span class="badge bg-purple-lt">样品库</span>
+                            {% else %}
+                            <span class="badge bg-cyan-lt">排产产出</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ obj.mold_count }}</td>
+                        <td class="text-muted">{{ obj.operator.realname|default:"-" }}</td>
+                        <td class="text-muted small">{{ obj.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{% url 'mold_injection:task_detail' obj.pk %}"
+                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" class="text-center py-4 text-muted">
+                            <i class="ti ti-injection fs-1 d-block mb-2"></i>
+                            暂无注塑任务
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
     </div>
-    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    initRemoteTomSelectAll(document, {
+        apiUrl: "{% url 'trial_api_search' %}",
+        valueField: 'id',
+        responseKey: 'results',
+    });
+});
+</script>
 {% endblock %}

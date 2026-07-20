@@ -112,6 +112,7 @@ class ProductionOrderService:
         )
 
         order.workflow_instance = instance
+        order.save(update_fields=['workflow_instance'])
         StateMachine.transition(order, 'WORKFLOW_RUNNING', user)
         return instance
 
@@ -165,6 +166,7 @@ class ProductionOrderService:
         )
         if extrusion_task.status == 'PENDING':
             extrusion_task.operator = user
+            extrusion_task.save(update_fields=['operator'])
             StateMachine.transition(extrusion_task, 'IN_PROGRESS', user)
         elif extrusion_task.status == 'IN_PROGRESS':
             # 操作员可能不同，更新为当前操作员
@@ -222,6 +224,12 @@ class ProductionOrderService:
         - 挤出完成       → 触发注塑任务（如有模具配置，配色任务独立并行不阻塞）
         - 注塑完成       → 触发测试任务（如有测试项目）
         """
+        # 使用 select_for_update 锁定工单行，防止并发推进。
+        # 所有调用方（ExtrusionTaskService / ColorMatchingTaskService /
+        # InjectionTaskService / TestingTaskService / SampleInventoryService）
+        # 均在 @transaction.atomic 装饰的方法内调用此方法，行锁正常工作。
+        order = ProductionOrder.objects.select_for_update().get(pk=order.pk)
+
         if order.status == ProductionOrder.Status.COMPLETED:
             return
 
@@ -330,12 +338,19 @@ class ProductionOrderService:
         if not plans.exists():
             return None
 
-        task = InjectionTask.objects.create(
+        task, created = InjectionTask.objects.get_or_create(
             production_order=order,
-            source='ORDER',
-            status='PENDING',
+            defaults={
+                'source': 'ORDER',
+                'status': 'PENDING',
+            },
         )
-        # 将规划阶段的 MoldRequirement 关联到新建的注塑任务
+        if not created:
+            logger.info(
+                f"InjectionTask already exists for order {order.code}, "
+                f"linking {plans.count()} pending mold requirements"
+            )
+        # 将规划阶段的 MoldRequirement 关联到注塑任务
         plans.update(injection_task=task)
 
         # 将工单下未关联的 FOR_INJECTION 颗粒链接到该注塑任务
@@ -362,6 +377,17 @@ class ProductionOrderService:
     def _create_testing_from_pending(order):
         """从 order.test_items 创建 TestingTask（注塑完成后调用）"""
         from app_material_testing.models import TestingTask
+
+        # 如果已有非终态的测试任务，直接复用，不再重复创建
+        existing = order.testing_tasks.exclude(
+            status=TestingTask.Status.RESULTS_WRITTEN_BACK
+        ).first()
+        if existing:
+            logger.info(
+                f"TestingTask {existing.pk} already exists for order {order.code}, "
+                f"skipping duplicate creation"
+            )
+            return existing
 
         task = TestingTask.objects.create(
             production_order=order,

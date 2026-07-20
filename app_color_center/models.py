@@ -53,7 +53,18 @@ class ColorMatchingTask(models.Model):
 
     @cached_property
     def needs_color_matching(self):
-        """从工单配方明细中判断是否需要配色（缓存，实例生命周期内只查一次）"""
+        """
+        从工单配方明细中实时判断是否需要配色。
+
+        注: ColorMatchingTask 只在工单至少有一个
+        formula_detail.needs_color_matching=True 时创建，因此此属性
+        对已存在的配色任务通常返回 True。
+
+        仅当关联的 ProductionOrderFormulaDetail 在任务创建后被修改为
+        needs_color_matching=False 时（极端边缘情况）才返回 False。
+
+        缓存: 实例生命周期内仅查询一次数据库。
+        """
         return self.production_order.formula_details.filter(
             needs_color_matching=True).exists()
 

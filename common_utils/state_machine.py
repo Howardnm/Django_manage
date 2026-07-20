@@ -94,9 +94,11 @@ class StateMachine:
         if target_status not in allowed:
             raise InvalidStateTransition(obj, current_status, target_status)
 
-        # 执行转换
-        old_status = obj.status
-        obj.status = target_status
+        old_status = current_status
+        model_class = type(obj)
+
+        # 构建原子更新字段（compare-and-swap: WHERE status = current_status）
+        update_fields = {'status': target_status}
 
         # 更新时间戳（使用注册时配置的字段名）
         tsf = cls._TIMESTAMP_FIELDS.get(model_name, {
@@ -105,13 +107,28 @@ class StateMachine:
         if target_status == 'COMPLETED':
             completed_field = tsf.get('completed', 'completed_at')
             if hasattr(obj, completed_field):
-                setattr(obj, completed_field, timezone.now())
+                update_fields[completed_field] = timezone.now()
         if target_status in ('IN_PROGRESS',):
             started_field = tsf.get('started', 'started_at')
             if hasattr(obj, started_field) and getattr(obj, started_field) is None:
-                setattr(obj, started_field, timezone.now())
+                update_fields[started_field] = timezone.now()
 
-        obj.save()
+        # 原子更新：只有状态未被其他事务修改时才生效（compare-and-swap）
+        updated = model_class.objects.filter(
+            pk=obj.pk, status=current_status
+        ).update(**update_fields)
+
+        if not updated:
+            raise InvalidStateTransition(obj, current_status, target_status)
+
+        # 同步内存中的对象状态
+        obj.status = target_status
+        completed_field = tsf.get('completed', 'completed_at')
+        if hasattr(obj, completed_field) and completed_field in update_fields:
+            setattr(obj, completed_field, update_fields[completed_field])
+        started_field = tsf.get('started', 'started_at')
+        if hasattr(obj, started_field) and started_field in update_fields:
+            setattr(obj, started_field, update_fields[started_field])
 
         user_info = f" by {user}" if user else ""
         logger.info(

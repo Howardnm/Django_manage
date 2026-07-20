@@ -1,7 +1,8 @@
 import logging
 from collections import OrderedDict
 from itertools import groupby
-from django.db.models import Count, Q
+from django.db import transaction
+from django.db.models import Count
 from django.views.generic import ListView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -135,21 +136,6 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
             project_stats[p.pk] = {'total': total, 'done': done}
         return project_stats
 
-
-class ColorTaskDetailView(ColorCenterAccessMixin, View):
-    """配色任务详情"""
-
-    def get(self, request, order_pk):
-        order = get_object_or_404(
-            ProductionOrder.objects.select_related('project'),
-            pk=order_pk)
-        if order.project:
-            RndAccessMixin.check_project_ownership(order.project, request.user)
-        task = getattr(order, 'color_task', None)
-        return render(request, 'apps/app_color_center/detail.html', {
-            'production_order': order,
-            'color_task': task,
-        })
 
 
 class ProjectColorView(ColorCenterAccessMixin, View):
@@ -423,41 +409,59 @@ class ProjectColorView(ColorCenterAccessMixin, View):
         entry_formset = ColorPowderBOMEntryFormSet(request.POST, instance=bom, prefix='entries')
 
         if bom_form.is_valid() and entry_formset.is_valid():
-            bom = bom_form.save(commit=False)
-            bom.filled_by = request.user
-            bom.save()
-            entry_formset.instance = bom
-            entry_formset.save()
-            messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
-
-            # 批量保存/覆盖：将该配方的 BOM 复制到同实验单号下其他需配色的配方
-            batch_mode = request.POST.get('batch_save_mode', '')
-            if batch_mode in ('save', 'overwrite'):
-                trial_code = selected_formula.code
-                overwrite = (batch_mode == 'overwrite')
-                copied = batch_copy_bom(selected_formula, trial_code, request.user, overwrite=overwrite)
-                if copied:
-                    label = '覆盖' if overwrite else '复制'
-                    messages.success(request, f'已批量{label}色粉BOM到 {copied} 个配方版本')
-
-            # BOM 保存后自动推进关联工单的 ColorMatchingTask
+            # 先取关联工单 ID（batch_copy + 任务推进都需要），避免在循环中重复查询
             from app_trial_production.models import ProductionOrderFormulaDetail
-            order_ids = ProductionOrderFormulaDetail.objects.filter(
+            order_ids = list(ProductionOrderFormulaDetail.objects.filter(
                 formula=selected_formula,
-            ).values_list('production_order_id', flat=True)
-            for order_id in order_ids:
-                try:
-                    task = ColorMatchingTask.objects.get(production_order_id=order_id)
-                except ColorMatchingTask.DoesNotExist:
-                    continue
-                # 已经完成的跳过
-                if task.status == ColorMatchingTask.Status.COMPLETED:
-                    continue
-                if task.status == ColorMatchingTask.Status.PENDING:
-                    ColorMatchingTaskService.start_task(task, request.user)
-                # 检查该工单所有需配色的配方 BOM 是否都已填完
-                if check_order_bom_complete(task.production_order):
-                    ColorMatchingTaskService.complete_task(task, request.user)
+            ).values_list('production_order_id', flat=True))
+            first_order_id = order_ids[0] if order_ids else None
+
+            with transaction.atomic():
+                bom = bom_form.save(commit=False)
+                bom.filled_by = request.user
+                bom.save()
+                entry_formset.instance = bom
+                entry_formset.save()
+
+                # 批量保存/覆盖：将该配方的 BOM 复制到同实验单号下其他需配色的配方
+                batch_mode = request.POST.get('batch_save_mode', '')
+                if batch_mode in ('save', 'overwrite'):
+                    trial_code = selected_formula.code
+                    overwrite = (batch_mode == 'overwrite')
+                    copied = batch_copy_bom(
+                        selected_formula, trial_code, request.user,
+                        overwrite=overwrite,
+                        production_order_id=first_order_id,
+                    )
+                    if copied:
+                        label = '覆盖' if overwrite else '复制'
+                        messages.success(request, f'已批量{label}色粉BOM到 {copied} 个配方版本')
+
+                # BOM 保存后自动推进关联工单的 ColorMatchingTask
+                for order_id in order_ids:
+                    try:
+                        task = ColorMatchingTask.objects.get(production_order_id=order_id)
+                    except ColorMatchingTask.DoesNotExist:
+                        continue
+                    # 已经完成的跳过
+                    if task.status == ColorMatchingTask.Status.COMPLETED:
+                        continue
+                    if task.status == ColorMatchingTask.Status.PENDING:
+                        try:
+                            ColorMatchingTaskService.start_task(task, request.user)
+                        except InvalidStateTransition as e:
+                            logger.warning(f"ColorMatchingTask start failed: order={order_id}, {e}")
+                            messages.warning(request, f'工单配色任务启动异常：{e}')
+                            continue
+                    # 检查该工单所有需配色的配方 BOM 是否都已填完
+                    if check_order_bom_complete(task.production_order):
+                        try:
+                            ColorMatchingTaskService.complete_task(task, request.user)
+                        except InvalidStateTransition as e:
+                            logger.warning(f"ColorMatchingTask complete failed: order={order_id}, {e}")
+                            messages.warning(request, f'工单配色任务完成异常：{e}')
+
+            messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
 
             # 保留现有 query 参数（如 stage/round/order_pk），覆盖 formula_id
             params = request.GET.copy()

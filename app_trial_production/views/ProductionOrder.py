@@ -1,7 +1,7 @@
 import logging
 
 from django.db import transaction
-from django.db.models import Sum, Q
+from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.utils.safestring import mark_safe
 from django.views.generic import DetailView, CreateView, UpdateView, View
@@ -19,7 +19,7 @@ from app_trial_production.models import ProductionOrder, SampleInventory, TrialP
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
 )
-from app_trial_production.services import ProductionOrderService, SampleInventoryService
+from app_trial_production.services import ProductionOrderService
 from app_user.models import User
 from common_utils.state_machine import InvalidStateTransition
 

@@ -33,6 +33,7 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
         fields=(
             ('created_at', 'created_at'),
             ('status', 'status'),
+            ('production_order__code', 'production_order__code'),
         ),
         widget=forms.HiddenInput,
     )
@@ -51,5 +52,6 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
             return queryset
         return queryset.filter(
             Q(production_order__code__icontains=value) |
-            Q(production_order__trial_code__icontains=value)
+            Q(production_order__trial_code__icontains=value) |
+            Q(production_order__project__name__icontains=value)
         )

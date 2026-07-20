@@ -17,11 +17,13 @@ def check_order_bom_complete(order):
 
 
 @transaction.atomic
-def batch_copy_bom(source_formula, target_trial_code, user, overwrite=False):
+def batch_copy_bom(source_formula, target_trial_code, user, overwrite=False,
+                   production_order_id=None):
     """将当前配方的色粉 BOM 批量复制到同实验单号下其他需要配色的配方。
 
     Args:
         overwrite: False=跳过已有BOM的配方，True=强制覆盖已有BOM
+        production_order_id: 限定目标工单范围（可选）。传入后只复制到该工单关联的配方。
     """
     from app_formula.models import ColorPowderBOM, ColorPowderBOMEntry
     from app_trial_production.models import ProductionOrderFormulaDetail
@@ -30,11 +32,18 @@ def batch_copy_bom(source_formula, target_trial_code, user, overwrite=False):
     if not source_bom or not source_bom.entries.exists():
         return 0
 
-    # 同实验单号下需要配色的配方版本
-    formula_ids = ProductionOrderFormulaDetail.objects.filter(
+    # 同实验单号下需要配色的配方版本（可限定工单范围）
+    formula_ids_qs = ProductionOrderFormulaDetail.objects.filter(
         formula__code=target_trial_code,
         needs_color_matching=True,
-    ).exclude(formula_id=source_formula.pk).values_list('formula_id', flat=True).distinct()
+    ).exclude(formula_id=source_formula.pk)
+
+    if production_order_id:
+        formula_ids_qs = formula_ids_qs.filter(
+            production_order_id=production_order_id
+        )
+
+    formula_ids = formula_ids_qs.values_list('formula_id', flat=True).distinct()
 
     copied = 0
     source_entries = list(source_bom.entries.all())
