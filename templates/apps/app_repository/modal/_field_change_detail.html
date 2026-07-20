@@ -70,6 +70,26 @@
                     <td class="text-muted small">预估订单用量</td>
                     <td>{% if change.estimated_order_volume %}{{ change.estimated_order_volume }} kg/年{% else %}—{% endif %}</td>
                 </tr>
+                <tr>
+                    <td class="text-muted small">第一次送样</td>
+                    <td>{% if change.first_sample_date %}{{ change.first_sample_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">第一次小试</td>
+                    <td>{% if change.first_trial_date %}{{ change.first_trial_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">小试周期</td>
+                    <td>{% if change.first_trial_cycle_days %}{{ change.first_trial_cycle_days }} 天{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">中试时间</td>
+                    <td>{% if change.pilot_date %}{{ change.pilot_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">量产时间</td>
+                    <td>{% if change.mass_production_date %}{{ change.mass_production_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+                </tr>
             </tbody>
         </table>
     </div>

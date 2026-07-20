@@ -41,6 +41,11 @@ def handle_repo_change_callback(instance: WorkflowInstance, target_status: str, 
             repo.target_cost = change.target_cost
             repo.competitor_price = change.competitor_price
             repo.estimated_order_volume = change.estimated_order_volume
+            repo.first_sample_date = change.first_sample_date
+            repo.first_trial_date = change.first_trial_date
+            repo.first_trial_cycle_days = change.first_trial_cycle_days
+            repo.pilot_date = change.pilot_date
+            repo.mass_production_date = change.mass_production_date
             repo.workflow_instance = None
             repo.save()
 

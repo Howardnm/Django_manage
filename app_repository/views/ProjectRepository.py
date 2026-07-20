@@ -61,6 +61,16 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
             messages.warning(self.request, "已有待审批的档案变更，请等待审批完成后再提交")
             return redirect(self.get_success_url())
 
+        # 项目计划字段：已录入的值后端强制覆盖，防止绕过前端 disabled
+        # 注意：form 校验后 repo 实例字段已被 cleaned_data 覆盖，需从 DB 读取原值
+        plan_fields = ['first_sample_date', 'first_trial_date', 'first_trial_cycle_days',
+                       'pilot_date', 'mass_production_date']
+        db_repo = ProjectRepository.objects.only(*plan_fields).get(pk=repo.pk)
+        plan_values = {}
+        for f in plan_fields:
+            existing = getattr(db_repo, f)
+            plan_values[f] = existing if existing is not None else form.cleaned_data.get(f)
+
         # 创建全字段变更记录 — Repository 原值保持不变，等待审批
         change = ProjectRepositoryFieldChange.objects.create(
             repository=repo,
@@ -74,6 +84,7 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
             estimated_order_volume=form.cleaned_data.get('estimated_order_volume'),
             submitted_by=self.request.user,
             submission_comment=form.cleaned_data.get('submission_comment', ''),
+            **plan_values,
         )
 
         # 启动审批流程

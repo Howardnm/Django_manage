@@ -94,6 +94,13 @@ class ProjectRepository(models.Model):
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
 
+    # 项目计划时间节点
+    first_sample_date = models.DateField("第一次客户送样时间", null=True, blank=True)
+    first_trial_date = models.DateField("第一次客户小试时间", null=True, blank=True)
+    first_trial_cycle_days = models.PositiveIntegerField("第一次小试完成周期 (天)", null=True, blank=True)
+    pilot_date = models.DateField("中试进行时间", null=True, blank=True)
+    mass_production_date = models.DateField("量产进行时间", null=True, blank=True)
+
     # 活跃审批追踪
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="活跃审批流程", help_text="当前正在进行的档案变更审批")
 
@@ -133,6 +140,13 @@ class ProjectRepositoryFieldChange(models.Model):
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
+
+    # 变更字段（新值快照）— 项目计划
+    first_sample_date = models.DateField("第一次客户送样时间", null=True, blank=True)
+    first_trial_date = models.DateField("第一次客户小试时间", null=True, blank=True)
+    first_trial_cycle_days = models.PositiveIntegerField("第一次小试完成周期 (天)", null=True, blank=True)
+    pilot_date = models.DateField("中试进行时间", null=True, blank=True)
+    mass_production_date = models.DateField("量产进行时间", null=True, blank=True)
 
     # 提交信息
     submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='repo_field_changes', verbose_name="提交人")

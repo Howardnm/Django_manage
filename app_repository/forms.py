@@ -64,6 +64,11 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
             'customer': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'}),
             'oem': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'oem'}),
             'salesperson': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'salesperson'}),
+            'first_sample_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'first_trial_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'first_trial_cycle_days': forms.NumberInput(attrs={'placeholder': '如：30'}),
+            'pilot_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'mass_production_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
 
     def __init__(self, *args, **kwargs):
@@ -87,3 +92,13 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
 
         self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
         self.fields['salesperson'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
+
+        # 项目计划时间节点：已录入的字段禁用编辑，仅允许首次录入
+        plan_fields = ['first_sample_date', 'first_trial_date', 'first_trial_cycle_days',
+                       'pilot_date', 'mass_production_date']
+        instance = kwargs.get('instance')
+        if instance and instance.pk:
+            for f in plan_fields:
+                if getattr(instance, f) is not None:
+                    self.fields[f].widget.attrs['disabled'] = True
+                    self.fields[f].required = False

@@ -98,7 +98,60 @@
                         </div>
                     </div>
 
-                    <!-- 第三行：业务员 -->
+                    <!-- 第三行：项目计划时间节点 -->
+                    <div class="col-12">
+                        <div class="p-2 border rounded">
+                            <div class="small fw-bold text-muted mb-2">
+                                <i class="ti ti-calendar-event me-1"></i>项目计划
+                            </div>
+                            <div class="d-flex align-items-center small">
+                                <span class="d-flex align-items-center me-2">
+                                    <span class="status-dot bg-{% if repo.first_sample_date %}green{% else %}secondary{% endif %} me-1"></span>
+                                    <span>送样</span>
+                                    {% if repo.first_sample_date %}
+                                        <span class="fw-bold ms-1">{{ repo.first_sample_date|date:"Y-m-d" }}</span>
+                                    {% else %}
+                                        <span class="text-muted ms-1">—</span>
+                                    {% endif %}
+                                </span>
+                                <span class="text-muted me-2">→</span>
+                                <span class="d-flex align-items-center me-2">
+                                    <span class="status-dot bg-{% if repo.first_trial_date %}azure{% else %}secondary{% endif %} me-1"></span>
+                                    <span>小试</span>
+                                    {% if repo.first_trial_date %}
+                                        <span class="fw-bold ms-1">{{ repo.first_trial_date|date:"Y-m-d" }}</span>
+                                        {% if repo.first_trial_cycle_days %}
+                                            <span class="badge bg-blue-lt ms-1" style="font-size: 10px;">{{ repo.first_trial_cycle_days }}天</span>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted ms-1">—</span>
+                                    {% endif %}
+                                </span>
+                                <span class="text-muted me-2">→</span>
+                                <span class="d-flex align-items-center me-2">
+                                    <span class="status-dot bg-{% if repo.pilot_date %}purple{% else %}secondary{% endif %} me-1"></span>
+                                    <span>中试</span>
+                                    {% if repo.pilot_date %}
+                                        <span class="fw-bold ms-1">{{ repo.pilot_date|date:"Y-m-d" }}</span>
+                                    {% else %}
+                                        <span class="text-muted ms-1">—</span>
+                                    {% endif %}
+                                </span>
+                                <span class="text-muted me-2">→</span>
+                                <span class="d-flex align-items-center">
+                                    <span class="status-dot bg-{% if repo.mass_production_date %}red{% else %}secondary{% endif %} me-1"></span>
+                                    <span>量产</span>
+                                    {% if repo.mass_production_date %}
+                                        <span class="fw-bold ms-1">{{ repo.mass_production_date|date:"Y-m-d" }}</span>
+                                    {% else %}
+                                        <span class="text-muted ms-1">—</span>
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 第四行：业务员 -->
                     {% if repo.salesperson %}
                     <div class="col-12">
                         <div class="d-flex align-items-center px-2 py-1 rounded bg-azure-lt small">

@@ -104,6 +104,42 @@
             </div>
         </div>
 
+        <!-- 项目计划时间节点 -->
+        <div class="row row-cards mt-3">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-status-top bg-purple"></div>
+                    <div class="card-header">
+                        <h3 class="card-title"><i class="ti ti-calendar-event me-2 text-purple"></i>项目计划时间节点</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">第一次客户送样时间</label>
+                                {{ form.first_sample_date }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">第一次客户小试时间</label>
+                                {{ form.first_trial_date }}
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">小试完成周期 (天)</label>
+                                {{ form.first_trial_cycle_days }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">中试进行时间</label>
+                                {{ form.pilot_date }}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">量产进行时间</label>
+                                {{ form.mass_production_date }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <div class="card mt-3">
             <div class="card-body">
                 {% if repo.workflow_instance and repo.workflow_instance.status == 'RUNNING' %}
