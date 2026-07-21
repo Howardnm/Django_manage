@@ -4,24 +4,12 @@ from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 
 from app_project.models import NodeScoreRule
 from app_project.forms import NodeScoreRuleForm
-from app_project.mixins import ProjectAccessMixin
+from app_project.mixins import PerformanceManagementMixin, PerformanceRuleReadMixin
 
 
-class PerformanceManagementMixin(ProjectAccessMixin):
-    """
-    绩效管理专用权限：
-    仅限拥有管理权限 (change_project) 且 职级达到 15 级（预设的高级经理级别）的人员。
-    或者通过 identity_required 锁定到特定的高级管理角色。
-    """
-    # 强制要求高职级
-    min_level_required = 15 
-    
-    # 即使是同一部门，普通员工也看不到规则
-    enforce_dept_isolation = False # 规则本身不分部门，但准入门槛极高
-
-class NodeScoreRuleListView(PerformanceManagementMixin, ListView):
-    """评分规则列表"""
-    permission_required = 'app_project.change_project'
+class NodeScoreRuleListView(PerformanceRuleReadMixin, ListView):
+    """评分规则列表 — 开放给研发工程师和业务经理查看"""
+    permission_required = 'app_project.view_project'
     model = NodeScoreRule
     template_name = 'apps/app_project/performance/rule_list.html'
     context_object_name = 'rules'

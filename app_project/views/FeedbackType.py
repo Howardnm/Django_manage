@@ -6,10 +6,10 @@ from django.shortcuts import redirect
 
 from app_project.models import FeedbackType
 from app_project.forms import FeedbackTypeForm
-from app_project.mixins import ProjectAccessMixin
+from app_project.mixins import SharedConfigMixin
 
 
-class FeedbackTypeListView(ProjectAccessMixin, ListView):
+class FeedbackTypeListView(SharedConfigMixin, ListView):
     """客户意见类型列表"""
     permission_required = 'app_project.change_project'
     model = FeedbackType
@@ -21,7 +21,7 @@ class FeedbackTypeListView(ProjectAccessMixin, ListView):
         return super().get_queryset().annotate(node_count=Count('projectnode')).order_by('order', 'name')
 
 
-class FeedbackTypeCreateView(ProjectAccessMixin, CreateView):
+class FeedbackTypeCreateView(SharedConfigMixin, CreateView):
     """创建客户意见类型"""
     permission_required = 'app_project.change_project'
     model = FeedbackType
@@ -34,7 +34,7 @@ class FeedbackTypeCreateView(ProjectAccessMixin, CreateView):
         return super().form_valid(form)
 
 
-class FeedbackTypeUpdateView(ProjectAccessMixin, UpdateView):
+class FeedbackTypeUpdateView(SharedConfigMixin, UpdateView):
     """编辑客户意见类型"""
     permission_required = 'app_project.change_project'
     model = FeedbackType
@@ -50,7 +50,7 @@ class FeedbackTypeUpdateView(ProjectAccessMixin, UpdateView):
         return super().form_valid(form)
 
 
-class FeedbackTypeDeleteView(ProjectAccessMixin, DeleteView):
+class FeedbackTypeDeleteView(SharedConfigMixin, DeleteView):
     """删除客户意见类型"""
     permission_required = 'app_project.change_project'
     model = FeedbackType

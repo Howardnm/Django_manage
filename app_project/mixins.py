@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.models import User
 
 class ProjectAccessMixin(UnifiedAccessMixin):
     """
@@ -59,3 +60,36 @@ class ProjectAccessMixin(UnifiedAccessMixin):
                 if obj.members.filter(user=user).exists():
                     return True
             raise
+
+
+class PerformanceManagementMixin(ProjectAccessMixin):
+    """
+    绩效管理写操作权限 Mixin（创建/编辑/删除）。
+
+    仅限高职级人员操作评分规则（预设高级经理级别 Lv.15）。
+    规则为全局配置，不区分部门。
+    """
+    min_level_required = 15
+    enforce_dept_isolation = False
+
+
+class PerformanceRuleReadMixin(ProjectAccessMixin):
+    """
+    绩效规则查看权限 Mixin（列表/详情）。
+
+    开放给研发工程师和业务经理查看评分规则。
+    规则为全局配置，不区分部门。
+    """
+    identity_required = [User.UserType.ENGINEER, User.UserType.SALES, User.UserType.ADMIN]
+    enforce_dept_isolation = False
+
+
+class SharedConfigMixin(ProjectAccessMixin):
+    """
+    全局配置表权限 Mixin（不合格原因、客户意见类型等）。
+
+    配置表为组织级共享资源，无数据所有者，部门内所有内部员工均可编辑。
+    关闭部门/工作组隔离，仅靠 L1（内部全员）+ L3（权限码）准入控制。
+    """
+    enforce_dept_isolation = False
+    enforce_group_isolation = False

@@ -6,10 +6,10 @@ from django.shortcuts import redirect
 
 from app_project.models import FailureReason
 from app_project.forms import FailureReasonForm
-from app_project.mixins import ProjectAccessMixin
+from app_project.mixins import SharedConfigMixin
 
 
-class FailureReasonListView(ProjectAccessMixin, ListView):
+class FailureReasonListView(SharedConfigMixin, ListView):
     """不合格原因列表"""
     permission_required = 'app_project.change_project'
     model = FailureReason
@@ -21,7 +21,7 @@ class FailureReasonListView(ProjectAccessMixin, ListView):
         return super().get_queryset().annotate(node_count=Count('projectnode')).order_by('order', 'name')
 
 
-class FailureReasonCreateView(ProjectAccessMixin, CreateView):
+class FailureReasonCreateView(SharedConfigMixin, CreateView):
     """创建不合格原因"""
     permission_required = 'app_project.change_project'
     model = FailureReason
@@ -34,7 +34,7 @@ class FailureReasonCreateView(ProjectAccessMixin, CreateView):
         return super().form_valid(form)
 
 
-class FailureReasonUpdateView(ProjectAccessMixin, UpdateView):
+class FailureReasonUpdateView(SharedConfigMixin, UpdateView):
     """编辑不合格原因"""
     permission_required = 'app_project.change_project'
     model = FailureReason
@@ -50,7 +50,7 @@ class FailureReasonUpdateView(ProjectAccessMixin, UpdateView):
         return super().form_valid(form)
 
 
-class FailureReasonDeleteView(ProjectAccessMixin, DeleteView):
+class FailureReasonDeleteView(SharedConfigMixin, DeleteView):
     """删除不合格原因"""
     permission_required = 'app_project.change_project'
     model = FailureReason
