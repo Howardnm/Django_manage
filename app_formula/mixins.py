@@ -18,3 +18,6 @@ class FormulaAccessMixin(UnifiedAccessMixin):
 
     # L4: 启用严格的部门隔离逻辑
     enforce_dept_isolation = True
+
+    # L5: 启用工作组隔离逻辑（同部门不同工作组之间数据不可见）
+    enforce_group_isolation = True

@@ -902,6 +902,11 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         formula_map = {
             f.pk: f for f in LabFormula.objects.filter(pk__in=formula_ids).prefetch_related('test_results', 'bom_lines')
         }
+
+        # 逐公式校验编辑权限（formula_ids 来自客户端 POST，不可信）
+        for formula in formula_map.values():
+            self.check_edit_permission(formula)
+
         with transaction.atomic():
             for col_idx, formula_id in enumerate(formula_ids):
                 formula = formula_map[formula_id]
@@ -1005,6 +1010,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
@@ -1321,6 +1327,7 @@ class FormulaImportFromView(FormulaAccessMixin, View):
         targets = list(LabFormula.objects.filter(code=target.code).order_by('version'))
         for t in targets:
             self.check_object_permission(t)
+            self.check_edit_permission(t)
 
         # 取源实验单中版本号最大的配方作为基础信息模板
         source = max(source_formulas, key=lambda f: f.version)

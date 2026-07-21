@@ -32,7 +32,7 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
         material_ids = request.session.get('cart_materials_v2', [])
         raw_material_ids = request.session.get('cart_raw_materials_v2', [])
 
-        formulas = LabFormula.objects.filter(pk__in=formula_ids).values('id', 'code', 'name')
+        formulas = self.get_queryset().filter(pk__in=formula_ids).values('id', 'code', 'name')
         materials = MaterialLibrary.objects.filter(pk__in=material_ids).values('id', 'grade_name', 'manufacturer')
         raw_materials = RawMaterial.objects.filter(pk__in=raw_material_ids).values('id', 'name', 'model_name', 'supplier__name')
         
@@ -95,6 +95,8 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
                     try:
                         fid_int = int(fid)
                         if fid_int not in target_list:
+                            if item_type == 'formula' and not self.get_queryset().filter(pk=fid_int).exists():
+                                continue
                             target_list.append(fid_int)
                     except (ValueError, TypeError):
                         continue
@@ -107,6 +109,8 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
                     fid = int(item_id)
                     if action == 'add':
                         if fid not in target_list:
+                            if item_type == 'formula' and not self.get_queryset().filter(pk=fid).exists():
+                                return JsonResponse({'status': 'error', 'message': '配方不存在或无权访问'}, status=403)
                             target_list.append(fid)
                     elif action == 'remove':
                         if fid in target_list:
@@ -115,6 +119,8 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
                         if fid in target_list:
                             target_list.remove(fid)
                         else:
+                            if item_type == 'formula' and not self.get_queryset().filter(pk=fid).exists():
+                                return JsonResponse({'status': 'error', 'message': '配方不存在或无权访问'}, status=403)
                             target_list.append(fid)
                 except ValueError:
                     pass
