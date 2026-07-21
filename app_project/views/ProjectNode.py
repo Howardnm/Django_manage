@@ -39,6 +39,7 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
 
     def post(self, request, pk):
         node = self.get_node_and_check_perm(pk)
+        self.check_edit_permission(node.project)
         form = ProjectNodeUpdateForm(request.POST, instance=node)
 
         if form.is_valid():
@@ -123,6 +124,7 @@ class NodeFailedView(ProjectAccessMixin, View):
     def post(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(node.project)
+        self.check_edit_permission(node.project)
 
         failure_reason_id = request.POST.get('failure_reason_id')
         failure_reason = None
@@ -152,6 +154,7 @@ class InsertFeedbackView(ProjectAccessMixin, View):
     def post(self, request, pk):
         current_node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(current_node.project)
+        self.check_edit_permission(current_node.project)
 
         feedback_type_id = request.POST.get('feedback_type_id')
         current_node.project.handle_customer_feedback(

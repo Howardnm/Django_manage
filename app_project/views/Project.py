@@ -119,6 +119,7 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)
         project = self.object
         config = ProjectConfig.get()
         edit_workflow = config.default_project_edit_approval_workflow

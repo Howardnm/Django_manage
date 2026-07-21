@@ -42,6 +42,7 @@ class ProjectSalesMemberManageView(ProjectAccessMixin, View):
 
     def post(self, request, pk):
         project = self.get_project_and_check_perm(pk)
+        self.check_edit_permission(project)
 
         member_id = request.POST.get('member_id')
         if member_id:
@@ -74,6 +75,7 @@ class ProjectSalesMemberDeleteView(ProjectAccessMixin, View):
     def post(self, request, pk):
         member = get_object_or_404(ProjectSalesMember.objects.select_related('project'), pk=pk)
         self.check_object_permission(member.project)
+        self.check_edit_permission(member.project)
         project_id = member.project.id
 
         member.delete()

@@ -42,6 +42,9 @@ class FailureReasonUpdateView(ProjectAccessMixin, UpdateView):
     template_name = 'apps/app_project/failure_reason_form.html'
     success_url = reverse_lazy('failure_reason_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def form_valid(self, form):
         messages.success(self.request, "不合格原因已更新")
         return super().form_valid(form)
@@ -53,8 +56,10 @@ class FailureReasonDeleteView(ProjectAccessMixin, DeleteView):
     model = FailureReason
     success_url = reverse_lazy('failure_reason_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def form_valid(self, form):
-        self.object = self.get_object()
         if self.object.projectnode_set.exists():
             messages.error(self.request, f'无法删除"{self.object.name}"：已有 {self.object.projectnode_set.count()} 个项目节点关联了该不合格原因。')
             return redirect(self.success_url)

@@ -495,6 +495,7 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
 
     def post(self, request, pk):
         project = self.get_object_or_deny()
+        self.check_edit_permission(project)
 
         # ── 提取基础字段 ──
         quantity_planned = float(request.POST.get('quantity_planned', 0) or 0)
@@ -611,6 +612,8 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
 
     def _get_formula(self, pk, formula_pk):
         project = get_object_or_404(Project, pk=pk)
+        self.check_object_permission(project)
+        self.check_edit_permission(project)
         return get_object_or_404(
             LabFormula.objects.select_related('project', 'material_type'),
             pk=formula_pk, project=project,

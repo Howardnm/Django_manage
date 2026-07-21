@@ -42,6 +42,9 @@ class FeedbackTypeUpdateView(ProjectAccessMixin, UpdateView):
     template_name = 'apps/app_project/feedback_type_form.html'
     success_url = reverse_lazy('feedback_type_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def form_valid(self, form):
         messages.success(self.request, "客户意见类型已更新")
         return super().form_valid(form)
@@ -53,8 +56,10 @@ class FeedbackTypeDeleteView(ProjectAccessMixin, DeleteView):
     model = FeedbackType
     success_url = reverse_lazy('feedback_type_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def form_valid(self, form):
-        self.object = self.get_object()
         if self.object.projectnode_set.exists():
             messages.error(self.request, f'无法删除"{self.object.name}"：已有 {self.object.projectnode_set.count()} 个项目节点关联了该意见类型。')
             return redirect(self.success_url)

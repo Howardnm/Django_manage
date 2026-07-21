@@ -7,8 +7,10 @@ class ProjectAccessMixin(UnifiedAccessMixin):
     项目模块专用的权限管控类。
 
     1. 负责人识别：manager。
-    2. 协同穿透：支持 ProjectMember 访问。
-    3. 准入规则：支持研发工程师、工艺工程师、业务经理、管理员 (INTERNAL_STAFF)。
+    2. 协同穿透：支持 ProjectMember 访问（查看）。
+    3. 准入规则：支持内部全员 (INTERNAL_STAFF)。
+    4. L5 工作组隔离：仅同组可查看项目。
+    5. 编辑权限：仅项目负责人可编辑（继承自基类 check_edit_permission）。
     """
 
     # 明确定义项目模块的负责人字段名
@@ -16,6 +18,9 @@ class ProjectAccessMixin(UnifiedAccessMixin):
 
     # 使用重构后的分组，确保工艺工程师也能进入项目模块
     identity_required = IdentityConfig.INTERNAL_STAFF
+
+    # ── 开启 L5 工作组隔离 ──
+    enforce_group_isolation = True
 
     def get_queryset(self):
         """

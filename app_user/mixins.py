@@ -304,3 +304,31 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                     raise PermissionDenied("您的工作组无权操作该数据资产")
 
         return True
+
+    def check_edit_permission(self, obj):
+        """
+        对象级编辑权限（默认实现）：
+        - 超管 / 数据所有者 → 可编辑
+        - 其他所有人（含同部门、同组）→ 仅可查看，不可编辑
+
+        子类可重写以添加模块特定的编辑权限逻辑（如审批人、管理员角色等）。
+        调用方：所有写操作视图（UpdateView 的 post/form_valid 方法）。
+
+        Raises: PermissionDenied 若非数据所有者。
+        """
+        user = self.request.user
+        if user.is_superuser:
+            return
+
+        # 探测数据所有者（复用 user_link_fields 检测逻辑，与 check_object_permission 一致）
+        owner = None
+        for attr in self.user_link_fields:
+            if hasattr(obj, attr):
+                owner = getattr(obj, attr)
+                if owner:
+                    break
+
+        if owner and owner == user:
+            return
+
+        raise PermissionDenied("仅数据所有者可编辑此记录。")
