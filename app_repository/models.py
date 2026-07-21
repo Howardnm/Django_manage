@@ -72,21 +72,18 @@ class Customer(models.Model):
 
 
 # ==========================================
-# 3. 项目商务档案 - 核心关联
+# 3. 项目档案共享字段 — 抽象基类
 # ==========================================
-class ProjectRepository(models.Model):
+class AbstractProjectRepositoryFields(models.Model):
     """
-    项目档案：在此处关联具体的 项目、客户公司、主机厂。
+    项目档案的共享业务字段 — 抽象基类，不创建数据库表。
+    ProjectRepository 与 ProjectRepositoryFieldChange 均继承此类，
+    确保字段定义一致，新增字段只需在一处维护。
     """
-    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='repository', verbose_name="关联项目")
-    
-    # 商业三要素：在此处产生交集
-    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户 (Tier1)")
-    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="终端主机厂 (OEM)")
-    
-    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, 
-                                    related_name='managed_project_repos', verbose_name="负责业务员")
-    
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_customers', verbose_name="直接客户 (Tier1)")
+    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_oems', verbose_name="终端主机厂 (OEM)")
+    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_salespersons', verbose_name="负责业务员")
+
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
 
@@ -101,6 +98,19 @@ class ProjectRepository(models.Model):
     pilot_date = models.DateField("中试进行时间", null=True, blank=True)
     mass_production_date = models.DateField("量产进行时间", null=True, blank=True)
 
+    class Meta:
+        abstract = True
+
+
+# ==========================================
+# 4. 项目商务档案 - 核心关联
+# ==========================================
+class ProjectRepository(AbstractProjectRepositoryFields):
+    """
+    项目档案：在此处关联具体的 项目、客户公司、主机厂。
+    """
+    project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='repository', verbose_name="关联项目")
+
     # 活跃审批追踪
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="活跃审批流程", help_text="当前正在进行的档案变更审批")
 
@@ -114,9 +124,9 @@ class ProjectRepository(models.Model):
 
 
 # ==========================================
-# 3.1 档案字段变更记录 — 审批申请 & 历史追踪
+# 4.1 档案字段变更记录 — 审批申请 & 历史追踪
 # ==========================================
-class ProjectRepositoryFieldChange(models.Model):
+class ProjectRepositoryFieldChange(AbstractProjectRepositoryFields):
     """项目档案财务字段变更记录 — 既是审批申请，也是历史记录"""
 
     STATUS_CHOICES = [
@@ -126,27 +136,6 @@ class ProjectRepositoryFieldChange(models.Model):
     ]
 
     repository = models.ForeignKey(ProjectRepository, on_delete=models.CASCADE, related_name='field_changes', verbose_name="关联档案")
-
-    # 变更字段（新值快照）— 商业关系
-    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户")
-    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="主机厂")
-    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='repo_change_salespersons', verbose_name="业务员")
-
-    # 变更字段（新值快照）— 产品信息
-    product_name = models.CharField("客户产品名称", max_length=100, blank=True)
-    product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
-
-    # 变更字段（新值快照）— 销售指标
-    target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
-    competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
-    estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
-
-    # 变更字段（新值快照）— 项目计划
-    first_sample_date = models.DateField("第一次客户送样时间", null=True, blank=True)
-    first_trial_date = models.DateField("第一次客户小试时间", null=True, blank=True)
-    first_trial_cycle_days = models.PositiveIntegerField("第一次小试完成周期 (天)", null=True, blank=True)
-    pilot_date = models.DateField("中试进行时间", null=True, blank=True)
-    mass_production_date = models.DateField("量产进行时间", null=True, blank=True)
 
     # 提交信息
     submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='repo_field_changes', verbose_name="提交人")

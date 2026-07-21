@@ -26,3 +26,14 @@ def ranking_medal_color(rank):
     if rank == 2: return "text-secondary"
     if rank == 3: return "text-orange"
     return "text-muted"
+
+
+@register.filter
+def comma(value):
+    """数字千分位逗号格式化 — 绕过 zh-hans 无分隔符问题"""
+    try:
+        if value is None:
+            return ''
+        return f'{int(value):,}'
+    except (ValueError, TypeError):
+        return str(value)

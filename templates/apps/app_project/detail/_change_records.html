@@ -1,0 +1,49 @@
+{% comment %}
+可复用组件：变更记录列表
+
+参数：
+  - records: 变更记录 queryset（ProjectFieldChange 或 ProjectRepositoryFieldChange）
+  - detail_url_name: 查看详情的 URL 名称（如 'repo_field_change_detail'、'project_field_change_detail'）
+
+使用示例：
+  {% include 'apps/app_project/detail/_change_records.html' with records=repo.field_changes.all detail_url_name='repo_field_change_detail' %}
+{% endcomment %}
+
+{% if records %}
+<div class="border-top p-2">
+    <div class="small fw-bold mb-2 text-muted">
+        <i class="ti ti-history me-1"></i>变更记录
+    </div>
+    {% for record in records|slice:":5" %}
+        <div class="d-flex align-items-center justify-content-between small py-1">
+            <div class="d-flex align-items-center">
+                {% if record.workflow_instance_id %}
+                <a href="{% url 'workflow_instance_detail' pk=record.workflow_instance_id %}"
+                   class="badge bg-{% if record.status == 'APPROVED' %}green{% elif record.status == 'REJECTED' %}red{% else %}purple{% endif %}-lt me-2 text-decoration-none"
+                   style="font-size: 10px;"
+                   title="查看审批流程">
+                    {{ record.get_status_display }}
+                </a>
+                {% else %}
+                <span class="badge bg-{% if record.status == 'APPROVED' %}green{% elif record.status == 'REJECTED' %}red{% else %}purple{% endif %}-lt me-2" style="font-size: 10px;">
+                    {{ record.get_status_display }}
+                </span>
+                {% endif %}
+                <span class="text-muted">
+                    {{ record.submitted_by.username|default:"系统" }}
+                    {% if record.submission_comment %}
+                        — <a href="#"
+                             data-bs-toggle="modal"
+                             data-bs-target="#modal-generic"
+                             hx-get="{% url detail_url_name record.pk %}"
+                             hx-target="#modal-content-placeholder"
+                             class="text-muted text-decoration-underline"
+                             title="查看变更详情">{{ record.submission_comment|truncatechars:30 }}</a>
+                    {% endif %}
+                </span>
+            </div>
+            <span class="text-muted">{{ record.created_at|date:"m-d H:i" }}</span>
+        </div>
+    {% endfor %}
+</div>
+{% endif %}

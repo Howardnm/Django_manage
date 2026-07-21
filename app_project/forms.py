@@ -9,6 +9,16 @@ from common_utils.forms import UserPickerWidget
 User = get_user_model()
 
 class ProjectForm(TablerFormMixin, forms.ModelForm):
+    submission_comment = forms.CharField(
+        label="提交意见",
+        widget=forms.Textarea(attrs={
+            'rows': 3,
+            'placeholder': '请说明本次编辑项目信息的原因（如：项目名称变更、等级调整等）',
+        }),
+        required=False,
+        help_text="编辑项目基本信息需填写变更原因并提交审批，审批通过后生效",
+    )
+
     class Meta:
         model = Project
         fields = ['code', 'name', 'grade', 'material', 'description']
@@ -29,6 +39,13 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
                 self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
             else:
                 self.fields['material'].queryset = MaterialLibrary.objects.none()
+
+        # 编辑已有项目 + 配置了审批流程 → submission_comment 必填
+        instance = kwargs.get('instance')
+        if instance and instance.pk:
+            from .models import ProjectConfig
+            if ProjectConfig.get().default_project_edit_approval_workflow_id:
+                self.fields['submission_comment'].required = True
 
 
 # 确保 ProjectNodeUpdateForm 也继承 TablerFormMixin

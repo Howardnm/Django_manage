@@ -49,9 +49,17 @@
 
         <!-- 操作区 -->
         <div class="ms-auto">
-            <a href="{% url 'project_edit' project.pk %}" class="btn btn-icon btn-white border-0 shadow-none text-muted" title="编辑项目信息">
-                <i class="ti ti-edit fs-2"></i>
+            {% if project.workflow_instance and project.workflow_instance.status == 'RUNNING' %}
+            <a href="{% url 'workflow_instance_detail' pk=project.workflow_instance.pk %}"
+               class="btn btn-primary btn-sm"
+               title="点击查看审批进度">
+                <i class="ti ti-clock me-1"></i>审批中
             </a>
+            {% else %}
+            <a href="{% url 'project_edit' project.pk %}" class="btn btn-icon btn-blue" title="编辑项目信息">
+                <i class="ti ti-edit"></i>
+            </a>
+            {% endif %}
         </div>
     </div>
 
@@ -93,6 +101,9 @@
             </div>
         </div>
     </div>
+
+    <!-- 4.1 项目信息变更记录 -->
+    {% include 'apps/app_project/detail/_change_records.html' with records=field_changes detail_url_name='project_field_change_detail' %}
 
     <!-- 5. 成员管理（协同 + 销售左右并排） -->
     <div class="row g-0 border-top">

@@ -1,7 +1,9 @@
 from django import forms
+from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 from .models import Customer, ProjectRepository, OEM, GradeFactor
 from common_utils.filters import TablerFormMixin
+from common_utils.forms import UserPickerWidget
 
 User = get_user_model()
 
@@ -57,19 +59,33 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
         help_text="编辑档案信息需填写变更原因并提交审批，审批通过后生效"
     )
 
+    salesperson = forms.CharField(
+        widget=UserPickerWidget(multi=False, title='选择业务员'),
+        required=False,
+    )
+
     class Meta:
         model = ProjectRepository
         exclude = ['project', 'updated_at', 'workflow_instance']
         widgets = {
             'customer': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'customer'}),
             'oem': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'oem'}),
-            'salesperson': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'salesperson'}),
             'first_sample_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'first_trial_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'first_trial_cycle_days': forms.NumberInput(attrs={'placeholder': '如：30'}),
             'pilot_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'mass_production_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
         }
+
+    def clean_salesperson(self):
+        """将 UserPickerWidget 返回的用户 ID 字符串转为 User 实例"""
+        user_id = self.cleaned_data.get('salesperson')
+        if not user_id:
+            return None
+        try:
+            return User.objects.get(pk=int(user_id), is_active=True)
+        except (ValueError, TypeError, User.DoesNotExist):
+            raise ValidationError('所选用户不存在或已禁用')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -79,19 +95,13 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
                 self.fields['customer'].queryset = Customer.objects.filter(pk=instance.customer_id)
             else:
                 self.fields['customer'].queryset = Customer.objects.none()
-            
+
             if instance and instance.oem_id:
                 self.fields['oem'].queryset = OEM.objects.filter(pk=instance.oem_id)
             else:
                 self.fields['oem'].queryset = OEM.objects.none()
-            
-            if instance and instance.salesperson_id:
-                self.fields['salesperson'].queryset = User.objects.filter(pk=instance.salesperson_id)
-            else:
-                self.fields['salesperson'].queryset = User.objects.none()
 
         self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
-        self.fields['salesperson'].label_from_instance = lambda obj: obj.get_full_name() or obj.username
 
         # 项目计划时间节点：已录入的字段禁用编辑，仅允许首次录入
         plan_fields = ['first_sample_date', 'first_trial_date', 'first_trial_cycle_days',

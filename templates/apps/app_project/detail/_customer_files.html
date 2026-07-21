@@ -1,3 +1,4 @@
+{% load repo_tags %}
 <div class="card mb-3">
     <!-- 头部 -->
     <div class="card-header py-2 min-h-auto bg-purple-lt d-flex align-items-center">
@@ -6,14 +7,15 @@
         <div class="ms-auto d-flex align-items-center">
             {% if repo.workflow_instance and repo.workflow_instance.status == 'RUNNING' %}
                 <a href="{% url 'workflow_instance_detail' pk=repo.workflow_instance.pk %}"
-                   class="btn btn-purple btn-sm me-2"
+                   class="btn btn-purple btn-sm"
                    title="点击查看审批进度">
                     <i class="ti ti-clock me-1"></i>审批中
                 </a>
-            {% endif %}
+            {% else %}
             <a href="{% url 'repo_project_edit' project.pk %}" class="btn btn-icon btn-purple" title="编辑">
                 <i class="ti ti-edit"></i>
             </a>
+            {% endif %}
         </div>
     </div>
 
@@ -27,13 +29,13 @@
                     <div class="col-6">
                         <div class="p-2 border rounded h-100">
                             <div class="small fw-bold mb-1">客户产品名称</div>
-                            <div class="fw-bold text-truncate">{{ repo.product_name|default:"—" }}</div>
+                            <div class="fw-bold text-blue text-truncate">{{ repo.product_name|default:"—" }}</div>
                         </div>
                     </div>
                     <div class="col-6">
                         <div class="p-2 border rounded h-100">
                             <div class="small fw-bold mb-1">产品代码 / 零件号</div>
-                            <div class="fw-bold">{{ repo.product_code|default:"—" }}</div>
+                            <div class="fw-bold text-blue">{{ repo.product_code|default:"—" }}</div>
                         </div>
                     </div>
 
@@ -92,7 +94,7 @@
                             <div class="d-flex justify-content-between align-items-center">
                                 <div class="small fw-bold">预估订单用量</div>
                                 <div class="fw-bold text-blue">
-                                    {% if repo.estimated_order_volume %}{{ repo.estimated_order_volume }}<small class="ms-1">kg/年</small>{% else %}-{% endif %}
+                                    {% if repo.estimated_order_volume %}{{ repo.estimated_order_volume|comma }}<small class="ms-1">kg/年</small>{% else %}-{% endif %}
                                 </div>
                             </div>
                         </div>
@@ -100,53 +102,49 @@
 
                     <!-- 第三行：项目计划时间节点 -->
                     <div class="col-12">
-                        <div class="p-2 border rounded">
-                            <div class="small fw-bold text-muted mb-2">
-                                <i class="ti ti-calendar-event me-1"></i>项目计划
+                        <div class="d-flex align-items-center px-2 py-1 rounded bg-azure-lt small mb-2">
+                            <i class="ti ti-calendar-event me-2 opacity-50"></i>
+                            <span class="fw-bold text-body">项目计划</span>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-3">
+                                <div class="card card-sm">
+                                    <div class="card-status-top bg-{% if repo.first_sample_date %}green{% else %}secondary{% endif %}"></div>
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted">第一次送样</div>
+                                        <div class="fw-bold small mt-1">{% if repo.first_sample_date %}{{ repo.first_sample_date|date:"Y-m-d" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="d-flex align-items-center small">
-                                <span class="d-flex align-items-center me-2">
-                                    <span class="status-dot bg-{% if repo.first_sample_date %}green{% else %}secondary{% endif %} me-1"></span>
-                                    <span>送样</span>
-                                    {% if repo.first_sample_date %}
-                                        <span class="fw-bold ms-1">{{ repo.first_sample_date|date:"Y-m-d" }}</span>
-                                    {% else %}
-                                        <span class="text-muted ms-1">—</span>
-                                    {% endif %}
-                                </span>
-                                <span class="text-muted me-2">→</span>
-                                <span class="d-flex align-items-center me-2">
-                                    <span class="status-dot bg-{% if repo.first_trial_date %}azure{% else %}secondary{% endif %} me-1"></span>
-                                    <span>小试</span>
-                                    {% if repo.first_trial_date %}
-                                        <span class="fw-bold ms-1">{{ repo.first_trial_date|date:"Y-m-d" }}</span>
-                                        {% if repo.first_trial_cycle_days %}
-                                            <span class="badge bg-blue-lt ms-1" style="font-size: 10px;">{{ repo.first_trial_cycle_days }}天</span>
-                                        {% endif %}
-                                    {% else %}
-                                        <span class="text-muted ms-1">—</span>
-                                    {% endif %}
-                                </span>
-                                <span class="text-muted me-2">→</span>
-                                <span class="d-flex align-items-center me-2">
-                                    <span class="status-dot bg-{% if repo.pilot_date %}purple{% else %}secondary{% endif %} me-1"></span>
-                                    <span>中试</span>
-                                    {% if repo.pilot_date %}
-                                        <span class="fw-bold ms-1">{{ repo.pilot_date|date:"Y-m-d" }}</span>
-                                    {% else %}
-                                        <span class="text-muted ms-1">—</span>
-                                    {% endif %}
-                                </span>
-                                <span class="text-muted me-2">→</span>
-                                <span class="d-flex align-items-center">
-                                    <span class="status-dot bg-{% if repo.mass_production_date %}red{% else %}secondary{% endif %} me-1"></span>
-                                    <span>量产</span>
-                                    {% if repo.mass_production_date %}
-                                        <span class="fw-bold ms-1">{{ repo.mass_production_date|date:"Y-m-d" }}</span>
-                                    {% else %}
-                                        <span class="text-muted ms-1">—</span>
-                                    {% endif %}
-                                </span>
+                            <div class="col-3">
+                                <div class="card card-sm">
+                                    <div class="card-status-top bg-{% if repo.first_trial_date %}azure{% else %}secondary{% endif %}"></div>
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted">第一次小试</div>
+                                        <div class="fw-bold small mt-1">
+                                            {% if repo.first_trial_date %}{{ repo.first_trial_date|date:"Y-m-d" }}{% else %}<span class="text-muted">—</span>{% endif %}
+                                            {% if repo.first_trial_cycle_days %}<span class="badge bg-azure-lt ms-1" style="font-size: 10px;">{{ repo.first_trial_cycle_days }}天</span>{% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card card-sm">
+                                    <div class="card-status-top bg-{% if repo.pilot_date %}purple{% else %}secondary{% endif %}"></div>
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted">中试时间</div>
+                                        <div class="fw-bold small mt-1">{% if repo.pilot_date %}{{ repo.pilot_date|date:"Y-m-d" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-3">
+                                <div class="card card-sm">
+                                    <div class="card-status-top bg-{% if repo.mass_production_date %}red{% else %}secondary{% endif %}"></div>
+                                    <div class="card-body p-2 text-center">
+                                        <div class="small text-muted">量产时间</div>
+                                        <div class="fw-bold small mt-1">{% if repo.mass_production_date %}{{ repo.mass_production_date|date:"Y-m-d" }}{% else %}<span class="text-muted">—</span>{% endif %}</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -171,44 +169,7 @@
                 </div>
             </div>
 
-            {% if repo.field_changes.exists %}
-            <div class="border-top p-2">
-                <div class="small fw-bold mb-2 text-muted">
-                    <i class="ti ti-history me-1"></i>变更记录
-                </div>
-                {% for record in repo.field_changes.all|slice:":5" %}
-                    <div class="d-flex align-items-center justify-content-between small py-1">
-                        <div class="d-flex align-items-center">
-                            {% if record.workflow_instance_id %}
-                            <a href="{% url 'workflow_instance_detail' pk=record.workflow_instance_id %}"
-                               class="badge bg-{% if record.status == 'APPROVED' %}green{% elif record.status == 'REJECTED' %}red{% else %}purple{% endif %}-lt me-2 text-decoration-none"
-                               style="font-size: 10px;"
-                               title="查看审批流程">
-                                {{ record.get_status_display }}
-                            </a>
-                            {% else %}
-                            <span class="badge bg-{% if record.status == 'APPROVED' %}green{% elif record.status == 'REJECTED' %}red{% else %}purple{% endif %}-lt me-2" style="font-size: 10px;">
-                                {{ record.get_status_display }}
-                            </span>
-                            {% endif %}
-                            <span class="text-muted">
-                                {{ record.submitted_by.username|default:"系统" }}
-                                {% if record.submission_comment %}
-                                    — <a href="#"
-                                         data-bs-toggle="modal"
-                                         data-bs-target="#modal-generic"
-                                         hx-get="{% url 'repo_field_change_detail' record.pk %}"
-                                         hx-target="#modal-content-placeholder"
-                                         class="text-muted text-decoration-underline"
-                                         title="查看变更详情">{{ record.submission_comment|truncatechars:30 }}</a>
-                                {% endif %}
-                            </span>
-                        </div>
-                        <span class="text-muted">{{ record.created_at|date:"m-d H:i" }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-            {% endif %}
+            {% include 'apps/app_project/detail/_change_records.html' with records=repo.field_changes.all detail_url_name='repo_field_change_detail' %}
 
         </div>
     {% else %}

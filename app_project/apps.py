@@ -24,7 +24,7 @@ class AppProjectConfig(AppConfig):
 
         from django.urls import reverse
         from app_workflow.utils import related_object_router
-        from .models import Project, ProjectNode
+        from .models import Project, ProjectNode, ProjectFieldChange
 
         related_object_router.register(
             Project,
@@ -38,7 +38,14 @@ class AppProjectConfig(AppConfig):
             display_name_resolver=lambda obj: str(obj),
             person_resolver=lambda obj: obj.project.manager,
         )
+        related_object_router.register(
+            ProjectFieldChange,
+            url_resolver=lambda obj: reverse('project_detail', kwargs={'pk': obj.project_id}),
+            display_name_resolver=lambda obj: f"{obj.project.name} 信息变更",
+            person_resolver=lambda obj: obj.submitted_by,
+        )
 
-        # 注册工作流功能 — 项目节点审批不支持退回操作
+        # 注册工作流功能 — 项目节点审批、项目信息变更审批不支持退回操作
         from app_workflow.utils import workflow_feature_registry
         workflow_feature_registry.register(ProjectNode, allow_return=False)
+        workflow_feature_registry.register(ProjectFieldChange, allow_return=False)

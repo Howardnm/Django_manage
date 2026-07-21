@@ -4,16 +4,17 @@ from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.conf import settings
 from django.contrib import messages
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 
 from app_project.forms import ProjectForm
 from app_project.mixins import ProjectAccessMixin
-from app_project.models import Project, ProjectConfig, ProjectNode
+from app_project.models import Project, ProjectConfig, ProjectNode, ProjectFieldChange
 from app_project.utils.calculate_project_gantt import get_project_gantt_data
 from app_project.utils.filters import ProjectFilter
+from app_workflow.services import WorkflowService
 
 
 # ==========================================
@@ -95,6 +96,8 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
     """
     项目编辑：
     - 准入：需有 change_project 权限。
+    - 审批：若配置了 default_project_edit_approval_workflow，编辑提交后进入审批流程，
+      审批通过后才更新 Project 字段。未配置则直接保存。
     """
     permission_required = 'app_project.change_project'
     model = Project
@@ -106,6 +109,82 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
 
     def get_success_url(self):
         return reverse('project_detail', kwargs={'pk': self.object.pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        config = ProjectConfig.get()
+        context['project_edit_workflow_configured'] = bool(
+            config.default_project_edit_approval_workflow_id
+        )
+        return context
+
+    def form_valid(self, form):
+        project = self.object
+        config = ProjectConfig.get()
+        edit_workflow = config.default_project_edit_approval_workflow
+
+        # 防御：清除已失效的 workflow_instance 引用（回调异常时可能残留）
+        if project.workflow_instance_id and project.workflow_instance.status != 'RUNNING':
+            project.workflow_instance = None
+            project.save(update_fields=['workflow_instance'])
+
+        # 无审批流程配置 → 直接保存（向后兼容）
+        if not edit_workflow:
+            form.save()
+            messages.success(self.request, "项目信息已更新")
+            return redirect(self.get_success_url())
+
+        # 检查是否已有进行中的审批（双重校验）
+        if project.workflow_instance_id or ProjectFieldChange.objects.filter(
+            project=project, status='PENDING'
+        ).exists():
+            messages.warning(self.request, "已有待审批的项目信息变更，请等待审批完成后再提交")
+            return redirect(self.get_success_url())
+
+        # 创建变更记录 — Project 原值保持不变，等待审批
+        change = ProjectFieldChange.objects.create(
+            project=project,
+            code=form.cleaned_data.get('code', ''),
+            name=form.cleaned_data.get('name', ''),
+            grade=form.cleaned_data.get('grade'),
+            material=form.cleaned_data.get('material'),
+            description=form.cleaned_data.get('description', ''),
+            submitted_by=self.request.user,
+            submission_comment=form.cleaned_data.get('submission_comment', ''),
+        )
+
+        # 启动审批流程
+        user = self.request.user
+        context_data = {
+            'change_id': change.pk,
+            'project_name': project.name,
+            'submission_comment': change.submission_comment,
+            'submitted_by': user.username,
+            'applicant_username': user.username,
+            'department_name': user.department.name if user.department else "未知部门",
+        }
+
+        callback_config = {
+            'handler': 'app_project.workflow_handlers.handle_project_change_callback',
+            'args': {'change_id': change.pk},
+        }
+
+        instance = WorkflowService.start(
+            definition=edit_workflow,
+            started_by=user,
+            related_object=change,
+            context_data=context_data,
+            callback_config=callback_config,
+        )
+
+        change.workflow_instance = instance
+        change.save(update_fields=['workflow_instance'])
+
+        project.workflow_instance = instance
+        project.save(update_fields=['workflow_instance'])
+
+        messages.success(self.request, "项目信息变更已提交审批，请等待审批结果")
+        return redirect(self.get_success_url())
 
 
 # ==========================================
@@ -125,7 +204,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
         'repository__salesperson', 'repository__workflow_instance__started_by',
         'material', 'material__category',
     ).prefetch_related(
-        'nodes', 'material__scenarios'
+        'nodes', 'material__scenarios', 'field_changes',
     )
 
     def get_object(self, queryset=None):
@@ -174,7 +253,24 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
             'gantt_data_json': get_project_gantt_data(project),
             'project_form_count': project_form_count,
             'total_form_count': project_form_count + sum(node_form_counts.values()),
+            'field_changes': project.field_changes.all()[:5],
         })
         return context
+
+
+class ProjectFieldChangeDetailView(ProjectAccessMixin, View):
+    """项目信息变更记录详情模态框"""
+    permission_required = 'app_project.view_project'
+    template_name = 'apps/app_project/modal/_field_change_detail.html'
+
+    def get(self, request, pk):
+        change = get_object_or_404(
+            ProjectFieldChange.objects.select_related(
+                'project', 'submitted_by', 'grade', 'material',
+            ),
+            pk=pk,
+        )
+        self.check_object_permission(change.project)
+        return render(request, self.template_name, {'change': change})
 
 
