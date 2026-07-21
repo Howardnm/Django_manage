@@ -129,7 +129,7 @@ class MenuModule:
                 {"name": "成员绩效看板", "url_name": "project_performance_list", "permissions": ["app_project.view_project"]},
                 # 仅高等级管理人员可见（对齐 PerformanceManagementMixin.min_level_required=15）
                 {"name": "项目评分规则", "url_name": "project_score_rule_list", "min_level": 15, "permissions": ["app_project.change_project"]},
-                {"name": "不合格原因", "url_name": "failure_reason_list", "min_level": 15, "permissions": ["app_project.change_project"]},
+                {"name": "不合格原因类型", "url_name": "failure_reason_list", "min_level": 15, "permissions": ["app_project.change_project"]},
                 {"name": "客户意见类型", "url_name": "feedback_type_list", "min_level": 15, "permissions": ["app_project.change_project"]},
             ]
         }
