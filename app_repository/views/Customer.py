@@ -29,16 +29,16 @@ class CustomerListView(RepositoryAccessMixin, ListView):
         # 优化：通过 prefetch_related 带出公司的联系人(User)
         qs = super().get_queryset().prefetch_related('members').annotate(
             completed_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__progress_percent=100, projectrepository__project__is_terminated=False)
+                'repo_records',
+                filter=Q(repo_records__project__progress_percent=100, repo_records__project__is_terminated=False)
             ),
             inprogress_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__progress_percent__lt=100, projectrepository__project__is_terminated=False)
+                'repo_records',
+                filter=Q(repo_records__project__progress_percent__lt=100, repo_records__project__is_terminated=False)
             ),
             terminated_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__is_terminated=True)
+                'repo_records',
+                filter=Q(repo_records__project__is_terminated=True)
             )
         ).order_by('-id')
         self.filterset = CustomerFilter(self.request.GET, queryset=qs)
@@ -151,8 +151,8 @@ class CustomerRankingView(RepositoryAccessMixin, ListView):
             weighted_points_sum=Coalesce(
                 Sum(
                     ExpressionWrapper(
-                        Coalesce(F('projectrepository__project__grade__factor'), 1.0, output_field=DecimalField()) * 
-                        F('projectrepository__project__quality_score') / 100.0,
+                        Coalesce(F('repo_records__project__grade__factor'), 1.0, output_field=DecimalField()) * 
+                        F('repo_records__project__quality_score') / 100.0,
                         output_field=DecimalField()
                     )
                 ),
@@ -162,12 +162,12 @@ class CustomerRankingView(RepositoryAccessMixin, ListView):
             # 分母：因子权重总和
             weight_factors_sum=Coalesce(
                 Sum(
-                    Coalesce(F('projectrepository__project__grade__factor'), 1.0, output_field=DecimalField())
+                    Coalesce(F('repo_records__project__grade__factor'), 1.0, output_field=DecimalField())
                 ),
                 1.00,
                 output_field=DecimalField()
             ),
-            project_count=Count('projectrepository')
+            project_count=Count('repo_records')
         ).annotate(
             # 最终得分 = 加权平均
             total_weighted_score=ExpressionWrapper(

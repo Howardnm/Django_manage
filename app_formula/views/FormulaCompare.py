@@ -25,6 +25,7 @@ class FormulaCompareCartView(FormulaAccessMixin, View):
     非研发用户不会在 header 中看到购物车组件，因此不会触发 AJAX 403。
     """
     permission_required = 'app_formula.view_labformula'
+    model = LabFormula
 
     def get(self, request):
         """获取当前对比列表"""

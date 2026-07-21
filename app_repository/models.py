@@ -80,9 +80,9 @@ class AbstractProjectRepositoryFields(models.Model):
     ProjectRepository 与 ProjectRepositoryFieldChange 均继承此类，
     确保字段定义一致，新增字段只需在一处维护。
     """
-    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_customers', verbose_name="直接客户 (Tier1)")
-    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_oems', verbose_name="终端主机厂 (OEM)")
-    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='%(class)s_salespersons', verbose_name="负责业务员")
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="直接客户 (Tier1)")
+    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="终端主机厂 (OEM)")
+    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="负责业务员")
 
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
@@ -109,6 +109,11 @@ class ProjectRepository(AbstractProjectRepositoryFields):
     """
     项目档案：在此处关联具体的 项目、客户公司、主机厂。
     """
+    # 覆盖基类 FK 字段，显式定义 related_name
+    customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True, related_name='repo_records', verbose_name="直接客户 (Tier1)")
+    oem = models.ForeignKey(OEM, on_delete=models.SET_NULL, null=True, blank=True, related_name='repo_records', verbose_name="终端主机厂 (OEM)")
+    salesperson = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='managed_repos', verbose_name="负责业务员")
+
     project = models.OneToOneField(Project, on_delete=models.CASCADE, related_name='repository', verbose_name="关联项目")
 
     # 活跃审批追踪

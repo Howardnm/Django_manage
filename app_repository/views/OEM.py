@@ -26,16 +26,16 @@ class OEMListView(RepositoryAccessMixin, ListView):
         # 预加载联系人账号
         qs = super().get_queryset().prefetch_related('members').annotate(
             completed_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__progress_percent=100, projectrepository__project__is_terminated=False)
+                'repo_records',
+                filter=Q(repo_records__project__progress_percent=100, repo_records__project__is_terminated=False)
             ),
             inprogress_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__progress_percent__lt=100, projectrepository__project__is_terminated=False)
+                'repo_records',
+                filter=Q(repo_records__project__progress_percent__lt=100, repo_records__project__is_terminated=False)
             ),
             terminated_project_count=Count(
-                'projectrepository',
-                filter=Q(projectrepository__project__is_terminated=True)
+                'repo_records',
+                filter=Q(repo_records__project__is_terminated=True)
             )
         ).order_by('name')
         self.filterset = OEMFilter(self.request.GET, queryset=qs)
