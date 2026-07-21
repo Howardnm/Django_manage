@@ -131,7 +131,11 @@ class MaterialLibrary(models.Model):
                 'unit': point.test_config.unit,
                 'standard': point.test_config.standard,
                 'condition': point.test_config.condition,
-                'data_type': point.test_config.data_type
+                'data_type': point.test_config.data_type,
+                'min_value': point.min_value,
+                'max_value': point.max_value,
+                'min_value_text': point.min_value_text,
+                'max_value_text': point.max_value_text,
             })
         result = []
         seen_cats = set()

@@ -20,41 +20,44 @@ class ProjectStage(models.TextChoices):
     FEEDBACK = 'FEEDBACK', '🎗️客户意见'
 
 
-# 2. 项目主体模型
-class Project(models.Model):
+# 2. 项目基本信息共享字段 — 抽象基类
+class AbstractProjectFields(models.Model):
+    """Project 与 ProjectFieldChange 共享的业务字段，不创建数据库表"""
+    code = models.CharField("项目编码", max_length=50, blank=True)
     name = models.CharField("项目名称", max_length=100)
-    code = models.CharField("项目编码", max_length=50, unique=True, blank=True, help_text="唯一项目编码，留空则自动生成")
-    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="项目负责人")
-    description = models.TextField("项目描述", blank=True)
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-    
-    # 【新增】项目等级关联
     grade = models.ForeignKey('app_repository.GradeFactor', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="项目等级")
+    material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用成品材料")
+    description = models.TextField("项目描述", blank=True)
+
+    class Meta:
+        abstract = True
+
+
+# 3. 项目主体模型
+class Project(AbstractProjectFields):
+    # 覆盖基类字段：添加 unique 约束
+    code = models.CharField("项目编码", max_length=50, unique=True, blank=True, help_text="唯一项目编码，留空则自动生成")
+    # 覆盖基类字段：保留已有 related_name
+    material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用成品材料", related_name='projects')
+
+    manager = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="项目负责人")
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     # 进度冗余字段
     current_stage = models.CharField("当前阶段", max_length=20, choices=ProjectStage.choices, default=ProjectStage.INIT)
     progress_percent = models.PositiveIntegerField("进度百分比", default=0)
     is_terminated = models.BooleanField("是否终止", default=False)
     latest_remark = models.CharField("最新进展", max_length=200, blank=True, help_text="自动同步当前活跃节点的备注")
-    
-    # 【核心优化】新增：项目质量分冗余字段 (用于绩效统计性能优化)
-    quality_score = models.DecimalField("项目研发质量得分", max_digits=5, decimal_places=2, default=0.00)
 
+    # 项目质量分冗余字段 (用于绩效统计性能优化)
+    quality_score = models.DecimalField("项目研发质量得分", max_digits=5, decimal_places=2, default=0.00)
     # 销售质量分（独立评定标准）
     sales_quality_score = models.DecimalField("项目销售质量得分", max_digits=5, decimal_places=2, default=0.00)
 
-    # 选用成品材料
-    material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用成品材料", related_name='projects')
-
     # 【联动工作流】默认审批流程（项目节点提交）
     approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="默认审批流程")
-
     # 【联动工作流】活跃的项目信息变更审批流程（并发门控）
-    workflow_instance = models.ForeignKey(
-        'app_workflow.WorkflowInstance', on_delete=models.SET_NULL,
-        null=True, blank=True, verbose_name="活跃审批流程",
-        help_text="当前正在进行的项目信息变更审批",
-    )
+    workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="活跃审批流程", help_text="当前正在进行的项目信息变更审批")
 
     class Meta:
         verbose_name = "项目"
@@ -161,8 +164,8 @@ class Project(models.Model):
             )
 
 
-# 3. 项目信息变更记录（审批申请 + 永久历史记录）
-class ProjectFieldChange(models.Model):
+# 4. 项目信息变更记录（审批申请 + 永久历史记录）
+class ProjectFieldChange(AbstractProjectFields):
     """项目基本信息编辑的变更记录，审批通过后才写入 Project 表"""
 
     STATUS_CHOICES = [
@@ -171,41 +174,15 @@ class ProjectFieldChange(models.Model):
         ('REJECTED', '已拒绝'),
     ]
 
-    project = models.ForeignKey(
-        Project, on_delete=models.CASCADE, related_name='field_changes',
-        verbose_name="关联项目",
-    )
-
-    # 可编辑字段（来自 ProjectForm）
-    code = models.CharField("项目编码", max_length=50, blank=True)
-    name = models.CharField("项目名称", max_length=100)
-    grade = models.ForeignKey(
-        'app_repository.GradeFactor', on_delete=models.SET_NULL,
-        null=True, blank=True, verbose_name="项目等级",
-    )
-    material = models.ForeignKey(
-        'app_material.MaterialLibrary', on_delete=models.SET_NULL,
-        null=True, blank=True, verbose_name="选用成品材料",
-    )
-    description = models.TextField("项目描述", blank=True)
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='field_changes', verbose_name="关联项目")
 
     # 提交元数据
-    submitted_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-        related_name='project_field_changes', verbose_name="提交人",
-    )
-    submission_comment = models.TextField(
-        "提交意见", help_text="请说明本次编辑项目信息的原因",
-    )
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='project_field_changes', verbose_name="提交人")
+    submission_comment = models.TextField("提交意见", help_text="请说明本次编辑项目信息的原因")
 
     # 审批跟踪
-    status = models.CharField(
-        "状态", max_length=20, choices=STATUS_CHOICES, default='PENDING',
-    )
-    workflow_instance = models.ForeignKey(
-        'app_workflow.WorkflowInstance', on_delete=models.SET_NULL,
-        null=True, blank=True, verbose_name="关联审批流程",
-    )
+    status = models.CharField("状态", max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="关联审批流程")
 
     # 时间戳
     created_at = models.DateTimeField("提交时间", auto_now_add=True)
@@ -224,7 +201,7 @@ class ProjectFieldChange(models.Model):
         return f"{self.project.name} — {self.get_status_display()} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
 
 
-# 4. 进度节点模型
+# 5. 进度节点模型
 class ProjectNode(models.Model):
     STATUS_CHOICES = [
         ('PENDING', '未开始'),
@@ -382,7 +359,7 @@ class ProjectNode(models.Model):
                 project.add_iteration_node(ProjectStage.PILOT, self.order + 1)
 
 
-# 5. 项目协同成员模型
+# 6. 项目协同成员模型
 class ProjectMember(models.Model):
     ROLE_CHOICES = [
         ('LEAD', '项目主导'),
@@ -401,7 +378,7 @@ class ProjectMember(models.Model):
         unique_together = ('project', 'user')
 
 
-# 5.1 项目销售成员模型（独立管理，独立工作量池）
+# 6.1 项目销售成员模型（独立管理，独立工作量池）
 class ProjectSalesMember(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sales_members', verbose_name="关联项目")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="销售成员")
@@ -416,7 +393,7 @@ class ProjectSalesMember(models.Model):
         return f"{self.project.name} - {self.user.username} (销售)"
 
 
-# 6. 项目全局配置（单例）
+# 7. 项目全局配置（单例）
 class ProjectConfig(models.Model):
     """项目全局配置，仅允许超级管理员修改。"""
     default_approval_workflow = models.ForeignKey('app_workflow.WorkflowDefinition', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='默认审批流程（项目节点）')
@@ -436,7 +413,7 @@ class ProjectConfig(models.Model):
         return obj
 
 
-# 7. 不合格原因库（lookup 模型）
+# 8. 不合格原因库（lookup 模型）
 class FailureReason(models.Model):
     """预定义的不合格原因类型，供节点申报异常时选择关联"""
     name = models.CharField("原因名称", max_length=50, unique=True)
@@ -454,7 +431,7 @@ class FailureReason(models.Model):
         return self.name
 
 
-# 7.1 客户意见类型库（lookup 模型）
+# 8.1 客户意见类型库（lookup 模型）
 class FeedbackType(models.Model):
     """预定义的客户意见类型，供节点客户反馈时选择关联"""
     name = models.CharField("意见类型名称", max_length=50, unique=True)
@@ -472,7 +449,7 @@ class FeedbackType(models.Model):
         return self.name
 
 
-# 8. 评分规则配置模型
+# 9. 评分规则配置模型
 class NodeScoreRule(models.Model):
     RULE_TYPES = [('RD', '研发'), ('SALES', '销售')]
 
