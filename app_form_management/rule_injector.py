@@ -81,11 +81,14 @@ def _configure_upload_rule(
     # onSuccess: 从服务端响应提取 url 和 name 存入文件对象
     # $FNX: form-create 将函数体包装为 function($inject){...}
     # $inject.args[0] = XHR 响应体, $inject.args[1] = ElUpload 文件对象
+    # 必须设置 file.value: update() 中 v.value || v.url，
+    # ElUpload 原生对象无 value 属性会退回 url 字符串，导致文件名丢失。
     props['onSuccess'] = (
         '$FNX:var res = $inject.args[0];\n'
         'var file = $inject.args[1];\n'
         'file.url = res.data.url;\n'
-        'if (res.data.name) file.name = res.data.name;'
+        'if (res.data.name) file.name = res.data.name;\n'
+        'file.value = {url: file.url, name: file.name};'
     )
 
     if is_editable:

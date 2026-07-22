@@ -255,9 +255,11 @@ class AttachmentDownloadView(AttachmentBaseMixin, View):
             raise PermissionDenied
 
         try:
+            filename = attachment.display_name or attachment.filename
             return FileResponse(
                 attachment.file.open('rb'),
                 as_attachment=False,
+                filename=filename,
             )
         except FileNotFoundError:
             raise PermissionDenied
