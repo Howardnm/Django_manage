@@ -11,7 +11,9 @@ from django.views.generic import CreateView, UpdateView, DetailView
 
 from app_project.forms import ProjectForm
 from app_project.mixins import ProjectAccessMixin
-from app_project.models import Project, ProjectConfig, ProjectNode, ProjectFieldChange
+from django.db.models import Prefetch
+from app_project.models import Project, ProjectConfig, ProjectNode, ProjectMember, ProjectSalesMember, ProjectFieldChange
+from app_repository.models import ProjectRepositoryFieldChange
 from app_project.utils.calculate_project_gantt import get_project_gantt_data
 from app_project.utils.filters import ProjectFilter
 from app_workflow.services import WorkflowService
@@ -201,11 +203,27 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
     context_object_name = 'project'
 
     queryset = Project.objects.select_related(
-        'manager', 'repository', 'repository__customer', 'repository__oem',
+        'manager',
+        'grade',
+        'workflow_instance',
+        'repository', 'repository__customer', 'repository__oem',
         'repository__salesperson', 'repository__workflow_instance__started_by',
         'material', 'material__category',
     ).prefetch_related(
-        'nodes', 'material__scenarios', 'field_changes',
+        # 阶段节点 — 同时预取关联的审批实例、不合格原因、客户意见类型
+        Prefetch('nodes', queryset=ProjectNode.objects.select_related(
+            'workflow_instance', 'failure_reason', 'feedback_type',
+        )),
+        # 协同成员 + 销售成员 — 避免模板中 N+1 查询 user FK
+        Prefetch('members', queryset=ProjectMember.objects.select_related('user')),
+        Prefetch('sales_members', queryset=ProjectSalesMember.objects.select_related('user')),
+        # 变更记录 — 预取提交人
+        Prefetch('field_changes', queryset=ProjectFieldChange.objects.select_related('submitted_by')),
+        # 项目档案的变更记录 — 通过 repository FK 穿透预取
+        Prefetch('repository__field_changes',
+                  queryset=ProjectRepositoryFieldChange.objects.select_related('submitted_by')),
+        'material__scenarios',
+        'material__characteristics',
     )
 
     def get_object(self, queryset=None):
