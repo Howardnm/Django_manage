@@ -215,7 +215,7 @@
                                 <strong style="color:#b06d0f;">审批已退回，请重新填写表单后提交</strong>
                                 <div style="font-size:13px;color:#909399;margin-top:4px;">表单步骤1的字段已开放编辑，完成后点击提交将重新启动审批流程</div>
                             </div>
-                            <a href="{% url 'form_submission_fill' template_pk=submission.template.pk %}"
+                            <a href="{% url 'form_submission_edit' template_pk=submission.template_id submission_pk=submission.pk %}"
                                style="padding:8px 18px;background:#f0ad4e;color:#fff;border-radius:6px;text-decoration:none;font-size:14px;white-space:nowrap;">
                                 去填写
                             </a>

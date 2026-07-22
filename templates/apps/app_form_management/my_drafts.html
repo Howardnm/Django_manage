@@ -46,13 +46,8 @@
                             <td class="text-muted">{{ draft.updated_at|date:"Y-m-d H:i" }}</td>
                             <td>
                                 <div class="btn-list flex-nowrap">
-                                    {% if draft.content_type_id and draft.target_alias %}
-                                    <a href="{% url 'form_submission_fill_target' template_pk=draft.template_id target_alias=draft.target_alias obj_pk=draft.object_id %}"
+                                    <a href="{% url 'form_submission_edit' template_pk=draft.template_id submission_pk=draft.pk %}"
                                        class="btn btn-sm btn-primary">继续填写</a>
-                                    {% else %}
-                                    <a href="{% url 'form_submission_fill' template_pk=draft.template_id %}"
-                                       class="btn btn-sm btn-primary">继续填写</a>
-                                    {% endif %}
                                     <button class="btn btn-sm btn-danger"
                                             hx-post="{% url 'form_submission_delete' pk=draft.pk %}"
                                             hx-confirm="确定要删除这条草稿吗？"

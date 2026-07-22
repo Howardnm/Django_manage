@@ -83,6 +83,7 @@
 <script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
 <script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
 <script id="existing-data" type="application/json">{{ existing_data_json|safe }}</script>
+<script id="submission-id" type="application/json">{{ existing.pk }}</script>
 
 <script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
@@ -163,17 +164,24 @@
             async sendData(formData, status) {
                 var remark = document.getElementById('remark-input').value.trim();
                 var url = '{{ submit_url|escapejs }}';
+                var submissionEl = document.getElementById('submission-id');
+                var submissionId = null;
+                try { submissionId = JSON.parse(submissionEl.textContent.trim()); } catch(e) {}
+                var body = {
+                    form_data: formData,
+                    status: status,
+                    remark: remark,
+                };
+                if (submissionId) {
+                    body.submission_id = submissionId;
+                }
                 var resp = await fetch(url, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'X-CSRFToken': '{{ csrf_token }}'
                     },
-                    body: JSON.stringify({
-                        form_data: formData,
-                        status: status,
-                        remark: remark
-                    })
+                    body: JSON.stringify(body)
                 });
                 var result = await resp.json();
                 if (result.status !== 'success') {

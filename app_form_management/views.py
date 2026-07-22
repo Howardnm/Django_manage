@@ -1,4 +1,6 @@
 import json
+import uuid as _uuid
+
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.views import View
@@ -8,6 +10,7 @@ from django.http import Http404
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
+from django.middleware.csrf import get_token
 
 from .models import FormTemplate, FormSubmission
 from app_workflow.models import WorkflowDefinition
@@ -17,6 +20,7 @@ from .mixins import FormManagementAccessMixin
 from .services import submission_service
 from .registry import get_target, get_module_choices, search_entities
 from .filters import FormTemplateFilter, MyDraftsFilter, MySubmissionsFilter
+from .rule_injector import inject_upload_config, enrich_upload_form_data
 
 
 # ==========================================
@@ -192,50 +196,72 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             return f'{model_name}：{target.name}'
         return f'{model_name} #{target.pk}'
 
-    def get(self, request, template_pk, target_alias=None, obj_pk=None):
+    def get(self, request, template_pk, target_alias=None, obj_pk=None, submission_pk=None):
         template = get_object_or_404(FormTemplate, pk=template_pk)
         target = self._resolve_target(target_alias=target_alias, object_id=obj_pk)
 
-        existing = None
-        submit_url = reverse('form_submission_fill', kwargs={'template_pk': template_pk})
-
-        # 检查是否是退回修订场景
-        revision_submission = None
-        if not target:
-            revision_submission = FormSubmission.objects.filter(
-                template=template, submitted_by=request.user, status='SUBMITTED',
-                workflow_instance__isnull=False,
-                workflow_instance__status='RUNNING',
-            ).first()
-            if revision_submission and not (revision_submission.workflow_instance.context_data or {}).get('_need_revision'):
-                revision_submission = None
-
-        if target:
-            existing = submission_service.get_draft(template, target, request.user)
-            if target_alias and obj_pk:
+        if submission_pk:
+            # ── 编辑模式：按 PK 精确加载已有提交 ──
+            existing = get_object_or_404(
+                FormSubmission, pk=submission_pk, template=template,
+            )
+            if existing.submitted_by_id != request.user.pk:
+                raise PermissionDenied('您没有权限编辑该提交')
+            if existing.status == 'SUBMITTED':
+                ctx = (existing.workflow_instance.context_data
+                       if existing.workflow_instance_id else {}) or {}
+                if not ctx.get('_need_revision'):
+                    raise PermissionDenied('该提交不处于退回修订状态')
+            submit_url = reverse('form_submission_edit', kwargs={
+                'template_pk': template_pk,
+                'submission_pk': submission_pk,
+            })
+            existing_data = existing.form_data or {}
+        else:
+            # ── 新建模式：永远创建全新 FormSubmission ──
+            if target:
+                existing = FormSubmission.objects.create(
+                    template=template,
+                    target_object=target,
+                    submitted_by=request.user,
+                    status='DRAFT',
+                )
                 submit_url = reverse('form_submission_fill_target', kwargs={
                     'template_pk': template_pk,
                     'target_alias': target_alias,
                     'obj_pk': obj_pk,
                 })
-        else:
-            existing = FormSubmission.objects.filter(
-                template=template, submitted_by=request.user, status='DRAFT'
-            ).first()
+            else:
+                existing = FormSubmission.objects.create(
+                    template=template,
+                    submitted_by=request.user,
+                    status='DRAFT',
+                )
+                submit_url = reverse('form_submission_fill', kwargs={
+                    'template_pk': template_pk,
+                })
+            existing_data = {}
 
-        existing_data = {}
-        if revision_submission:
-            existing_data = revision_submission.form_data or {}
-        elif existing:
-            existing_data = existing.form_data or {}
+        # ── 公共逻辑：注入上传配置 + 富化数据 ──
+        csrf_token = get_token(request)
+        configured_rules = inject_upload_config(
+            template.form_config or [],
+            submission_id=existing.pk,
+            csrf_token=csrf_token,
+            is_editable=True,
+        )
+        if existing_data:
+            existing_data = enrich_upload_form_data(
+                existing_data, configured_rules, existing,
+            )
 
         return render(request, 'apps/app_form_management/submission_fill.html', {
             'template': template,
             'target': target,
             'target_display': self._get_target_display(target),
-            'existing': existing or revision_submission,
+            'existing': existing,
             'submit_url': submit_url,
-            'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
+            'form_config_json': json.dumps(configured_rules, ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
             'existing_data_json': json.dumps(existing_data, ensure_ascii=False),
             'step_groups_json': template.step_group_json,
@@ -244,7 +270,7 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             'workflow_restricted': template.is_multi_step and template.has_workflow,
         })
 
-    def post(self, request, template_pk, target_alias=None, obj_pk=None):
+    def post(self, request, template_pk, target_alias=None, obj_pk=None, submission_pk=None):
         template = get_object_or_404(FormTemplate, pk=template_pk)
         target = self._resolve_target(target_alias=target_alias, object_id=obj_pk)
 
@@ -257,36 +283,37 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
         status = data.get('status', 'SUBMITTED')
         remark = data.get('remark', '')
 
-        if target:
-            submission = submission_service.create_or_update(
-                template=template,
-                target_object=target,
-                submitted_by=request.user,
-                form_data=form_data,
-                status=status,
-                remark=remark,
+        if submission_pk:
+            # ── 编辑模式：按 PK 精确更新 ──
+            submission = get_object_or_404(
+                FormSubmission, pk=submission_pk, template=template,
             )
+            if submission.submitted_by_id != request.user.pk:
+                return JsonResponse(
+                    {'status': 'error', 'message': '您没有权限编辑该提交'},
+                    status=403,
+                )
+            submission.form_data = form_data
+            submission.remark = remark
+            submission.status = status
+            submission.save()
         else:
-            # 优先查找退回修订的已提交记录
-            submission = FormSubmission.objects.filter(
-                template=template, submitted_by=request.user, status='SUBMITTED',
-                workflow_instance__isnull=False,
-                workflow_instance__status='RUNNING',
-            ).first()
-            if submission and not (submission.workflow_instance.context_data or {}).get('_need_revision'):
-                submission = None
-
-            if not submission:
-                submission = FormSubmission.objects.filter(
-                    template=template, submitted_by=request.user, status='DRAFT'
-                ).first()
-
+            # ── 新建模式：用 submission_id 定位 get() 阶段创建的草稿 ──
+            submission_id = data.get('submission_id')
+            submission = (get_object_or_404(FormSubmission, pk=submission_id)
+                          if submission_id else None)
             if submission:
+                if submission.submitted_by_id != request.user.pk:
+                    return JsonResponse(
+                        {'status': 'error', 'message': '您没有权限编辑该提交'},
+                        status=403,
+                    )
                 submission.form_data = form_data
                 submission.remark = remark
                 submission.status = status
                 submission.save()
             else:
+                # 兜底：submission_id 丢失时创建新记录
                 submission = FormSubmission.objects.create(
                     template=template,
                     submitted_by=request.user,
@@ -294,6 +321,10 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     status=status,
                     remark=remark,
                 )
+                if target:
+                    submission.content_type = ContentType.objects.get_for_model(target)
+                    submission.object_id = target.pk
+                    submission.save()
 
         # 提交时如果模板关联了审批流程，自动启动流程实例
         if status == 'SUBMITTED' and template.workflow_id:
@@ -432,6 +463,22 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                          (workflow_data['instance'].context_data or {}).get('_need_revision')
                          and request.user == submission.submitted_by)
 
+        # 注入上传配置到 form-create rules
+        csrf_token = get_token(request)
+        configured_rules = inject_upload_config(
+            template.form_config or [],
+            submission_id=submission.pk,
+            csrf_token=csrf_token,
+            is_editable=True,  # 前端的 step-disable 逻辑处理字段启用/禁用
+        )
+
+        # 将 upload 字段的 URL 字符串转为 {url, name} 对象，使文件名正确显示
+        submission_data = submission.form_data or {}
+        if submission_data:
+            submission_data = enrich_upload_form_data(
+                submission_data, configured_rules, submission,
+            )
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
@@ -443,9 +490,9 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'active_step_index': active_step_index,
             'is_workflow_completed': is_workflow_completed,
             'current_task_form_step': current_task_form_step,
-            'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
+            'form_config_json': json.dumps(configured_rules, ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
-            'submission_data_json': json.dumps(submission.form_data or {}, ensure_ascii=False),
+            'submission_data_json': json.dumps(submission_data, ensure_ascii=False),
             'step_groups_json': template.step_group_json,
             'field_step_map_json': json.dumps(template.get_field_step_map(), ensure_ascii=False),
             'related_module': related_module,
@@ -453,6 +500,240 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'related_entity_url': related_entity_url,
             'workflow_data': workflow_data,
         })
+
+
+# ==========================================
+# 2.5 表单附件上传 / 删除 API
+# ==========================================
+
+def _url_matches(value, target_url):
+    """判断 form_data 中的值与目标下载 URL 是否匹配。
+
+    兼容两种存储格式：字符串 URL 和 {url, name} 对象。
+    """
+    if isinstance(value, str):
+        return value == target_url
+    if isinstance(value, dict):
+        return value.get('url') == target_url
+    return False
+
+
+def _sync_form_data_add(submission, field_name, file_entry):
+    """将上传文件信息追加到 form_data 对应字段中。"""
+    form_data = dict(submission.form_data or {})
+    field_files = form_data.get(field_name)
+    if not isinstance(field_files, list):
+        field_files = []
+    field_files.append(file_entry)
+    form_data[field_name] = field_files
+    submission.form_data = form_data
+    submission.save(update_fields=['form_data'])
+
+
+def _sync_form_data_remove(attachment):
+    """从 form_data 中移除被删除附件对应的条目。
+
+    通过 attachment.group_key 定位字段名，
+    通过 attachment.download_token 构建下载 URL 进行匹配。
+    """
+    from app_form_management.models import FormSubmission as FSModel
+
+    group_key = attachment.group_key or ''
+    if not group_key.startswith('field:'):
+        return
+    field_name = group_key[len('field:'):]
+
+    download_url = reverse('attachment:download', kwargs={
+        'token': str(attachment.download_token),
+    })
+
+    try:
+        submission = FSModel.objects.get(pk=attachment.object_id)
+    except FSModel.DoesNotExist:
+        return
+
+    form_data = dict(submission.form_data or {})
+    field_files = form_data.get(field_name)
+    if not isinstance(field_files, list):
+        return
+
+    form_data[field_name] = [
+        v for v in field_files
+        if not _url_matches(v, download_url)
+    ]
+    submission.form_data = form_data
+    submission.save(update_fields=['form_data'])
+
+
+class FormUploadView(FormManagementAccessMixin, View):
+    """
+    POST /forms/api/upload/
+    Receives file upload from form-create fcUpload component.
+    Creates an Attachment record parented to the FormSubmission,
+    with group_key derived from the field name.
+    """
+
+    def post(self, request):
+        submission_id = request.POST.get('submission_id', '')
+        field_name = request.POST.get('field_name', '')
+        file = request.FILES.get('file')
+
+        if not submission_id or not file:
+            return JsonResponse(
+                {'status': 'error', 'message': '缺少必要参数 (submission_id, file)'},
+                status=400,
+            )
+
+        try:
+            submission_id = int(submission_id)
+        except (ValueError, TypeError):
+            return JsonResponse(
+                {'status': 'error', 'message': '无效的 submission_id'},
+                status=400,
+            )
+
+        submission = get_object_or_404(FormSubmission, pk=submission_id)
+        _check_attachment_modify_permission(request.user, submission, field_name)
+
+        ct = ContentType.objects.get_for_model(FormSubmission)
+        attachment = self._create_attachment(ct, submission, file, field_name, request.user)
+
+        download_url = reverse('attachment:download', kwargs={
+            'token': str(attachment.download_token),
+        })
+        file_entry = {
+            'url': download_url,
+            'name': attachment.display_name,
+        }
+
+        # 同步更新 form_data，无需等待用户手动保存
+        _sync_form_data_add(submission, field_name, file_entry)
+
+        return JsonResponse({'data': file_entry})
+
+    def _create_attachment(self, ct, submission, file, field_name, uploader):
+        """Create an Attachment record linked to the submission."""
+        from app_attachment.models import Attachment
+
+        attachment = Attachment(
+            content_type=ct,
+            object_id=submission.pk,
+            file=file,
+            uploader=uploader,
+            category='OTHER',
+            group_key=f'field:{field_name}' if field_name else '',
+        )
+        attachment.save()
+        return attachment
+
+
+def _check_attachment_modify_permission(user, submission, field_name):
+    """统一附件操作权限（上传/删除通用），无超管豁免。
+
+    单步骤表单：仅提交者在草稿或退回修订时可操作。
+    多步骤表单：草稿/退回修订=提交者；审批中=仅当前步骤审批人。
+    """
+    # ── 草稿：仅提交者 ──
+    if submission.status == 'DRAFT':
+        if submission.submitted_by_id != user.pk:
+            raise PermissionDenied('草稿状态下仅提交者可操作附件')
+        return
+
+    # ── 退回修订：仅提交者 ──
+    if submission.workflow_instance_id:
+        ctx = submission.workflow_instance.context_data or {}
+        if ctx.get('_need_revision'):
+            if submission.submitted_by_id != user.pk:
+                raise PermissionDenied('退回修订状态下仅提交者可操作附件')
+            return
+
+    # ── 已提交状态 ──
+    if submission.status == 'SUBMITTED':
+        # 单步骤：审批中任何人不可操作
+        if not submission.template.is_multi_step:
+            raise PermissionDenied('当前审批状态下不可操作附件')
+
+        # 多步骤：检查字段步骤归属 + 当前审批人
+        _check_multi_step_field_permission(user, submission, field_name)
+        return
+
+    raise PermissionDenied('当前状态下不可操作附件')
+
+
+def _check_multi_step_field_permission(user, submission, field_name):
+    """多步骤表单：验证用户是当前步骤审批人，且字段属于该步骤。"""
+    if not submission.workflow_instance_id:
+        raise PermissionDenied('该提交未关联审批流程')
+
+    field_step = submission.template.get_field_step_map().get(field_name, 1)
+
+    from app_workflow.models import WorkflowTask
+    task = WorkflowTask.objects.filter(
+        instance_id=submission.workflow_instance_id,
+        assigned_to=user,
+        status='PENDING',
+        form_step=field_step,
+    ).first()
+
+    if not task:
+        raise PermissionDenied('当前审批步骤无权操作该字段的附件')
+
+
+class FormUploadDeleteView(FormManagementAccessMixin, View):
+    """
+    POST /forms/api/upload/delete/
+    Soft-deletes an Attachment by its download_token.
+    Permission is enforced by _check_attachment_modify_permission in post().
+    Called by the beforeRemove hook in fcUpload.
+    """
+
+    def post(self, request):
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse(
+                {'status': 'error', 'message': '无效的JSON数据'},
+                status=400,
+            )
+
+        token = data.get('token', '').strip()
+        if not token:
+            return JsonResponse(
+                {'status': 'error', 'message': '缺少令牌参数'},
+                status=400,
+            )
+
+        try:
+            _uuid.UUID(token)
+        except (ValueError, AttributeError):
+            return JsonResponse(
+                {'status': 'error', 'message': '无效的令牌格式'},
+                status=400,
+            )
+
+        from app_attachment.models import Attachment
+        attachment = get_object_or_404(
+            Attachment,
+            download_token=token,
+            is_deleted=False,
+        )
+
+        # 提取字段名并校验权限
+        field_name = ''
+        if attachment.group_key and attachment.group_key.startswith('field:'):
+            field_name = attachment.group_key[len('field:'):]
+
+        from app_form_management.models import FormSubmission as FSModel
+        submission = get_object_or_404(FSModel, pk=attachment.object_id)
+        _check_attachment_modify_permission(request.user, submission, field_name)
+
+        attachment.is_deleted = True
+        attachment.save(update_fields=['is_deleted'])
+
+        # 同步移除 form_data 中的对应条目
+        _sync_form_data_remove(attachment)
+
+        return JsonResponse({'status': 'success'})
 
 
 # ==========================================
@@ -487,6 +768,15 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
                     initial_module = ''
                     initial_entity_pk = ''
 
+        # 查询当前用户在这些模板中是否有草稿
+        user_draft_template_ids = set(
+            FormSubmission.objects.filter(
+                template__in=templates,
+                submitted_by=request.user,
+                status='DRAFT',
+            ).values_list('template_id', flat=True)
+        )
+
         # 按分组整理模板 — 有分组的在前，未分组的末尾
         template_groups = []
         seen = set()
@@ -504,6 +794,7 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
 
         return render(request, 'apps/app_form_management/form_create_wizard.html', {
             'template_groups': template_groups,
+            'user_draft_template_ids': user_draft_template_ids,
             'modules': get_module_choices(),
             'initial_module': initial_module,
             'initial_entity_pk': initial_entity_pk,
