@@ -254,6 +254,30 @@
                     </div>
                     {% endif %}
                 </div>
+
+                <!-- 表单附件（按上传组件分组） -->
+                {% if attachment_groups %}
+                <div class="card" style="margin-top:16px;">
+                    <div class="card-title">表单附件</div>
+                    {% for group in attachment_groups %}
+                    <div style="margin-top:12px;">
+                        <div style="font-size:13px; font-weight:500; color:#606266; margin-bottom:6px;">{{ group.title }}</div>
+                        <div style="display:flex; flex-wrap:wrap; gap:8px;">
+                            {% for att in group.attachments %}
+                            <a href="{% url 'attachment:download' token=att.download_token %}" target="_blank"
+                               style="display:inline-flex; align-items:center; gap:6px;
+                                      padding:6px 12px; border:1px solid #e6e8e9; border-radius:4px;
+                                      text-decoration:none; color:#303133; font-size:13px;">
+                                <span style="color:#909399;">{{ att.extension|upper }}</span>
+                                <span>{{ att.display_name }}</span>
+                                <span style="font-size:11px; color:#909399;">{{ att.file_size|filesizeformat }}</span>
+                            </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% endif %}
             </div>
 
             <!-- Flow Diagram Tab -->

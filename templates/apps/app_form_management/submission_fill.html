@@ -84,6 +84,43 @@
 <script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
 <script id="existing-data" type="application/json">{{ existing_data_json|safe }}</script>
 
+<script>
+// ── 运行时注入 upload 组件的 action / CSRF / field_name ──
+// 设计器中保存的 form_config 不含会话相关数据，在此动态注入
+(function() {
+    var configEl = document.getElementById('form-config-data');
+    if (!configEl) return;
+    try {
+        var rules = JSON.parse(configEl.textContent.trim());
+        var modified = false;
+        rules.forEach(function(rule) {
+            if (rule.type === 'upload' || rule.type === 'image' || rule.type === 'file') {
+                rule.props = rule.props || {};
+                // 上传目标 URL
+                rule.props.action = '{% url "form_file_upload" template_pk=template.pk %}';
+                // CSRF token
+                rule.props.headers = rule.props.headers || {};
+                rule.props.headers['X-CSRFToken'] = '{{ csrf_token }}';
+                // 附带 field_name 用于后端区分多上传组件
+                rule.props.data = rule.props.data || {};
+                rule.props.data.template_id = '{{ template.pk }}';
+                rule.props.data.field_name = rule.field;
+                // 确保自动上传开启
+                if (rule.props.autoUpload !== false) {
+                    rule.props.autoUpload = true;
+                }
+                modified = true;
+            }
+        });
+        if (modified) {
+            configEl.textContent = JSON.stringify(rules);
+        }
+    } catch(e) {
+        // 解析失败时静默忽略，表单正常渲染（upload 组件使用默认配置）
+    }
+})();
+</script>
+
 <script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>

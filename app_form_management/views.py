@@ -341,6 +341,75 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
         return JsonResponse({'status': 'success'})
 
 
+# ==========================================
+# 2.5. 表单文件上传 API（供 form-create upload 组件调用）
+# ==========================================
+
+class FormFileUploadView(FormManagementAccessMixin, View):
+    """
+    form-create upload 组件专用上传端点。
+
+    POST /forms/api/upload/<template_pk>/
+    接收 form-create el-upload 组件发送的文件，创建 Attachment 关联到 FormSubmission。
+    如果尚无草稿则自动创建 DRAFT FormSubmission。
+    """
+
+    permission_required = 'app_form_management.add_formsubmission'
+
+    def post(self, request, template_pk):
+        template = get_object_or_404(FormTemplate, pk=template_pk, is_active=True)
+
+        uploaded_file = request.FILES.get('file')
+        if not uploaded_file:
+            return JsonResponse({'error': '未收到文件'}, status=400)
+
+        # 文件大小校验（50MB 限制，复用 app_attachment 的 validator）
+        from app_attachment.validators import validate_file_size
+        try:
+            validate_file_size(uploaded_file)
+        except Exception as e:
+            return JsonResponse({'error': str(e) or '文件校验失败'}, status=400)
+
+        field_name = request.POST.get('field_name', '')
+
+        # 查找或创建 DRAFT FormSubmission（保证 Attachment 始终有合法父对象）
+        submission = FormSubmission.objects.filter(
+            template=template,
+            submitted_by=request.user,
+            status='DRAFT',
+        ).first()
+        if not submission:
+            submission = FormSubmission.objects.create(
+                template=template,
+                submitted_by=request.user,
+                form_data={},
+                status='DRAFT',
+            )
+
+        # 创建 Attachment 记录（GFK → FormSubmission）
+        from app_attachment.models import Attachment
+        ct = ContentType.objects.get_for_model(FormSubmission)
+        attachment = Attachment.objects.create(
+            content_type=ct,
+            object_id=submission.pk,
+            file=uploaded_file,
+            uploader=request.user,
+            category='FORM_FILE',
+            group_key=field_name,
+        )
+
+        download_url = reverse('attachment:download', kwargs={'token': attachment.download_token})
+
+        # 返回 ElUpload 期望的 {data: {url, name, ...}} 格式
+        return JsonResponse({
+            'data': {
+                'url': download_url,
+                'name': attachment.display_name,
+                'attachment_id': attachment.pk,
+            }
+        })
+
+
 class FormSubmissionDetailView(FormManagementAccessMixin, View):
     permission_required = 'app_form_management.view_formsubmission'
 
@@ -432,6 +501,32 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                          (workflow_data['instance'].context_data or {}).get('_need_revision')
                          and request.user == submission.submitted_by)
 
+        # 查询表单附件并按上传组件分组
+        from app_attachment.models import Attachment
+        attachments = Attachment.objects.filter(
+            content_type=ContentType.objects.get_for_model(FormSubmission),
+            object_id=submission.pk,
+            is_deleted=False,
+        ).select_related('uploader').order_by('-uploaded_at')
+
+        # 构建 field_name → title 映射（从 form_config 提取上传组件的显示名）
+        field_title_map = {}
+        for rule in (template.form_config or []):
+            if rule.get('type') in ('upload', 'image', 'file'):
+                field_title_map[rule.get('field', '')] = rule.get('title', rule.get('field', ''))
+
+        # 按 group_key 分组，预解 title
+        attachment_groups = []
+        groups = {}
+        for att in attachments:
+            key = att.group_key or '__ungrouped__'
+            if key not in groups:
+                groups[key] = []
+            groups[key].append(att)
+        for key, att_list in groups.items():
+            title = field_title_map.get(key, key if key != '__ungrouped__' else '其他附件')
+            attachment_groups.append({'title': title, 'attachments': att_list})
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
@@ -452,6 +547,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'related_entity': related_entity,
             'related_entity_url': related_entity_url,
             'workflow_data': workflow_data,
+            'attachment_groups': attachment_groups,
         })
 
 

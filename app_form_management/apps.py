@@ -19,3 +19,18 @@ class AppFormManagementConfig(AppConfig):
             display_name_resolver=lambda obj: obj.template.name,
             person_resolver=lambda obj: obj.submitted_by,
         )
+
+        # 注册 FormSubmission 为附件父模型，使表单支持文件上传
+        from app_attachment.registry import register_attachment
+        from app_attachment.configs import AttachmentConfig
+        from .mixins import FormManagementAccessMixin
+
+        register_attachment(AttachmentConfig(
+            parent_model=FormSubmission,
+            access_mixin=FormManagementAccessMixin,
+            view_permission='app_form_management.view_formsubmission',
+            add_permission='app_form_management.add_formsubmission',
+            delete_permission='app_form_management.delete_formsubmission',
+            categories=[('FORM_FILE', '表单附件')],
+            folder_id_resolver=lambda sub: str(sub.template_id),
+        ))

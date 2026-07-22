@@ -7,6 +7,7 @@ urlpatterns = [
     path('create/', views.FormTemplateCreateView.as_view(), name='form_template_create'),
     path('new/', views.FormCreateWizardView.as_view(), name='form_create_wizard'),
     path('api/entities/', views.EntitySearchView.as_view(), name='form_entity_search'),
+    path('api/upload/<int:template_pk>/', views.FormFileUploadView.as_view(), name='form_file_upload'),
     path('<int:pk>/edit/', views.FormTemplateUpdateView.as_view(), name='form_template_edit'),
     path('<int:pk>/update_info/', views.FormTemplateBasicInfoUpdateView.as_view(), name='form_template_update_info'),
     path('<int:pk>/delete/', views.FormTemplateDeleteView.as_view(), name='form_template_delete'),
