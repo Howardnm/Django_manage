@@ -479,6 +479,15 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                 submission_data, configured_rules, submission,
             )
 
+        # 查询该提交的所有附件
+        from app_attachment.models import Attachment
+        att_ct = ContentType.objects.get_for_model(FormSubmission)
+        attachments = list(
+            Attachment.objects.filter(
+                content_type=att_ct, object_id=submission.pk, is_deleted=False,
+            ).select_related('uploader').order_by('-uploaded_at')
+        )
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
@@ -499,6 +508,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'related_entity': related_entity,
             'related_entity_url': related_entity_url,
             'workflow_data': workflow_data,
+            'attachments': attachments,
         })
 
 
