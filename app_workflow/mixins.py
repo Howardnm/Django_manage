@@ -1,8 +1,10 @@
-from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.mixins import UnifiedAccessMixin
 
 
 class WorkflowAccessMixin(UnifiedAccessMixin):
-    """审批流程模块权限管控（L1 内部全员准入 / L4 关闭部门隔离，审批跨部门协作）"""
+    """审批流程模块权限管控。
 
-    identity_required = IdentityConfig.INTERNAL_STAFF
-    enforce_dept_isolation = False
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    """
+
+    module_code = 'workflow'

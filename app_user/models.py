@@ -1,6 +1,8 @@
-"""app_user 数据模型。定义 User、Department、Subsidiary、OrgRole、OrgRoleAssignment、WorkGroup、ReviewGroup、PermissionGroup。
+"""app_user 数据模型。
 
-导出: PermissionGroup, Subsidiary, Department, OrgRole, OrgRoleAssignment, ReviewGroup, WorkGroup, User。"""
+导出: UserRole, RoleGroup, ModuleAccessConfig, SidebarModule, SidebarSubItem,
+      L3PermissionConfig, PermissionGroup, Subsidiary, Department, OrgRole,
+      OrgRoleAssignment, ReviewGroup, WorkGroup, User。"""
 
 import uuid
 from django.db import models
@@ -255,26 +257,49 @@ class WorkGroup(models.Model):
         return f"[{self.department.name}] {self.name}"
 
 
+class UserRole(models.Model):
+    """[L1] 用户角色定义 — 替代原 User.UserType 枚举。
+
+    每个角色对应一个唯一的 code，作为权限判断的标识符。
+    Admin 可随时新增、禁用角色，无需改代码或 migration。
+    """
+    code = models.CharField("角色编码", max_length=50, primary_key=True,
+                            help_text="全局唯一标识符，如 'ENGINEER'、'SALES'。")
+    name = models.CharField("角色名称", max_length=50,
+                            help_text="如 '研发工程师'、'业务员'。")
+    is_internal = models.BooleanField("内部角色", default=True,
+                                      help_text="内部员工角色可登录管理系统；外部角色（客户/OEM）仅可访问电子手册。")
+    sort_order = models.IntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "[L1] 用户角色"
+        verbose_name_plural = "[L1] 用户角色"
+        ordering = ['sort_order', 'code']
+
+    def __eq__(self, other):
+        """支持与字符串比较: user.user_type == 'ENGINEER' 正常工作。"""
+        if isinstance(other, str):
+            return self.code == other
+        return super().__eq__(other)
+
+    def __hash__(self):
+        return hash(self.code)
+
+    def __str__(self):
+        return self.name
+
+
 class User(AbstractUser):
     """
     自定义用户模型，集成了研发、工艺、销售、采购、管理等核心业务角色。
     """
-    class UserType(models.TextChoices):
-        """用户角色枚举，与 IdentityConfig 分组常量对应。"""
-        ENGINEER = 'ENGINEER', '研发工程师'
-        PROCESS_ENGINEER = 'PROCESS_ENGINEER', '工艺工程师'
-        SALES = 'SALES', '业务员'
-        PURCHASING = 'PURCHASING', '采购专员'
-        CUSTOMER = 'CUSTOMER', '外部客户'
-        OEM = 'OEM', '主机厂成员'
-        ADMIN = 'ADMIN', '项目管理文员'
-        EXTRUSION_OPERATOR = 'EXTRUSION_OPERATOR', '挤出操作员'
-        COLOR_OPERATOR = 'COLOR_OPERATOR', '配色员'
-        INJECTION_OPERATOR = 'INJECTION_OPERATOR', '注塑操作员'
-        TESTING_OPERATOR = 'TESTING_OPERATOR', '测试员'
-
     # --- 1. 核心权限决策字段 ---
-    user_type = models.CharField("用户角色", max_length=20, choices=UserType.choices, default=UserType.ENGINEER)
+    user_type = models.ForeignKey(
+        UserRole, on_delete=models.PROTECT, verbose_name="用户角色",
+        help_text="决定 L1 角色白名单准入权限。")
+    user_level = models.PositiveIntegerField("用户等级", default=1)
     user_level = models.PositiveIntegerField("用户等级", default=1)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所属部门")
     subsidiary = models.ForeignKey(
@@ -306,56 +331,149 @@ class User(AbstractUser):
     def __str__(self):
         """返回 "[部门] 角色 - 用户名" 格式。"""
         dept_str = f"[{self.department.name}]" if self.department else ""
-        return f"{dept_str} {self.get_user_type_display()} - {self.username}"
+        role_name = self.user_type.name if self.user_type_id else '未分配角色'
+        return f"{dept_str} {role_name} - {self.username}"
 
-    # --- 快捷权限判断方法 (用于模板) ---
-    @property
-    def is_engineer(self):
-        """是否为研发工程师。"""
-        return self.user_type == self.UserType.ENGINEER
-    @property
-    def is_process_engineer(self):
-        """是否为工艺工程师。"""
-        return self.user_type == self.UserType.PROCESS_ENGINEER
-    @property
-    def can_use_compare_cart(self):
-        """配方对比购物车准入：仅研发工程师 + 管理员（RND_ONLY）"""
-        return self.is_engineer or self.user_type == self.UserType.ADMIN or self.is_superuser
-    @property
-    def is_sales(self):
-        """是否为业务员。"""
-        return self.user_type == self.UserType.SALES
 
-    @property
-    def is_purchasing(self):
-        """是否为采购专员。"""
-        return self.user_type == self.UserType.PURCHASING
+# ============================================================
+# 动态 RBAC 权限体系 — 以下模型替代原硬编码的 IdentityConfig / MenuModule / init_permissions
+# ============================================================
 
-    @property
-    def is_external(self):
-        """是否为客户或 OEM 外部角色。"""
-        return self.user_type in [self.UserType.CUSTOMER, self.UserType.OEM]
-    @property
-    def is_extrusion_operator(self):
-        """是否为挤出操作员。"""
-        return self.user_type == self.UserType.EXTRUSION_OPERATOR
+class RoleGroup(models.Model):
+    """[L1 分组] 角色分组 — 替代原 IdentityConfig 静态常量。
 
-    @property
-    def is_color_operator(self):
-        """是否为配色员。"""
-        return self.user_type == self.UserType.COLOR_OPERATOR
+    将多个 UserRole 归入一个命名的权限组（如 TECH_CORE、RND_ONLY），
+    然后通过 ModuleAccessConfig 分配给各业务模块。
+    """
+    code = models.CharField("分组编码", max_length=50, unique=True,
+                            help_text="如 'TECH_CORE'、'RND_ONLY'。")
+    name = models.CharField("分组名称", max_length=50,
+                            help_text="如 '技术核心组'、'纯研发组'。")
+    description = models.TextField("描述", blank=True)
+    roles = models.ManyToManyField(UserRole, verbose_name="包含角色",
+                                   related_name='groups')
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
-    @property
-    def is_injection_operator(self):
-        """是否为注塑操作员。"""
-        return self.user_type == self.UserType.INJECTION_OPERATOR
+    class Meta:
+        verbose_name = "[L1 分组] 角色分组"
+        verbose_name_plural = "[L1 分组] 角色分组"
+        ordering = ['code']
 
-    @property
-    def is_testing_operator(self):
-        """是否为测试员。"""
-        return self.user_type == self.UserType.TESTING_OPERATOR
+    def __str__(self):
+        return f"{self.name} ({self.code})"
 
-    @property
-    def is_admin(self):
-        """是否为系统管理员。"""
-        return self.user_type == self.UserType.ADMIN
+
+class ModuleAccessConfig(models.Model):
+    """[L1~L5 配置] 模块权限配置 — 核心枢纽。
+
+    每个业务模块对应一条记录，声明：
+    - 哪些 RoleGroup 可以访问（L1）
+    - 最低用户等级（L2）
+    - 是否启用部门隔离（L4）
+    - 是否启用工作组隔离（L5）
+
+    mixin 通过 module_code 查找对应记录，动态获取全部权限配置。
+    """
+    module_code = models.CharField("模块编码", max_length=80, unique=True,
+                                   help_text="如 'formula'、'trial_production.extrusion_task'。")
+    module_name = models.CharField("模块名称", max_length=50,
+                                   help_text="如 '实验配方库'。")
+    role_groups = models.ManyToManyField(RoleGroup, verbose_name="允许访问的角色组",
+                                         help_text="用户所属角色在任一勾选组中即可访问本模块。")
+    min_level = models.PositiveIntegerField("最低等级", default=1,
+                                            help_text="L2 用户等级门槛。")
+    enforce_dept_isolation = models.BooleanField("部门隔离 (L4)", default=True)
+    enforce_group_isolation = models.BooleanField("工作组隔离 (L5)", default=False)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "[L1~L5] 模块权限配置"
+        verbose_name_plural = "[L1~L5] 模块权限配置"
+        ordering = ['module_code']
+
+    def __str__(self):
+        return f"{self.module_name} ({self.module_code})"
+
+
+class SidebarModule(models.Model):
+    """[菜单] 侧边栏模块 — 替代原 MenuModule.get_*() 静态方法。
+
+    每个顶级菜单项对应一条记录，通过 module_access 关联到 ModuleAccessConfig，
+    共用同一套 L1 角色白名单，确保菜单可见性与视图层权限一致。
+    """
+    code = models.CharField("菜单编码", max_length=50, unique=True,
+                            help_text="如 'dashboard'、'formula'。")
+    name = models.CharField("菜单名称", max_length=50)
+    icon = models.CharField("图标", max_length=50,
+                            help_text="Tabler Icons 类名，不含 'ti-' 前缀，如 'ti-test-pipe' 写 'test-pipe'。")
+    url_name = models.CharField("URL 名称", max_length=200,
+                                help_text="Django URL name，用于 reverse() 解析。")
+    module_access = models.ForeignKey(ModuleAccessConfig, on_delete=models.SET_NULL,
+                                      null=True, blank=True, verbose_name="关联权限配置",
+                                      help_text="共用 ModuleAccessConfig 的 L1 角色白名单。")
+    sort_order = models.IntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "[菜单] 侧边栏模块"
+        verbose_name_plural = "[菜单] 侧边栏模块"
+        ordering = ['sort_order', 'code']
+
+    def __str__(self):
+        return self.name
+
+
+class SidebarSubItem(models.Model):
+    """[菜单] 侧边栏子项 — 替代原子菜单 dict。
+
+    支持独立覆盖 L1（窄于模块级）、L2（min_level）、L3（Django 权限码）。
+    """
+    module = models.ForeignKey(SidebarModule, on_delete=models.CASCADE,
+                               related_name='sub_items', verbose_name="所属模块")
+    name = models.CharField("子项名称", max_length=50)
+    url_name = models.CharField("URL 名称", max_length=200)
+    role_group = models.ForeignKey(RoleGroup, on_delete=models.SET_NULL,
+                                   null=True, blank=True, verbose_name="L1 角色覆盖",
+                                   help_text="留空则继承父模块的可见角色。")
+    min_level = models.PositiveIntegerField("最低等级 (L2)", null=True, blank=True,
+                                            help_text="留空则不检查等级。")
+    permissions = models.JSONField("权限码 (L3)", default=list, blank=True,
+                                   help_text="Django 权限码列表，如 ['app_formula.view_labformula']。")
+    sort_order = models.IntegerField("排序", default=0)
+    is_active = models.BooleanField("启用", default=True)
+
+    class Meta:
+        verbose_name = "[菜单] 侧边栏子项"
+        verbose_name_plural = "[菜单] 侧边栏子项"
+        ordering = ['module', 'sort_order']
+
+    def __str__(self):
+        return f"{self.module.name} > {self.name}"
+
+
+class L3PermissionConfig(models.Model):
+    """[L3] Django 权限码配置 — 替代原 init_permissions PERMISSION_MAP。
+
+    定义每个 app_label 下各 RoleGroup 应获得的 CRUD 权限码集合。
+    init_permissions 命令从此表读取并写入 Django auth_permission 表。
+    """
+    app_label = models.CharField("App 标签", max_length=100,
+                                 help_text="如 'app_formula'、'app_project'。")
+    role_group = models.ForeignKey(RoleGroup, on_delete=models.CASCADE,
+                                   verbose_name="角色组")
+    actions = models.JSONField("操作列表", default=list,
+                               help_text="['view','add','change','delete'] 或 ['all']。")
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "[L3] 权限码配置"
+        verbose_name_plural = "[L3] 权限码配置"
+        unique_together = ('app_label', 'role_group')
+        ordering = ['app_label', 'role_group']
+
+    def __str__(self):
+        return f"{self.app_label} ← {self.role_group.code}: {self.actions}"

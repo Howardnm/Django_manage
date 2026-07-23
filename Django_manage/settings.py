@@ -111,6 +111,7 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'app_notification.context_processors.notifications',
                 'app_user.context_processors.menu_processor.sidebar_menu_permissions',
+                'app_formula.context_processors.formula_permissions',
             ],
         },
     },

@@ -20,7 +20,6 @@ from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
 )
 from app_trial_production.services import ProductionOrderService
-from app_user.models import User
 from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
@@ -316,11 +315,9 @@ class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
             })
         context['formula_split_summaries'] = formula_split_summaries
 
-        # 操作权限：挤出操作员或超级用户可触发启动挤出
-        context['can_start_extrusion'] = order.can_start_extrusion and (
-            self.request.user.user_type == User.UserType.EXTRUSION_OPERATOR
-            or self.request.user.is_superuser
-        )
+        # 操作权限：复用 ExtrusionTaskAccessMixin 的动态角色配置
+        context['can_start_extrusion'] = order.can_start_extrusion and \
+            ExtrusionTaskAccessMixin.user_has_access(self.request.user)
 
         return context
 

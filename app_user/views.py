@@ -16,7 +16,7 @@ from django.core.cache import cache
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, PasswordResetForm
-from .mixins import IdentityConfig
+from .services.identity_service import IdentityService
 from .utils import generate_captcha, send_verification_email, send_register_success_email
 
 User = get_user_model()
@@ -48,7 +48,7 @@ class CustomLoginView(LoginView):
         user = form.get_user()
         # 外部角色 (CUSTOMER, OEM) 禁止登录此后台管理系统
         # 他们应该前往电子手册系统 (app_catalog)
-        allowed_roles = IdentityConfig.INTERNAL_STAFF
+        allowed_roles = IdentityService.get_internal_role_codes()
         
         if not user.is_superuser and user.user_type not in allowed_roles:
             messages.error(self.request, "您的账号身份不属于内部成员，无法访问管理系统。")

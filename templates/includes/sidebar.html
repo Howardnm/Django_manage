@@ -35,7 +35,7 @@
                         {# 只有一级的业务模块 #}
                         <li class="nav-item mb-1 {% if item.is_active %}active{% endif %}">
                             <a class="nav-link rounded-2 mx-2" href="{{ item.url }}">
-                                <span class="nav-link-icon"><i class="ti {{ item.icon }}"></i></span>
+                                <span class="nav-link-icon"><i class="ti ti-{{ item.icon }}"></i></span>
                                 <span class="nav-link-title fw-bold">{{ item.name }}</span>
                             </a>
                         </li>
@@ -47,7 +47,7 @@
                                data-bs-toggle="collapse"
                                role="button"
                                aria-expanded="{{ item.is_expanded|yesno:'true,false' }}">
-                                <span class="nav-link-icon"><i class="ti {{ item.icon }}"></i></span>
+                                <span class="nav-link-icon"><i class="ti ti-{{ item.icon }}"></i></span>
                                 <span class="nav-link-title">{{ item.name }}</span>
                                 <span class="nav-link-arrow"></span>
                             </a>

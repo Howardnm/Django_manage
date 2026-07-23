@@ -1,57 +1,34 @@
-from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.mixins import UnifiedAccessMixin
 
 
 class TrialProductionAccessMixin(UnifiedAccessMixin):
-    """试验排产模块 — 基础权限管控"""
+    """试验排产模块 — 基础权限管控。
+
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    操作员数据视野放宽逻辑已移除——角色通过 ModuleAccessConfig 分配后自然有权访问。
+    """
+
+    module_code = 'trial_production'
     user_link_fields = ['creator', 'extruder_operator', 'operator',
                         'assigned_to', 'recorded_by']
-    identity_required = [IdentityConfig.R_ENGINEER, IdentityConfig.R_EXTRUSION_OP]
-
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if qs is None:
-            return None
-        user = self.request.user
-
-        # 生产操作员按任务分配放宽数据可见范围
-        if user.user_type in [
-            IdentityConfig.R_EXTRUSION_OP,
-            IdentityConfig.R_COLOR_OP,
-            IdentityConfig.R_INJECTION_OP,
-            IdentityConfig.R_TESTING_OP,
-        ]:
-            model = qs.model
-            model_fields = [f.name for f in model._meta.get_fields()]
-            operator_field_map = {
-                IdentityConfig.R_EXTRUSION_OP: 'operator',
-                IdentityConfig.R_COLOR_OP: 'operator',
-                IdentityConfig.R_INJECTION_OP: 'operator',
-                IdentityConfig.R_TESTING_OP: 'assigned_to',
-            }
-            field = operator_field_map.get(user.user_type)
-            if field and field in model_fields:
-                from django.db.models import Q
-                qs = qs.filter(
-                    Q(**{f"{field}": user}) |
-                    Q(**{f"{field}__isnull": True})
-                )
-        return qs
 
 
 class ExtrusionTaskAccessMixin(TrialProductionAccessMixin):
-    """挤出任务 — 仅挤出操作员"""
-    identity_required = [IdentityConfig.R_EXTRUSION_OP]
+    """挤出任务 — 仅挤出操作员。"""
+
+    module_code = 'trial_production.extrusion_task'
 
 
 class DashboardAccessMixin(TrialProductionAccessMixin):
-    """排产总览 — 仅研发工程师"""
-    identity_required = [IdentityConfig.R_ENGINEER]
-    enforce_dept_isolation = False
+    """排产总览 — 仅研发工程师。"""
+
+    module_code = 'trial_production.dashboard'
 
 
 class RndAccessMixin(TrialProductionAccessMixin):
-    """排产发起/审批 — 仅研发工程师，按项目负责人隔离"""
-    identity_required = [IdentityConfig.R_ENGINEER]
+    """排产发起/审批 — 仅研发工程师，按项目负责人隔离。"""
+
+    module_code = 'trial_production.rnd'
     user_link_fields = ['manager']
 
     @staticmethod
@@ -68,6 +45,6 @@ class RndAccessMixin(TrialProductionAccessMixin):
 
 
 class SampleInventoryAccessMixin(TrialProductionAccessMixin):
-    """样品库存 — 研发工程师 + 挤出操作员可访问，不做部门隔离"""
-    identity_required = [IdentityConfig.R_ENGINEER, IdentityConfig.R_EXTRUSION_OP]
-    enforce_dept_isolation = False
+    """样品库存 — 研发工程师 + 操作员可访问。"""
+
+    module_code = 'trial_production.sample_inventory'

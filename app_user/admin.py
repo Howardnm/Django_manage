@@ -1,13 +1,16 @@
-"""Django Admin 配置。注册 User、Department、Subsidiary、OrgRole、OrgRoleAssignment、ReviewGroup、WorkGroup、PermissionGroup 的管理界面。
-
-导出: PermissionGroupAdmin, DepartmentAdmin, SubsidiaryAdmin, OrgRoleAdmin, OrgRoleAssignmentAdmin, MyUserAdmin, ReviewGroupAdmin, WorkGroupAdmin。
-"""
+"""Django Admin 配置。注册全部 app_user 模型的管理界面。"""
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
 from django.shortcuts import render
-from .models import User, Department, Subsidiary, OrgRole, OrgRoleAssignment, ReviewGroup, WorkGroup, PermissionGroup
+from .models import (
+    User, Department, Subsidiary, OrgRole, OrgRoleAssignment,
+    ReviewGroup, WorkGroup, PermissionGroup,
+    UserRole, RoleGroup, ModuleAccessConfig,
+    SidebarModule, SidebarSubItem, L3PermissionConfig,
+)
+from .services.identity_service import IdentityService
 
 admin.site.unregister(Group)
 
@@ -337,3 +340,73 @@ class WorkGroupAdmin(admin.ModelAdmin):
     def member_count(self, obj):
         """返回工作组成员数。Returns: 整数。"""
         return obj.members.count()
+
+
+# ============================================================
+# 动态 RBAC 权限体系 — Admin 注册
+# ============================================================
+
+def _invalidate_rbac_cache():
+    """Admin 保存/删除后清除 IdentityService 模块级缓存。"""
+    IdentityService.invalidate_cache()
+
+
+class CacheInvalidatingMixin:
+    """Mixin: save_model / delete_model 后自动清除权限缓存。"""
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        _invalidate_rbac_cache()
+
+    def delete_model(self, request, obj):
+        super().delete_model(request, obj)
+        _invalidate_rbac_cache()
+
+    def delete_queryset(self, request, queryset):
+        super().delete_queryset(request, queryset)
+        _invalidate_rbac_cache()
+
+
+@admin.register(UserRole)
+class UserRoleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+    list_display = ('code', 'name', 'is_internal', 'sort_order', 'is_active')
+    list_filter = ('is_internal', 'is_active')
+    search_fields = ('code', 'name')
+    ordering = ('sort_order', 'code')
+
+
+@admin.register(RoleGroup)
+class RoleGroupAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+    list_display = ('code', 'name', 'is_active')
+    search_fields = ('code', 'name')
+    filter_horizontal = ('roles',)
+
+
+@admin.register(ModuleAccessConfig)
+class ModuleAccessConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+    list_display = ('module_code', 'module_name', 'min_level',
+                    'enforce_dept_isolation', 'enforce_group_isolation', 'is_active')
+    list_filter = ('is_active', 'enforce_dept_isolation', 'enforce_group_isolation')
+    search_fields = ('module_code', 'module_name')
+    filter_horizontal = ('role_groups',)
+
+
+class SidebarSubItemInline(admin.TabularInline):
+    model = SidebarSubItem
+    extra = 1
+    fields = ('name', 'url_name', 'role_group', 'min_level', 'permissions', 'sort_order', 'is_active')
+
+
+@admin.register(SidebarModule)
+class SidebarModuleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+    list_display = ('code', 'name', 'module_access', 'sort_order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('code', 'name')
+    inlines = [SidebarSubItemInline]
+
+
+@admin.register(L3PermissionConfig)
+class L3PermissionConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+    list_display = ('app_label', 'role_group', 'actions', 'is_active')
+    list_filter = ('app_label', 'role_group', 'is_active')
+    search_fields = ('app_label',)

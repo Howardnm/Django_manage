@@ -1,10 +1,14 @@
 from django.core.exceptions import PermissionDenied
-from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.mixins import UnifiedAccessMixin
 
 
 class FormManagementAccessMixin(UnifiedAccessMixin):
-    identity_required = IdentityConfig.INTERNAL_STAFF
-    enforce_dept_isolation = False
+    """表单管理模块权限管控。
+
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    """
+
+    module_code = 'form_management'
     user_link_fields = ['submitted_by', 'manager', 'creator', 'user', 'owner', 'uploader', 'salesperson']
 
     def check_object_permission(self, obj):

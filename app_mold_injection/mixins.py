@@ -1,28 +1,21 @@
-from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.mixins import UnifiedAccessMixin
 
 
 class InjectionTaskAccessMixin(UnifiedAccessMixin):
-    """注塑任务 — 仅注塑操作员 + 技术核心 + 管理员"""
-    user_link_fields = ['operator']
-    identity_required = IdentityConfig.INJECTION_TEAM
+    """注塑任务权限管控。
 
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if qs is None:
-            return None
-        user = self.request.user
-        if user.user_type in [IdentityConfig.R_INJECTION_OP]:
-            model = qs.model
-            model_fields = [f.name for f in model._meta.get_fields()]
-            if 'operator' in model_fields:
-                from django.db.models import Q
-                qs = qs.filter(
-                    Q(operator=user) | Q(operator__isnull=True)
-                )
-        return qs
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    操作员数据视野放宽逻辑已移除——角色通过 ModuleAccessConfig 分配后自然有权访问。
+    """
+
+    module_code = 'mold_injection.task'
+    user_link_fields = ['operator']
 
 
 class MoldManageAccessMixin(UnifiedAccessMixin):
-    """模具台账管理 — 仅技术核心 + 管理员"""
-    identity_required = IdentityConfig.TECH_CORE
-    enforce_dept_isolation = False
+    """模具台账管理权限管控。
+
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    """
+
+    module_code = 'mold_injection.mold'

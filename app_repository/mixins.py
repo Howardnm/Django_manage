@@ -1,17 +1,15 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from app_user.mixins import UnifiedAccessMixin, IdentityConfig
+from app_user.mixins import UnifiedAccessMixin
 
 class RepositoryAccessMixin(UnifiedAccessMixin):
+    """档案中心权限管控 (双重负责制适配)。
+
+    L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
     """
-    档案中心权限管控 (双重负责制适配)。
-    """
-    
+
+    module_code = 'repository'
     user_link_fields = ['salesperson', 'project__manager']
-    identity_required = IdentityConfig.INTERNAL_STAFF
-    
-    # 默认开启隔离，但在具体视图中（如客户名录）可手动关闭
-    enforce_dept_isolation = True
 
     def get_queryset(self):
         """
@@ -29,12 +27,10 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
 
         # 探测模型是否包含 salesperson 字段，以决定是否执行双重负责制过滤
         if not hasattr(qs.model, 'salesperson'):
-            # 没有 salesperson 字段的模型（如 Customer、OEM 公司名录），
-            # 直接返回基类的 L4/L5 结果，不额外过滤
             return qs
 
         # 双重负责制：业务部（salesperson 所属部门）OR 研发部（project.manager 所属部门）
-        if self.enforce_dept_isolation:
+        if self._resolve_config()['enforce_dept_isolation']:
             if user.department:
                 return qs.filter(
                     Q(salesperson__department=user.department) |

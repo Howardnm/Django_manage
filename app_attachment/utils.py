@@ -70,12 +70,13 @@ class PermissionAdapter:
         mixin = self.config.access_mixin()
         mixin.request = request
 
-        # ---- Step 3: 身份角色检查 (Dim: Identity) ----
-        if mixin.identity_required and user.user_type not in mixin.identity_required:
+        # ---- Step 3: 身份角色检查 (L1) — 从 _resolve_config() 动态读取 ----
+        cfg = mixin._resolve_config()
+        if cfg['role_codes'] and user.user_type_id not in cfg['role_codes']:
             raise PermissionDenied("您的角色无权访问此附件")
 
-        # ---- Step 4: 用户等级检查 (Dim: Level) ----
-        if user.user_level < mixin.min_level_required:
+        # ---- Step 4: 用户等级检查 (L2) ——
+        if user.user_level < cfg['min_level']:
             raise PermissionDenied("您的账号等级不足，无法访问此附件")
 
         # ---- Step 5: Django 原生权限码检查 ----

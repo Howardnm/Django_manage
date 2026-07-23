@@ -77,29 +77,39 @@ def make_autocomplete_access_filter(access_mixin_class):
     from django.db.models import Q, Exists, OuterRef
 
     # 从 AccessMixin 类属性自动提取权限配置
-    identity_required = getattr(access_mixin_class, 'identity_required', [])
+    # module_code 模式：从 DB 动态读取；否则从 class attribute 读取
+    module_code = getattr(access_mixin_class, 'module_code', None)
     user_link_fields = getattr(access_mixin_class, 'user_link_fields', [])
     user_link_field = user_link_fields[0] if user_link_fields else None
-    enforce_dept_isolation = getattr(access_mixin_class, 'enforce_dept_isolation', False)
-    enforce_group_isolation = getattr(access_mixin_class, 'enforce_group_isolation', False)
 
     def _filter(user, qs):
         if user.is_superuser:
             return qs
 
-        # L1: 角色白名单
-        if identity_required and user.user_type not in identity_required:
+        # L1: 角色白名单 — module_code 模式从 DB 读取，否则从 class attribute
+        if module_code:
+            from app_user.services.identity_service import IdentityService
+            cfg = IdentityService.get_module_config(module_code)
+            role_codes = cfg['role_codes']
+            do_l4 = cfg['enforce_dept_isolation']
+            do_l5 = cfg['enforce_group_isolation']
+        else:
+            role_codes = getattr(access_mixin_class, 'identity_required', [])
+            do_l4 = getattr(access_mixin_class, 'enforce_dept_isolation', False)
+            do_l5 = getattr(access_mixin_class, 'enforce_group_isolation', False)
+
+        if role_codes and user.user_type_id not in role_codes:
             raise PermissionDenied()
 
         # L4: 部门隔离
-        if enforce_dept_isolation and user_link_field:
+        if do_l4 and user_link_field:
             if user.department:
                 qs = qs.filter(**{f'{user_link_field}__department': user.department})
             else:
                 qs = qs.filter(**{user_link_field: user})
 
         # L5: 工作组隔离
-        if enforce_group_isolation and user_link_field:
+        if do_l5 and user_link_field:
             from app_user.models import WorkGroup
             user_wg_ids = list(
                 user.work_groups.filter(is_active=True).values_list('id', flat=True)
@@ -121,7 +131,7 @@ def make_autocomplete_access_filter(access_mixin_class):
                     ~Q(Exists(owner_has_wg))
                 )
 
-        if enforce_dept_isolation or enforce_group_isolation:
+        if do_l4 or do_l5:
             qs = qs.distinct()
 
         return qs
