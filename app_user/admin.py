@@ -393,8 +393,10 @@ class ModuleAccessConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
 
 class SidebarSubItemInline(admin.TabularInline):
     model = SidebarSubItem
-    extra = 1
+    extra = 0
     fields = ('name', 'url_name', 'role_group', 'min_level', 'permissions', 'sort_order', 'is_active')
+    # menu_modules.py 控制的字段只读；管理员只能调整 role_group / min_level / sort_order / is_active
+    readonly_fields = ('name', 'url_name', 'permissions')
 
 
 @admin.register(SidebarModule)
@@ -402,6 +404,8 @@ class SidebarModuleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
     list_display = ('code', 'name', 'module_access', 'sort_order', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('code', 'name')
+    # menu_modules.py 控制的字段只读；管理员只能调整 sort_order / is_active
+    readonly_fields = ('code', 'name', 'icon', 'url_name', 'module_access')
     inlines = [SidebarSubItemInline]
 
 

@@ -300,7 +300,6 @@ class User(AbstractUser):
         UserRole, on_delete=models.PROTECT, verbose_name="用户角色",
         help_text="决定 L1 角色白名单准入权限。")
     user_level = models.PositiveIntegerField("用户等级", default=1)
-    user_level = models.PositiveIntegerField("用户等级", default=1)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="所属部门")
     subsidiary = models.ForeignKey(
         'Subsidiary',
