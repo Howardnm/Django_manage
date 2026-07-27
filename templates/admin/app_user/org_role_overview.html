@@ -1,0 +1,253 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}组织角色体系 — 说明{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .overview { max-width: 900px; margin: 0 auto; }
+  .overview h2 {
+    margin-top: 32px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary); font-size: 18px;
+  }
+  .overview .card {
+    background: var(--body-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px 24px; margin-bottom: 16px;
+  }
+  .overview table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .overview td, .overview th {
+    padding: 10px 14px; border-bottom: 1px solid var(--border-color);
+    vertical-align: top; text-align: left;
+  }
+  .overview tr:last-child td { border-bottom: none; }
+  .overview .tag {
+    display: inline-block; padding: 2px 10px; border-radius: 4px;
+    font-weight: 700; font-size: 12px; color: #fff;
+  }
+  .tag-wg  { background: #206bc4; }
+  .tag-dept{ background: #4299e1; }
+  .tag-sub { background: #ae3ec9; }
+  .overview .flow {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    font-size: 14px; margin: 8px 0;
+  }
+  .overview .flow .box {
+    border: 2px solid var(--primary); border-radius: 8px;
+    padding: 10px 16px; text-align: center; background: var(--body-bg);
+    min-width: 100px;
+  }
+  .overview .flow .arrow { font-size: 20px; color: var(--primary); }
+  .overview .btn-row {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+  }
+  .overview .btn-row .button {
+    padding: 8px 16px; border-radius: 4px; font-size: 13px; text-decoration: none;
+  }
+  .overview .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .overview .steps li {
+    counter-increment: step;
+    padding: 14px 14px 14px 52px; margin-bottom: 10px;
+    background: var(--body-bg);
+    border: 1px solid var(--border-color); border-radius: 6px;
+    position: relative; font-size: 14px;
+  }
+  .overview .steps li::before {
+    content: counter(step);
+    position: absolute; left: 12px; top: 12px;
+    width: 28px; height: 28px; border-radius: 50%;
+    background: var(--primary); color: #fff;
+    font-weight: 700; font-size: 14px; line-height: 28px; text-align: center;
+  }
+  .overview .steps li strong { display: block; margin-bottom: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="overview">
+
+  <h1>组织角色体系</h1>
+  <p style="color: var(--body-quiet-color);">
+    组织角色体系为 <strong>BPMN 工作流引擎</strong>提供审批人动态查找能力——引擎根据发起人的组织归属，
+    自动找到对应的「组长」「部门经理」「基地总经理」来完成审批，无需为每个流程硬编码审批人。
+  </p>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 工作流程 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>审批人查找流程</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="box"><strong>发起人</strong><br><small>提交审批</small></div>
+      <span class="arrow">→</span>
+      <div class="box"><strong>WorkflowTaskConfig</strong><br><small>引用 OrgRole 编码</small></div>
+      <span class="arrow">→</span>
+      <div class="box"><strong>OrgRole</strong><br><small>按 scope 查找</small></div>
+      <span class="arrow">→</span>
+      <div class="box"><strong>OrgRoleAssignment</strong><br><small>找到指派人</small></div>
+      <span class="arrow">→</span>
+      <div class="box"><strong>审批完成</strong></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 操作步骤 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>操作步骤</h2>
+  <ol class="steps">
+    <li>
+      <strong>创建组织架构</strong>
+      先在 <a href="{% url 'admin:app_user_subsidiary_changelist' %}">子公司/基地</a>、
+      <a href="{% url 'admin:app_user_department_changelist' %}">[L4] 部门</a>、
+      <a href="{% url 'admin:app_user_workgroup_changelist' %}">[L5] 工作组</a>
+      中建立完整的组织树。
+    </li>
+    <li>
+      <strong>定义组织角色</strong>
+      进入 <a href="{% url 'admin:app_user_orgrole_changelist' %}">[审批] 组织角色</a>，
+      创建角色（如「组长」scope=工作组、「部门经理」scope=部门），
+      建议开启 <code>allow_escalation</code> 避免漏配导致审批中断。
+    </li>
+    <li>
+      <strong>（可选）指派人员到组织单元</strong>
+      步骤②的组织角色详情页已内置 inline 指派表格，可直接在角色页面完成指派。
+      如需集中管理所有指派，可进入
+      <a href="{% url 'admin:app_user_orgroleassignment_changelist' %}">[审批] 组织角色指派</a> 独立页面。
+      同一位置可指派多人（正副职），勾选 <code>is_primary</code> 标识主负责人。
+    </li>
+    <li>
+      <strong>（可选）创建审核组</strong>
+      进入 <a href="{% url 'admin:app_user_reviewgroup_changelist' %}">[审批] 审核组</a>，
+      创建固定审批人池（如「法务审核组」），添加成员。
+    </li>
+    <li>
+      <strong>关联到工作流节点</strong>
+      进入 <strong>app_workflow → WorkflowTaskConfig</strong>，配置 BPMN 的 userTask 节点：
+      <ul style="margin:4px 0 0 0;">
+        <li><code>assignee_type=org_role</code> + 选择 OrgRole 编码 → 动态查找审批人</li>
+        <li><code>assignee_type=static_group</code> + 选择 ReviewGroup → 固定审批人池</li>
+        <li><code>assignee_type=static_user</code> + 直接选择用户 → 固定审批人</li>
+      </ul>
+    </li>
+    <li>
+      <strong>验证配置</strong>
+      点击 <a href="{% url 'admin:app_user_org_structure_matrix' %}">组织架构总览</a> 矩阵视图，
+      检查每个角色×组织单元的指派是否完整。
+    </li>
+  </ol>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 组织角色 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>组织角色 (OrgRole)</h2>
+  <div class="card">
+    <p style="margin-top:0;">
+      定义职位角色及其<strong>查找作用域</strong>。引擎在指定组织层级中查找该角色的负责人。
+    </p>
+    <table>
+      <tr>
+        <td><span class="tag tag-wg">工作组级</span></td>
+        <td><code>scope=workgroup</code></td>
+        <td>在发起人的工作组中查找（如「配方组」的「组长」）</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-dept">部门级</span></td>
+        <td><code>scope=department</code></td>
+        <td>在发起人的部门中查找（如「研发中心」的「部门经理」）</td>
+      </tr>
+      <tr>
+        <td><span class="tag tag-sub">子公司级</span></td>
+        <td><code>scope=subsidiary</code></td>
+        <td>在发起人的子公司中查找（如「上海总部」的「基地总经理」）</td>
+      </tr>
+    </table>
+    <p style="margin-bottom:0;">
+      <strong>allow_escalation</strong>（逐级回退）：开启后，若当前 scope 找不到指派人，
+      自动向上一级查找：工作组 → 部门 → 子公司。避免因某个层级漏配而导致审批中断。
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 组织角色指派 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>组织角色指派 (OrgRoleAssignment)</h2>
+  <div class="card">
+    <p style="margin-top:0;">
+      将具体的<strong>用户</strong>指派为某个组织角色在<strong>特定组织单元</strong>中的负责人。
+    </p>
+    <p><strong>示例</strong>：</p>
+    <table>
+      <tr><th>用户</th><th>角色</th><th>组织单元</th></tr>
+      <tr><td>张三</td><td>组长</td><td>配方组（工作组级）</td></tr>
+      <tr><td>李四</td><td>部门经理</td><td>研发中心（部门级）</td></tr>
+      <tr><td>王五</td><td>基地总经理</td><td>上海总部（子公司级）</td></tr>
+    </table>
+    <p style="margin-bottom:0;">
+      同一角色在同一组织单元可以有多个指派（如正副职），<strong>is_primary</strong> 标识主负责人，
+      引擎优先匹配。
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 审核组 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>审核组 (ReviewGroup)</h2>
+  <div class="card">
+    <p style="margin-top:0;">
+      <strong>静态审批人池</strong>——与 OrgRole 的动态查找不同，审核组是一组固定人员。
+    </p>
+    <p><strong>使用场景</strong>：</p>
+    <ul>
+      <li>某些审批节点不需要根据发起人的组织归属动态查找，而是发给固定的几个人</li>
+      <li>例如「法务审核」→ 法务部的 3 个人组成一个 ReviewGroup</li>
+      <li>在 <code>WorkflowTaskConfig</code> 中选择 <code>assignee_type=static_group</code> 并关联此审核组</li>
+    </ul>
+    <p style="margin-bottom:0;">
+      <code>department</code> 字段可限定审核组的部门作用域（留空 = 跨部门通用）。
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 与 BPMN 工作流的关联 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>与工作流引擎的关联</h2>
+  <div class="card">
+    <p style="margin-top:0;">
+      以上配置最终在 <strong>app_workflow → WorkflowTaskConfig</strong> 中被引用。
+      每个 BPMN userTask 节点通过 <code>assignee_type</code> 选择解析模式：
+    </p>
+    <table>
+      <tr><th>assignee_type</th><th>引用的配置</th><th>说明</th></tr>
+      <tr>
+        <td><code>org_role</code></td>
+        <td>OrgRole.code</td>
+        <td>动态查找：根据发起人组织归属找到该角色的指派人</td>
+      </tr>
+      <tr>
+        <td><code>static_group</code></td>
+        <td>ReviewGroup</td>
+        <td>静态池：固定的一组审批人</td>
+      </tr>
+      <tr>
+        <td><code>static_user</code></td>
+        <td>直接指定 User</td>
+        <td>固定人：写死某个审批人</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════ -->
+  <!-- 快速入口 -->
+  <!-- ═══════════════════════════════════ -->
+  <h2>快速入口</h2>
+  <div class="btn-row">
+    <a class="button" href="{% url 'admin:app_user_orgrole_changelist' %}">组织角色</a>
+    <a class="button" href="{% url 'admin:app_user_orgroleassignment_changelist' %}">组织角色指派</a>
+    <a class="button" href="{% url 'admin:app_user_reviewgroup_changelist' %}">审核组</a>
+    <a class="button" href="{% url 'admin:app_user_org_structure_matrix' %}">组织架构总览</a>
+  </div>
+
+</div>
+{% endblock %}

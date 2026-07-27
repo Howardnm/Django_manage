@@ -54,6 +54,15 @@ class Command(BaseCommand):
         from app_user.models import ModuleAccessConfig
         from app_user.services.identity_service import IdentityService
 
+        # 前置检查
+        try:
+            ModuleAccessConfig.objects.exists()
+        except Exception:
+            self.stdout.write(self.style.ERROR(
+                'ModuleAccessConfig 表不存在。请先运行: python manage.py migrate'
+            ))
+            return
+
         discovered = self._discover_module_codes()
         existing = set(ModuleAccessConfig.objects.values_list('module_code', flat=True))
 

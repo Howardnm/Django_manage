@@ -1,6 +1,8 @@
 """Django Admin 配置。注册全部 app_user 模型的管理界面。"""
 
+from django import forms
 from django.contrib import admin
+from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.models import Group
 from django.shortcuts import render
@@ -8,17 +10,49 @@ from .models import (
     User, Department, Subsidiary, OrgRole, OrgRoleAssignment,
     ReviewGroup, WorkGroup, PermissionGroup,
     UserRole, RoleGroup, ModuleAccessConfig,
-    SidebarModule, SidebarSubItem, L3PermissionConfig,
+    SidebarModule, SidebarSubItem,
 )
 from .services.identity_service import IdentityService
 
 admin.site.unregister(Group)
 
 
+class PermissionGroupForm(forms.ModelForm):
+    """自定义表单，显式声明 user_set 反向 M2M 字段。"""
+    user_set = forms.ModelMultipleChoiceField(
+        queryset=User.objects.all().order_by('username'),
+        required=False,
+        widget=FilteredSelectMultiple('用户', False),
+    )
+
+    class Meta:
+        model = PermissionGroup
+        fields = '__all__'
+
+
 @admin.register(PermissionGroup)
 class PermissionGroupAdmin(GroupAdmin):
-    """PermissionGroup（auth.Group 代理）的 Admin 配置。"""
-    pass
+    """PermissionGroup（auth.Group 代理）的 Admin 配置。
+
+    分组详情页可同时管理：组成员 + Django 权限码。
+    """
+    form = PermissionGroupForm
+    fieldsets = (
+        (None, {'fields': ('name',)}),
+        ('组成员', {'fields': ('user_set',)}),
+        ('权限码', {'fields': ('permissions',)}),
+    )
+    filter_horizontal = ('permissions',)
+
+    def get_form(self, request, obj=None, **kwargs):
+        form = super().get_form(request, obj, **kwargs)
+        if obj:
+            form.base_fields['user_set'].initial = obj.user_set.all()
+        return form
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        obj.user_set.set(form.cleaned_data.get('user_set', []))
 
 
 @admin.register(Department)
@@ -79,14 +113,26 @@ class OrgRoleAdmin(admin.ModelAdmin):
     # ── 自定义 URL ──────────────────────────────────────────
 
     def get_urls(self):
-        """注入自定义 URL：组织架构总览矩阵页面。"""
+        """注入自定义 URL：说明页 + 组织架构总览矩阵。"""
         from django.urls import path
         urls = super().get_urls()
         custom_urls = [
+            path('overview/', self.admin_site.admin_view(self.org_role_overview_view),
+                 name='app_user_org_role_overview'),
             path('org-matrix/', self.admin_site.admin_view(self.org_structure_matrix_view),
                  name='app_user_org_structure_matrix'),
         ]
         return custom_urls + urls
+
+    def org_role_overview_view(self, request):
+        """组织角色体系说明页。"""
+        from django.shortcuts import render
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '组织角色体系 — 说明',
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/app_user/org_role_overview.html', context)
 
     def org_structure_matrix_view(self, request):
         """组织架构总览矩阵视图 — 按作用域分段展示。
@@ -195,18 +241,20 @@ class OrgRoleAdmin(admin.ModelAdmin):
     # ── Changelist 入口按钮 ──────────────────────────────────
 
     def changelist_view(self, request, extra_context=None):
-        """在列表页顶部注入「组织架构总览」快捷入口。"""
+        """在列表页顶部注入快捷入口。"""
         from django.urls import reverse
         from django.utils.html import format_html
         extra_context = extra_context or {}
-        matrix_url = reverse('admin:app_user_org_structure_matrix')
-        extra_context['matrix_url'] = matrix_url
-        # 通过 messages 提示或直接在页面顶部添加导航
+        overview_url = reverse('admin:app_user_org_role_overview')
+        extra_context['matrix_url'] = reverse('admin:app_user_org_structure_matrix')
         self.message_user(
             request,
             format_html(
-                '💡 <a href="{}" style="font-weight:600;">点击查看「组织架构总览」矩阵视图</a>',
-                matrix_url,
+                '💡 <a href="{}" style="font-weight:600;">点击查看「组织角色体系」说明</a>'
+                ' &nbsp;|&nbsp;'
+                '<a href="{}">组织架构总览矩阵</a>',
+                overview_url,
+                extra_context['matrix_url'],
             ),
             level='info',
         )
@@ -241,6 +289,19 @@ class OrgRoleAssignmentAdmin(admin.ModelAdmin):
     def get_org_unit(self, obj):
         """返回该指派关联的组织单元名称。"""
         return str(obj.workgroup or obj.department or obj.subsidiary or '—')
+
+    def changelist_view(self, request, extra_context=None):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        self.message_user(
+            request,
+            format_html(
+                '💡 <a href="{}" style="font-weight:600;">点击查看「组织角色体系」说明</a>',
+                reverse('admin:app_user_org_role_overview'),
+            ),
+            level='info',
+        )
+        return super().changelist_view(request, extra_context)
 
 
 @admin.register(User)
@@ -322,6 +383,19 @@ class ReviewGroupAdmin(admin.ModelAdmin):
         """返回审核组成员数。Returns: 整数。"""
         return obj.members.count()
 
+    def changelist_view(self, request, extra_context=None):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        self.message_user(
+            request,
+            format_html(
+                '💡 <a href="{}" style="font-weight:600;">点击查看「组织角色体系」说明</a>',
+                reverse('admin:app_user_org_role_overview'),
+            ),
+            level='info',
+        )
+        return super().changelist_view(request, extra_context)
+
 
 @admin.register(WorkGroup)
 class WorkGroupAdmin(admin.ModelAdmin):
@@ -390,12 +464,53 @@ class ModuleAccessConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
     search_fields = ('module_code', 'module_name')
     filter_horizontal = ('role_groups',)
 
+    # ── 自定义 URL：权限体系说明页 ──
+
+    def get_urls(self):
+        from django.urls import path
+        urls = super().get_urls()
+        custom_urls = [
+            path('overview/', self.admin_site.admin_view(self.rbac_overview_view),
+                 name='app_user_rbac_overview'),
+        ]
+        return custom_urls + urls
+
+    def rbac_overview_view(self, request):
+        """权限管控中心 — 全套权限体系说明页。"""
+        from django.shortcuts import render
+        context = {
+            **self.admin_site.each_context(request),
+            'title': '权限管控中心 — 全套权限体系说明',
+            'opts': self.model._meta,
+        }
+        return render(request, 'admin/app_user/rbac_overview.html', context)
+
+    def changelist_view(self, request, extra_context=None):
+        """在列表页顶部注入说明页链接。"""
+        from django.urls import reverse
+        from django.utils.html import format_html
+        extra_context = extra_context or {}
+        overview_url = reverse('admin:app_user_rbac_overview')
+        self.message_user(
+            request,
+            format_html(
+                '💡 <a href="{}" style="font-weight:600;">点击查看「权限管控中心」全套权限体系说明</a>',
+                overview_url,
+            ),
+            level='info',
+        )
+        return super().changelist_view(request, extra_context)
+
 
 class SidebarSubItemInline(admin.TabularInline):
     model = SidebarSubItem
     extra = 0
+    can_delete = False
     fields = ('name', 'url_name', 'role_group', 'min_level', 'permissions', 'sort_order', 'is_active')
     # menu_modules.py 控制的字段只读；管理员只能调整 role_group / min_level / sort_order / is_active
+
+    def has_add_permission(self, request, obj=None):
+        return False
     readonly_fields = ('name', 'url_name', 'permissions')
 
 
@@ -408,9 +523,8 @@ class SidebarModuleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
     readonly_fields = ('code', 'name', 'icon', 'url_name', 'module_access')
     inlines = [SidebarSubItemInline]
 
+    def has_add_permission(self, request):
+        return False
 
-@admin.register(L3PermissionConfig)
-class L3PermissionConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
-    list_display = ('app_label', 'role_group', 'actions', 'is_active')
-    list_filter = ('app_label', 'role_group', 'is_active')
-    search_fields = ('app_label',)
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -1,7 +1,7 @@
 """app_user 数据模型。
 
 导出: UserRole, RoleGroup, ModuleAccessConfig, SidebarModule, SidebarSubItem,
-      L3PermissionConfig, PermissionGroup, Subsidiary, Department, OrgRole,
+      PermissionGroup, Subsidiary, Department, OrgRole,
       OrgRoleAssignment, ReviewGroup, WorkGroup, User。"""
 
 import uuid
@@ -101,8 +101,8 @@ class OrgRole(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
-        verbose_name = "组织角色"
-        verbose_name_plural = "组织角色"
+        verbose_name = "[审批] 组织角色"
+        verbose_name_plural = "[审批] 组织角色"
         ordering = ['scope', 'name']
 
     def __str__(self):
@@ -162,8 +162,8 @@ class OrgRoleAssignment(models.Model):
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
     class Meta:
-        verbose_name = "组织角色指派"
-        verbose_name_plural = "组织角色指派"
+        verbose_name = "[审批] 组织角色指派"
+        verbose_name_plural = "[审批] 组织角色指派"
         constraints = [
             models.UniqueConstraint(
                 fields=['role', 'user', 'subsidiary'],
@@ -453,26 +453,3 @@ class SidebarSubItem(models.Model):
         return f"{self.module.name} > {self.name}"
 
 
-class L3PermissionConfig(models.Model):
-    """[L3] Django 权限码配置 — 替代原 init_permissions PERMISSION_MAP。
-
-    定义每个 app_label 下各 RoleGroup 应获得的 CRUD 权限码集合。
-    init_permissions 命令从此表读取并写入 Django auth_permission 表。
-    """
-    app_label = models.CharField("App 标签", max_length=100,
-                                 help_text="如 'app_formula'、'app_project'。")
-    role_group = models.ForeignKey(RoleGroup, on_delete=models.CASCADE,
-                                   verbose_name="角色组")
-    actions = models.JSONField("操作列表", default=list,
-                               help_text="['view','add','change','delete'] 或 ['all']。")
-    is_active = models.BooleanField("启用", default=True)
-    created_at = models.DateTimeField("创建时间", auto_now_add=True)
-
-    class Meta:
-        verbose_name = "[L3] 权限码配置"
-        verbose_name_plural = "[L3] 权限码配置"
-        unique_together = ('app_label', 'role_group')
-        ordering = ['app_label', 'role_group']
-
-    def __str__(self):
-        return f"{self.app_label} ← {self.role_group.code}: {self.actions}"

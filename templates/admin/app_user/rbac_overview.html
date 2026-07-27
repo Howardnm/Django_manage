@@ -1,0 +1,232 @@
+{% extends "admin/base_site.html" %}
+{% load static %}
+
+{% block title %}权限管控中心 — 全套权限体系说明{% endblock %}
+
+{% block extrastyle %}
+{{ block.super }}
+<style>
+  .rbac-overview { max-width: 960px; margin: 0 auto; }
+  .rbac-overview h2 {
+    margin-top: 32px; padding-bottom: 8px;
+    border-bottom: 2px solid var(--primary);
+    font-size: 18px;
+  }
+  .rbac-overview .card {
+    background: var(--body-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin-bottom: 20px;
+  }
+  .rbac-overview .arch-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  .rbac-overview .arch-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    vertical-align: top;
+  }
+  .rbac-overview .arch-table tr:last-child td { border-bottom: none; }
+  .rbac-overview .layer-tag {
+    display: inline-block;
+    min-width: 48px;
+    padding: 2px 10px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 12px;
+    text-align: center;
+    color: #fff;
+  }
+  .l1 { background: #206bc4; }
+  .l2 { background: #4299e1; }
+  .l3 { background: #ae3ec9; }
+  .l4 { background: #d6336c; }
+  .l5 { background: #e03131; }
+
+  .rbac-overview .steps { counter-reset: step; list-style: none; padding-left: 0; }
+  .rbac-overview .steps li {
+    counter-increment: step;
+    padding: 14px 14px 14px 52px;
+    margin-bottom: 10px;
+    background: var(--body-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    position: relative;
+    font-size: 14px;
+  }
+  .rbac-overview .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 12px;
+    top: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: #fff;
+    font-weight: 700;
+    font-size: 14px;
+    line-height: 28px;
+    text-align: center;
+  }
+  .rbac-overview .steps li strong { display: block; margin-bottom: 4px; }
+
+  .rbac-overview .cmd-block {
+    background: #1a1a2e;
+    color: #a5d6ff;
+    font-family: monospace;
+    padding: 8px 14px;
+    border-radius: 4px;
+    margin: 4px 0;
+    font-size: 13px;
+  }
+  .rbac-overview .btn-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .rbac-overview .btn-row .button {
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+    text-decoration: none;
+  }
+  .rbac-overview .divider {
+    border: none;
+    border-top: 1px dashed var(--border-color);
+    margin: 12px 0 6px 0;
+    font-size: 12px;
+    color: var(--body-quiet-color);
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="rbac-overview">
+
+  <h1>权限管控中心</h1>
+  <p style="color: var(--body-quiet-color);">
+    本系统采用 <strong>L1~L5 五层安全模型</strong>，前三层为<strong>准入控制</strong>（决定你能进哪些模块做什么操作），
+    后两层为<strong>数据隔离</strong>（决定你能看到哪些数据）。全部配置均可在 Admin 后台动态管理，无需改代码。
+  </p>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 1. 架构总览 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2>五层安全架构</h2>
+  <div class="card">
+    <table class="arch-table">
+      <tr>
+        <td><span class="layer-tag l1">L1</span></td>
+        <td><strong>角色白名单</strong></td>
+        <td><code>ModuleAccessConfig.role_groups</code></td>
+        <td style="color: var(--body-quiet-color);">你是哪个角色？→ 能进哪些模块</td>
+      </tr>
+      <tr>
+        <td><span class="layer-tag l2">L2</span></td>
+        <td><strong>用户等级</strong></td>
+        <td><code>ModuleAccessConfig.min_level</code></td>
+        <td style="color: var(--body-quiet-color);">你的职级够吗？</td>
+      </tr>
+      <tr>
+        <td><span class="layer-tag l3">L3</span></td>
+        <td><strong>Django 权限码</strong></td>
+        <td><code>[L3 权限容器] 权限角色组</code></td>
+        <td style="color: var(--body-quiet-color);">你能做 view / add / change / delete 吗？</td>
+      </tr>
+      <tr><td colspan="4"><hr class="divider">准入边界 — 通过以上三层后进入模块<br>以下两层控制模块内能看到哪些数据</td></tr>
+      <tr>
+        <td><span class="layer-tag l4">L4</span></td>
+        <td><strong>部门隔离</strong></td>
+        <td><code>ModuleAccessConfig.enforce_dept_isolation</code></td>
+        <td style="color: var(--body-quiet-color);">只能看本部门拥有的数据</td>
+      </tr>
+      <tr>
+        <td><span class="layer-tag l5">L5</span></td>
+        <td><strong>工作组隔离</strong></td>
+        <td><code>ModuleAccessConfig.enforce_group_isolation</code></td>
+        <td style="color: var(--body-quiet-color);">只能看本工作组拥有的数据</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 2. 配置步骤 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2>配置步骤</h2>
+  <ol class="steps">
+    <li>
+      <strong>定义有哪些用户角色</strong>
+      进入 <a href="{% url 'admin:app_user_userrole_changelist' %}">[L1] 用户角色</a>，
+      系统中的每个身份对应一条记录（如 ENGINEER 研发工程师、SALES 业务员）。
+      可随时新增或禁用角色。
+    </li>
+    <li>
+      <strong>把角色归入分组</strong>
+      进入 <a href="{% url 'admin:app_user_rolegroup_changelist' %}">[L1 分组] 角色分组</a>，
+      将多个角色归入一个命名分组（如 TECH_CORE = ENGINEER + PROCESS_ENGINEER + ADMIN）。
+      后续模块权限配置引用的是分组，而非单个角色。
+    </li>
+    <li>
+      <strong>给每个业务模块勾选允许的角色组</strong>
+      进入 <a href="{% url 'admin:app_user_moduleaccessconfig_changelist' %}">[L1~L5] 模块权限配置</a>，
+      每条记录对应一个业务模块（如 formula 实验配方库），勾选其 role_groups 即决定谁能访问。
+      同时可配置 L2 最低等级、L4 部门隔离、L5 工作组隔离开关。
+    </li>
+    <li>
+      <strong>给用户分配角色 + L3 权限组</strong>
+      进入 <a href="{% url 'admin:app_user_user_changelist' %}">用户管理</a>，编辑具体用户：
+      <ul style="margin:4px 0 0 0;">
+        <li><strong>用户角色</strong> (user_type) → 决定 L1 准入</li>
+        <li><strong>组</strong> (groups) → 勾选 <a href="{% url 'admin:app_user_permissiongroup_changelist' %}">[L3 权限容器]</a> 中的角色组，决定 L3 操作权限</li>
+      </ul>
+    </li>
+    <li>
+      <strong>管理侧边栏菜单</strong>
+      进入 <a href="{% url 'admin:app_user_sidebarmodule_changelist' %}">[菜单] 侧边栏模块</a>，
+      菜单的 URL 和结构由 <code>menu_modules.py</code> 代码定义，
+      Admin 中可调整排序、临时隐藏、对子项做 L1 角色覆盖。
+    </li>
+  </ol>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 3. 部署命令 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2>部署命令</h2>
+  <div class="card">
+    <p style="margin-top:0;">以下命令在项目部署或新增业务模块时使用：</p>
+    <div class="cmd-block">python manage.py sync_rbac_modules</div>
+    <p style="font-size:13px; color:var(--body-quiet-color); margin:2px 0 12px 0;">
+      扫描所有 app mixin 中声明的 <code>module_code</code>，自动在
+      <code>ModuleAccessConfig</code> 表中创建缺失记录。
+    </p>
+    <div class="cmd-block">python manage.py sync_menus</div>
+    <p style="font-size:13px; color:var(--body-quiet-color); margin:2px 0 12px 0;">
+      从 <code>menu_modules.py</code> 代码定义同步菜单到
+      <code>SidebarModule</code> / <code>SidebarSubItem</code> 表。
+    </p>
+    <div class="cmd-block">python manage.py init_rbac</div>
+    <p style="font-size:13px; color:var(--body-quiet-color); margin:2px 0 0 0;">
+      一键执行以上两步（含 <code>--dry-run</code> 预览模式）。
+    </p>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- 4. 快速入口 -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <h2>快速入口</h2>
+  <div class="btn-row">
+    <a class="button" href="{% url 'admin:app_user_userrole_changelist' %}">用户角色</a>
+    <a class="button" href="{% url 'admin:app_user_rolegroup_changelist' %}">角色分组</a>
+    <a class="button" href="{% url 'admin:app_user_moduleaccessconfig_changelist' %}">模块权限配置</a>
+    <a class="button" href="{% url 'admin:app_user_permissiongroup_changelist' %}">权限容器 (L3)</a>
+    <a class="button" href="{% url 'admin:app_user_sidebarmodule_changelist' %}">菜单管理</a>
+    <a class="button" href="{% url 'admin:app_user_user_changelist' %}">用户管理</a>
+  </div>
+
+</div>
+{% endblock %}
