@@ -23,11 +23,34 @@
         .btn-row { display: flex; justify-content: space-between; margin-top: 16px; }
         .step-card { min-height: 200px; }
         .workflow-notice { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 6px; font-size: 13px; color: #409eff; margin-bottom: 16px; }
+
+        /* ── Django Messages ── */
+        .django-messages { margin-bottom: 16px; }
+        .django-message { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 6px; font-size: 14px; margin-bottom: 8px; animation: msgSlideIn 0.3s ease; }
+        .django-message.success { background: #d4f1da; color: #1a7a2e; border: 1px solid #a3d9a5; }
+        .django-message.error   { background: #fce4e4; color: #b02a2a; border: 1px solid #f5b7b7; }
+        .django-message.warning { background: #fdf6ec; color: #b06d0f; border: 1px solid #f5dab1; }
+        .django-message.info    { background: #e6f0ff; color: #0054a6; border: 1px solid #b3d1f5; }
+        .django-message .msg-close { cursor: pointer; font-size: 18px; line-height: 1; opacity: 0.6; transition: opacity 0.2s; background: none; border: none; color: inherit; padding: 0 0 0 12px; }
+        .django-message .msg-close:hover { opacity: 1; }
+        @keyframes msgSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <div class="page" id="form-fill-app">
+    <!-- Django Messages -->
+    {% if messages %}
+    <div class="django-messages">
+        {% for message in messages %}
+        <div class="django-message {{ message.tags|default:'info' }}">
+            <span>{{ message }}</span>
+            <button class="msg-close" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <div class="header">
         <div>
             <h2>{{ template.name }}</h2>

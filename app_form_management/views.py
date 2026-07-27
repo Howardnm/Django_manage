@@ -464,12 +464,14 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
                          and request.user == submission.submitted_by)
 
         # 注入上传配置到 form-create rules
+        # is_editable 仅当当前用户是活跃审批人时才为 True，
+        # 否则上传组件设 disabled=True 且不注入 beforeRemove 钩子
         csrf_token = get_token(request)
         configured_rules = inject_upload_config(
             template.form_config or [],
             submission_id=submission.pk,
             csrf_token=csrf_token,
-            is_editable=True,  # 前端的 step-disable 逻辑处理字段启用/禁用
+            is_editable=can_edit_step,
         )
 
         # 将 upload 字段的 URL 字符串转为 {url, name} 对象，使文件名正确显示
@@ -603,7 +605,13 @@ class FormUploadView(FormManagementAccessMixin, View):
             )
 
         submission = get_object_or_404(FormSubmission, pk=submission_id)
-        _check_attachment_modify_permission(request.user, submission, field_name)
+        try:
+            _check_attachment_modify_permission(request.user, submission, field_name)
+        except PermissionDenied as e:
+            return JsonResponse(
+                {'status': 'error', 'message': str(e)},
+                status=403,
+            )
 
         ct = ContentType.objects.get_for_model(FormSubmission)
         attachment = self._create_attachment(ct, submission, file, field_name, request.user)
@@ -735,7 +743,13 @@ class FormUploadDeleteView(FormManagementAccessMixin, View):
 
         from app_form_management.models import FormSubmission as FSModel
         submission = get_object_or_404(FSModel, pk=attachment.object_id)
-        _check_attachment_modify_permission(request.user, submission, field_name)
+        try:
+            _check_attachment_modify_permission(request.user, submission, field_name)
+        except PermissionDenied as e:
+            return JsonResponse(
+                {'status': 'error', 'message': str(e)},
+                status=403,
+            )
 
         attachment.is_deleted = True
         attachment.save(update_fields=['is_deleted'])

@@ -342,8 +342,10 @@ class TaskClaimView(WorkflowAccessMixin, View):
         except InvalidActionError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-        messages.success(request, f"任务 '{task.task_name}' 已成功签收。")
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({
+            'status': 'success',
+            'message': f"任务 '{task.task_name}' 已成功签收。",
+        })
 
 
 class TaskReassignView(WorkflowAccessMixin, View):
@@ -364,11 +366,13 @@ class TaskReassignView(WorkflowAccessMixin, View):
 
         try:
             WorkflowService.reassign(task, request.user, to_user)
-            messages.success(request, f"任务 '{task.task_name}' 已转交给 {to_user.username}。")
         except InvalidActionError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({
+            'status': 'success',
+            'message': f"任务 '{task.task_name}' 已转交给 {to_user.username}。",
+        })
 
 
 class TaskReturnView(WorkflowAccessMixin, View):
@@ -407,7 +411,10 @@ class TaskReturnView(WorkflowAccessMixin, View):
 
             WorkflowService.return_task(task, request.user, target_task, remark,
                                         extra_data=extra_data)
-            messages.success(request, f"任务 '{task.task_name}' 已退回到 '{target_name}'。")
+            return JsonResponse({
+                'status': 'success',
+                'message': f"任务 '{task.task_name}' 已退回到 '{target_name}'。",
+            })
         except InvalidActionError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
         except ReturnNotAllowedError as e:
@@ -634,20 +641,30 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
     def post(self, request, pk):
         context = self.get_context_data()
         current_task = context.get('current_task')
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
 
         if not current_task:
-            return self.handle_no_permission(message="您没有权限处理此任务或任务已处理。")
+            msg = "您没有权限处理此任务或任务已处理。"
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': msg}, status=403)
+            return self.handle_no_permission(message=msg)
 
         action = request.POST.get('action')
         remark = request.POST.get('remark', '').strip()
         step_form_data_json = request.POST.get('step_form_data', '')
 
         if action not in ['APPROVE', 'REJECT']:
-            messages.error(request, "无效的审批动作。")
+            msg = "无效的审批动作。"
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': msg}, status=400)
+            messages.error(request, msg)
             return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
 
         if not remark and action == 'REJECT':
-            messages.warning(request, "驳回操作需要填写备注。")
+            msg = "驳回操作需要填写备注。"
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': msg}, status=400)
+            messages.warning(request, msg)
             return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
 
         extra_data = {}
@@ -660,11 +677,20 @@ class WorkflowInstanceDetailView(WorkflowAccessMixin, View):
         try:
             WorkflowService.complete_task(current_task, request.user, action, remark,
                                           extra_data=extra_data)
-            messages.success(request, f"任务已成功{'通过' if action == 'APPROVE' else '驳回'}。")
+            msg = f"任务已成功{'通过' if action == 'APPROVE' else '驳回'}。"
+            if is_ajax:
+                return JsonResponse({'status': 'success', 'message': msg})
+            messages.success(request, msg)
         except TaskNotFoundError as e:
-            messages.error(request, f"任务处理失败: {e}")
+            msg = f"任务处理失败: {e}"
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': msg}, status=400)
+            messages.error(request, msg)
         except WorkflowError as e:
-            messages.error(request, f"流程执行错误: {e}")
+            msg = f"流程执行错误: {e}"
+            if is_ajax:
+                return JsonResponse({'status': 'error', 'message': msg}, status=500)
+            messages.error(request, msg)
 
         return redirect(reverse('workflow_instance_detail', kwargs={'pk': pk}))
 
@@ -687,8 +713,10 @@ class WorkflowCancelView(WorkflowAccessMixin, View):
 
         try:
             WorkflowService.cancel(instance, request.user, reason)
-            messages.success(request, '流程已取消。')
         except CancelNotAllowedError as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
-        return JsonResponse({'status': 'success'})
+        return JsonResponse({
+            'status': 'success',
+            'message': '流程已取消。',
+        })

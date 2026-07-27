@@ -71,7 +71,10 @@ def _configure_upload_rule(
     props['action'] = '/forms/api/upload/'
     props['withCredentials'] = True
     props['autoUpload'] = True
-    props['headers'] = {'X-CSRFToken': csrf_token}
+    props['headers'] = {
+        'X-CSRFToken': csrf_token,
+        'X-Requested-With': 'XMLHttpRequest',
+    }
     props['data'] = {
         'submission_id': str(submission_id) if submission_id else '',
         'field_name': field_name,
@@ -89,6 +92,14 @@ def _configure_upload_rule(
         'file.url = res.data.url;\n'
         'if (res.data.name) file.name = res.data.name;\n'
         'file.value = {url: file.url, name: file.name};'
+    )
+
+    # onError: 权限拒绝等错误时显示服务端返回的具体原因
+    # $inject.args[0] = XHR 响应体（JSON 对象或错误信息）
+    props['onError'] = (
+        '$FNX:var res = $inject.args[0];\n'
+        'var msg = (res && res.message) || "文件上传失败，请检查权限或文件格式";\n'
+        'ElementPlus.ElMessage.error(msg);'
     )
 
     if is_editable:
@@ -114,11 +125,18 @@ def _build_before_remove(csrf_token: str) -> str:
         'if (!token) return false;\n'
         f'return fetch("/forms/api/upload/delete/", {{\n'
         f'  method: "POST",\n'
-        f'  headers: {{"Content-Type": "application/json",'
-        f' "X-CSRFToken": "{csrf_token}"}},\n'
+        f'  headers: {{\n'
+        f'    "Content-Type": "application/json",\n'
+        f'    "X-CSRFToken": "{csrf_token}",\n'
+        f'    "Accept": "application/json",\n'
+        f'    "X-Requested-With": "XMLHttpRequest"\n'
+        f'  }},\n'
         f'  body: JSON.stringify({{token: token}})\n'
-        f'}}).then(function(r) {{ return r.json(); }})'
-        f'.then(function(data) {{\n'
+        f'}}).then(function(r) {{\n'
+        f'  if (!r.ok) {{ return r.json().then(function(data)'
+        f' {{ throw new Error(data.message || "删除失败，HTTP " + r.status); }}); }}\n'
+        f'  return r.json();\n'
+        f'}}).then(function(data) {{\n'
         f'  if (data.status === "success") return true;\n'
         f'  throw new Error(data.message || "删除失败");\n'
         f'}}).catch(function(e) {{\n'

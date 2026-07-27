@@ -155,11 +155,34 @@
         .chat-badge.badge-return  { background: #fdf6ec; color: #b06d0f; }
         .chat-task { font-size: 11px; color: #909399; margin-bottom: 4px; }
         .chat-msg { font-size: 13px; color: #303133; background: #f5f7fa; border-radius: 0 10px 10px 10px; padding: 10px 14px; line-height: 1.6; white-space: pre-wrap; word-break: break-all; }
+
+        /* ── Django Messages ── */
+        .django-messages { margin-bottom: 16px; }
+        .django-message { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-radius: 6px; font-size: 14px; margin-bottom: 8px; animation: msgSlideIn 0.3s ease; }
+        .django-message.success { background: #d4f1da; color: #1a7a2e; border: 1px solid #a3d9a5; }
+        .django-message.error   { background: #fce4e4; color: #b02a2a; border: 1px solid #f5b7b7; }
+        .django-message.warning { background: #fdf6ec; color: #b06d0f; border: 1px solid #f5dab1; }
+        .django-message.info    { background: #e6f0ff; color: #0054a6; border: 1px solid #b3d1f5; }
+        .django-message .msg-close { cursor: pointer; font-size: 18px; line-height: 1; opacity: 0.6; transition: opacity 0.2s; background: none; border: none; color: inherit; padding: 0 0 0 12px; }
+        .django-message .msg-close:hover { opacity: 1; }
+        @keyframes msgSlideIn { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
 <body>
 
 <div class="page">
+    <!-- Django Messages -->
+    {% if messages %}
+    <div class="django-messages">
+        {% for message in messages %}
+        <div class="django-message {{ message.tags|default:'info' }}">
+            <span>{{ message }}</span>
+            <button class="msg-close" onclick="this.parentElement.remove()">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
     <!-- Header -->
     <div class="header">
         <div>
@@ -449,8 +472,9 @@
                 form: Object.assign({}, option.form || {})
             });
 
-            // 禁用非当前步骤字段、移除必填校验
+            // 字段编辑权限：仅当前审批人可以编辑其负责步骤的字段
             if (canEditStep) {
+                // 当前用户是活跃审批人 → 启用其负责步骤的字段，其余步骤 disabled
                 allRules = allRules.map(function(r) {
                     var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
                     if (ruleStep !== currentTaskFormStep) {
@@ -461,6 +485,13 @@
                         });
                     }
                     return r;
+                });
+            } else {
+                // 非活跃审批人（仅查看 / 流程已结束 / 单步骤表单审批中）→ 全部只读
+                allRules = allRules.map(function(r) {
+                    return Object.assign({}, r, {
+                        props: Object.assign({}, r.props || {}, { disabled: true })
+                    });
                 });
             }
 
@@ -566,15 +597,18 @@
             }
             var resp = await fetch('/workflow/instance/{{ workflow_data.instance.pk }}/', {
                 method: 'POST',
-                headers: { 'X-CSRFToken': csrfToken },
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 body: formData
             });
-            if (resp.ok) {
-                showToast(action === 'APPROVE' ? '审批通过' : '已驳回', 'success');
+            var data = await resp.json().catch(function() { return {}; });
+            if (resp.ok && data.status === 'success') {
+                showToast(data.message || (action === 'APPROVE' ? '审批通过' : '已驳回'), 'success');
                 setTimeout(function() { location.reload(); }, 1200);
             } else {
-                var data = await resp.json().catch(function() { return {}; });
-                showToast('操作失败: ' + (data.message || '请重试'), 'error');
+                showToast(data.message || '操作失败，请重试', 'error');
             }
         } catch(e) {
             showToast('网络错误，请重试', 'error');
@@ -649,12 +683,12 @@
                 headers: { 'X-CSRFToken': csrfToken },
                 body: formData
             });
-            if (resp.ok) {
-                showToast('已退回', 'success');
+            var data = await resp.json().catch(function() { return {}; });
+            if (resp.ok && data.status === 'success') {
+                showToast(data.message || '已退回', 'success');
                 setTimeout(function() { location.reload(); }, 1200);
             } else {
-                var data = await resp.json().catch(function() { return {}; });
-                showToast('退回失败: ' + (data.message || '请重试'), 'error');
+                showToast(data.message || '退回失败，请重试', 'error');
             }
         } catch(e) {
             showToast('网络错误，请重试', 'error');
@@ -681,12 +715,12 @@
                 headers: { 'X-CSRFToken': csrfToken },
                 body: formData
             });
-            if (resp.ok) {
-                showToast('任务已移交给 ' + user.label, 'success');
+            var data = await resp.json().catch(function() { return {}; });
+            if (resp.ok && data.status === 'success') {
+                showToast(data.message || '任务已移交给 ' + user.label, 'success');
                 setTimeout(function() { location.reload(); }, 1200);
             } else {
-                var data = await resp.json().catch(function() { return {}; });
-                showToast('移交失败: ' + (data.message || '请重试'), 'error');
+                showToast(data.message || '移交失败，请重试', 'error');
             }
         } catch(e) {
             showToast('网络错误，请重试', 'error');
