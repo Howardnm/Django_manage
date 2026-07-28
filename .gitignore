@@ -1,0 +1,31 @@
+# Environment
+.env
+
+# Python
+*.pyc
+__pycache__/
+*.egg-info
+
+# Virtual environment
+.venv/
+venv/
+
+# Static & media (collected at deploy time)
+staticfiles/
+
+# Logs
+logs/
+
+# Upload files
+upload_files/
+
+# IDE
+.idea/
+*.iml
+
+# Database
+db.sqlite3
+
+# OS
+.DS_Store
+Thumbs.db

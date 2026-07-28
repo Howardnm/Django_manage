@@ -7,33 +7,34 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# 加载 .env 文件（本地开发用；Docker 环境下环境变量已由 compose 注入，override=False 确保不覆盖）
+from dotenv import load_dotenv
+load_dotenv(BASE_DIR / '.env')
+
 
 # ==============================================================================
 # 核心安全配置
 # ==============================================================================
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-)e+q_t^)%a1(&zrgpj=hgz6aeuj-(4edq4tgod(*s8e^(qwvcv'
+# 通过环境变量 SECRET_KEY 设置（必须在 .env 或容器环境变量中配置）
+SECRET_KEY = os.environ.get('SECRET_KEY', '')
+
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-# 允许所有ip访问
-ALLOWED_HOSTS = ['*']
+DEBUG = os.environ.get('DEBUG', 'True').lower() in ('true', '1', 'yes')
+
+# 允许访问的主机名/IP，逗号分隔。使用 '*' 仅允许开发环境
+ALLOWED_HOSTS = [host.strip() for host in os.environ.get('ALLOWED_HOSTS', '*').split(',') if host.strip()]
 
 
 # ==============================================================================
 # CSRF / 跨域受信域名
 # ==============================================================================
 
-# 默认值始终生效，环境变量 CSRF_TRUSTED_ORIGINS 逗号分隔追加
-# 示例：export CSRF_TRUSTED_ORIGINS="http://192.168.5.10:8080,https://your-domain.com"
-CSRF_TRUSTED_ORIGINS = [
-    'http://192.168.123.18:8080',
-    'https://www.yourdomain.com', # 若开启了HTTPS，必须添加对应https域名
-]
-
-_csrf_env = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
-if _csrf_env:
-    CSRF_TRUSTED_ORIGINS.extend(origin.strip() for origin in _csrf_env.split(',') if origin.strip())
+# CSRF 受信域名，逗号分隔（通过环境变量 CSRF_TRUSTED_ORIGINS 配置）
+# 示例：http://192.168.5.10:8080,https://your-domain.com
+_csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in _csrf_origins.split(',') if origin.strip()]
 
 # HTTPS 反向代理配置
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
@@ -148,7 +149,7 @@ DATABASES = {
         'ENGINE': os.environ.get('DB_ENGINE', 'django.db.backends.postgresql'),
         'NAME': os.environ.get('DB_NAME', 'django_manage'),
         'USER': os.environ.get('DB_USER', 'postgres'),
-        'PASSWORD': os.environ.get('DB_PASSWORD', '123456'),
+        'PASSWORD': os.environ.get('DB_PASSWORD', ''),
         'HOST': os.environ.get('DB_HOST', '127.0.0.1'),
         'PORT': os.environ.get('DB_PORT', '5432'),
     }
@@ -175,8 +176,8 @@ AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
 
-# 注册页面邀请码（当注释掉邀请码时，自动关闭注册入口）
-REGISTER_INVITE_CODE = '888888'
+# 注册页面邀请码（留空则关闭注册入口）
+REGISTER_INVITE_CODE = os.environ.get('REGISTER_INVITE_CODE', '888888')
 
 # ==============================================================================
 # 国际化 & 时区
@@ -223,23 +224,23 @@ INTERNAL_IPS = [
 # 邮件配置
 # ==============================================================================
 
-# 邮件配置 (使用163邮箱作为示例，请替换为实际配置)
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = 'smtp.163.com'
-EMAIL_PORT = 994
-EMAIL_USE_SSL = True
-EMAIL_HOST_USER = 'bueess@163.com'
-EMAIL_HOST_PASSWORD = 'DXHZGGWTFIIQAHCV'
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER  # 默认发件人
+# 邮件配置（通过环境变量配置；默认值仅用于本地开发）
+EMAIL_BACKEND = os.environ.get('EMAIL_BACKEND', 'django.core.mail.backends.smtp.EmailBackend')
+EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.163.com')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '994') or '994')
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'True').lower() in ('true', '1', 'yes')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', os.environ.get('EMAIL_HOST_USER', ''))  # 默认发件人
 
 
 # ==============================================================================
 # django-axes（防暴力破解）
 # ==============================================================================
 
-AXES_FAILURE_LIMIT = 5  # 允许失败的次数
-AXES_COOLOFF_TIME = 0.0833   # 锁定时间（小时），约5分钟
-AXES_RESET_ON_SUCCESS = True # 登录成功后重置失败计数
+AXES_FAILURE_LIMIT = int(os.environ.get('AXES_FAILURE_LIMIT', '5'))
+AXES_COOLOFF_TIME = float(os.environ.get('AXES_COOLOFF_TIME', '0.0833'))
+AXES_RESET_ON_SUCCESS = os.environ.get('AXES_RESET_ON_SUCCESS', 'True').lower() in ('true', '1', 'yes')
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
 
 
@@ -265,12 +266,12 @@ REST_FRAMEWORK = {
 # 内部集成 — API Token & Webhook
 # ==============================================================================
 # 通信安全 Token (必须与主系统 INTERNAL_API_TOKEN 保持一致)
-INTERNAL_API_TOKEN = 'catalog-portal-secure-token-2024'
+INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
 # Webhook 校验密钥 (必须与主系统 WEBHOOK_SECRET_KEY 保持一致)
-WEBHOOK_SECRET_KEY = 'your-secure-webhook-secret-key'
-CATALOG_WEBHOOK_URL = 'http://127.0.0.1:8001/catalog/api/webhook/material/'
+WEBHOOK_SECRET_KEY = os.environ.get('WEBHOOK_SECRET_KEY', 'change-me-in-production')
+CATALOG_WEBHOOK_URL = os.environ.get('CATALOG_WEBHOOK_URL', 'http://127.0.0.1:8001/catalog/api/webhook/material/')
 # 主系统 API 的基础地址 (结尾需带斜杠)
-REMOTE_API_BASE_URL = 'http://127.0.0.1:8000/api/material/'
+REMOTE_API_BASE_URL = os.environ.get('REMOTE_API_BASE_URL', 'http://127.0.0.1:8000/api/material/')
 
 
 # ==============================================================================
@@ -315,20 +316,20 @@ SAP_SERVICES_CONFIG = {
         r"D:\SAP_SDK\win-nwrfc750P_6-70002755\nwrfcsdk\lib"
     ),
 
-    # SAP 连接参数
+    # SAP 连接参数（通过环境变量配置）
     'connection': {
-        'ashost': '192.168.103.181',  # SAP 服务器 IP 或主机名
-        'sysnr': '00',                 # SAP 系统编号
-        'client': '400',               # SAP 客户端号
-        'user': 'RFC07',               # SAP 通信账号
-        'passwd': 'Saite@2026',        # SAP 通信密码
-        'lang': 'ZH',                  # 语言（ZH=中文, EN=英文）
+        'ashost': os.environ.get('SAP_HOST', ''),
+        'sysnr': os.environ.get('SAP_SYSNR', '00'),
+        'client': os.environ.get('SAP_CLIENT', '400'),
+        'user': os.environ.get('SAP_USER', ''),
+        'passwd': os.environ.get('SAP_PASSWORD', ''),
+        'lang': os.environ.get('SAP_LANG', 'ZH'),
     },
 
     # 连接池参数
-    'max_idle_seconds': 300,  # 闲置连接超过此时长（秒）后自动重建
-    'max_retries': 3,         # 连接失败重试次数
-    'retry_delay': 1.0,       # 重试初始间隔（秒），每次重试翻倍
+    'max_idle_seconds': int(os.environ.get('SAP_MAX_IDLE_SECONDS', '300')),
+    'max_retries': int(os.environ.get('SAP_MAX_RETRIES', '3')),
+    'retry_delay': float(os.environ.get('SAP_RETRY_DELAY', '1.0')),
 }
 
 # SAP 日志
