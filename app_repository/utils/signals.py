@@ -20,7 +20,7 @@ def sync_member_to_catalog(sender, instance, created, **kwargs):
     """
     # 确定角色类型
     role = 'CUSTOMER'
-    if instance.is_superuser or instance.is_staff or instance.user_type.is_internal:
+    if instance.is_superuser or instance.is_staff or (instance.user_type and instance.user_type.is_internal):
         role = 'STAFF'
     elif instance.associated_oem:
         role = 'OEM'
