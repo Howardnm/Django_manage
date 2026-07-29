@@ -20,9 +20,24 @@ from .exceptions import SAPConnectionError
 
 logger = logging.getLogger('sap.connection')
 
-# 模块级 DLL 引导锁——确保只初始化一次
+# 模块级锁 + 状态
 _bootstrap_lock = threading.Lock()
 _pyrfc_bootstrapped = False
+# 延迟导入的 pyrfc.Connection（由 _import_pyrfc() 设置）
+Connection = None
+
+
+def _import_pyrfc():
+    """
+    延迟导入 pyrfc（必须在 _bootstrap_pyrfc() 之后调用）。
+
+    将 pyrfc.Connection 提升为模块级变量，供 _create_connection() 使用。
+    Python import 缓存确保多次调用无副作用。
+    """
+    global Connection
+    if Connection is None:
+        from pyrfc import Connection as _Conn
+        Connection = _Conn
 
 
 def _bootstrap_pyrfc(sap_lib_path: str):
@@ -72,9 +87,7 @@ class ConnectionManager:
 
     def __init__(self, config: SAPConfig):
         _bootstrap_pyrfc(config.sap_lib_path)
-        # 延时导入 pyrfc，确保 DLL 已引导
-        global Connection, RFCError
-        from pyrfc import Connection, RFCError
+        _import_pyrfc()  # 延迟导入 pyrfc，确保 DLL 已引导
 
         self._conn_params = config.to_connection_params()
         self._max_idle_seconds = config.max_idle_seconds

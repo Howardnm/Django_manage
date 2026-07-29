@@ -1,25 +1,40 @@
 """
 app_sap_services — SAP RFC 服务模块。
 
-提供统一的 SAP 数据访问层，供其他 Django app import 调用。
-所有服务均为惰性初始化单例，首次调用时自动建立 SAP 连接。
+声明式、Schema 驱动的 SAP 数据访问层。新增 RFC 接口只需定义 RfcSchema 子类，
+无需手写连接管理、参数构建、结果解析等重复代码。
 
 用法:
-    from app_sap_services import sap_material
+    from app_sap_services import sap
+    from app_sap_services.definitions.material import MaterialQuery
 
-    materials = sap_material.query_materials(mat_nr='A01*', mat_type='ROH')
+    # 链式调用
+    result = sap.rfc(MaterialQuery) \
+        .filter(mat_range__cp="A01*") \
+        .filter(mta_range__eq="ROH") \
+        .limit(50) \
+        .call()
 
-可用服务:
-    sap_material    — 物料主数据
-    sap_customer    — 客户主数据
-    sap_sales       — 销售订单
-    sap_price       — 价格查询
-    sap_delivery    — 交货单
-    sap_production  — 生产工单/计件工资
-    sap_vendor      — 供应商
-    sap_wms         — 领料数据
-    sap_quota       — 配额协议
+    # 快捷调用
+    result = sap.call(MaterialQuery, mat_range__cp="A01*", mta_range__eq="ROH")
+
+    for row in result:
+        print(row.MATNR, row.MAKTX, row.MTART)
+
+    # 原始调用（未声明 Schema 的临时调试）
+    result = sap.execute_raw("ZRFC_MATERIAL_MESN", MAT_RANGE=[...])
+
+架构:
+    schemas/     — RFC Schema 定义系统 (RfcSchema, RangeTableParam, OutputTable, fields)
+    query/       — 查询引擎 (SAPGateway, RfcQuery)
+    definitions/ — RFC 函数声明式定义 (按业务域分文件)
+    config.py    — SAPConfig 配置
+    connection.py— ConnectionManager 线程安全连接池
+    converters.py— SAP 数据转换工具函数
+    exceptions.py— 异常层次结构
 """
+
+import threading
 
 from .exceptions import (
     SAPError,
@@ -29,82 +44,71 @@ from .exceptions import (
     SAPFilterError,
     SAPResultParseError,
 )
-from .filters import SAPFilter
 from .config import SAPConfig
-from .connection import ConnectionManager
-
-# 服务类
-from .services.material import MaterialService
-from .services.customer import CustomerService
-from .services.sales import SalesService
-from .services.price import PriceService
-from .services.delivery import DeliveryService
-from .services.production import ProductionService
-from .services.vendor import VendorService
-from .services.wms import WMSService
-from .services.quota import QuotaService
+from .query.gateway import SAPGateway, _get_gateway
 
 __all__ = [
+    # 入口
+    "sap",
+    "sap_health_check",
     # 异常
-    'SAPError', 'SAPConfigError', 'SAPConnectionError',
-    'SAPRfcError', 'SAPFilterError', 'SAPResultParseError',
-    # 工具
-    'SAPFilter', 'SAPConfig',
-    # 服务单例
-    'sap_material', 'sap_customer', 'sap_sales', 'sap_price',
-    'sap_delivery', 'sap_production', 'sap_vendor', 'sap_wms', 'sap_quota',
-    # 健康检查
-    'sap_health_check',
+    "SAPError",
+    "SAPConfigError",
+    "SAPConnectionError",
+    "SAPRfcError",
+    "SAPFilterError",
+    "SAPResultParseError",
+    # 配置
+    "SAPConfig",
+    "SAPGateway",
 ]
 
 
-# ======================================================================
-# 惰性初始化：Django 启动时 settings 可能尚未加载，延迟到首次调用
-# ======================================================================
+# =============================================================================
+# 惰性单例: 首次访问 sap.xxx 时自动初始化连接
+# =============================================================================
 
-_conn_manager: ConnectionManager = None
-_service_cache: dict = {}
+class _LazyGateway:
+    """
+    惰性代理：首次访问属性时才初始化 SAPGateway（线程安全）。
+
+    用法:
+        sap = _LazyGateway()
+        result = sap.rfc(MaterialQuery).call()  # 首次调用时初始化连接
+    """
+
+    def __init__(self):
+        self._gateway = None
+        self._lock = threading.Lock()
+
+    def _ensure(self):
+        if self._gateway is None:
+            with self._lock:
+                if self._gateway is None:
+                    self._gateway = _get_gateway()
+        return self._gateway
+
+    def rfc(self, schema_class):
+        return self._ensure().rfc(schema_class)
+
+    def call(self, schema_class, **kwargs):
+        return self._ensure().call(schema_class, **kwargs)
+
+    def execute_raw(self, function_name, **params):
+        return self._ensure().execute_raw(function_name, **params)
+
+    def health_check(self):
+        return self._ensure().health_check()
+
+    def __repr__(self):
+        if self._gateway is None:
+            return "SAPGateway(未初始化)"
+        return repr(self._gateway)
 
 
-def _get_connection_manager() -> ConnectionManager:
-    """获取全局连接管理器（惰性初始化）"""
-    global _conn_manager
-    if _conn_manager is None:
-        config = SAPConfig.from_django_settings()
-        _conn_manager = ConnectionManager(config)
-    return _conn_manager
-
-
-def _get_service(service_class):
-    """获取服务单例（惰性初始化）"""
-    if service_class not in _service_cache:
-        _service_cache[service_class] = service_class(_get_connection_manager())
-    return _service_cache[service_class]
-
-
-# 对外暴露的惰性服务单例（通过模块级 __getattr__ 实现零开销惰性访问）
-# Python 3.7+ 支持
-def __getattr__(name):
-    _services = {
-        'sap_material': MaterialService,
-        'sap_customer': CustomerService,
-        'sap_sales': SalesService,
-        'sap_price': PriceService,
-        'sap_delivery': DeliveryService,
-        'sap_production': ProductionService,
-        'sap_vendor': VendorService,
-        'sap_wms': WMSService,
-        'sap_quota': QuotaService,
-    }
-    if name in _services:
-        return _get_service(_services[name])
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+sap = _LazyGateway()
 
 
 def sap_health_check() -> dict:
-    """SAP 连接健康检查"""
-    try:
-        mgr = _get_connection_manager()
-        return mgr.health_check()
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}
+    """SAP 连接健康检查（延迟初始化）"""
+    return sap.health_check()
