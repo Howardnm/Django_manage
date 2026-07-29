@@ -349,17 +349,26 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         plotOptions: {
-            spline: {
-                dataLabels: {
-                    enabled: true
+            line: {
+                step: 'left',
+                marker: {
+                    enabled: true,
+                    radius: 4,
+                    fillColor: '#ffffff',
+                    lineWidth: 2,
+                    lineColor: null
                 },
+                dataLabels: {
+                    enabled: true,
+                    allowOverlap: false
+                }
             }
         },
 
         series: [{
             name: '单价',
             data: priceData,
-            type: 'spline',
+            type: 'line',
             tooltip: {
                 valueDecimals: 2,
                 pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}'
