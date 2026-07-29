@@ -7,6 +7,8 @@ RangeTableParam 是核心：封装 SAP Range Table 的 SIGN/OPTION/LOW/HIGH 结�
 
 from typing import Any, Dict
 
+from ..converters import safe_str
+
 # SAP OPTION → 人类可读说明
 OPTION_LABELS = {
     "EQ": "等于",
@@ -75,94 +77,87 @@ class RangeTableParam:
 
     # ---- 链式构建方法（返回单行 range dict）----
 
-    @staticmethod
-    def _safe_str(value: Any) -> str:
-        """安全转字符串：None → ''，0/'0'/False 保留"""
-        if value is None:
-            return ""
-        return str(value)
-
     def eq(self, value: Any) -> Dict[str, str]:
         """【EQ】精确等于"""
-        return self._row("I", "EQ", self._safe_str(value), "")
+        return self._row("I", "EQ", safe_str(value), "")
 
     def ne(self, value: Any) -> Dict[str, str]:
         """【NE】不等于"""
-        return self._row("I", "NE", self._safe_str(value), "")
+        return self._row("I", "NE", safe_str(value), "")
 
     def cp(self, pattern: str) -> Dict[str, str]:
         """【CP】包含模式匹配（支持 * 通配符）"""
-        return self._row("I", "CP", self._safe_str(pattern), "")
+        return self._row("I", "CP", safe_str(pattern), "")
 
     def np(self, pattern: str) -> Dict[str, str]:
         """【NP】不包含模式"""
-        return self._row("I", "NP", self._safe_str(pattern), "")
+        return self._row("I", "NP", safe_str(pattern), "")
 
     def bt(self, low: Any, high: Any) -> Dict[str, str]:
         """【BT】介于 low 和 high 之间（含边界）"""
-        return self._row("I", "BT", self._safe_str(low), self._safe_str(high))
+        return self._row("I", "BT", safe_str(low), safe_str(high))
 
     def nb(self, low: Any, high: Any) -> Dict[str, str]:
         """【NB】不介于"""
-        return self._row("I", "NB", self._safe_str(low), self._safe_str(high))
+        return self._row("I", "NB", safe_str(low), safe_str(high))
 
     def gt(self, value: Any) -> Dict[str, str]:
         """【GT】大于"""
-        return self._row("I", "GT", self._safe_str(value), "")
+        return self._row("I", "GT", safe_str(value), "")
 
     def ge(self, value: Any) -> Dict[str, str]:
         """【GE】大于等于"""
-        return self._row("I", "GE", self._safe_str(value), "")
+        return self._row("I", "GE", safe_str(value), "")
 
     def lt(self, value: Any) -> Dict[str, str]:
         """【LT】小于"""
-        return self._row("I", "LT", self._safe_str(value), "")
+        return self._row("I", "LT", safe_str(value), "")
 
     def le(self, value: Any) -> Dict[str, str]:
         """【LE】小于等于"""
-        return self._row("I", "LE", self._safe_str(value), "")
+        return self._row("I", "LE", safe_str(value), "")
 
     # ---- 排除条件 (SIGN='E') ----
 
     def exclude_eq(self, value: Any) -> Dict[str, str]:
         """排除精确等于"""
-        return self._row("E", "EQ", self._safe_str(value), "")
+        return self._row("E", "EQ", safe_str(value), "")
 
     def exclude_ne(self, value: Any) -> Dict[str, str]:
         """排除不等于（即包含除该值外的所有值）"""
-        return self._row("E", "NE", self._safe_str(value), "")
+        return self._row("E", "NE", safe_str(value), "")
 
     def exclude_cp(self, pattern: str) -> Dict[str, str]:
         """排除匹配模式"""
-        return self._row("E", "CP", self._safe_str(pattern), "")
+        return self._row("E", "CP", safe_str(pattern), "")
 
     def exclude_np(self, pattern: str) -> Dict[str, str]:
         """排除不包含模式（即只包含匹配的值）"""
-        return self._row("E", "NP", self._safe_str(pattern), "")
+        return self._row("E", "NP", safe_str(pattern), "")
 
     def exclude_bt(self, low: Any, high: Any) -> Dict[str, str]:
         """排除介于 low 和 high 之间的值"""
-        return self._row("E", "BT", self._safe_str(low), self._safe_str(high))
+        return self._row("E", "BT", safe_str(low), safe_str(high))
 
     def exclude_nb(self, low: Any, high: Any) -> Dict[str, str]:
         """排除不介于的值（即只包含介于 low 和 high 的值）"""
-        return self._row("E", "NB", self._safe_str(low), self._safe_str(high))
+        return self._row("E", "NB", safe_str(low), safe_str(high))
 
     def exclude_gt(self, value: Any) -> Dict[str, str]:
         """排除大于某值的记录"""
-        return self._row("E", "GT", self._safe_str(value), "")
+        return self._row("E", "GT", safe_str(value), "")
 
     def exclude_ge(self, value: Any) -> Dict[str, str]:
         """排除大于等于某值的记录"""
-        return self._row("E", "GE", self._safe_str(value), "")
+        return self._row("E", "GE", safe_str(value), "")
 
     def exclude_lt(self, value: Any) -> Dict[str, str]:
         """排除小于某值的记录"""
-        return self._row("E", "LT", self._safe_str(value), "")
+        return self._row("E", "LT", safe_str(value), "")
 
     def exclude_le(self, value: Any) -> Dict[str, str]:
         """排除小于等于某值的记录"""
-        return self._row("E", "LE", self._safe_str(value), "")
+        return self._row("E", "LE", safe_str(value), "")
 
     def _row(self, sign: str, option: str, low: str, high: str) -> Dict[str, str]:
         """内部：构建单行 range 字典"""

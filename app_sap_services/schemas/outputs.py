@@ -66,7 +66,7 @@ class OutputTableMeta(type):
         cls = super().__new__(mcs, name, bases, namespace)
 
         # 跳过基础 OutputTable 类本身
-        if name == "OutputTable":
+        if name == "OutputTable" and cls.__module__ == __name__:
             return cls
 
         # 收集字段

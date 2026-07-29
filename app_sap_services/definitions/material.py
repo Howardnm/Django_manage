@@ -48,10 +48,7 @@ class MaterialQuery(RfcSchema):
     # ---- 输入参数 (Range Tables) ----
     mat_range = RangeTableParam("MAT_RANGE", field="MATNR")
     wek_range = RangeTableParam("WEK_RANGE", field="WERKS")
-    mta_range = RangeTableParam(
-        "MTA_RANGE", field="MTART",
-        low_field="MTART_LOW", high_field="MTART_HIGH",
-    )
+    mta_range = RangeTableParam("MTA_RANGE", field="MTART", low_field="MTART_LOW", high_field="MTART_HIGH",)
     dat_range = RangeTableParam("DAT_RANGE", field="ERDAT")
 
     # ---- 输出表 ----
@@ -66,5 +63,5 @@ class MaterialQuery(RfcSchema):
         MATKL = CharField("物料组")
         LVORM = CharField("删除标识符")
         LVORMC = CharField("删除标识符(工厂)")
-        ZZTEXT1 = CharField("备注")
+        ZZTEXT1 = CharField("物料描述2")
         ZZFIGURE_NO = CharField("图号")

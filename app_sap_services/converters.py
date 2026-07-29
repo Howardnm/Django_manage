@@ -12,6 +12,13 @@ from typing import Optional, Any, List, Dict
 from datetime import datetime, date
 
 
+def safe_str(value: Any) -> str:
+    """安全转字符串：None → ''，其他值保留原始 str()"""
+    if value is None:
+        return ""
+    return str(value)
+
+
 def clean_material_no(matnr: Optional[str]) -> str:
     """清理物料编号前导零。SAP 物料编号常以 18 位定长返回，带前导零。"""
     if not matnr:

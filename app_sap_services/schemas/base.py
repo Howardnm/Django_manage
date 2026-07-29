@@ -13,6 +13,8 @@ RfcSchema — RFC 函数声明式定义的基类。
 
 from typing import Any, Dict, List, Type, ClassVar
 
+from ..converters import safe_str
+
 from .params import RangeTableParam, ImportParam, TableInput, OP_SUFFIX_MAP
 from .outputs import OutputTable
 
@@ -31,7 +33,7 @@ class RfcSchemaMeta(type):
     def __new__(mcs, name, bases, namespace):
         cls = super().__new__(mcs, name, bases, namespace)
 
-        if name == "RfcSchema":
+        if name == "RfcSchema" and cls.__module__ == __name__:
             return cls
 
         # 继承基类已收集的参数
@@ -182,13 +184,6 @@ class RfcSchema(metaclass=RfcSchemaMeta):
 
         return params
 
-    @staticmethod
-    def _safe_str(value: Any) -> str:
-        """安全转字符串：None → ''，0/False 保留原值"""
-        if value is None:
-            return ""
-        return str(value)
-
     @classmethod
     def _make_range_row(
         cls,
@@ -201,13 +196,13 @@ class RfcSchema(metaclass=RfcSchemaMeta):
         if option in ("BT", "NB"):
             # 期待传入 (low, high) 元组
             if isinstance(value, (tuple, list)) and len(value) == 2:
-                low, high = cls._safe_str(value[0]), cls._safe_str(value[1])
+                low, high = safe_str(value[0]), safe_str(value[1])
             else:
                 raise ValueError(
                     f"{rp._attr_name}{{__bt|__nb}} 需要 (low, high) 二元组，收到: {value!r}"
                 )
         else:
-            low = cls._safe_str(value)
+            low = safe_str(value)
             high = ""
 
         if rp.low_field == "LOW" and rp.high_field == "HIGH":

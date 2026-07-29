@@ -16,15 +16,11 @@ SAPGateway — SAP 服务模块顶层入口。
     result = sap.call(MaterialQuery, mat_range__cp="A01*")
 """
 
-import logging
 import threading
 from typing import Dict, List, Optional, Type, Any
 
 from ..config import SAPConfig
 from ..connection import ConnectionManager
-from ..exceptions import SAPRfcError
-
-logger = logging.getLogger("sap.gateway")
 
 
 class SAPGateway:
@@ -113,24 +109,7 @@ class SAPGateway:
         Returns:
             SAP 返回的原始字典
         """
-        conn = None
-        try:
-            conn = self._conn_mgr.get_connection()
-            logger.debug(f"RFC 调用: {function_name}, params: {list(params.keys())}")
-            result = conn.call(function_name, **params)
-            logger.info(f"RFC 调用成功: {function_name}")
-            return result
-        except SAPRfcError:
-            raise
-        except Exception as e:
-            raise SAPRfcError(
-                function=function_name,
-                message=str(e),
-                params={k: str(v)[:200] for k, v in params.items()},
-            ) from e
-        finally:
-            if conn:
-                self._conn_mgr.release_connection(conn)
+        return self._conn_mgr.call_rfc(function_name, **params)
 
 
 # =============================================================================

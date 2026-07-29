@@ -149,8 +149,6 @@ class RawMaterial(models.Model):
         verbose_name = "原材料"
         verbose_name_plural = "原材料库"
         ordering = ['category', 'name']
-        # 关键修改：添加联合唯一约束
-        unique_together = ('name', 'model_name')
 
 
 # 4. 【新增】原材料性能指标子表

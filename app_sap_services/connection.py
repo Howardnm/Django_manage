@@ -6,8 +6,7 @@ SAP RFC 连接管理器 —— 线程安全 + DLL 引导 + 自动重连。
 
 用法:
     mgr = ConnectionManager(config)
-    with mgr.connection() as conn:
-        result = conn.call('ZRFC_MATERIAL_MESN', ...)
+    result = mgr.call_rfc('ZRFC_MATERIAL_MESN', MAT_RANGE=[...])
 """
 
 import os
@@ -16,28 +15,23 @@ import threading
 import logging
 
 from .config import SAPConfig
-from .exceptions import SAPConnectionError
+from .exceptions import SAPConnectionError, SAPRfcError
 
 logger = logging.getLogger('sap.connection')
 
-# 模块级锁 + 状态
 _bootstrap_lock = threading.Lock()
 _pyrfc_bootstrapped = False
-# 延迟导入的 pyrfc.Connection（由 _import_pyrfc() 设置）
-Connection = None
 
 
 def _import_pyrfc():
     """
     延迟导入 pyrfc（必须在 _bootstrap_pyrfc() 之后调用）。
 
-    将 pyrfc.Connection 提升为模块级变量，供 _create_connection() 使用。
+    返回 pyrfc.Connection 类，不依赖模块级全局变量。
     Python import 缓存确保多次调用无副作用。
     """
-    global Connection
-    if Connection is None:
-        from pyrfc import Connection as _Conn
-        Connection = _Conn
+    from pyrfc import Connection
+    return Connection
 
 
 def _bootstrap_pyrfc(sap_lib_path: str):
@@ -62,11 +56,9 @@ def _bootstrap_pyrfc(sap_lib_path: str):
             )
 
         if os.name == 'nt':
-            # Windows: DLL 目录注册 + PATH 追加，解决 ICU 依赖查找问题
             os.add_dll_directory(sap_lib_path)
             os.environ['PATH'] = sap_lib_path + os.pathsep + os.environ.get('PATH', '')
         else:
-            # Linux: LD_LIBRARY_PATH 由 Dockerfile 设置，此处仅校验路径
             os.environ['LD_LIBRARY_PATH'] = (
                 sap_lib_path + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
             )
@@ -82,18 +74,22 @@ class ConnectionManager:
     - 每个线程独立连接 (threading.local), 避免跨线程段错误
     - 连接闲置超时自动重建
     - 连接失败自动重试（指数退避）
-    - 支持上下文管理器: with mgr.connection() as conn: ...
+    - call_rfc() 统一入口，封装连接获取/释放/异常转换
     """
 
     def __init__(self, config: SAPConfig):
         _bootstrap_pyrfc(config.sap_lib_path)
-        _import_pyrfc()  # 延迟导入 pyrfc，确保 DLL 已引导
+        self._Connection = _import_pyrfc()
 
         self._conn_params = config.to_connection_params()
         self._max_idle_seconds = config.max_idle_seconds
         self._max_retries = config.max_retries
         self._retry_delay = config.retry_delay
         self._local = threading.local()
+
+    # =========================================================================
+    # 连接生命周期
+    # =========================================================================
 
     def get_connection(self):
         """
@@ -114,17 +110,28 @@ class ConnectionManager:
         self._local.last_used = now
         return conn
 
-    def release_connection(self, conn=None):
+    def release_connection(self):
         """标记连接为闲置（不立即关闭，由过期机制处理）"""
         self._local.last_used = time.time()
+
+    def close(self):
+        """关闭当前线程的 SAP 连接"""
+        conn = getattr(self._local, 'connection', None)
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.connection = None
+            logger.debug("已关闭当前线程的 SAP 连接")
 
     def _create_connection(self):
         """创建新 SAP 连接（带重试 + 指数退避）"""
         last_error = None
         for attempt in range(1, self._max_retries + 1):
             try:
-                conn = Connection(**self._conn_params)
-                conn.ping()  # 健康检查
+                conn = self._Connection(**self._conn_params)
+                conn.ping()
                 logger.info(
                     f"SAP 连接建立成功 "
                     f"(ashost={self._conn_params.get('ashost')}, "
@@ -142,20 +149,50 @@ class ConnectionManager:
             f"无法建立 SAP 连接，已重试 {self._max_retries} 次: {last_error}"
         )
 
-    def connection(self):
-        """上下文管理器: with mgr.connection() as conn: ..."""
-        return _ConnectionContext(self)
+    # =========================================================================
+    # RFC 调用
+    # =========================================================================
 
-    def close(self):
-        """关闭当前线程的 SAP 连接"""
-        conn = getattr(self._local, 'connection', None)
-        if conn:
-            try:
-                conn.close()
-            except Exception:
-                pass
-            self._local.connection = None
-            logger.debug("已关闭当前线程的 SAP 连接")
+    def call_rfc(self, function_name: str, **params):
+        """
+        执行 RFC 调用 —— 统一入口。
+
+        封装连接获取、释放、异常转换，消除 builder/gateway 中的重复代码。
+
+        Args:
+            function_name: RFC 函数名
+            **params: pyrfc 调用参数
+
+        Returns:
+            SAP 返回的原始字典
+
+        Raises:
+            SAPRfcError: RFC 调用失败时
+        """
+        conn = None
+        try:
+            conn = self.get_connection()
+            logger.debug(
+                f"RFC 调用: {function_name}, params: {list(params.keys())}"
+            )
+            result = conn.call(function_name, **params)
+            logger.info(f"RFC 调用成功: {function_name}")
+            return result
+        except SAPRfcError:
+            raise
+        except Exception as e:
+            raise SAPRfcError(
+                function=function_name,
+                message=str(e),
+                params={k: str(v)[:200] for k, v in params.items()},
+            ) from e
+        finally:
+            if conn:
+                self.release_connection()
+
+    # =========================================================================
+    # 健康检查
+    # =========================================================================
 
     def health_check(self) -> dict:
         """健康检查：返回连接状态"""
@@ -169,18 +206,3 @@ class ConnectionManager:
             }
         except Exception as e:
             return {'status': 'unhealthy', 'error': str(e)}
-
-
-class _ConnectionContext:
-    """轻量上下文管理器，支持 with mgr.connection() as conn 语法"""
-
-    def __init__(self, manager: ConnectionManager):
-        self._mgr = manager
-        self._conn = None
-
-    def __enter__(self):
-        self._conn = self._mgr.get_connection()
-        return self._conn
-
-    def __exit__(self, *args):
-        self._mgr.release_connection(self._conn)

@@ -38,3 +38,13 @@ class SAPFilterError(SAPError):
 class SAPResultParseError(SAPError):
     """结果解析错误：返回格式不符合预期"""
     pass
+
+
+class DoesNotExist(SAPError):
+    """查询结果为空（用于 get() 方法）"""
+    pass
+
+
+class MultipleObjectsReturned(SAPError):
+    """查询结果多于一条（用于 get() 方法）"""
+    pass

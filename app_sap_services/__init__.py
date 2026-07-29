@@ -43,6 +43,8 @@ from .exceptions import (
     SAPRfcError,
     SAPFilterError,
     SAPResultParseError,
+    DoesNotExist,
+    MultipleObjectsReturned,
 )
 from .config import SAPConfig
 from .query.gateway import SAPGateway, _get_gateway
@@ -58,6 +60,8 @@ __all__ = [
     "SAPRfcError",
     "SAPFilterError",
     "SAPResultParseError",
+    "DoesNotExist",
+    "MultipleObjectsReturned",
     # 配置
     "SAPConfig",
     "SAPGateway",
@@ -65,45 +69,18 @@ __all__ = [
 
 
 # =============================================================================
-# 惰性单例: 首次访问 sap.xxx 时自动初始化连接
+# 惰性代理：sap.xxx 首次访问时自动委托给 _get_gateway()（其内部已线程安全）
 # =============================================================================
 
 class _LazyGateway:
     """
-    惰性代理：首次访问属性时才初始化 SAPGateway（线程安全）。
+    惰性代理：首次访问属性时委托给 _get_gateway()。
 
-    用法:
-        sap = _LazyGateway()
-        result = sap.rfc(MaterialQuery).call()  # 首次调用时初始化连接
+    不自行加锁，线程安全由 _get_gateway() 的双检锁保证。
     """
 
-    def __init__(self):
-        self._gateway = None
-        self._lock = threading.Lock()
-
-    def _ensure(self):
-        if self._gateway is None:
-            with self._lock:
-                if self._gateway is None:
-                    self._gateway = _get_gateway()
-        return self._gateway
-
-    def rfc(self, schema_class):
-        return self._ensure().rfc(schema_class)
-
-    def call(self, schema_class, **kwargs):
-        return self._ensure().call(schema_class, **kwargs)
-
-    def execute_raw(self, function_name, **params):
-        return self._ensure().execute_raw(function_name, **params)
-
-    def health_check(self):
-        return self._ensure().health_check()
-
-    def __repr__(self):
-        if self._gateway is None:
-            return "SAPGateway(未初始化)"
-        return repr(self._gateway)
+    def __getattr__(self, name):
+        return getattr(_get_gateway(), name)
 
 
 sap = _LazyGateway()
