@@ -1,3 +1,5 @@
+import logging
+
 from django.core.paginator import Paginator
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -9,6 +11,8 @@ from app_basic_research.forms import ResearchProjectForm, ResearchProjectNodeUpd
 from app_basic_research.models import ResearchProject, ResearchStage, ResearchProjectNode
 from app_basic_research.utils.filters import ResearchProjectFilter
 from app_basic_research.mixins import BasicResearchAccessMixin
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================

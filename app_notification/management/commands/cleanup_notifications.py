@@ -1,7 +1,11 @@
 import datetime
+import logging
+
 from django.core.management.base import BaseCommand
 from django.utils import timezone
 from app_notification.models import Notification
+
+logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     """
@@ -47,3 +51,4 @@ class Command(BaseCommand):
             self.stdout.write('  [-] 没有需要清理的未读通知。')
             
         self.stdout.write(self.style.SUCCESS('\n✅ 清理完成！'))
+        logger.info("Notification cleanup completed: deleted %d read + %d unread.", read_count, unread_count)

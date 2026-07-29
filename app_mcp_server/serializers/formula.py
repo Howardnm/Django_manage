@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict
 from .base import format_date
 
-logger = logging.getLogger("app_mcp_server.serializers.formula")
+logger = logging.getLogger(__name__)
 
 def serialize_formula(formula) -> Dict[str, Any]:
     """Full Formula Serialization including BOM and detailed Test Results."""

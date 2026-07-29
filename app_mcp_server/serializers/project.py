@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict
 from .base import format_date
 
-logger = logging.getLogger("app_mcp_server.serializers.project")
+logger = logging.getLogger(__name__)
 
 def serialize_project(project) -> Dict[str, Any]:
     """Basic project serialization for list view."""

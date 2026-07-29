@@ -7,7 +7,7 @@ from mcp.types import Tool, TextContent, ImageContent, EmbeddedResource
 from django.core.serializers.json import DjangoJSONEncoder
 from .registry import mcp_site
 
-logger = logging.getLogger("app_mcp_server.core")
+logger = logging.getLogger(__name__)
 
 # 初始化单例 MCP Server
 mcp_server = Server("Django_manage_HTTP_MCP")

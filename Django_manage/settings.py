@@ -275,33 +275,11 @@ REMOTE_API_BASE_URL = os.environ.get('REMOTE_API_BASE_URL', 'http://127.0.0.1:80
 
 
 # ==============================================================================
-# 日志配置
+# 日志配置 — 详见 logging_config.py
 # ==============================================================================
+from .logging_config import build_logging
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}', 'style': '{'},
-        'simple': {'format': '{levelname} {asctime} {message}', 'style': '{'},
-    },
-    'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs/system_integration.log'),
-            'formatter': 'verbose',
-        },
-        'console': {'level': 'DEBUG', 'class': 'logging.StreamHandler', 'formatter': 'simple'},
-    },
-    'loggers': {
-        'app_material_api.integration': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
-        'app_catalog.api': {'handlers': ['file', 'console'], 'level': 'INFO', 'propagate': True},
-    },
-}
-
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
-os.makedirs(LOG_DIR, exist_ok=True)
+LOGGING = build_logging(debug=DEBUG)
 
 
 # ==============================================================================
@@ -330,11 +308,4 @@ SAP_SERVICES_CONFIG = {
     'max_idle_seconds': int(os.environ.get('SAP_MAX_IDLE_SECONDS', '300')),
     'max_retries': int(os.environ.get('SAP_MAX_RETRIES', '3')),
     'retry_delay': float(os.environ.get('SAP_RETRY_DELAY', '1.0')),
-}
-
-# SAP 日志
-LOGGING['loggers']['sap'] = {
-    'handlers': ['file', 'console'],
-    'level': 'INFO',
-    'propagate': True,
 }

@@ -1,8 +1,12 @@
 import os
+import logging
+
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.db import transaction
 from app_raw_material.models import RawMaterial, RawMaterialPriceRecord, Supplier, RawMaterialType
+
+logger = logging.getLogger(__name__)
 
 try:
     import openpyxl
@@ -123,3 +127,5 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS('\n导入完成！'))
         self.stdout.write(f'总计: 新建 {created_count} 个, 更新 {updated_count} 个, 跳过 {skipped_count} 个。')
+        logger.info("Raw material import completed: created=%d, updated=%d, skipped=%d",
+                     created_count, updated_count, skipped_count)

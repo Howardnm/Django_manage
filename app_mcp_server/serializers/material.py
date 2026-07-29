@@ -2,7 +2,7 @@ import logging
 from typing import Any, Dict
 from .base import format_date
 
-logger = logging.getLogger("app_mcp_server.serializers.material")
+logger = logging.getLogger(__name__)
 
 def serialize_material(material) -> Dict[str, Any]:
     """Serialize material base info, performance data and associated files."""

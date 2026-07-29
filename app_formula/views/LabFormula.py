@@ -1,3 +1,4 @@
+import logging
 from decimal import Decimal, InvalidOperation
 from django.contrib import messages
 from django.urls import reverse
@@ -16,6 +17,8 @@ from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
 from app_formula.utils.search_picker_config import for_formula_import
 from django.utils.safestring import mark_safe
+
+logger = logging.getLogger(__name__)
 
 
 def _build_integrity_error_message(e):

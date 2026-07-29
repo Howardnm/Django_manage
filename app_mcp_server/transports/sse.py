@@ -7,7 +7,7 @@ from mcp.server.models import InitializationOptions
 from ..core.server import mcp_server, mcp_json_dumps
 from ..core.sessions import session_manager
 
-logger = logging.getLogger("app_mcp_server.transports.sse")
+logger = logging.getLogger(__name__)
 
 async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, None]:
     """

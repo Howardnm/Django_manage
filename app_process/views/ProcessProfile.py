@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.urls import reverse
 from django.views.generic import ListView, CreateView, UpdateView, DetailView
@@ -9,6 +11,8 @@ from app_process.models import ProcessProfile
 from app_process.forms import ProcessProfileForm
 from app_process.utils.filters import ProcessProfileFilter
 from app_process.mixins import ProcessAccessMixin
+
+logger = logging.getLogger(__name__)
 
 
 class ProcessProfileListView(ProcessAccessMixin, ListView):

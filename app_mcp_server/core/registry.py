@@ -3,7 +3,7 @@ import logging
 from typing import Callable, Any, Dict, List, Optional
 from dataclasses import dataclass
 
-logger = logging.getLogger("app_mcp_server.core")
+logger = logging.getLogger(__name__)
 
 @dataclass
 class ToolMetadata:

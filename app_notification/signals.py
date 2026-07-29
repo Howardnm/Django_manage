@@ -1,9 +1,13 @@
+import logging
+
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.contrib.auth import get_user_model
 from app_project.models import ProjectNode
 from .models import Notification
 from .thread_local import get_current_user
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -21,6 +25,7 @@ def _send_notification_to_recipients(recipients, actor, verb, target, action_obj
     ]
     if notifications_to_create:
         Notification.objects.bulk_create(notifications_to_create)
+        logger.debug("Sent %d notifications, verb=%s", len(notifications_to_create), verb)
 
 # 项目级别的通知信号已被移除
 

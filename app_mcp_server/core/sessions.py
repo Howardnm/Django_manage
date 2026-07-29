@@ -5,7 +5,7 @@ import time
 from typing import Dict, Optional, Any
 from mcp.types import JSONRPCMessage
 
-logger = logging.getLogger("app_mcp_server.sessions")
+logger = logging.getLogger(__name__)
 
 # 模拟 SDK 内部的消息包装结构
 class IncomingMessage:

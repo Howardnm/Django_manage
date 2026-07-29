@@ -5,7 +5,7 @@ from django.apps import AppConfig
 from django.utils.module_loading import autodiscover_modules
 from . import tools as tools_pkg
 
-logger = logging.getLogger("app_mcp_server.apps")
+logger = logging.getLogger(__name__)
 
 class AppMcpServerConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'

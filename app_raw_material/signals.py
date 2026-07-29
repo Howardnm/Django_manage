@@ -1,7 +1,11 @@
+import logging
+
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from .models import RawMaterial
 from app_formula.models import FormulaBOM
+
+logger = logging.getLogger(__name__)
 
 @receiver(pre_save, sender=RawMaterial)
 def capture_old_price(sender, instance, **kwargs):
@@ -27,19 +31,20 @@ def update_formula_costs(sender, instance, created, **kwargs):
     new_price = instance._latest_price
 
     if old_price != new_price:
-        print(f"[signal] RawMaterial [{instance.name}] price change: {old_price} -> {new_price}, updating formulas...")
-        
+        logger.info("RawMaterial [%s] price change: %s -> %s, updating formulas...",
+                     instance.name, old_price, new_price)
+
         # 1. 找到所有使用了该原材料的 BOM 行
         # select_related('formula') 优化查询
         boms = FormulaBOM.objects.filter(raw_material=instance).select_related('formula')
-        
+
         # 2. 获取所有受影响的配方 (去重)
         formulas = set(bom.formula for bom in boms)
-        
+
         # 3. 逐个重新计算成本
         count = 0
         for formula in formulas:
             formula.calculate_cost()
             count += 1
-            
-        print(f"[signal] Updated {count} formulas.")
+
+        logger.info("Updated %d formulas for raw material [%s] price change.", count, instance.name)

@@ -3,7 +3,7 @@ import logging
 from mcp.types import JSONRPCMessage
 from ..core.sessions import session_manager, IncomingMessage
 
-logger = logging.getLogger("app_mcp_server.transports.http")
+logger = logging.getLogger(__name__)
 
 async def process_mcp_message(session_id: str, request_body: bytes) -> bool:
     """

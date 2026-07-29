@@ -8,7 +8,7 @@ from mcp.server import NotificationOptions
 from ...core.server import mcp_server
 
 # 在 Stdio 模式下，禁用向 stdout 打印任何业务日志，因为 stdout 被 MCP 协议占用
-logger = logging.getLogger("app_mcp_server.stdio")
+logger = logging.getLogger(__name__)
 
 class Command(BaseCommand):
     help = 'Run MCP (Model Context Protocol) Server in Stdio mode for local AI tools (e.g. Claude Desktop)'

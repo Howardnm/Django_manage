@@ -1,7 +1,11 @@
 import os
+import logging
+
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from app_material.models import MaterialType, ApplicationScenario
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -94,3 +98,4 @@ class Command(BaseCommand):
         self._import_material_types()
         self._import_application_scenarios()
         self.stdout.write(self.style.SUCCESS('\n✅ 所有基础数据导入完成！'))
+        logger.info("Base data import completed.")

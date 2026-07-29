@@ -1,3 +1,5 @@
+import logging
+
 from django.shortcuts import render
 from django.views import View
 from datetime import timedelta
@@ -10,6 +12,8 @@ from app_formula.models import LabFormula
 from app_process.models import ProcessProfile
 from app_raw_material.models import RawMaterial
 from app_panel.mixins import PanelAccessMixin
+
+logger = logging.getLogger(__name__)
 
 
 class HomeView(PanelAccessMixin, View):

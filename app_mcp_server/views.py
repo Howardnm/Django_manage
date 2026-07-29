@@ -8,7 +8,7 @@ from .transports.http import process_mcp_message
 from .core.sessions import session_manager
 
 # 设置日志
-logger = logging.getLogger("app_mcp_server.views")
+logger = logging.getLogger(__name__)
 
 def add_cors_headers(response):
     """为响应添加通用的 CORS 允许头"""

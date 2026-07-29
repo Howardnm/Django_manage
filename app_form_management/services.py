@@ -1,5 +1,9 @@
+import logging
+
 from django.contrib.contenttypes.models import ContentType
 from .models import FormSubmission
+
+logger = logging.getLogger(__name__)
 
 
 class FormSubmissionService:
