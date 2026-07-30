@@ -14,6 +14,9 @@ Django 管理命令: 从 SAP 同步物料评估价格到 app_raw_material。
     操作:   启动程序 python.exe
     参数:   manage.py sync_material_prices
     起始于: 项目根目录
+
+注意：
+    必须加上工厂筛选参数，否则当一个物料在多个工厂都有库存时，同一个物料+会计期间会返回多条记录（每个工厂一条），同步时通过取平均值聚合。
 """
 
 from datetime import date
