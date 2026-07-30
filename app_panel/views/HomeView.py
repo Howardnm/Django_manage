@@ -1,44 +1,17 @@
-import logging
-
 from django.shortcuts import render
 from django.views import View
-from datetime import timedelta
-from django.utils import timezone
 
-# 导入相关模型
-from app_project.models import Project
-from app_material.models import MaterialLibrary
-from app_formula.models import LabFormula
-from app_process.models import ProcessProfile
-from app_raw_material.models import RawMaterial
 from app_panel.mixins import PanelAccessMixin
-
-logger = logging.getLogger(__name__)
 
 
 class HomeView(PanelAccessMixin, View):
+    """系统首页：纯静态系统介绍页，登录后的安全兜底。
+
+    L1/L2: PanelAccessMixin (module_code='panel') 从 DB 读取。
+    L3: 显式声明 [] — 本页为零数据库查询的纯静态页面，无适用 L3 权限码。
     """
-    系统首页：展示全系统数据概况。
-    - 准入：内部全员 (INTERNAL_STAFF)。
-    """
-    permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
+
+    permission_required = []  # 纯静态页面，零数据查询
 
     def get(self, request):
-        context = {}
-        today = timezone.now()
-        thirty_days_ago = today - timedelta(days=30)
-
-        # Helper function to calculate new count
-        def get_new_count_and_trend(model):
-            current_count = model.objects.count()
-            new_count = model.objects.filter(created_at__gte=thirty_days_ago).count()
-            return current_count, new_count
-
-        # --- 数据聚合 ---
-        context['total_projects'], context['project_new_count'] = get_new_count_and_trend(Project)
-        context['total_materials'], context['material_new_count'] = get_new_count_and_trend(MaterialLibrary)
-        context['total_formulas'], context['formula_new_count'] = get_new_count_and_trend(LabFormula)
-        context['total_processes'], context['process_new_count'] = get_new_count_and_trend(ProcessProfile)
-        context['total_raw_materials'], context['raw_material_new_count'] = get_new_count_and_trend(RawMaterial)
-
-        return render(request, 'apps/app_panel/home.html', context)
+        return render(request, 'apps/app_panel/home.html')

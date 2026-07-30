@@ -21,11 +21,11 @@
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-2">
 
-                {# 1. 固定入口：工作台首页 #}
+                {# 1. 固定入口：首页 #}
                 <li class="nav-item mb-2 {% if request.resolver_match.url_name == 'panel_home' %}active{% endif %}">
                     <a class="nav-link rounded-2 mx-2" href="{% url 'panel_home' %}">
                         <span class="nav-link-icon"><i class="ti ti-smart-home"></i></span>
-                        <span class="nav-link-title fw-bold">工作台首页</span>
+                        <span class="nav-link-title fw-bold">首页</span>
                     </a>
                 </li>
 

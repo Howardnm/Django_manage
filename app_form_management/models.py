@@ -143,5 +143,10 @@ class FormSubmission(models.Model):
             return task.assigned_to.username
         return '待签收'
 
+    @property
+    def status_css_class(self):
+        """状态徽章 CSS 类名"""
+        return 'bg-primary' if self.status == 'SUBMITTED' else 'bg-secondary'
+
     def __str__(self):
         return f'{self.template.name} - {self.submitted_by} ({self.get_status_display()})'

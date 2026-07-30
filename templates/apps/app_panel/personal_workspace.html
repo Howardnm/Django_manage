@@ -1,0 +1,273 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}个人工作台{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">工作台</div>
+            <h2 class="page-title">个人工作台</h2>
+        </div>
+    </div>
+</div>
+
+{% if not has_form and not has_workflow %}
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="empty">
+            <div class="empty-icon">
+                <i class="ti ti-lock icon-lg"></i>
+            </div>
+            <p class="empty-title">暂无可用模块</p>
+            <p class="empty-subtitle text-muted">
+                您当前没有表单管理或流程审批模块的访问权限。如需开通，请联系系统管理员。
+            </p>
+            <div class="empty-action">
+                <a href="{% url 'panel_home' %}" class="btn btn-primary">
+                    <i class="ti ti-home me-2"></i>返回首页
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="row row-cards mt-2">
+    {% if has_form %}
+    {# ── 卡片 1a：我的表单草稿 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ti ti-pencil text-secondary me-2"></i>我的表单草稿
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-secondary text-white me-2">{{ draft_count }} 条</span>
+                    <a href="{% url 'my_drafts' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>表单模板</th>
+                            <th>状态</th>
+                            <th>更新时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for draft in recent_drafts %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'form_submission_edit' draft.template_id draft.pk %}'">
+                            <td>{{ draft.template.name }}</td>
+                            <td>
+                                <span class="badge bg-secondary text-white">{{ draft.get_status_display }}</span>
+                            </td>
+                            <td class="text-muted small">{{ draft.updated_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── 卡片 1b：我提交的表单 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ti ti-file-text text-primary me-2"></i>我提交的表单
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-primary text-white me-2">{{ submission_count }} 条</span>
+                    <a href="{% url 'my_submissions' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>表单模板</th>
+                            <th>状态</th>
+                            <th>审批进度</th>
+                            <th>提交时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in recent_submissions %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'form_submission_detail' sub.pk %}'">
+                            <td>{{ sub.template.name }}</td>
+                            <td>
+                                <span class="badge {{ sub.status_css_class }} text-white">{{ sub.get_status_display }}</span>
+                            </td>
+                            <td>
+                                {% if sub.current_approval_node %}
+                                <span class="text-muted small">{{ sub.current_approval_node }}</span>
+                                {% else %}
+                                <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-muted small">{{ sub.created_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if has_workflow %}
+    {# ── 卡片 2：我已发的流程 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ti ti-git-pull-request text-success me-2"></i>我已发的流程
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-success text-white me-2">{{ initiated_count }} 条</span>
+                    <a href="{% url 'workflow_initiated_list' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>流程名称</th>
+                            <th>状态</th>
+                            <th>发起时间</th>
+                            <th>当前审批人</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for inst in recent_instances %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' inst.pk %}'">
+                            <td>{{ inst.definition.name }}</td>
+                            <td>
+                                <span class="badge {{ inst.status_css_class }} text-white">{{ inst.get_status_display }}</span>
+                            </td>
+                            <td class="text-muted small">{{ inst.started_at|date:"Y-m-d" }}</td>
+                            <td>
+                                {% for task in inst.tasks.all %}
+                                    {% if task.status == 'PENDING' %}
+                                    {% if task.assigned_to %}
+                                    <span class="badge bg-azure-lt text-white">{{ task.assigned_to.username }}</span>
+                                    {% else %}
+                                    <span class="badge bg-warning-lt text-white">待签收</span>
+                                    {% endif %}
+                                    {% endif %}
+                                {% empty %}
+                                <span class="text-muted">—</span>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── 卡片 3：待办任务 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ti ti-clock-hour-4 text-warning me-2"></i>待办任务
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-warning text-white me-2">{{ pending_count }} 个待处理</span>
+                    <a href="{% url 'workflow_my_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>任务名称</th>
+                            <th>所属流程</th>
+                            <th>发起人</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in pending_tasks %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
+                            <td>{{ task.display_name }}</td>
+                            <td class="text-muted small">{{ task.instance.definition.name }}</td>
+                            <td>
+                                <span class="badge bg-azure-lt text-white">{{ task.instance.started_by.username }}</span>
+                            </td>
+                            <td class="text-muted small">{{ task.created_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── 卡片 4：已办任务 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">
+                    <i class="ti ti-checklist text-info me-2"></i>已办任务
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-info text-white me-2">{{ completed_count }} 条</span>
+                    <a href="{% url 'workflow_completed_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap">
+                    <thead>
+                        <tr>
+                            <th>任务名称</th>
+                            <th>所属流程</th>
+                            <th>处理结果</th>
+                            <th>完成时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in completed_tasks %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
+                            <td>{{ task.display_name }}</td>
+                            <td class="text-muted small">{{ task.instance.definition.name }}</td>
+                            <td>
+                                <span class="badge {{ task.status_css_class }} text-white">{{ task.get_status_display }}</span>
+                            </td>
+                            <td class="text-muted small">{{ task.completed_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}系统总览{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="row align-items-center">
+        <div class="col">
+            <div class="page-pretitle">看板</div>
+            <h2 class="page-title">系统总览</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row row-cards mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">系统资源概览</h3>
+            </div>
+            <div class="card-body">
+                <div class="row row-cards">
+                    {# 总项目数 #}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="bg-primary text-white avatar">
+                                            <i class="ti ti-folder"></i>
+                                        </span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="font-weight-medium">总项目数</div>
+                                        <div class="d-flex align-items-baseline">
+                                            <div class="h2 mb-0 me-2">{{ total_projects }}</div>
+                                            <div class="ms-auto text-end">
+                                                {% if project_new_count > 0 %}
+                                                    <span class="text-green d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>{{ project_new_count }}</strong>
+                                                        <i class="ti ti-trending-up icon-sm ms-1"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-yellow d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>0</strong>
+                                                        <i class="ti ti-minus icon-sm ms-1"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {# 总材料数 #}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="bg-success text-white avatar">
+                                            <i class="ti ti-building-warehouse"></i>
+                                        </span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="font-weight-medium">总材料数</div>
+                                        <div class="d-flex align-items-baseline">
+                                            <div class="h2 mb-0 me-2">{{ total_materials }}</div>
+                                            <div class="ms-auto text-end">
+                                                {% if material_new_count > 0 %}
+                                                    <span class="text-green d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>{{ material_new_count }}</strong>
+                                                        <i class="ti ti-trending-up icon-sm ms-1"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-yellow d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>0</strong>
+                                                        <i class="ti ti-minus icon-sm ms-1"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {# 总配方数 #}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="bg-info text-white avatar">
+                                            <i class="ti ti-flask"></i>
+                                        </span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="font-weight-medium">总配方数</div>
+                                        <div class="d-flex align-items-baseline">
+                                            <div class="h2 mb-0 me-2">{{ total_formulas }}</div>
+                                            <div class="ms-auto text-end">
+                                                {% if formula_new_count > 0 %}
+                                                    <span class="text-green d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>{{ formula_new_count }}</strong>
+                                                        <i class="ti ti-trending-up icon-sm ms-1"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-yellow d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>0</strong>
+                                                        <i class="ti ti-minus icon-sm ms-1"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {# 总工艺数 #}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="bg-warning text-white avatar">
+                                            <i class="ti ti-tools"></i>
+                                        </span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="font-weight-medium">总工艺数</div>
+                                        <div class="d-flex align-items-baseline">
+                                            <div class="h2 mb-0 me-2">{{ total_processes }}</div>
+                                            <div class="ms-auto text-end">
+                                                {% if process_new_count > 0 %}
+                                                    <span class="text-green d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>{{ process_new_count }}</strong>
+                                                        <i class="ti ti-trending-up icon-sm ms-1"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-yellow d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>0</strong>
+                                                        <i class="ti ti-minus icon-sm ms-1"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {# 总原材料数 #}
+                    <div class="col-sm-6 col-lg-4">
+                        <div class="card card-sm">
+                            <div class="card-body">
+                                <div class="row align-items-center">
+                                    <div class="col-auto">
+                                        <span class="bg-danger text-white avatar">
+                                            <i class="ti ti-box"></i>
+                                        </span>
+                                    </div>
+                                    <div class="col">
+                                        <div class="font-weight-medium">总原材料数</div>
+                                        <div class="d-flex align-items-baseline">
+                                            <div class="h2 mb-0 me-2">{{ total_raw_materials }}</div>
+                                            <div class="ms-auto text-end">
+                                                {% if raw_material_new_count > 0 %}
+                                                    <span class="text-green d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>{{ raw_material_new_count }}</strong>
+                                                        <i class="ti ti-trending-up icon-sm ms-1"></i>
+                                                    </span>
+                                                {% else %}
+                                                    <span class="text-yellow d-inline-flex align-items-center lh-1 small">
+                                                        最近30日： <strong>0</strong>
+                                                        <i class="ti ti-minus icon-sm ms-1"></i>
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

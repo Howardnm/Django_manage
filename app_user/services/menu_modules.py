@@ -35,15 +35,15 @@ class MenuModule:
             "url_name": "panel_home",
             "module_access_code": "panel",
             "sub_items": [
-                {"name": "系统资源看板", "url_name": "panel_home"},
+                {"name": "个人工作台", "url_name": "personal_workspace"},
+                {"name": "系统总览", "url_name": "system_overview",
+                 "permissions": ["app_project.view_project"]},
                 {"name": "项目全景看板", "url_name": "project_overview",
                  "permissions": ["app_project.view_project"]},
                 {"name": "项目统计看板", "url_name": "project_statistics",
                  "permissions": ["app_project.view_project"]},
                 {"name": "客户行为分析", "url_name": "customer_activity_overview",
                  "permissions": ["app_repository.view_customer"]},
-                {"name": "成员绩效榜单", "url_name": "user_performance_list",
-                 "permissions": ["app_project.view_project"]},
             ],
         }
 
