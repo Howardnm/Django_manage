@@ -23,9 +23,6 @@ urlpatterns = [
     # 【新增】复制副本路由
     path('materials/<int:pk>/duplicate/', RawMaterialDuplicateView.as_view(), name='raw_material_duplicate'),
 
-    # 价格历史记录
-    path('materials/<int:pk>/price/add/', RawMaterialPriceRecordCreateView.as_view(), name='raw_material_price_add'),
-
     # API 搜索路由 (Tom Select 远程加载)
     path('api/search/', RawMaterialAutocompleteView.as_view(), name='raw_material_api_search'),
 ]

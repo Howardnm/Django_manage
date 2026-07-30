@@ -8,7 +8,7 @@ from django.shortcuts import redirect
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 
 from app_raw_material.models import PriceAvgConfig, RawMaterial, RawMaterialPriceRecord, RawMaterialProperty, Supplier
-from app_raw_material.forms import RawMaterialForm, RawMaterialPriceRecordForm, RawMaterialPropertyFormSet
+from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 from app_raw_material.mixins import RawMaterialAccessMixin
 
@@ -111,6 +111,7 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
         import calendar
         import json
         from collections import defaultdict
+        from decimal import Decimal
 
         context = super().get_context_data(**kwargs)
         material = self.object
@@ -120,7 +121,21 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
         context['recent_records'] = material.price_records.select_related('plant').order_by('-date')[:5]
         context['avg_months'] = PriceAvgConfig.get().months
 
-        # 按工厂分组构建多 series 图表数据
+        # 全局走势线：按日期取各工厂均值
+        from collections import defaultdict as dd
+        date_prices = dd(list)
+        for record in price_records:
+            date_prices[record.date].append(record.price)
+        global_trend = []
+        for d in sorted(date_prices.keys()):
+            avg_price = sum(date_prices[d], Decimal('0')) / len(date_prices[d])
+            global_trend.append({
+                'x': calendar.timegm(d.timetuple()) * 1000,
+                'y': float(avg_price.quantize(Decimal('0.01'))),
+                'source': '',
+            })
+
+        # 按工厂分组构建多 series 图表数据（数组保证顺序，避免 JS for-in 数字key排序问题）
         plant_series = defaultdict(list)
         for record in price_records.select_related('plant'):
             plant_name = str(record.plant) if record.plant else '未指定工厂'
@@ -129,7 +144,12 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
                 'y': float(record.price),
                 'source': record.source or '',
             })
-        context['price_series_json'] = json.dumps(plant_series)
+        series_list = []
+        if len(global_trend) >= 2:
+            series_list.append({'name': '全局均值', 'data': global_trend})
+        for plant_name in plant_series:
+            series_list.append({'name': plant_name, 'data': plant_series[plant_name]})
+        context['price_series_json'] = json.dumps(series_list)
 
         # 价格概览：各工厂最新价 / 均价
         plants = material.plants_with_prices
@@ -141,7 +161,6 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
                 'avg': material.avg_price_for_plant(plant),
             })
         context['plant_prices'] = plant_prices
-        context['price_record_form'] = RawMaterialPriceRecordForm()
         return context
 
 class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
@@ -275,39 +294,6 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
 
     def get_success_url(self):
         return reverse('raw_material_detail', kwargs={'pk': self.object.pk})
-
-
-class RawMaterialPriceRecordCreateView(RawMaterialAccessMixin, CreateView):
-    """添加价格记录"""
-    permission_required = 'app_raw_material.add_rawmaterial'
-    model = RawMaterialPriceRecord
-    form_class = RawMaterialPriceRecordForm
-
-    def form_valid(self, form):
-        raw_material = RawMaterial.objects.get(pk=self.kwargs['pk'])
-        plant = form.cleaned_data['plant']
-        date = form.cleaned_data['date']
-        price = form.cleaned_data['price']
-        source = form.cleaned_data.get('source', '')
-
-        obj, created = RawMaterialPriceRecord.objects.update_or_create(
-            raw_material=raw_material,
-            plant=plant,
-            date=date,
-            defaults={'price': price, 'source': source}
-        )
-        if created:
-            messages.success(self.request, f"已添加 {plant} 的价格记录")
-        else:
-            messages.success(self.request, f"已覆盖 {date} — {plant} 的价格记录")
-        return redirect(self.get_success_url())
-
-    def form_invalid(self, form):
-        messages.error(self.request, "请检查输入内容")
-        return redirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('raw_material_detail', kwargs={'pk': self.kwargs['pk']})
 
 
 class RawMaterialAutocompleteView(RawMaterialAccessMixin, View):

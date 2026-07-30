@@ -274,11 +274,16 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
         context['price_trend_json'] = json.dumps(trend)
         context['avg_months'] = PriceAvgConfig.get().months
 
-        # 按工厂的趋势（多线图表）
+        # 按工厂的趋势（多线图表），全局趋势线放在最前面（用数组保证 JS 顺序）
         trend_by_plant = self.object.get_price_trend_by_plant()
+        trend_list = []
+        if len(trend) >= 2:
+            trend_list.append({'name': '全局均值', 'data': trend})
+        for plant_name, data in trend_by_plant.items():
+            trend_list.append({'name': plant_name, 'data': data})
         has_plant_trend = len(trend_by_plant) > 0
         context['has_plant_trend'] = has_plant_trend
-        context['price_trend_by_plant_json'] = json.dumps(trend_by_plant)
+        context['price_trend_by_plant_json'] = json.dumps(trend_list)
 
         # 各工厂成本（仅纳入全部BOM材料都有价格的工厂）
         plant_costs = []

@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory
-from .models import Supplier, RawMaterialType, RawMaterial, RawMaterialProperty, RawMaterialPriceRecord
+from .models import Supplier, RawMaterialType, RawMaterial, RawMaterialProperty
 from app_material.models import TestConfig
 from django.utils.text import Truncator
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -127,14 +127,3 @@ RawMaterialPropertyFormSet = inlineformset_factory(
 )
 
 
-# 5. 价格历史记录表单
-class RawMaterialPriceRecordForm(TablerFormMixin, forms.ModelForm):
-    class Meta:
-        model = RawMaterialPriceRecord
-        fields = ['price', 'date', 'source', 'plant']
-        widgets = {
-            'price': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '元/kg'}),
-            'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
-            'source': forms.TextInput(attrs={'placeholder': '如：供应商报价、合同号'}),
-            'plant': forms.Select(attrs={'class': 'form-select'}),
-        }

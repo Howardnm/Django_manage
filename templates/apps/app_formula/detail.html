@@ -366,66 +366,17 @@
 <script src="{% static 'highcharts/core-12.5.0/highstock.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var trendByPlant = {{ price_trend_by_plant_json|safe }};
-    var colors = ['#206bc4', '#d63939', '#2fb344', '#ae3ec9', '#f59f00',
-                  '#4299e1', '#e53e3e', '#38a169'];
+    var trendList = {{ price_trend_by_plant_json|safe }};
     var series = [];
-    var colorIdx = 0;
-
-    {% if has_plant_trend %}
-    // 多工厂线模式
-    for (var plantName in trendByPlant) {
-        if (!trendByPlant.hasOwnProperty(plantName)) continue;
+    for (var i = 0; i < trendList.length; i++) {
         series.push({
-            name: plantName,
-            data: trendByPlant[plantName],
+            name: trendList[i].name,
+            data: trendList[i].data,
             type: 'line',
             step: 'left',
-            color: colors[colorIdx % colors.length],
-            marker: {
-                enabled: true,
-                radius: 4,
-                fillColor: '#ffffff',
-                lineWidth: 2,
-                lineColor: null
-            },
-            dataLabels: {
-                enabled: true,
-                allowOverlap: false
-            },
-            tooltip: {
-                valueDecimals: 2,
-                pointFormat: '<b>¥{point.y:.2f}/kg</b>'
-            }
+            tooltip: { valueDecimals: 2, pointFormat: '<b>¥{point.y:.2f}/kg</b>' }
         });
-        colorIdx++;
     }
-    {% else %}
-    // 无工厂数据时回退到全局趋势线
-    var overallTrend = {{ price_trend_json|safe }};
-    series.push({
-        name: '配方单位成本（全局）',
-        data: overallTrend,
-        type: 'line',
-        step: 'left',
-        color: colors[0],
-        marker: {
-            enabled: true,
-            radius: 4,
-            fillColor: '#ffffff',
-            lineWidth: 2,
-            lineColor: null
-        },
-        dataLabels: {
-            enabled: true,
-            allowOverlap: false
-        },
-        tooltip: {
-            valueDecimals: 2,
-            pointFormat: '<b>¥{point.y:.2f}/kg</b>'
-        }
-    });
-    {% endif %}
 
     if (series.length > 0) {
         Highcharts.stockChart('formula-price-trend-chart', {

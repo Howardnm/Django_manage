@@ -208,11 +208,8 @@
 
             <!-- 价格走势 -->
             <div class="card">
-                <div class="card-header bg-green-lt d-flex justify-content-between align-items-center">
+                <div class="card-header bg-green-lt">
                     <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>价格走势</h3>
-                    <button type="button" class="btn btn-sm btn-outline-success" data-bs-toggle="modal" data-bs-target="#priceRecordModal">
-                        <i class="ti ti-plus me-1"></i>添加记录
-                    </button>
                 </div>
                 <!-- 价格走势图 -->
                 {% if price_records|length >= 2 %}
@@ -260,45 +257,6 @@
         </div>
     </div>
 
-    <!-- 价格记录添加模态框 -->
-    <div class="modal modal-blur fade" id="priceRecordModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog modal-sm" role="document">
-            <div class="modal-content">
-                <form method="POST" action="{% url 'raw_material_price_add' material.pk %}">
-                    {% csrf_token %}
-                    <div class="modal-header">
-                        <h5 class="modal-title">添加价格记录</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <label class="form-label">工厂 <span class="text-danger">*</span></label>
-                            {{ price_record_form.plant }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">价格 (元/kg) <span class="text-danger">*</span></label>
-                            {{ price_record_form.price }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">日期 <span class="text-danger">*</span></label>
-                            {{ price_record_form.date }}
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">来源/备注</label>
-                            {{ price_record_form.source }}
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-link link-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="submit" class="btn btn-primary ms-auto">
-                            <i class="ti ti-device-floppy me-1"></i>保存
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
     <script>
         function addToCompare(id) {
             const formData = new FormData();
@@ -336,36 +294,16 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     {% if price_records|length >= 2 %}
-    var seriesData = {{ price_series_json|safe }};
-    var colors = ['#206bc4', '#d63939', '#2fb344', '#ae3ec9', '#f59f00',
-                  '#4299e1', '#e53e3e', '#38a169'];
+    var seriesList = {{ price_series_json|safe }};
     var series = [];
-    var colorIdx = 0;
-    for (var plantName in seriesData) {
-        if (!seriesData.hasOwnProperty(plantName)) continue;
+    for (var i = 0; i < seriesList.length; i++) {
         series.push({
-            name: plantName,
-            data: seriesData[plantName],
+            name: seriesList[i].name,
+            data: seriesList[i].data,
             type: 'line',
             step: 'left',
-            color: colors[colorIdx % colors.length],
-            marker: {
-                enabled: true,
-                radius: 4,
-                fillColor: '#ffffff',
-                lineWidth: 2,
-                lineColor: null
-            },
-            dataLabels: {
-                enabled: true,
-                allowOverlap: false
-            },
-            tooltip: {
-                valueDecimals: 2,
-                pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}'
-            }
+            tooltip: { valueDecimals: 2, pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}' }
         });
-        colorIdx++;
     }
 
     Highcharts.stockChart('price-trend-chart', {
@@ -430,11 +368,6 @@ document.addEventListener('DOMContentLoaded', function () {
         series: series,
     });
     {% endif %}
-
-    var dateInput = document.querySelector('#priceRecordModal input[type="date"]');
-    if (dateInput && !dateInput.value) {
-        dateInput.value = new Date().toISOString().split('T')[0];
-    }
 });
 </script>
 {% endblock %}
