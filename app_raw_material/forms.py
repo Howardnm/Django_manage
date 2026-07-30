@@ -131,9 +131,10 @@ RawMaterialPropertyFormSet = inlineformset_factory(
 class RawMaterialPriceRecordForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = RawMaterialPriceRecord
-        fields = ['price', 'date', 'source']
+        fields = ['price', 'date', 'source', 'plant']
         widgets = {
             'price': forms.NumberInput(attrs={'step': '0.01', 'placeholder': '元/kg'}),
             'date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'source': forms.TextInput(attrs={'placeholder': '如：供应商报价、合同号'}),
+            'plant': forms.Select(attrs={'class': 'form-select'}),
         }

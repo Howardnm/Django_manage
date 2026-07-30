@@ -16,7 +16,8 @@ Django 管理命令: 从 SAP 同步物料评估价格到 app_raw_material。
     起始于: 项目根目录
 
 注意：
-    必须加上工厂筛选参数，否则当一个物料在多个工厂都有库存时，同一个物料+会计期间会返回多条记录（每个工厂一条），同步时通过取平均值聚合。
+    每个物料+工厂+会计期间独立存储，不再做跨工厂价格聚合。
+    未知工厂代码将在同步时自动创建 Plant 记录。
 """
 
 from datetime import date
@@ -29,7 +30,7 @@ from django.db import transaction
 
 from app_sap_services import sap, sap_health_check
 from app_sap_services.definitions.price import MaterialPriceQuery
-from app_raw_material.models import RawMaterial, RawMaterialPriceRecord
+from app_raw_material.models import Plant, RawMaterial, RawMaterialPriceRecord
 
 
 CHUNK_SIZE = 500
@@ -284,7 +285,7 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     def _transform_prices(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Polars 端：价格单位换算 + 多工厂聚合 + 异常值过滤"""
+        """Polars 端：价格单位换算 + 异常值过滤（保留工厂维度）"""
         before = df.height
 
         # 过滤 PEINH <= 0（除零保护）
@@ -298,16 +299,10 @@ class Command(BaseCommand):
         # 过滤无效价格
         df = df.filter(pl.col("UNIT_PRICE") > 0)
 
-        # 多工厂/多期间聚合：同一物料+期间取平均价
-        df = df.group_by(["MATNR", "LFGJA", "LFMON"]).agg(
-            pl.col("UNIT_PRICE").mean().round(2).alias("UNIT_PRICE"),
-            pl.col("BWKEY").count().alias("PLANT_COUNT"),
-        )
-
         after = df.height
         self.stdout.write(
             f"   价格换算: {before} 条 → 有效 {after} 条 "
-            f"(VERPR/PEINH=单价, 多工厂取均值)"
+            f"(VERPR/PEINH=单价, 保留工厂维度)"
         )
 
         return df
@@ -317,9 +312,10 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _make_source(lfgja: str, lfmon: str) -> str:
+    def _make_source(lfgja: str, lfmon: str, bwkey: str = "") -> str:
         """生成价格来源标识"""
-        return f"SAP MBEW {lfgja}-{lfmon}"
+        base = f"SAP MBEW {lfgja}-{lfmon}"
+        return f"{base} [{bwkey}]" if bwkey else base
 
     # ------------------------------------------------------------------
     # dry-run
@@ -334,6 +330,7 @@ class Command(BaseCommand):
         for row in df.iter_rows(named=True):
             matnr = row["MATNR"]
             unit_price = row["UNIT_PRICE"]
+            bwkey = row.get("BWKEY", "")
 
             rm = warehouse_map.get(matnr)
             if rm is None:
@@ -349,21 +346,22 @@ class Command(BaseCommand):
             if unit_price > PRICE_WARN_THRESHOLD:
                 price_warns += 1
 
+            plant = Plant.objects.filter(code=bwkey).first()
             existing = RawMaterialPriceRecord.objects.filter(
-                raw_material=rm, date=price_date
+                raw_material=rm, plant=plant, date=price_date
             ).first()
 
-            source = self._make_source(row["LFGJA"], row["LFMON"])
+            source = self._make_source(row["LFGJA"], row["LFMON"], bwkey)
             if existing:
                 will_update += 1
                 self.stdout.write(
-                    f"   [~] 将更新: {rm.name} ({matnr}) "
+                    f"   [~] 将更新: {rm.name} ({matnr}) [{bwkey}] "
                     f"{price_date}: {existing.price} -> {unit_price}"
                 )
             else:
                 will_create += 1
                 self.stdout.write(
-                    f"   [+] 将创建: {rm.name} ({matnr}) "
+                    f"   [+] 将创建: {rm.name} ({matnr}) [{bwkey}] "
                     f"{price_date}: CNY{unit_price} [{source}]"
                 )
 
@@ -407,9 +405,15 @@ class Command(BaseCommand):
                 for row in chunk_df.iter_rows(named=True):
                     matnr = row["MATNR"]
                     unit_price = row["UNIT_PRICE"]
+                    bwkey = row.get("BWKEY", "")
 
                     rm = warehouse_map.get(matnr)
                     if rm is None:
+                        skipped_invalid += 1
+                        continue
+
+                    # 跳过无工厂记录
+                    if not bwkey:
                         skipped_invalid += 1
                         continue
 
@@ -424,13 +428,19 @@ class Command(BaseCommand):
                     if unit_price > PRICE_WARN_THRESHOLD:
                         price_warn_count += 1
 
+                    # 获取或自动创建工厂
+                    plant, _ = Plant.objects.get_or_create(
+                        code=bwkey, defaults={'name': ''}
+                    )
+
                     source_text = self._make_source(
-                        row["LFGJA"], row["LFMON"]
+                        row["LFGJA"], row["LFMON"], bwkey
                     )
 
                     try:
                         record, is_new = RawMaterialPriceRecord.objects.update_or_create(
                             raw_material=rm,
+                            plant=plant,
                             date=price_date,
                             defaults={
                                 "price": unit_price,
@@ -440,7 +450,7 @@ class Command(BaseCommand):
                     except Exception as e:
                         self.stdout.write(
                             self.style.ERROR(
-                                f"   [ERR] 保存失败: {rm.name} ({matnr}) — {e}"
+                                f"   [ERR] 保存失败: {rm.name} ({matnr}) [{bwkey}] — {e}"
                             )
                         )
                         skipped_invalid += 1

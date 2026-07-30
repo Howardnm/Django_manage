@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import PriceAvgConfig, RawMaterialType, Supplier, RawMaterial, RawMaterialProperty, RawMaterialPriceRecord
+from .models import Plant, PriceAvgConfig, RawMaterialType, Supplier, RawMaterial, RawMaterialProperty, RawMaterialPriceRecord
 
 @admin.register(RawMaterialType)
 class RawMaterialTypeAdmin(admin.ModelAdmin):
@@ -23,7 +23,7 @@ class RawMaterialPropertyInline(admin.TabularInline):
 class RawMaterialPriceRecordInline(admin.TabularInline):
     model = RawMaterialPriceRecord
     extra = 1
-    fields = ('price', 'date', 'source')
+    fields = ('price', 'date', 'plant', 'source')
 
 
 @admin.register(RawMaterial)
@@ -49,9 +49,16 @@ class PriceAvgConfigAdmin(admin.ModelAdmin):
         return not PriceAvgConfig.objects.exists()
 
 
+@admin.register(Plant)
+class PlantAdmin(admin.ModelAdmin):
+    list_display = ('code', 'name', 'is_active', 'created_at')
+    search_fields = ('code', 'name')
+    list_filter = ('is_active',)
+
+
 @admin.register(RawMaterialPriceRecord)
 class RawMaterialPriceRecordAdmin(admin.ModelAdmin):
-    list_display = ('raw_material', 'price', 'date', 'source', 'created_at')
+    list_display = ('raw_material', 'plant', 'price', 'date', 'source', 'created_at')
     search_fields = ('raw_material__name', 'raw_material__model_name', 'source')
-    list_filter = ('date', 'raw_material__category')
-    autocomplete_fields = ['raw_material']
+    list_filter = ('date', 'plant', 'raw_material__category')
+    autocomplete_fields = ['raw_material', 'plant']

@@ -179,7 +179,7 @@
                         </td>
                         
                         <td class="text-orange fw-bold">
-                            {% if material.latest_price %}¥{{ material.latest_price }}{% else %}-{% endif %}
+                            {% if material.latest_price %}¥{{ material.latest_price|floatformat:2 }}{% else %}-{% endif %}
                         </td>
                         
                         <!-- === 动态数据列 (val_xxx) === -->

@@ -196,6 +196,95 @@ class LabFormula(models.Model):
 
         return trend
 
+    # ── 工厂维度扩展方法 ──
+
+    def calculate_cost_for_plant(self, plant):
+        """按工厂计算预测成本（加权平均），任一原材料缺失价格则返回 None"""
+        total_amount = Decimal('0.00')
+        total_parts = Decimal('0.00')
+        for line in self.bom_lines.select_related('raw_material').all():
+            price = line.raw_material.latest_price_for_plant(plant)
+            if price is None:
+                return None  # 该工厂缺少此原材料价格，成本无效
+            total_parts += line.percentage
+            total_amount += price * line.percentage
+        if total_parts > 0:
+            return (total_amount / total_parts).quantize(Decimal('0.01'))
+        return None
+
+    def get_unit_cost_for_plant(self, plant):
+        """按工厂计算近N月均价成本，任一原材料缺失价格则返回 None"""
+        total_amount = Decimal('0.00')
+        total_parts = Decimal('0.00')
+        for line in self.bom_lines.select_related('raw_material').all():
+            price = (line.raw_material.avg_price_for_plant(plant)
+                     or line.raw_material.latest_price_for_plant(plant))
+            if price is None:
+                return None  # 该工厂缺少此原材料价格，成本无效
+            total_parts += line.percentage
+            total_amount += price * line.percentage
+        if total_parts > 0:
+            return (total_amount / total_parts).quantize(Decimal('0.01'))
+        return None
+
+    def get_price_trend_for_plant(self, plant):
+        """按工厂构建配方单位成本时间线（LOCF 算法）"""
+        bom_lines = list(self.bom_lines.select_related('raw_material').all())
+        if not bom_lines:
+            return []
+
+        all_dates = set()
+        for line in bom_lines:
+            for record in line.raw_material.price_records.filter(plant=plant):
+                all_dates.add(record.date)
+
+        if not all_dates:
+            return []
+
+        sorted_dates = sorted(all_dates)
+        records_by_line = [
+            sorted(
+                line.raw_material.price_records.filter(plant=plant),
+                key=lambda r: r.date
+            )
+            for line in bom_lines
+        ]
+
+        trend = []
+        for d in sorted_dates:
+            total_amount = Decimal('0.00')
+            total_parts = Decimal('0.00')
+            skip = False
+            for i, line in enumerate(bom_lines):
+                total_parts += line.percentage
+                price = None
+                for record in records_by_line[i]:
+                    if record.date <= d:
+                        price = record.price
+                    else:
+                        break
+                if price is None:
+                    skip = True
+                    break
+                total_amount += price * line.percentage
+            if not skip and total_parts > 0:
+                cost = total_amount / total_parts
+                trend.append([
+                    calendar.timegm(d.timetuple()) * 1000,
+                    float(cost.quantize(Decimal('0.01')))
+                ])
+        return trend
+
+    def get_price_trend_by_plant(self):
+        """返回 {plant_display: [[ts, cost], ...], ...}，用于多线图表"""
+        from app_raw_material.models import Plant
+        trends = {}
+        for plant in Plant.objects.filter(is_active=True):
+            trend = self.get_price_trend_for_plant(plant)
+            if len(trend) >= 2:
+                trends[str(plant)] = trend
+        return trends
+
     # 【新增】获取关键物性指标字典 (用于列表展示)
     def get_key_properties(self):
         """

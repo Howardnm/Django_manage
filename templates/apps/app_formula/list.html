@@ -185,9 +185,9 @@
 
                         <!-- 4. 成本 -->
                         <td>
-                            <div class="fw-bold text-orange">¥{{ formula.cost_predicted }}</div>
+                            <div class="fw-bold text-orange">¥{{ formula.cost_predicted|floatformat:2 }}</div>
                             {% if formula.unit_cost %}
-                                <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ formula.unit_cost }}</div>
+                                <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ formula.unit_cost|floatformat:2 }}</div>
                             {% endif %}
                         </td>
 

@@ -141,7 +141,7 @@
             </div>
 
             <!-- 配方价格走势 -->
-            {% if has_trend %}
+            {% if has_trend or plant_costs %}
             <div class="card">
                 <div class="card-header bg-green-lt">
                     <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>配方价格走势</h3>
@@ -223,16 +223,37 @@
                     <h3 class="card-title text-green"><i class="ti ti-currency-yen me-2"></i>成本核算</h3>
                 </div>
                 <div class="card-body">
+                    <div class="mb-2">
+                        <div class="text-muted small">全部工厂均值</div>
+                    </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>预测成本</span>
-                        <span class="fw-bold text-orange">¥{{ formula.cost_predicted }}</span>
+                        <span class="fw-bold text-orange">¥{{ formula.cost_predicted|floatformat:2 }}</span>
                     </div>
-                    <div class="d-flex justify-content-between">
+                    <div class="d-flex justify-content-between mb-0">
                         <span>近{{ avg_months }}月均价</span>
                         <span class="fw-bold text-green">
-                            {% if formula.unit_cost %}¥{{ formula.unit_cost }}{% else %}-{% endif %}
+                            {% if formula.unit_cost %}¥{{ formula.unit_cost|floatformat:2 }}{% else %}-{% endif %}
                         </span>
                     </div>
+                    {% if plant_costs %}
+                    <hr>
+                    {% for pc in plant_costs %}
+                    <div class="mb-2">
+                        <span class="badge bg-azure-lt mb-1">{{ pc.plant.code }}{% if pc.plant.name %} ({{ pc.plant.name }}){% endif %}</span>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">预测成本</span>
+                            <span class="fw-bold text-orange">¥{{ pc.predicted|floatformat:2 }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between small">
+                            <span class="text-muted">近{{ avg_months }}月均价</span>
+                            <span class="fw-bold text-green">
+                                {% if pc.avg %}¥{{ pc.avg|floatformat:2 }}{% else %}-{% endif %}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
@@ -341,74 +362,134 @@
 
 {% block extra_js %}
 {% load static %}
-{% if has_trend %}
+{% if has_trend or plant_costs %}
 <script src="{% static 'highcharts/core-12.5.0/highstock.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    var trendData = {{ price_trend_json|safe }};
+    var trendByPlant = {{ price_trend_by_plant_json|safe }};
+    var colors = ['#206bc4', '#d63939', '#2fb344', '#ae3ec9', '#f59f00',
+                  '#4299e1', '#e53e3e', '#38a169'];
+    var series = [];
+    var colorIdx = 0;
 
-    Highcharts.stockChart('formula-price-trend-chart', {
-
-        rangeSelector: {
-            selected: 4,
-            buttons: [{
-                type: 'month',
-                count: 1,
-                text: '1月'
-            }, {
-                type: 'month',
-                count: 3,
-                text: '3月'
-            }, {
-                type: 'month',
-                count: 6,
-                text: '6月'
-            }, {
-                type: 'year',
-                count: 1,
-                text: '1年'
-            }, {
-                type: 'all',
-                text: '全部'
-            }]
-        },
-
-        title: {
-            text: null
-        },
-
-        xAxis: {
-            max: new Date().getTime(),
-            ordinal: false
-        },
-
-        plotOptions: {
-            line: {
-                step: 'left',
-                marker: {
-                    enabled: true,
-                    radius: 4,
-                    fillColor: '#ffffff',
-                    lineWidth: 2,
-                    lineColor: null
-                },
-                dataLabels: {
-                    enabled: true,
-                    allowOverlap: false
-                }
-            }
-        },
-
-        series: [{
-            name: '配方单位成本',
-            data: trendData,
+    {% if has_plant_trend %}
+    // 多工厂线模式
+    for (var plantName in trendByPlant) {
+        if (!trendByPlant.hasOwnProperty(plantName)) continue;
+        series.push({
+            name: plantName,
+            data: trendByPlant[plantName],
             type: 'line',
+            step: 'left',
+            color: colors[colorIdx % colors.length],
+            marker: {
+                enabled: true,
+                radius: 4,
+                fillColor: '#ffffff',
+                lineWidth: 2,
+                lineColor: null
+            },
+            dataLabels: {
+                enabled: true,
+                allowOverlap: false
+            },
             tooltip: {
                 valueDecimals: 2,
                 pointFormat: '<b>¥{point.y:.2f}/kg</b>'
             }
-        }],
+        });
+        colorIdx++;
+    }
+    {% else %}
+    // 无工厂数据时回退到全局趋势线
+    var overallTrend = {{ price_trend_json|safe }};
+    series.push({
+        name: '配方单位成本（全局）',
+        data: overallTrend,
+        type: 'line',
+        step: 'left',
+        color: colors[0],
+        marker: {
+            enabled: true,
+            radius: 4,
+            fillColor: '#ffffff',
+            lineWidth: 2,
+            lineColor: null
+        },
+        dataLabels: {
+            enabled: true,
+            allowOverlap: false
+        },
+        tooltip: {
+            valueDecimals: 2,
+            pointFormat: '<b>¥{point.y:.2f}/kg</b>'
+        }
     });
+    {% endif %}
+
+    if (series.length > 0) {
+        Highcharts.stockChart('formula-price-trend-chart', {
+
+            rangeSelector: {
+                selected: 4,
+                buttons: [{
+                    type: 'month',
+                    count: 1,
+                    text: '1月'
+                }, {
+                    type: 'month',
+                    count: 3,
+                    text: '3月'
+                }, {
+                    type: 'month',
+                    count: 6,
+                    text: '6月'
+                }, {
+                    type: 'year',
+                    count: 1,
+                    text: '1年'
+                }, {
+                    type: 'all',
+                    text: '全部'
+                }]
+            },
+
+            title: {
+                text: null
+            },
+
+            legend: {
+                enabled: true,
+                align: 'right',
+                verticalAlign: 'top',
+                layout: 'vertical'
+            },
+
+            xAxis: {
+                max: new Date().getTime(),
+                ordinal: false
+            },
+
+            plotOptions: {
+                line: {
+                    step: 'left',
+                    marker: {
+                        enabled: true,
+                        radius: 4,
+                        fillColor: '#ffffff',
+                        lineWidth: 2,
+                        lineColor: null
+                    },
+                    dataLabels: {
+                        enabled: true,
+                        allowOverlap: false
+                    }
+                }
+            },
+
+            series: series,
+        });
+    }
 });
 </script>
 {% endif %}

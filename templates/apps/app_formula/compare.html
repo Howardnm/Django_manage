@@ -114,9 +114,9 @@
                             {% if col.type == 'material' %}
                                 <td class="align-middle">-</td>
                             {% elif col.type == 'raw_material' %}
-                                <td class="fw-bold text-green align-middle">{{ col.obj.latest_price|default:"-" }}</td>
+                                <td class="fw-bold text-green align-middle">{{ col.obj.latest_price|floatformat:2|default:"-" }}</td>
                             {% else %}
-                                <td class="fw-bold text-green align-middle">{{ col.obj.cost_predicted }}</td>
+                                <td class="fw-bold text-green align-middle">{{ col.obj.cost_predicted|floatformat:2 }}</td>
                             {% endif %}
                         {% endfor %}
                     </tr>

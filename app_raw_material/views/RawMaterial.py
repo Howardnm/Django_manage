@@ -110,24 +110,37 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
     def get_context_data(self, **kwargs):
         import calendar
         import json
+        from collections import defaultdict
 
         context = super().get_context_data(**kwargs)
         material = self.object
 
         price_records = material.price_records.order_by('date')
         context['price_records'] = price_records
-        context['recent_records'] = material.price_records.order_by('-date')[:5]
+        context['recent_records'] = material.price_records.select_related('plant').order_by('-date')[:5]
         context['avg_months'] = PriceAvgConfig.get().months
 
-        chart_data = [
-            {
+        # 按工厂分组构建多 series 图表数据
+        plant_series = defaultdict(list)
+        for record in price_records.select_related('plant'):
+            plant_name = str(record.plant) if record.plant else '未指定工厂'
+            plant_series[plant_name].append({
                 'x': calendar.timegm(record.date.timetuple()) * 1000,
                 'y': float(record.price),
                 'source': record.source or '',
-            }
-            for record in price_records
-        ]
-        context['price_records_json'] = json.dumps(chart_data)
+            })
+        context['price_series_json'] = json.dumps(plant_series)
+
+        # 价格概览：各工厂最新价 / 均价
+        plants = material.plants_with_prices
+        plant_prices = []
+        for plant in plants:
+            plant_prices.append({
+                'plant': plant,
+                'latest': material.latest_price_for_plant(plant),
+                'avg': material.avg_price_for_plant(plant),
+            })
+        context['plant_prices'] = plant_prices
         context['price_record_form'] = RawMaterialPriceRecordForm()
         return context
 
@@ -272,19 +285,21 @@ class RawMaterialPriceRecordCreateView(RawMaterialAccessMixin, CreateView):
 
     def form_valid(self, form):
         raw_material = RawMaterial.objects.get(pk=self.kwargs['pk'])
+        plant = form.cleaned_data['plant']
         date = form.cleaned_data['date']
         price = form.cleaned_data['price']
         source = form.cleaned_data.get('source', '')
 
         obj, created = RawMaterialPriceRecord.objects.update_or_create(
             raw_material=raw_material,
+            plant=plant,
             date=date,
             defaults={'price': price, 'source': source}
         )
         if created:
-            messages.success(self.request, "价格记录已添加")
+            messages.success(self.request, f"已添加 {plant} 的价格记录")
         else:
-            messages.success(self.request, f"已覆盖 {date} 的价格记录")
+            messages.success(self.request, f"已覆盖 {date} — {plant} 的价格记录")
         return redirect(self.get_success_url())
 
     def form_invalid(self, form):

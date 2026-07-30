@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.db import models
 from django.db.models import Avg
@@ -118,11 +119,16 @@ class RawMaterial(models.Model):
 
     @property
     def latest_price(self):
-        """最新单价 — 取价格记录中最新日期的价格，无记录时返回存储值"""
+        """最新单价 — 全局最新日期均价（方案B），保留2位小数"""
         if self.pk is None:
             return self._latest_price
-        latest = self.price_records.order_by('-date').first()
-        return latest.price if latest else self._latest_price
+        from django.db.models import Max
+        max_date = self.price_records.aggregate(max_date=Max('date'))['max_date']
+        if max_date is None:
+            return self._latest_price
+        day_records = self.price_records.filter(date=max_date)
+        avg = day_records.aggregate(avg=Avg('price'))['avg']
+        return avg.quantize(Decimal('0.01')) if avg is not None else self._latest_price
 
     @latest_price.setter
     def latest_price(self, value):
@@ -130,20 +136,45 @@ class RawMaterial(models.Model):
 
     @property
     def avg_price(self):
-        """近N月均价 — 时间范围内无记录时，回退到最新单价"""
+        """近N月均价 — 先同日均值，再全窗口均值（方案B变体），保留2位小数"""
         if self.pk is None:
             return self._avg_price
         config = PriceAvgConfig.get()
         cutoff = date.today() - timedelta(days=config.months * 30)
         records = self.price_records.filter(date__gte=cutoff)
-        if records.exists():
-            return records.aggregate(avg=Avg('price'))['avg']
-        # 窗口内无记录时，回退到最新单价
-        return self.latest_price
+        if not records.exists():
+            return self.latest_price
+        daily_avg = records.values('date').annotate(daily_avg=Avg('price'))
+        overall = daily_avg.aggregate(overall=Avg('daily_avg'))['overall']
+        return overall.quantize(Decimal('0.01')) if overall is not None else self.latest_price
 
     @avg_price.setter
     def avg_price(self, value):
         self._avg_price = value
+
+    # ── 工厂级别方法 ──
+
+    def latest_price_for_plant(self, plant):
+        """指定工厂的最新单价，保留2位小数"""
+        latest = self.price_records.filter(plant=plant).order_by('-date').first()
+        return latest.price if latest else None
+
+    def avg_price_for_plant(self, plant):
+        """指定工厂的近N月均价，保留2位小数"""
+        config = PriceAvgConfig.get()
+        cutoff = date.today() - timedelta(days=config.months * 30)
+        records = self.price_records.filter(plant=plant, date__gte=cutoff)
+        if records.exists():
+            avg = records.aggregate(avg=Avg('price'))['avg']
+            return avg.quantize(Decimal('0.01')) if avg is not None else self.latest_price_for_plant(plant)
+        return self.latest_price_for_plant(plant)
+
+    @property
+    def plants_with_prices(self):
+        """返回有价格记录的工厂 QuerySet"""
+        return Plant.objects.filter(
+            pk__in=self.price_records.values('plant').distinct()
+        )
 
     class Meta:
         verbose_name = "原材料"
@@ -179,11 +210,34 @@ class RawMaterialProperty(models.Model):
         ordering = ['test_config__category__order', 'test_config__order']
 
 
-# 5. 价格历史记录
+# 5. 工厂 (Plant)
+class Plant(models.Model):
+    """工厂/评估范围 (对应 SAP BWKEY)"""
+    code = models.CharField("工厂代码", max_length=20, unique=True,
+                            help_text="SAP 评估范围代码，如 3011")
+    name = models.CharField("工厂名称", max_length=100, blank=True,
+                            help_text="如：上海工厂、昆山工厂")
+    is_active = models.BooleanField("启用", default=True)
+    created_at = models.DateTimeField("录入时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "工厂"
+        verbose_name_plural = "工厂库"
+        ordering = ['code']
+
+    def __str__(self):
+        return f"{self.code} ({self.name})" if self.name else self.code
+
+
+# 6. 价格历史记录
 class RawMaterialPriceRecord(models.Model):
     raw_material = models.ForeignKey(
         RawMaterial, on_delete=models.CASCADE,
         related_name='price_records', verbose_name="原材料"
+    )
+    plant = models.ForeignKey(
+        Plant, on_delete=models.PROTECT,
+        verbose_name="工厂", help_text="该价格对应的工厂/评估范围"
     )
     price = models.DecimalField("价格 (元/kg)", max_digits=10, decimal_places=2)
     date = models.DateField("日期")
@@ -197,10 +251,11 @@ class RawMaterialPriceRecord(models.Model):
         verbose_name = "价格历史记录"
         verbose_name_plural = "价格历史记录"
         ordering = ['-date']
-        unique_together = ('raw_material', 'date')
+        unique_together = ('raw_material', 'plant', 'date')
         indexes = [
-            models.Index(fields=['raw_material', '-date']),
+            models.Index(fields=['raw_material', 'plant', '-date']),
         ]
 
     def __str__(self):
-        return f"{self.raw_material} - ¥{self.price} ({self.date})"
+        plant_str = f" [{self.plant.code}]" if self.plant_id else ""
+        return f"{self.raw_material}{plant_str} - ¥{self.price} ({self.date})"

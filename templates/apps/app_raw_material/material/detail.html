@@ -73,19 +73,33 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-2">
-                        <div class="text-muted small">最新单价</div>
+                        <div class="text-muted small">最新单价（全局）</div>
                         <span class="h3 mb-0 text-orange">
-                            {% if material.latest_price %}¥{{ material.latest_price }}{% else %}-{% endif %}
+                            {% if material.latest_price %}¥{{ material.latest_price|floatformat:2 }}{% else %}-{% endif %}
                             <span class="fs-6 text-muted fw-normal">/kg</span>
                         </span>
                     </div>
-                    <div>
-                        <div class="text-muted small">近{{ avg_months }}月均价</div>
+                    <div class="mb-3">
+                        <div class="text-muted small">近{{ avg_months }}月均价（全局）</div>
                         <span class="h3 mb-0 text-green">
                             {% if material.avg_price %}¥{{ material.avg_price|floatformat:2 }}{% else %}-{% endif %}
                             <span class="fs-6 text-muted fw-normal">/kg</span>
                         </span>
                     </div>
+                    {% if plant_prices %}
+                    <hr>
+                    <div class="text-muted small mb-2">各工厂明细</div>
+                    {% for pp in plant_prices %}
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="badge bg-azure-lt">{{ pp.plant.code }}</span>
+                        <span class="small">
+                            <span class="text-orange fw-bold">¥{{ pp.latest|default:"-"|floatformat:2 }}</span>
+                            <span class="text-muted"> / </span>
+                            <span class="text-green">¥{{ pp.avg|default:"-"|floatformat:2 }}</span>
+                        </span>
+                    </div>
+                    {% endfor %}
+                    {% endif %}
                 </div>
             </div>
 
@@ -222,6 +236,7 @@
                         <thead>
                             <tr class="text-muted">
                                 <th>日期</th>
+                                <th>工厂</th>
                                 <th>价格</th>
                                 <th>来源</th>
                             </tr>
@@ -230,6 +245,7 @@
                             {% for record in recent_records %}
                             <tr>
                                 <td>{{ record.date|date:"Y-m-d" }}</td>
+                                <td><span class="badge bg-azure-lt">{{ record.plant.code|default:"-" }}</span></td>
                                 <td class="text-orange fw-bold">¥{{ record.price }}</td>
                                 <td class="text-truncate" style="max-width:120px;" title="{{ record.source }}">
                                     {{ record.source|default:"-" }}
@@ -255,6 +271,10 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">工厂 <span class="text-danger">*</span></label>
+                            {{ price_record_form.plant }}
+                        </div>
                         <div class="mb-3">
                             <label class="form-label">价格 (元/kg) <span class="text-danger">*</span></label>
                             {{ price_record_form.price }}
@@ -316,7 +336,37 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     {% if price_records|length >= 2 %}
-    var priceData = {{ price_records_json|safe }};
+    var seriesData = {{ price_series_json|safe }};
+    var colors = ['#206bc4', '#d63939', '#2fb344', '#ae3ec9', '#f59f00',
+                  '#4299e1', '#e53e3e', '#38a169'];
+    var series = [];
+    var colorIdx = 0;
+    for (var plantName in seriesData) {
+        if (!seriesData.hasOwnProperty(plantName)) continue;
+        series.push({
+            name: plantName,
+            data: seriesData[plantName],
+            type: 'line',
+            step: 'left',
+            color: colors[colorIdx % colors.length],
+            marker: {
+                enabled: true,
+                radius: 4,
+                fillColor: '#ffffff',
+                lineWidth: 2,
+                lineColor: null
+            },
+            dataLabels: {
+                enabled: true,
+                allowOverlap: false
+            },
+            tooltip: {
+                valueDecimals: 2,
+                pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}'
+            }
+        });
+        colorIdx++;
+    }
 
     Highcharts.stockChart('price-trend-chart', {
 
@@ -348,6 +398,13 @@ document.addEventListener('DOMContentLoaded', function () {
             text: null
         },
 
+        legend: {
+            enabled: true,
+            align: 'right',
+            verticalAlign: 'top',
+            layout: 'vertical'
+        },
+
         xAxis: {
             max: new Date().getTime(),
             ordinal: false
@@ -370,15 +427,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         },
 
-        series: [{
-            name: '单价',
-            data: priceData,
-            type: 'line',
-            tooltip: {
-                valueDecimals: 2,
-                pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}'
-            }
-        }],
+        series: series,
     });
     {% endif %}
 
