@@ -37,8 +37,7 @@ class ProjectConfigAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'node_workflow_display', 'repo_workflow_display', 'edit_workflow_display']
 
     def has_add_permission(self, request):
-        """禁止新增（单例模式，已由 get_or_create 自动创建）"""
-        return False
+        return not ProjectConfig.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         """禁止删除"""

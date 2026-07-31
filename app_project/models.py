@@ -403,6 +403,9 @@ class ProjectConfig(models.Model):
     class Meta:
         verbose_name = "项目全局配置"
 
+    def __str__(self):
+        return "项目全局配置"
+
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)

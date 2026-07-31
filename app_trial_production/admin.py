@@ -41,8 +41,7 @@ class TrialProductionConfigAdmin(admin.ModelAdmin):
     list_display = ['__str__', 'workflow_display', 'updated_at']
 
     def has_add_permission(self, request):
-        """禁止新增（单例模式）"""
-        return False
+        return not TrialProductionConfig.objects.exists()
 
     def has_delete_permission(self, request, obj=None):
         """禁止删除"""
