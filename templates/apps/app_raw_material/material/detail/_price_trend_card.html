@@ -1,0 +1,46 @@
+<!-- 价格走势卡片 -->
+<div class="card">
+    <div class="card-header bg-green-lt">
+        <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>价格走势</h3>
+    </div>
+    {% if price_records|length >= 2 %}
+    <div id="price-trend-chart" style="height: 400px; width: 100%;"></div>
+    {% elif price_records|length == 1 %}
+    <div class="text-center py-4 text-muted">
+        <i class="ti ti-chart-line fs-2 d-block mb-2 opacity-25"></i>
+        仅有1条记录，需至少2条记录以显示走势图
+    </div>
+    {% else %}
+    <div class="text-center py-4 text-muted">
+        <i class="ti ti-chart-line fs-2 d-block mb-2 opacity-25"></i>
+        暂无价格历史记录
+    </div>
+    {% endif %}
+
+    {% if price_records %}
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-nowrap mb-0 small">
+            <thead>
+                <tr class="text-muted">
+                    <th>日期</th>
+                    <th>工厂</th>
+                    <th>价格</th>
+                    <th>来源</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for record in recent_records %}
+                <tr>
+                    <td>{{ record.date|date:"Y-m-d" }}</td>
+                    <td><span class="badge bg-azure-lt">{{ record.plant.code|default:"-" }}</span></td>
+                    <td class="text-orange fw-bold">¥{{ record.price }}</td>
+                    <td class="text-truncate" style="max-width:120px;" title="{{ record.source }}">
+                        {{ record.source|default:"-" }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>

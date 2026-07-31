@@ -1,5 +1,6 @@
 from datetime import date, timedelta
 from decimal import Decimal
+import uuid
 
 from django.db import models
 from django.db.models import Avg
@@ -176,6 +177,42 @@ class RawMaterial(models.Model):
             pk__in=self.price_records.values('plant').distinct()
         )
 
+    # ── 库存方法 ──
+
+    def stock_for_plant(self, plant):
+        """指定工厂的最新库存快照 QuerySet（按库位+批次分组）"""
+        latest = self.stock_snapshots.filter(plant=plant).order_by('-synced_at').first()
+        if latest is None:
+            return self.stock_snapshots.none()
+        return self.stock_snapshots.filter(
+            plant=plant, sync_batch_id=latest.sync_batch_id
+        )
+
+    def stock_total_for_plant(self, plant):
+        """指定工厂的非限制库存汇总（CLABS 合计）"""
+        result = self.stock_for_plant(plant).aggregate(
+            total=models.Sum('unrestricted_stock')
+        )['total']
+        return result or 0
+
+    def stock_safety_for_plant(self, plant):
+        """指定工厂的安全库存汇总（EISBE 合计）"""
+        result = self.stock_for_plant(plant).aggregate(
+            total=models.Sum('safety_stock')
+        )['total']
+        return result or 0
+
+    def stock_available_above_safety(self, plant):
+        """超额可用量 = CLABS合计 - EISBE合计。正数=安全，负数=低于安全线"""
+        return self.stock_total_for_plant(plant) - self.stock_safety_for_plant(plant)
+
+    @property
+    def plants_with_stock(self):
+        """返回有库存记录的工厂 QuerySet"""
+        return Plant.objects.filter(
+            pk__in=self.stock_snapshots.values('plant').distinct()
+        )
+
     class Meta:
         verbose_name = "原材料"
         verbose_name_plural = "原材料库"
@@ -259,3 +296,66 @@ class RawMaterialPriceRecord(models.Model):
     def __str__(self):
         plant_str = f" [{self.plant.code}]" if self.plant_id else ""
         return f"{self.raw_material}{plant_str} - ¥{self.price} ({self.date})"
+
+
+# 7. 原材料库存快照
+class RawMaterialStockSnapshot(models.Model):
+    """原材料库存快照（SAP ZRFC_GET_MAT_STOCK），每次同步全量保存，保留历史"""
+
+    sync_batch_id = models.UUIDField(
+        "同步批次", default=uuid.uuid4, editable=False,
+        help_text="同一次同步任务共享同一批次ID"
+    )
+    raw_material = models.ForeignKey(
+        RawMaterial, on_delete=models.CASCADE,
+        related_name='stock_snapshots', verbose_name="原材料"
+    )
+    plant = models.ForeignKey(
+        Plant, on_delete=models.PROTECT,
+        verbose_name="工厂", help_text="库存所在工厂 (SAP WERKS)"
+    )
+    storage_location = models.CharField(
+        "库存地点", max_length=4, blank=True,
+        help_text="SAP 库存地点代码 (LGORT)"
+    )
+    batch = models.CharField(
+        "批号", max_length=10, blank=True, default="",
+        help_text="批次号 (CHARG)，无批次时为空"
+    )
+    unrestricted_stock = models.DecimalField(
+        "非限制库存", max_digits=13, decimal_places=3, default=0,
+        help_text="实际可用库存量 (CLABS/LABST)，可直接用于生产领料"
+    )
+    safety_stock = models.DecimalField(
+        "安全库存", max_digits=13, decimal_places=3, default=0,
+        help_text="安全库存阈值 (EISBE)，MRP 参数，低于此值触发补货建议。非实际库存"
+    )
+    synced_at = models.DateTimeField(
+        "同步时间", auto_now_add=True,
+        help_text="该条记录写入数据库的时间"
+    )
+
+    @property
+    def available_above_safety(self):
+        """该行超额可用量 = CLABS - EISBE"""
+        return self.unrestricted_stock - self.safety_stock
+
+    @property
+    def is_below_safety(self):
+        """该行是否低于安全库存"""
+        return self.available_above_safety < 0
+
+    class Meta:
+        verbose_name = "原材料库存快照"
+        verbose_name_plural = "原材料库存快照"
+        ordering = ['-synced_at', 'raw_material', 'plant']
+        indexes = [
+            models.Index(fields=['raw_material', 'plant', '-synced_at']),
+            models.Index(fields=['sync_batch_id']),
+            models.Index(fields=['synced_at']),
+        ]
+
+    def __str__(self):
+        plant_str = f" [{self.plant.code}]" if self.plant_id else ""
+        loc_str = f" / {self.storage_location}" if self.storage_location else ""
+        return f"{self.raw_material}{plant_str}{loc_str} - CLABS={self.unrestricted_stock}"

@@ -101,7 +101,7 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related(
-            'properties__test_config', 'price_records'
+            'properties__test_config', 'price_records', 'stock_snapshots__plant'
         )
 
     def get_object(self, queryset=None):
@@ -161,6 +161,35 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
                 'avg': material.avg_price_for_plant(plant),
             })
         context['plant_prices'] = plant_prices
+
+        # ── 库存概览 ──
+        stock_plants = material.plants_with_stock
+        plant_stocks = []
+        latest_synced_at = None
+        for plant in stock_plants:
+            snapshots = material.stock_for_plant(plant).order_by(
+                'storage_location', 'batch'
+            )
+            clabs_total = material.stock_total_for_plant(plant)
+            eisbe_total = material.stock_safety_for_plant(plant)
+            available = material.stock_available_above_safety(plant)
+
+            # 记录最新同步时间
+            first = snapshots.first()
+            if first and (latest_synced_at is None or first.synced_at > latest_synced_at):
+                latest_synced_at = first.synced_at
+
+            plant_stocks.append({
+                'plant': plant,
+                'snapshots': snapshots,
+                'clabs_total': clabs_total,
+                'eisbe_total': eisbe_total,
+                'available': available,
+                'is_below_safety': available < 0,
+            })
+        context['plant_stocks'] = plant_stocks
+        context['latest_stock_synced_at'] = latest_synced_at
+
         return context
 
 class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):

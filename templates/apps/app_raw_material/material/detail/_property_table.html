@@ -1,0 +1,49 @@
+<!-- 性能指标表格 -->
+<div class="card mb-3">
+    <div class="card-header bg-purple-lt">
+        <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>性能指标</h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table table-striped">
+            <thead>
+            <tr>
+                <th>分类</th>
+                <th>测试项目</th>
+                <th>标准/条件</th>
+                <th>数值 / 结果</th>
+                <th>测试日期</th>
+                <th>备注</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for prop in material.properties.all %}
+                <tr>
+                    <td><span class="badge bg-secondary-lt">{{ prop.test_config.category.name }}</span></td>
+                    <td class="fw-bold">{{ prop.test_config.name }}</td>
+                    <td class="text-muted small">
+                        {{ prop.test_config.standard }}
+                        {% if prop.test_config.condition %}<br>({{ prop.test_config.condition }}){% endif %}
+                    </td>
+                    <td class="fs-3 fw-bold text-dark">
+                        {% if prop.test_config.data_type == 'NUMBER' %}
+                            {{ prop.value }}
+                        {% else %}
+                            {{ prop.value_text }}
+                        {% endif %}
+                        <span class="text-muted fs-5 fw-normal">{{ prop.test_config.unit }}</span>
+                    </td>
+                    <td>{{ prop.test_date|date:"Y-m-d"|default:"-" }}</td>
+                    <td class="text-muted">{{ prop.remark }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 text-muted">
+                        <i class="ti ti-flask-off fs-1 d-block mb-2 opacity-25"></i>
+                        暂无性能数据
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

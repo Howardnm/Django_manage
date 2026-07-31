@@ -1,0 +1,36 @@
+<!-- 基础信息卡片 -->
+<div class="card mb-3">
+    <div class="card-header bg-blue-lt">
+        <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基础信息</h3>
+    </div>
+    <div class="card-body">
+        <dl class="row mb-0">
+            <dt class="col-5 text-muted">类型</dt>
+            <dd class="col-7"><span class="badge bg-blue-lt">{{ material.category.name }}</span></dd>
+
+            <dt class="col-5 text-muted">供应商</dt>
+            <dd class="col-7">
+                {% if material.supplier %}
+                    <a href="{% url 'raw_supplier_detail' material.supplier.pk %}">{{ material.supplier.name }}</a>
+                {% else %}
+                    -
+                {% endif %}
+            </dd>
+
+            <dt class="col-5 text-muted">内部编码</dt>
+            <dd class="col-7">{{ material.warehouse_code|default:"-" }}</dd>
+
+            <dt class="col-5 text-muted">购入日期</dt>
+            <dd class="col-7">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</dd>
+
+            <dt class="col-5 text-muted">适用体系</dt>
+            <dd class="col-7">
+                {% for mat_type in material.suitable_materials.all %}
+                    <span class="badge bg-green-lt mb-1">{{ mat_type.name }}</span>
+                {% empty %}
+                    <span class="text-muted">-</span>
+                {% endfor %}
+            </dd>
+        </dl>
+    </div>
+</div>

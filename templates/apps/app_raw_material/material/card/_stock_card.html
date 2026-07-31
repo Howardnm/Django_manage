@@ -1,0 +1,91 @@
+<!-- 库存概览卡片 -->
+<div class="card mb-3">
+    <div class="card-header bg-azure-lt">
+        <h3 class="card-title text-azure"><i class="ti ti-package me-2"></i>库存概览</h3>
+        {% if latest_stock_synced_at %}
+        <span class="text-muted small ms-auto">
+            <i class="ti ti-clock me-1"></i>{{ latest_stock_synced_at|date:"Y-m-d H:i" }}
+        </span>
+        {% endif %}
+    </div>
+    {% if plant_stocks %}
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table mb-0">
+            <thead>
+                <tr>
+                    <th>工厂</th>
+                    <th>库位</th>
+                    <th>批号</th>
+                    <th class="text-end">非限制库存</th>
+                    <th class="text-end">安全库存</th>
+                    <th class="text-end">超额可用量</th>
+                    <th class="text-center">状态</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ps in plant_stocks %}
+                    {% if ps.snapshots %}
+                        {% for rec in ps.snapshots %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-azure-lt">
+                                    {{ ps.plant.code }}{% if ps.plant.name %} ({{ ps.plant.name }}){% endif %}
+                                </span>
+                            </td>
+                            <td>{{ rec.storage_location|default:"-" }}</td>
+                            <td>{{ rec.batch|default:"-" }}</td>
+                            <td class="text-end fw-bold">{{ rec.unrestricted_stock|floatformat:3 }}</td>
+                            <td class="text-end text-muted">{{ rec.safety_stock|floatformat:3 }}</td>
+                            <td class="text-end {% if rec.is_below_safety %}text-red{% else %}text-green{% endif %}">
+                                {{ rec.available_above_safety|floatformat:3 }}
+                            </td>
+                            <td class="text-center">
+                                {% if rec.is_below_safety %}
+                                <span class="badge bg-red-lt" title="低于安全库存">⚠</span>
+                                {% else %}
+                                <span class="text-green">✓</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                        <!-- 工厂汇总行 -->
+                        <tr class="table-active">
+                            <td colspan="3" class="text-end text-muted small">
+                                <strong>{{ ps.plant.code }}</strong> 合计
+                            </td>
+                            <td class="text-end fw-bold">{{ ps.clabs_total|floatformat:3 }}</td>
+                            <td class="text-end text-muted">{{ ps.eisbe_total|floatformat:3 }}</td>
+                            <td class="text-end fw-bold {% if ps.available < 0 %}text-red{% else %}text-green{% endif %}">
+                                {{ ps.available|floatformat:3 }}
+                            </td>
+                            <td class="text-center">
+                                {% if ps.is_below_safety %}
+                                <span class="badge bg-red-lt">低于安全库存</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td>
+                                <span class="badge bg-azure-lt">
+                                    {{ ps.plant.code }}{% if ps.plant.name %} ({{ ps.plant.name }}){% endif %}
+                                </span>
+                            </td>
+                            <td colspan="5" class="text-muted">无明细数据</td>
+                            <td class="text-center">-</td>
+                        </tr>
+                        {% endif %}
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="card-body">
+        <div class="text-center py-3 text-muted">
+            <i class="ti ti-package-off fs-2 d-block mb-2 opacity-25"></i>
+            暂无库存数据
+            <div class="small mt-1">请运行库存同步命令获取数据</div>
+        </div>
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,36 @@
+<!-- 价格概览卡片 -->
+<div class="card mb-3">
+    <div class="card-header bg-green-lt">
+        <h3 class="card-title text-green"><i class="ti ti-currency-yen me-2"></i>价格概览</h3>
+    </div>
+    <div class="card-body">
+        <div class="mb-2">
+            <div class="text-muted small">最新单价（全局）</div>
+            <span class="h3 mb-0 text-orange">
+                {% if material.latest_price %}¥{{ material.latest_price|floatformat:2 }}{% else %}-{% endif %}
+                <span class="fs-6 text-muted fw-normal">/kg</span>
+            </span>
+        </div>
+        <div class="mb-3">
+            <div class="text-muted small">近{{ avg_months }}月均价（全局）</div>
+            <span class="h3 mb-0 text-green">
+                {% if material.avg_price %}¥{{ material.avg_price|floatformat:2 }}{% else %}-{% endif %}
+                <span class="fs-6 text-muted fw-normal">/kg</span>
+            </span>
+        </div>
+        {% if plant_prices %}
+        <hr>
+        <div class="text-muted small mb-2">各工厂明细</div>
+        {% for pp in plant_prices %}
+        <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="badge bg-azure-lt">{{ pp.plant.code }}</span>
+            <span class="small">
+                <span class="text-orange fw-bold">¥{{ pp.latest|default:"-"|floatformat:2 }}</span>
+                <span class="text-muted"> / </span>
+                <span class="text-green">¥{{ pp.avg|default:"-"|floatformat:2 }}</span>
+            </span>
+        </div>
+        {% endfor %}
+        {% endif %}
+    </div>
+</div>

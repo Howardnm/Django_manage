@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attachment_tags %}
 
 {% block content %}
     <div class="page-header d-print-none mb-3">
@@ -9,11 +10,9 @@
             </div>
             <div class="col-auto ms-auto">
                 <div class="btn-list">
-                    <!-- 加入对比按钮 -->
                     <button type="button" class="btn btn-outline-warning" onclick="addToCompare({{ material.pk }})">
                         <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
                     </button>
-                    <!-- 复制副本按钮 -->
                     <a href="{% url 'raw_material_duplicate' material.pk %}" class="btn btn-outline-secondary">
                         <i class="ti ti-copy me-1"></i> 复制副本
                     </a>
@@ -26,234 +25,18 @@
     </div>
 
     <div class="row row-cards">
-        <!-- 左侧：基础信息与文档 (30%) -->
         <div class="col-lg-4">
-
-            <!-- 1. 基础信息卡片 -->
-            <div class="card mb-3">
-                <div class="card-header bg-blue-lt">
-                    <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基础信息</h3>
-                </div>
-                <div class="card-body">
-                    <dl class="row mb-0">
-                        <dt class="col-5 text-muted">类型</dt>
-                        <dd class="col-7"><span class="badge bg-blue-lt">{{ material.category.name }}</span></dd>
-
-                        <dt class="col-5 text-muted">供应商</dt>
-                        <dd class="col-7">
-                            {% if material.supplier %}
-                                <a href="{% url 'raw_supplier_detail' material.supplier.pk %}">{{ material.supplier.name }}</a>
-                            {% else %}
-                                -
-                            {% endif %}
-                        </dd>
-
-                        <dt class="col-5 text-muted">内部编码</dt>
-                        <dd class="col-7">{{ material.warehouse_code|default:"-" }}</dd>
-
-                        <dt class="col-5 text-muted">购入日期</dt>
-                        <dd class="col-7">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</dd>
-
-                        <dt class="col-5 text-muted">适用体系</dt>
-                        <dd class="col-7">
-                            {% for mat_type in material.suitable_materials.all %}
-                                <span class="badge bg-green-lt mb-1">{{ mat_type.name }}</span>
-                            {% empty %}
-                                <span class="text-muted">-</span>
-                            {% endfor %}
-                        </dd>
-                    </dl>
-                </div>
-            </div>
-
-            <!-- 2. 价格概览 -->
-            <div class="card mb-3">
-                <div class="card-header bg-green-lt">
-                    <h3 class="card-title text-green"><i class="ti ti-currency-yen me-2"></i>价格概览</h3>
-                </div>
-                <div class="card-body">
-                    <div class="mb-2">
-                        <div class="text-muted small">最新单价（全局）</div>
-                        <span class="h3 mb-0 text-orange">
-                            {% if material.latest_price %}¥{{ material.latest_price|floatformat:2 }}{% else %}-{% endif %}
-                            <span class="fs-6 text-muted fw-normal">/kg</span>
-                        </span>
-                    </div>
-                    <div class="mb-3">
-                        <div class="text-muted small">近{{ avg_months }}月均价（全局）</div>
-                        <span class="h3 mb-0 text-green">
-                            {% if material.avg_price %}¥{{ material.avg_price|floatformat:2 }}{% else %}-{% endif %}
-                            <span class="fs-6 text-muted fw-normal">/kg</span>
-                        </span>
-                    </div>
-                    {% if plant_prices %}
-                    <hr>
-                    <div class="text-muted small mb-2">各工厂明细</div>
-                    {% for pp in plant_prices %}
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <span class="badge bg-azure-lt">{{ pp.plant.code }}</span>
-                        <span class="small">
-                            <span class="text-orange fw-bold">¥{{ pp.latest|default:"-"|floatformat:2 }}</span>
-                            <span class="text-muted"> / </span>
-                            <span class="text-green">¥{{ pp.avg|default:"-"|floatformat:2 }}</span>
-                        </span>
-                    </div>
-                    {% endfor %}
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- 3. 文档下载 -->
-            <div class="card mb-3">
-                <div class="card-header bg-red-lt">
-                    <h3 class="card-title text-red"><i class="ti ti-file-download me-2"></i>文档资料</h3>
-                </div>
-{% load attachment_tags %}
-                <div class="list-group list-group-flush">
-                    {% attachment_url material 'TDS' as tds_url %}{% if tds_url %}
-                        <a href="{{ tds_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
-                            <span class="avatar avatar-xs bg-azure-lt me-2">TDS</span>
-                            TDS 物性表
-                            <i class="ti ti-download ms-auto text-muted"></i>
-                        </a>
-                    {% endif %}
-                    {% attachment_url material 'MSDS' as msds_url %}{% if msds_url %}
-                        <a href="{{ msds_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
-                            <span class="avatar avatar-xs bg-red-lt me-2">MSDS</span>
-                            MSDS 报告
-                            <i class="ti ti-download ms-auto text-muted"></i>
-                        </a>
-                    {% endif %}
-                    {% attachment_url material 'RoHS' as rohs_url %}{% if rohs_url %}
-                        <a href="{{ rohs_url }}" target="_blank" class="list-group-item list-group-item-action d-flex align-items-center">
-                            <span class="avatar avatar-xs bg-green-lt me-2">RoHS</span>
-                            RoHS 环保报告
-                            <i class="ti ti-download ms-auto text-muted"></i>
-                        </a>
-                    {% endif %}
-                    {% if not tds_url and not msds_url and not rohs_url %}
-                        <div class="list-group-item text-muted text-center py-3">
-                            <i class="ti ti-file-off fs-2 d-block mb-2 opacity-25"></i>
-                            暂无文档
-                        </div>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- 4. 附件管理 -->
+            {% include 'apps/app_raw_material/material/card/_info_card.html' %}
+            {% include 'apps/app_raw_material/material/card/_price_card.html' %}
+            {% include 'apps/app_raw_material/material/card/_stock_card.html' %}
+            {% include 'apps/app_raw_material/material/card/_document_card.html' %}
             {% attachment_panel material %}
-
-            <!-- 5. 使用说明 -->
-            <div class="card">
-                <div class="card-header">
-                    <h3 class="card-title"><i class="ti ti-notes me-2"></i>使用说明</h3>
-                </div>
-                <div class="card-body">
-                    {{ material.usage_method|linebreaks|default:"暂无描述" }}
-                </div>
-            </div>
+            {% include 'apps/app_raw_material/material/card/_usage_card.html' %}
         </div>
 
-        <!-- 右侧：性能指标 & 价格走势 (70%) -->
         <div class="col-lg-8">
-            <!-- 性能指标 -->
-            <div class="card mb-3">
-                <div class="card-header bg-purple-lt">
-                    <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>性能指标</h3>
-                </div>
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table table-striped">
-                        <thead>
-                        <tr>
-                            <th>分类</th>
-                            <th>测试项目</th>
-                            <th>标准/条件</th>
-                            <th>数值 / 结果</th>
-                            <th>测试日期</th>
-                            <th>备注</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for prop in material.properties.all %}
-                            <tr>
-                                <td><span class="badge bg-secondary-lt">{{ prop.test_config.category.name }}</span></td>
-                                <td class="fw-bold">{{ prop.test_config.name }}</td>
-                                <td class="text-muted small">
-                                    {{ prop.test_config.standard }}
-                                    {% if prop.test_config.condition %}<br>({{ prop.test_config.condition }}){% endif %}
-                                </td>
-                                <td class="fs-3 fw-bold text-dark">
-                                    {% if prop.test_config.data_type == 'NUMBER' %}
-                                        {{ prop.value }}
-                                    {% else %}
-                                        {{ prop.value_text }}
-                                    {% endif %}
-                                    <span class="text-muted fs-5 fw-normal">{{ prop.test_config.unit }}</span>
-                                </td>
-                                <td>{{ prop.test_date|date:"Y-m-d"|default:"-" }}</td>
-                                <td class="text-muted">{{ prop.remark }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="6" class="text-center py-5 text-muted">
-                                    <i class="ti ti-flask-off fs-1 d-block mb-2 opacity-25"></i>
-                                    暂无性能数据
-                                </td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- 价格走势 -->
-            <div class="card">
-                <div class="card-header bg-green-lt">
-                    <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>价格走势</h3>
-                </div>
-                <!-- 价格走势图 -->
-                {% if price_records|length >= 2 %}
-                <div id="price-trend-chart" style="height: 400px; width: 100%;"></div>
-                {% elif price_records|length == 1 %}
-                <div class="text-center py-4 text-muted">
-                    <i class="ti ti-chart-line fs-2 d-block mb-2 opacity-25"></i>
-                    仅有1条记录，需至少2条记录以显示走势图
-                </div>
-                {% else %}
-                <div class="text-center py-4 text-muted">
-                    <i class="ti ti-chart-line fs-2 d-block mb-2 opacity-25"></i>
-                    暂无价格历史记录
-                </div>
-                {% endif %}
-
-                <!-- 最近记录 -->
-                {% if price_records %}
-                <div class="table-responsive">
-                    <table class="table table-vcenter card-table table-nowrap mb-0 small">
-                        <thead>
-                            <tr class="text-muted">
-                                <th>日期</th>
-                                <th>工厂</th>
-                                <th>价格</th>
-                                <th>来源</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for record in recent_records %}
-                            <tr>
-                                <td>{{ record.date|date:"Y-m-d" }}</td>
-                                <td><span class="badge bg-azure-lt">{{ record.plant.code|default:"-" }}</span></td>
-                                <td class="text-orange fw-bold">¥{{ record.price }}</td>
-                                <td class="text-truncate" style="max-width:120px;" title="{{ record.source }}">
-                                    {{ record.source|default:"-" }}
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                {% endif %}
-            </div>
+            {% include 'apps/app_raw_material/material/detail/_property_table.html' %}
+            {% include 'apps/app_raw_material/material/detail/_price_trend_card.html' %}
         </div>
     </div>
 

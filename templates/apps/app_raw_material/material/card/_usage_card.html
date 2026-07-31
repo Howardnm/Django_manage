@@ -1,0 +1,9 @@
+<!-- 使用说明卡片 -->
+<div class="card">
+    <div class="card-header">
+        <h3 class="card-title"><i class="ti ti-notes me-2"></i>使用说明</h3>
+    </div>
+    <div class="card-body">
+        {{ material.usage_method|linebreaks|default:"暂无描述" }}
+    </div>
+</div>

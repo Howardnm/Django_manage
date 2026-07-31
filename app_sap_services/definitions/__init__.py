@@ -14,8 +14,10 @@ app_sap_services.definitions — RFC 函数声明式定义。
 
 from .material import MaterialQuery
 from .price import MaterialPriceQuery
+from .stock import MaterialStockQuery
 
 __all__ = [
     "MaterialQuery",
     "MaterialPriceQuery",
+    "MaterialStockQuery",
 ]
