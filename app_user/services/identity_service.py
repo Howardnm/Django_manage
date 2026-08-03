@@ -37,12 +37,6 @@ VERSION_CHECK_INTERVAL = 5  # 每 5 秒检查一次 L2 版本号
 _last_version_check = 0
 _cached_version = ''
 
-# ── 兼容旧缓存 key（升级过渡期）─────────────────────────────
-RBAC_CACHE_KEY_ROLES = 'rbac:roles'
-RBAC_CACHE_KEY_GROUPS = 'rbac:groups'
-RBAC_CACHE_KEY_MODULES = 'rbac:modules'
-RBAC_TIMEOUT = 3600  # 1 小时 TTL（仅 L2 版本号无过期时间）
-
 
 def _rbac_cache():
     """获取 rbac 缓存后端；若不可用，回退到 default。"""
