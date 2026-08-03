@@ -309,3 +309,19 @@ SAP_SERVICES_CONFIG = {
     'max_retries': int(os.environ.get('SAP_MAX_RETRIES', '3')),
     'retry_delay': float(os.environ.get('SAP_RETRY_DELAY', '1.0')),
 }
+
+
+# ==============================================================================
+# 缓存配置 — RBAC 权限缓存使用 DatabaseCache 实现跨 Worker 共享
+# ==============================================================================
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    },
+    'rbac': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'rbac_cache',
+        'TIMEOUT': 3600,  # 1 小时 TTL，兜底保护：即使缓存失效遗漏，1 小时后自动过期
+    },
+}

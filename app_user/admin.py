@@ -421,15 +421,24 @@ class WorkGroupAdmin(admin.ModelAdmin):
 # ============================================================
 
 def _invalidate_rbac_cache():
-    """Admin 保存/删除后清除 IdentityService 模块级缓存。"""
+    """Admin 保存/删除后清除 IdentityService 权限缓存（DatabaseCache 跨 Worker 即时生效）。"""
     IdentityService.invalidate_cache()
 
 
 class CacheInvalidatingMixin:
-    """Mixin: save_model / delete_model 后自动清除权限缓存。"""
+    """Mixin: save_model / save_related / delete_model 后自动清除权限缓存。
+
+    save_related() 覆盖确保 M2M 关系（filter_horizontal）保存后清除缓存，
+    消除 save_model() 与 save_related() 之间的竞态窗口。
+    """
 
     def save_model(self, request, obj, form, change):
         super().save_model(request, obj, form, change)
+        _invalidate_rbac_cache()
+
+    def save_related(self, request, form, formsets, change):
+        """M2M 关系/内联表单保存后再清除缓存，消除竞态窗口。"""
+        super().save_related(request, form, formsets, change)
         _invalidate_rbac_cache()
 
     def delete_model(self, request, obj):

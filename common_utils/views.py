@@ -15,6 +15,7 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.views import View
 from common_utils.autocomplete_registry import get_registry
+from common_utils.mixins import InternalUserRequiredMixin
 
 # 模块级简单 TTL 缓存（组织树变更多发于维护期，60s 缓存大幅减少重复查询）
 _user_tree_cache = {'data': None, 'expires_at': 0}
@@ -90,9 +91,9 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
         return JsonResponse(data, safe=False)
 
 
-class UserTreeAPIView(View):
+class UserTreeAPIView(InternalUserRequiredMixin, View):
     """
-    组织架构人员树 API。
+    组织架构人员树 API（仅限内部用户 + 超管访问）。
 
     返回三级树形 JSON：Department → WorkGroup → User + ReviewGroup + 未分配用户。
     供前端 user_picker_modal.js 调用。

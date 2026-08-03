@@ -5,6 +5,7 @@
 
 导出: UnifiedAccessMixin。"""
 
+import logging
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse
@@ -13,6 +14,8 @@ from django.conf import settings
 from django.db.models import Q, Exists, OuterRef
 from .models import User, WorkGroup
 from .services.identity_service import IdentityService
+
+logger = logging.getLogger(__name__)
 
 
 class UnifiedAccessMixin(PermissionRequiredMixin):
@@ -70,6 +73,9 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         if not cls.module_code:
             return True
         role_codes = IdentityService.get_module_role_codes(cls.module_code)
+        # 空 role_codes = 未配置 → 拒绝访问（与 has_permission() 保持一致）
+        if not role_codes:
+            return False
         return user.user_type_id in role_codes
 
     # ══════════════════════════════════════════════════════════
@@ -120,11 +126,24 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         if user.is_superuser:
             return True
 
+        # 防御性检查：用户自身角色是否被停用（修复 #5）
+        if user.user_type_id and not getattr(user.user_type, 'is_active', True):
+            return False
+
         cfg = self._resolve_config()
+        role_codes = cfg['role_codes']
 
         # L1: 角色白名单
-        if cfg['role_codes'] and user.user_type_id not in cfg['role_codes']:
-            return False
+        if self.module_code:
+            # 动态模块（DB 驱动）：role_codes 为空 = 未配置任何角色 → 拒绝所有非超管用户（修复 #3）
+            if not role_codes:
+                return False
+            if user.user_type_id not in role_codes:
+                return False
+        else:
+            # 静态模块（类属性回退）：role_codes 为空 = 无限制（兼容旧行为）
+            if role_codes and user.user_type_id not in role_codes:
+                return False
 
         # L2: 用户等级
         if user.user_level < cfg['min_level']:
@@ -197,6 +216,14 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                     qs = qs.filter(**{f"{user_field}__department": user.department})
                 else:
                     qs = qs.filter(**{user_field: user})
+            else:
+                # 修复 C1: 无 user_link_field 时记录警告，避免静默跳过数据隔离
+                logger.warning(
+                    "get_queryset: model %s has no matching user_link_field (%s). "
+                    "L4 department isolation skipped. "
+                    "Add a matching field or set user_link_fields on the mixin.",
+                    qs.model.__name__, self.user_link_fields,
+                )
 
         # L5: 工作组级数据隔离
         if cfg['enforce_group_isolation']:
@@ -280,7 +307,18 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                 if owner:
                     break
         if not owner:
-            return True
+            # 修复 #8: 无法确定所有者时的处理
+            cfg = self._resolve_config()
+            if not cfg['enforce_dept_isolation'] and not cfg['enforce_group_isolation']:
+                # L4/L5 均未启用 → 无需所有者校验，放行
+                return True
+            # L4 或 L5 已启用但无法确定所有者 → 拒绝访问（fail-closed）
+            logger.warning(
+                "check_object_permission: object %s (pk=%s) has no matching "
+                "user_link_field (%s), but L4/L5 isolation is enabled. Denying access.",
+                type(obj).__name__, obj.pk, self.user_link_fields,
+            )
+            raise PermissionDenied("无法确定数据所有者，操作被拒绝。")
 
         # 2. 所有者本人 → 直接放行
         if owner == user:

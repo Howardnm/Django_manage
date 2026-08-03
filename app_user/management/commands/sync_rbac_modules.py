@@ -82,19 +82,38 @@ class Command(BaseCommand):
 
         # ── 创建缺失的记录 ──
         if to_create:
+            # 获取默认 RoleGroup，用于自动分配给新记录
+            default_group = None
+            try:
+                from app_user.models import RoleGroup
+                default_group = RoleGroup.objects.filter(is_active=True).first()
+            except Exception:
+                pass
+
             self.stdout.write(self.style.MIGRATE_HEADING(
                 f'\n[新增] {len(to_create)} 个 ModuleAccessConfig:'))
             for code, info in sorted(to_create.items()):
                 self.stdout.write(
                     f'  + {code} (app={info["app_label"]}, mixin={info["class_name"]})')
                 if not dry_run:
-                    ModuleAccessConfig.objects.create(
+                    cfg = ModuleAccessConfig.objects.create(
                         module_code=code,
                         module_name=code,  # 默认名称为 module_code，管理员可在 Admin 中修改
                         min_level=1,
                         enforce_dept_isolation=True,
                         enforce_group_isolation=False,
                     )
+                    # 自动分配默认 RoleGroup，避免空 role_groups 导致拒绝所有访问
+                    if default_group:
+                        cfg.role_groups.add(default_group)
+
+            if default_group:
+                self.stdout.write(
+                    f'  已自动分配默认 RoleGroup "{default_group.code}" 到以上 {len(to_create)} 个记录')
+            else:
+                self.stdout.write(self.style.WARNING(
+                    '  警告：未找到可用的 RoleGroup，请手动在 Admin 中为以上记录分配 role_groups，'
+                    '否则所有非超管用户将无法访问这些模块。'))
 
         # ── 报告孤立记录 ──
         if orphaned:

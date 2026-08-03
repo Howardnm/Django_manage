@@ -72,8 +72,17 @@ class PermissionAdapter:
 
         # ---- Step 3: 身份角色检查 (L1) — 从 _resolve_config() 动态读取 ----
         cfg = mixin._resolve_config()
-        if cfg['role_codes'] and user.user_type_id not in cfg['role_codes']:
-            raise PermissionDenied("您的角色无权访问此附件")
+        role_codes = cfg['role_codes']
+        if mixin.module_code:
+            # 动态模块（DB 驱动）：空 role_codes = 未配置 → 拒绝
+            if not role_codes:
+                raise PermissionDenied("您的角色无权访问此附件")
+            if user.user_type_id not in role_codes:
+                raise PermissionDenied("您的角色无权访问此附件")
+        else:
+            # 静态模块：空 role_codes = 无限制
+            if role_codes and user.user_type_id not in role_codes:
+                raise PermissionDenied("您的角色无权访问此附件")
 
         # ---- Step 4: 用户等级检查 (L2) ——
         if user.user_level < cfg['min_level']:

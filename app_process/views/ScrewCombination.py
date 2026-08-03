@@ -87,3 +87,7 @@ class ScrewCombinationDetailView(ProcessAccessMixin, DetailView):
 
     def get_object(self, queryset=None):
         return self.get_object_or_deny()
+
+    def check_object_permission(self, obj):
+        """ScrewCombination 是共享配置对象，无所有者字段，无需 L4/L5 对象级校验。"""
+        return True

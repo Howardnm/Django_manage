@@ -23,9 +23,21 @@ class CommonUtilsConfig(AppConfig):
 
         User = get_user_model()
 
+        # user 类型的 access_filter：仅内部用户和超管可搜索用户列表
+        def _user_access_filter(user, qs):
+            if user.is_superuser:
+                return qs
+            from app_user.services.identity_service import IdentityService
+            internal_codes = IdentityService.get_internal_role_codes()
+            if user.user_type_id not in internal_codes:
+                from django.core.exceptions import PermissionDenied
+                raise PermissionDenied()
+            return qs
+
         register_autocomplete('user',
             lambda q: User.objects.only('pk', 'username', 'first_name').filter(
                 is_active=True,
             ).filter(Q(username__icontains=q) | Q(first_name__icontains=q)),
             lambda u: {'value': u.pk, 'text': f'{u.first_name or u.username}'},
+            access_filter=_user_access_filter,
         )

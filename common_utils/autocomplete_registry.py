@@ -98,8 +98,14 @@ def make_autocomplete_access_filter(access_mixin_class):
             do_l4 = getattr(access_mixin_class, 'enforce_dept_isolation', False)
             do_l5 = getattr(access_mixin_class, 'enforce_group_isolation', False)
 
-        if role_codes and user.user_type_id not in role_codes:
+        if role_codes:
+            # 已配置角色白名单 → 按配置检查
+            if user.user_type_id not in role_codes:
+                raise PermissionDenied()
+        elif module_code:
+            # 已配置 ModuleAccessConfig 但无 role_groups → 拒绝访问（与 has_permission() 保持一致）
             raise PermissionDenied()
+        # 未配置 module_code 且 role_codes 为空 → 不限制（兼容旧行为）
 
         # L4: 部门隔离
         if do_l4 and user_link_field:

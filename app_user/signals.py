@@ -7,7 +7,7 @@ Admin 中通过 CacheInvalidatingMixin 覆盖 save/delete 方法实现失效；
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
-from .models import UserRole, RoleGroup, ModuleAccessConfig, SidebarModule
+from .models import UserRole, RoleGroup, ModuleAccessConfig, SidebarModule, SidebarSubItem
 from .services.identity_service import IdentityService
 
 
@@ -15,6 +15,7 @@ from .services.identity_service import IdentityService
 @receiver([post_save, post_delete], sender=RoleGroup)
 @receiver([post_save, post_delete], sender=ModuleAccessConfig)
 @receiver([post_save, post_delete], sender=SidebarModule)
+@receiver([post_save, post_delete], sender=SidebarSubItem)
 def invalidate_rbac_cache(sender, instance, **kwargs):
-    """UserRole / RoleGroup / ModuleAccessConfig / SidebarModule 变更时清除缓存。"""
+    """UserRole / RoleGroup / ModuleAccessConfig / SidebarModule / SidebarSubItem 变更时清除缓存。"""
     IdentityService.invalidate_cache()

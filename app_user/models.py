@@ -272,6 +272,7 @@ class UserRole(models.Model):
     sort_order = models.IntegerField("排序", default=0)
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
 
     class Meta:
         verbose_name = "[L1] 用户角色"
@@ -355,6 +356,7 @@ class RoleGroup(models.Model):
                                    related_name='groups')
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
 
     class Meta:
         verbose_name = "[L1 分组] 角色分组"
@@ -388,6 +390,7 @@ class ModuleAccessConfig(models.Model):
     enforce_group_isolation = models.BooleanField("工作组隔离 (L5)", default=False)
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
+    updated_at = models.DateTimeField("更新时间", auto_now=True)
 
     class Meta:
         verbose_name = "[L1~L5] 模块权限配置"
