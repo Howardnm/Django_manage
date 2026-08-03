@@ -50,9 +50,11 @@ def _is_cache_stale():
     """检查 L2 版本号，判断 L1 缓存是否过期。
 
     每 VERSION_CHECK_INTERVAL 秒最多检查一次，避免每次请求都查 DB。
+    检测到版本变化时，清空全部 L1 缓存，确保所有 get_all_* 方法都重新加载。
     Returns: True 若 L1 缓存需要刷新。
     """
     global _last_version_check, _cached_version
+    global _cache_roles, _cache_groups, _cache_modules
     now = time.time()
     if now - _last_version_check < VERSION_CHECK_INTERVAL:
         return False  # 快速路径: 跳过 DB 检查
@@ -62,9 +64,13 @@ def _is_cache_stale():
         current_version = cache.get(RBAC_VERSION_KEY, '')
         if current_version != _cached_version:
             _cached_version = current_version
+            # 清空全部 L1 缓存，避免各 get_all_* 方法间状态不一致
+            _cache_roles = None
+            _cache_groups = None
+            _cache_modules = None
             return True
     except Exception as e:
-        logger.warning("RBAC version check failed: %s", e)
+        _handle_cache_error(e, "version check")
     return False
 
 
@@ -76,8 +82,17 @@ def _bump_version():
         cache.set(RBAC_VERSION_KEY, new_version, timeout=None)
         return new_version
     except Exception as e:
-        logger.warning("RBAC version bump failed: %s", e)
+        _handle_cache_error(e, "version bump")
         return ''
+
+
+def _handle_cache_error(exc, operation):
+    """统一处理缓存错误：表不存在 → debug，其他 → warning。"""
+    msg = str(exc)
+    if "doesn't exist" in msg or "does not exist" in msg or "1146" in msg:
+        logger.debug("RBAC cache %s skipped (table not available): %s", operation, msg)
+    else:
+        logger.warning("RBAC cache %s failed: %s", operation, msg)
 
 
 class IdentityService:
