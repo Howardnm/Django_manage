@@ -12,7 +12,6 @@ from .models import (
     UserRole, RoleGroup, ModuleAccessConfig,
     SidebarModule, SidebarSubItem,
 )
-from .services.identity_service import IdentityService
 
 admin.site.unregister(Group)
 
@@ -419,39 +418,12 @@ class WorkGroupAdmin(admin.ModelAdmin):
 # ============================================================
 # 动态 RBAC 权限体系 — Admin 注册
 # ============================================================
-
-def _invalidate_rbac_cache():
-    """Admin 保存/删除后清除 IdentityService 权限缓存（DatabaseCache 跨 Worker 即时生效）。"""
-    IdentityService.invalidate_cache()
-
-
-class CacheInvalidatingMixin:
-    """Mixin: save_model / save_related / delete_model 后自动清除权限缓存。
-
-    save_related() 覆盖确保 M2M 关系（filter_horizontal）保存后清除缓存，
-    消除 save_model() 与 save_related() 之间的竞态窗口。
-    """
-
-    def save_model(self, request, obj, form, change):
-        super().save_model(request, obj, form, change)
-        _invalidate_rbac_cache()
-
-    def save_related(self, request, form, formsets, change):
-        """M2M 关系/内联表单保存后再清除缓存，消除竞态窗口。"""
-        super().save_related(request, form, formsets, change)
-        _invalidate_rbac_cache()
-
-    def delete_model(self, request, obj):
-        super().delete_model(request, obj)
-        _invalidate_rbac_cache()
-
-    def delete_queryset(self, request, queryset):
-        super().delete_queryset(request, queryset)
-        _invalidate_rbac_cache()
-
+# 注意：RBAC 缓存失效统一由 app_user.signals 的 post_save / post_delete /
+# m2m_changed 信号负责，覆盖 Admin 与 shell 等所有变更路径，
+# 此处不再调用 IdentityService.invalidate_cache()，避免双重失效。
 
 @admin.register(UserRole)
-class UserRoleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+class UserRoleAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'is_internal', 'sort_order', 'is_active')
     list_filter = ('is_internal', 'is_active')
     search_fields = ('code', 'name')
@@ -459,14 +431,14 @@ class UserRoleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
 
 
 @admin.register(RoleGroup)
-class RoleGroupAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+class RoleGroupAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'is_active')
     search_fields = ('code', 'name')
     filter_horizontal = ('roles',)
 
 
 @admin.register(ModuleAccessConfig)
-class ModuleAccessConfigAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+class ModuleAccessConfigAdmin(admin.ModelAdmin):
     list_display = ('module_code', 'module_name', 'min_level',
                     'enforce_dept_isolation', 'enforce_group_isolation', 'is_active')
     list_filter = ('is_active', 'enforce_dept_isolation', 'enforce_group_isolation')
@@ -524,7 +496,7 @@ class SidebarSubItemInline(admin.TabularInline):
 
 
 @admin.register(SidebarModule)
-class SidebarModuleAdmin(CacheInvalidatingMixin, admin.ModelAdmin):
+class SidebarModuleAdmin(admin.ModelAdmin):
     list_display = ('code', 'name', 'module_access', 'sort_order', 'is_active')
     list_filter = ('is_active',)
     search_fields = ('code', 'name')
