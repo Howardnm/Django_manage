@@ -7,6 +7,21 @@ class PanelAccessMixin(UnifiedAccessMixin):
     module_code = 'panel'
 
 
+class HomeAccessMixin(UnifiedAccessMixin):
+    """系统首页基础权限 — 独立 module_code='home'，与看板工作台（panel）权限解耦。
+
+    L1/L2: HomeAccessMixin (module_code='home') 从 DB 读取。
+    L3: 显式声明 [] — 本页为零数据库查询的纯静态页面，无适用 L3 权限码。
+
+    注意：module_code='home' 的 ModuleAccessConfig 需通过
+    python manage.py sync_rbac_modules 创建，并在 Admin 中配置 role_groups；
+    未配置时 fail-closed（仅超管可访问首页）。
+    """
+
+    module_code = 'home'
+    permission_required = []  # 纯静态页面，零数据查询
+
+
 # ══════════════════════════════════════════════════════════
 #  个人工作台卡片权限 Mixin（组合对应模块权限，统一管理）
 # ══════════════════════════════════════════════════════════

@@ -353,7 +353,9 @@ class RoleGroup(models.Model):
                             help_text="如 '技术核心组'、'纯研发组'。")
     description = models.TextField("描述", blank=True)
     roles = models.ManyToManyField(UserRole, verbose_name="包含角色",
-                                   related_name='groups')
+                                   related_name='groups',
+                                   blank=True,
+                                   help_text="本分组包含的角色。留空 = 空分组（引用它的模块将为 fail-closed，拒绝所有非超管用户访问）。")
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)
@@ -383,7 +385,9 @@ class ModuleAccessConfig(models.Model):
     module_name = models.CharField("模块名称", max_length=50,
                                    help_text="如 '实验配方库'。")
     role_groups = models.ManyToManyField(RoleGroup, verbose_name="允许访问的角色组",
-                                         help_text="用户所属角色在任一勾选组中即可访问本模块。")
+                                         blank=True,
+                                         help_text="用户所属角色在任一勾选组中即可访问本模块。"
+                                                   "留空 = 拒绝所有非超管用户访问（fail-closed）。")
     min_level = models.PositiveIntegerField("最低等级", default=1,
                                             help_text="L2 用户等级门槛。")
     enforce_dept_isolation = models.BooleanField("部门隔离 (L4)", default=True)

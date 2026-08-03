@@ -27,11 +27,13 @@
                     本系统集成了项目管理、材料配方管理、试验排产、流程审批、表单管理等功能模块，
                     为研发与生产团队提供一站式协作平台。
                 </p>
+                {% if has_panel_access %}
                 <div class="mt-4">
                     <a href="{% url 'personal_workspace' %}" class="btn btn-primary btn-lg">
                         <i class="ti ti-layout-dashboard me-2"></i>进入个人工作台
                     </a>
                 </div>
+                {% endif %}
             </div>
         </div>
     </div>
