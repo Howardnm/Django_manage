@@ -168,15 +168,15 @@ class OrgRoleAssignment(models.Model):
             models.UniqueConstraint(
                 fields=['role', 'user', 'subsidiary'],
                 name='unique_role_user_subsidiary',
-                condition=models.Q(subsidiary__isnull=False)),
+            ),
             models.UniqueConstraint(
                 fields=['role', 'user', 'department'],
                 name='unique_role_user_department',
-                condition=models.Q(department__isnull=False)),
+            ),
             models.UniqueConstraint(
                 fields=['role', 'user', 'workgroup'],
                 name='unique_role_user_workgroup',
-                condition=models.Q(workgroup__isnull=False)),
+            ),
         ]
 
     def clean(self):
