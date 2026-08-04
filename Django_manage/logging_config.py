@@ -56,7 +56,10 @@ FORMATTERS = {
 
 def _file_handler(filename, *, level=INFO, formatter='verbose',
                   max_bytes=10 * 1024 * 1024, backup_count=5):
-    """轮转文件处理器 — 生产环境标配，防止日志文件无限增长。"""
+    """轮转文件处理器 — 生产环境标配，防止日志文件无限增长。
+
+    统一 UTF-8 编码：避免 Windows 默认用 GBK 写入导致跨平台/日志平台乱码。
+    """
     return {
         'level': level,
         'class': 'logging.handlers.RotatingFileHandler',
@@ -64,6 +67,7 @@ def _file_handler(filename, *, level=INFO, formatter='verbose',
         'formatter': formatter,
         'maxBytes': max_bytes,
         'backupCount': backup_count,
+        'encoding': 'utf-8',
     }
 
 

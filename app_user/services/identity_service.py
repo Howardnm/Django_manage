@@ -27,12 +27,16 @@
 """
 
 import logging
+import os
 import threading
 import time
 import uuid
 from django.core.cache import caches
 
 logger = logging.getLogger(__name__)
+
+# 当前进程的 Worker 标识（gunicorn 多 worker 下各进程 PID 不同，用于缓存审计日志）
+_worker_label = f"pid{os.getpid()}"
 
 # ── L1 模块级内存缓存 ─────────────────────────────────────
 # 每个条目为 (version, data) 元组；None 表示尚未加载。
@@ -85,7 +89,12 @@ def _is_cache_stale():
         cache = _rbac_cache()
         current_version = cache.get(RBAC_VERSION_KEY, '')
         if current_version != _cached_version:
+            old_version = _cached_version
             _cached_version = current_version
+            logger.info(
+                "worker %s 同步 L2 版本 %s → %s",
+                _worker_label, old_version, current_version,
+            )
             _record_version_change(now)
             return True
         # 无变化时也检查报告窗口，确保窗口内变化后无新变化时仍能输出
@@ -120,15 +129,15 @@ def _flush_version_report_if_due(now):
     window = now - _version_change_report_at
     if count >= VERSION_CHANGE_STORM_THRESHOLD:
         logger.warning(
-            "RBAC 缓存版本在 %.0f 秒内变化 %d 次（阈值 %d），疑似变更风暴。"
-            "请排查是否有多余的 invalidate_cache() 调用："
+            "worker %s 检测到 %.0f 秒内 L2 版本变化 %d 次（阈值 %d），疑似变更风暴。"
+            "请排查是否有重复的 invalidate_cache() 调用："
             "Admin 频繁操作 / 定时运行 sync 命令 / 外部进程周期写 RBAC 表。",
-            window, count, VERSION_CHANGE_STORM_THRESHOLD,
+            _worker_label, window, count, VERSION_CHANGE_STORM_THRESHOLD,
         )
     else:
         logger.info(
-            "RBAC 缓存版本在 %.0f 秒内变化 %d 次。",
-            window, count,
+            "worker %s 检测到 %.0f 秒内 L2 版本变化 %d 次。",
+            _worker_label, window, count,
         )
     _version_change_count = 0
     _version_change_report_at = now
@@ -183,8 +192,8 @@ def _get_or_reload(cache_name, load_fn):
         data = load_fn()
         globals()[cache_name] = (_cached_version, data)
         logger.info(
-            "L1 缓存 %s 重新加载完成: %d 条 (版本 %s)",
-            cache_name, len(data), _cached_version,
+            "worker %s 重载 L1 缓存 %s（%d 条，版本 %s）",
+            _worker_label, cache_name, len(data), _cached_version,
         )
         return data
 
@@ -313,13 +322,13 @@ class IdentityService:
         在锁内执行，保证清空与版本号更新原子性。
         """
         global _cache_roles, _cache_groups, _cache_modules, _cached_version
-        logger.info("RBAC 缓存失效: %s", trigger or "手动调用")
+        logger.info("worker %s 触发缓存失效（起因：%s）", _worker_label, trigger or "手动调用")
         with _reload_lock:
             _cache_roles = None
             _cache_groups = None
             _cache_modules = None
             _cached_version = _bump_version()
             logger.info(
-                "RBAC 缓存失效完成，L2 版本号: %s (触发源: %s)",
-                _cached_version, trigger or "手动调用",
+                "worker %s 更新 L2 版本 → %s（起因：%s）",
+                _worker_label, _cached_version, trigger or "手动调用",
             )
