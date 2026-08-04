@@ -3,7 +3,7 @@
 {% block title %}个人资料{% endblock %}
 
 {% block content %}
-<div class="page-header">
+<div class="page-header mb-3">
     <div class="row align-items-center">
         <div class="col">
             <h2 class="page-title">个人中心</h2>
@@ -11,67 +11,83 @@
     </div>
 </div>
 
-<div class="card">
-    <div class="card-body">
-        <!-- 显示消息提示 (如：保存成功) -->
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-success">{{ message }}</div>
-            {% endfor %}
-        {% endif %}
-
-        <form method="post">
-            {% csrf_token %}
-            
-            <div class="row">
-                <div class="col-md-6">
-                    <h3 class="card-title">基本信息</h3>
-                    <div class="mb-3">
-                        <label class="form-label">用户名</label>
-                        <input type="text" class="form-control" value="{{ user.username }}" disabled>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">姓</label>
-                        {{ user_form.last_name }}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">名</label>
-                        {{ user_form.first_name }}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">邮箱</label>
-                        {{ user_form.email }}
-                    </div>
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">基本信息</h3>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">用户名</label>
+                    <div><span class="badge bg-blue-lt">{{ user.username }}</span></div>
                 </div>
-
-                <div class="col-md-6">
-                    <h3 class="card-title">详细资料</h3>
-                    <div class="mb-3">
-                        <label class="form-label">所属部门</label>
-                        {{ profile_form.department }}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">手机号码</label>
-                        {{ profile_form.phone }}
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">用户组 / 角色</label>
-                        <!-- 展示用户所在的组 -->
-                        <div>
-                            {% for group in user.groups.all %}
-                                <span class="badge bg-blue-lt">{{ group.name }}</span>
-                            {% empty %}
-                                <span class="text-muted">暂无分组</span>
-                            {% endfor %}
-                        </div>
-                    </div>
+                <div class="mb-3">
+                    <label class="form-label">姓名</label>
+                    <div><span class="badge bg-teal-lt">{{ user.get_full_name|default:"—" }}</span></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">邮箱</label>
+                    <div><span class="badge bg-cyan-lt">{{ user.email }}</span></div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">手机号码</label>
+                    <div>{% if user.phone %}<span class="badge bg-green-lt">{{ user.phone }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">所属部门</label>
+                    <div>{% if user.department %}<span class="badge bg-purple-lt">{{ user.department }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">所属子公司/基地</label>
+                    <div>{% if user.subsidiary %}<span class="badge bg-indigo-lt">{{ user.subsidiary }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <div class="card-footer bg-transparent mt-3 text-end">
-                <button type="submit" class="btn btn-primary">保存修改</button>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">详细资料</h3>
             </div>
-        </form>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">角色</label>
+                    <div>{% if user.user_type %}<span class="badge bg-orange-lt">{{ user.user_type }}</span>{% else %}<span class="badge bg-secondary-lt">未分配角色</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">职称/职位</label>
+                    <div>{% if user.job_title %}<span class="badge bg-pink-lt">{{ user.job_title }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">用户组 / 角色</label>
+                    <div>
+                        {% for group in user.groups.all %}
+                            <span class="badge bg-blue-lt">{{ group.name }}</span>
+                        {% empty %}
+                            <span class="badge bg-secondary-lt">暂无分组</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">所属客户公司</label>
+                    <div>{% if user.associated_customer %}<span class="badge bg-amber-lt">{{ user.associated_customer }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">所属主机厂</label>
+                    <div>{% if user.associated_oem %}<span class="badge bg-lime-lt">{{ user.associated_oem }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">联系地址</label>
+                    <div>{% if user.address %}<span class="badge bg-gray-lt">{{ user.address }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">个人备注</label>
+                    <div>{% if user.description %}<span class="badge bg-gray-lt">{{ user.description }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

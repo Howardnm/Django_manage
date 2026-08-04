@@ -322,7 +322,8 @@ class User(AbstractUser):
 
     job_title = models.CharField("职称/职位", max_length=50, blank=True)
     phone = models.CharField("个人电话", max_length=20, blank=True)
-    email = models.EmailField("电子邮箱", blank=True)  # 未设置 unique=True：历史数据可能存在多用户共享邮箱的情况
+    email = models.EmailField("电子邮箱", unique=True,
+                              help_text="登录账号，必填且唯一。历史缺失/重复邮箱已由迁移自动补齐。")
     address = models.CharField("联系地址", max_length=255, blank=True)
     description = models.TextField("个人备注", blank=True)
 

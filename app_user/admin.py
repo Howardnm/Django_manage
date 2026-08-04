@@ -4,6 +4,7 @@ from django import forms
 from django.contrib import admin
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import Group
 from django.shortcuts import render
 from .models import (
@@ -125,7 +126,6 @@ class OrgRoleAdmin(admin.ModelAdmin):
 
     def org_role_overview_view(self, request):
         """组织角色体系说明页。"""
-        from django.shortcuts import render
         context = {
             **self.admin_site.each_context(request),
             'title': '组织角色体系 — 说明',
@@ -303,6 +303,22 @@ class OrgRoleAssignmentAdmin(admin.ModelAdmin):
         return super().changelist_view(request, extra_context)
 
 
+class AdminUserCreationForm(UserCreationForm):
+    """Admin 新增用户表单：邮箱必填且唯一（作为登录账号）。"""
+    email = forms.EmailField(label="邮箱", required=True)
+
+    class Meta(UserCreationForm.Meta):
+        model = User
+        fields = ("username", "email")
+
+    def clean_email(self):
+        """邮箱转小写并校验唯一性。Raises: ValidationError。Returns: 归一化后的邮箱。"""
+        email = (self.cleaned_data.get('email') or '').strip().lower()
+        if User.objects.filter(email=email).exists():
+            raise forms.ValidationError("该邮箱已被使用")
+        return email
+
+
 @admin.register(User)
 class MyUserAdmin(UserAdmin):
     """自定义 User Admin。展示 L1~L5 五层权限字段，按权限模型分层组织 fieldsets。"""
@@ -333,7 +349,11 @@ class MyUserAdmin(UserAdmin):
     )
     
     # 账号创建时的快捷字段
-    add_fieldsets = UserAdmin.add_fieldsets + (
+    add_form = AdminUserCreationForm  # 新增用户时邮箱必填且唯一
+    add_fieldsets = (
+        (None, {
+            'fields': ('username', 'email', 'password1', 'password2'),
+        }),
         ('初始业务分配', {
             'fields': ('user_type', 'subsidiary', 'department', 'phone'),
         }),
@@ -458,7 +478,6 @@ class ModuleAccessConfigAdmin(admin.ModelAdmin):
 
     def rbac_overview_view(self, request):
         """权限管控中心 — 全套权限体系说明页。"""
-        from django.shortcuts import render
         context = {
             **self.admin_site.each_context(request),
             'title': '权限管控中心 — 全套权限体系说明',

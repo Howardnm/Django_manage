@@ -12,7 +12,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, get_object_or_404
 from django.conf import settings
 from django.db.models import Q, Exists, OuterRef
-from .models import User, WorkGroup
+from .models import WorkGroup
 from .services.identity_service import IdentityService
 
 logger = logging.getLogger(__name__)

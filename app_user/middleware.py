@@ -13,7 +13,6 @@ class SecurityShieldMiddleware:
     def __init__(self, get_response):
         """缓存受保护路径列表和管理登录 URL，避免每次请求调用 reverse。Args: get_response: 下一个中间件/视图的可调用对象。"""
         self.get_response = get_response
-        from django.urls import reverse, NoReverseMatch
         try:
             self.admin_login = reverse('admin:login')
         except NoReverseMatch:

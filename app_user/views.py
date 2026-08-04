@@ -2,11 +2,10 @@
 
 导出: CustomLoginView, RegisterView, ProfileView, PasswordResetView, captcha_view, verify_browser, send_email_code。"""
 import json
-from django.shortcuts import render, redirect
+from django.shortcuts import render
 from django.contrib.auth.views import LoginView
 from django.views.decorators.http import require_GET
-from django.views.generic import CreateView, View, TemplateView, FormView
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import CreateView, TemplateView, FormView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
@@ -15,9 +14,10 @@ from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .forms import UserLoginForm, UserRegisterForm, UserUpdateForm, PasswordResetForm
+from .forms import UserLoginForm, UserRegisterForm, PasswordResetForm
 from .services.identity_service import IdentityService
 from .utils import generate_captcha, send_verification_email, send_register_success_email
+from app_panel.mixins import HomeAccessMixin
 
 User = get_user_model()
 
@@ -26,10 +26,6 @@ class CustomLoginView(LoginView):
     template_name = 'apps/app_user/login.html'
     authentication_form = UserLoginForm
     redirect_authenticated_user = True  # 如果已登录，直接跳走
-
-    # 验证码校验逻辑已移至 UserLoginForm.clean 方法中
-    # 这里不需要再重写 form_valid 进行校验，因为 form.is_valid() 会调用 clean 方法
-    # 如果 clean 方法抛出 ValidationError，form_valid 就不会被执行，而是执行 form_invalid
 
     def get_context_data(self, **kwargs):
         """向模板注入锁定提示。Returns: 上下文字典。"""
@@ -64,9 +60,6 @@ class CustomLoginView(LoginView):
             self.request.session.set_expiry(settings.SESSION_COOKIE_AGE)
 
         return super().form_valid(form)
-
-    def form_invalid(self, form):
-        return super().form_invalid(form)
 
 
 # 生成图形验证码视图
@@ -265,26 +258,15 @@ class RegisterSuccessView(TemplateView):
     template_name = 'apps/app_user/register_success.html'
 
 
-# 3. 个人中心 (查看 + 修改)
-class ProfileView(LoginRequiredMixin, View):
-    """个人资料查看与编辑视图。"""
+# 3. 个人中心 (只读展示)
+class ProfileView(HomeAccessMixin, TemplateView):
+    """个人资料只读展示视图。不提供编辑表单，基础信息由管理员维护。
+
+    L1/L2: HomeAccessMixin (module_code='home') 从 DB 读取 — 与首页权限一致。
+    L3: 显式声明 [] — 纯只读展示页，无适用 L3 权限码。
+    """
+    permission_required = []  # 纯只读展示页，零数据查询
     template_name = 'apps/app_user/profile.html'
-
-    def get(self, request):
-        """显示带当前用户数据的编辑表单。Returns: HttpResponse。"""
-        user_form = UserUpdateForm(instance=request.user)
-        return render(request, self.template_name, {'user_form': user_form})
-
-    def post(self, request):
-        """保存个人资料更新。Returns: HttpResponse。"""
-        user_form = UserUpdateForm(request.POST, instance=request.user)
-
-        if user_form.is_valid():
-            user_form.save()
-            messages.success(request, "个人资料已更新！")
-            return redirect('user_profile')
-
-        return render(request, self.template_name, {'user_form': user_form})
 
 # 4. 密码重置视图
 class PasswordResetView(FormView):
