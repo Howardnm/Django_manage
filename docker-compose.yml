@@ -1,5 +1,57 @@
 version: "3.9"
 
+# ── 公共应用环境变量（web 与 mcp 服务共用）──
+# 使用 YAML merge key (<<: *app-env) 引用，兼容 PyCharm schema 校验
+x-app-env: &app-env
+  # Core security — 必须在 .env 中配置
+  SECRET_KEY: ${SECRET_KEY:-}
+  DEBUG: ${DEBUG:-True}
+  ALLOWED_HOSTS: ${ALLOWED_HOSTS:-*}
+  # CSRF
+  CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-}
+  # Database (fixed for Docker network)
+  DB_ENGINE: django.db.backends.postgresql
+  DB_HOST: db
+  DB_PORT: 5432
+  DB_NAME: django_manage
+  DB_USER: postgres
+  DB_PASSWORD: ${DB_PASSWORD:-}
+  # Registration
+  REGISTER_INVITE_CODE: ${REGISTER_INVITE_CODE:-}
+  # Email
+  EMAIL_HOST: ${EMAIL_HOST:-}
+  EMAIL_PORT: ${EMAIL_PORT:-}
+  EMAIL_USE_SSL: ${EMAIL_USE_SSL:-}
+  EMAIL_HOST_USER: ${EMAIL_HOST_USER:-}
+  EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
+  DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-}
+  # django-axes
+  AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
+  AXES_COOLOFF_TIME: ${AXES_COOLOFF_TIME:-0.0833}
+  AXES_RESET_ON_SUCCESS: ${AXES_RESET_ON_SUCCESS:-True}
+  # Internal API integration
+  INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN:-}
+  WEBHOOK_SECRET_KEY: ${WEBHOOK_SECRET_KEY:-}
+  CATALOG_WEBHOOK_URL: ${CATALOG_WEBHOOK_URL:-}
+  REMOTE_API_BASE_URL: ${REMOTE_API_BASE_URL:-}
+  # SAP RFC
+  SAP_LIB_PATH: /opt/sap_nwrfcsdk/lib
+  SAP_HOST: ${SAP_HOST:-}
+  SAP_SYSNR: ${SAP_SYSNR:-00}
+  SAP_CLIENT: ${SAP_CLIENT:-400}
+  SAP_USER: ${SAP_USER:-}
+  SAP_PASSWORD: ${SAP_PASSWORD:-}
+  SAP_LANG: ${SAP_LANG:-ZH}
+  SAP_MAX_IDLE_SECONDS: ${SAP_MAX_IDLE_SECONDS:-300}
+  SAP_MAX_RETRIES: ${SAP_MAX_RETRIES:-3}
+  SAP_RETRY_DELAY: ${SAP_RETRY_DELAY:-1.0}
+  # Superuser auto-creation
+  DJANGO_SUPERUSER_USERNAME: ${DJANGO_SUPERUSER_USERNAME:-admin}
+  DJANGO_SUPERUSER_EMAIL: ${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
+  DJANGO_SUPERUSER_PASSWORD: ${DJANGO_SUPERUSER_PASSWORD:-}
+  # MCP
+  MCP_API_KEY: ${MCP_API_KEY:-}
+
 services:
   # ── PostgreSQL 16 + pgvector ──
   db:
@@ -18,7 +70,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Django 应用 ──
+  # ── Django 业务应用（3 worker，HTTP 负载均衡）──
   web:
     image: ${DOCKERHUB_USERNAME:-django-manage}/django-manage:latest
     build: .
@@ -28,54 +80,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      # Core security — 必须在 .env 中配置
-      - SECRET_KEY=${SECRET_KEY:-}
-      - DEBUG=${DEBUG:-True}
-      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
-      # CSRF
-      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS:-}
-      # Database (fixed for Docker network)
-      - DB_ENGINE=django.db.backends.postgresql
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_NAME=django_manage
-      - DB_USER=postgres
-      - DB_PASSWORD=${DB_PASSWORD:-}
-      # Registration
-      - REGISTER_INVITE_CODE=${REGISTER_INVITE_CODE:-}
-      # Email
-      - EMAIL_HOST=${EMAIL_HOST:-}
-      - EMAIL_PORT=${EMAIL_PORT:-}
-      - EMAIL_USE_SSL=${EMAIL_USE_SSL:-}
-      - EMAIL_HOST_USER=${EMAIL_HOST_USER:-}
-      - EMAIL_HOST_PASSWORD=${EMAIL_HOST_PASSWORD:-}
-      - DEFAULT_FROM_EMAIL=${DEFAULT_FROM_EMAIL:-}
-      # django-axes
-      - AXES_FAILURE_LIMIT=${AXES_FAILURE_LIMIT:-5}
-      - AXES_COOLOFF_TIME=${AXES_COOLOFF_TIME:-0.0833}
-      - AXES_RESET_ON_SUCCESS=${AXES_RESET_ON_SUCCESS:-True}
-      # Internal API integration
-      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-}
-      - WEBHOOK_SECRET_KEY=${WEBHOOK_SECRET_KEY:-}
-      - CATALOG_WEBHOOK_URL=${CATALOG_WEBHOOK_URL:-}
-      - REMOTE_API_BASE_URL=${REMOTE_API_BASE_URL:-}
-      # SAP RFC
-      - SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib
-      - SAP_HOST=${SAP_HOST:-}
-      - SAP_SYSNR=${SAP_SYSNR:-00}
-      - SAP_CLIENT=${SAP_CLIENT:-400}
-      - SAP_USER=${SAP_USER:-}
-      - SAP_PASSWORD=${SAP_PASSWORD:-}
-      - SAP_LANG=${SAP_LANG:-ZH}
-      - SAP_MAX_IDLE_SECONDS=${SAP_MAX_IDLE_SECONDS:-300}
-      - SAP_MAX_RETRIES=${SAP_MAX_RETRIES:-3}
-      - SAP_RETRY_DELAY=${SAP_RETRY_DELAY:-1.0}
-      # Superuser auto-creation
-      - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME:-admin}
-      - DJANGO_SUPERUSER_EMAIL=${DJANGO_SUPERUSER_EMAIL:-admin@example.com}
-      - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD:-}
-      # MCP
-      - MCP_API_KEY=${MCP_API_KEY:-}
+      <<: *app-env
     volumes:
       - staticfiles:/app/staticfiles
       - logs:/app/logs
@@ -90,6 +95,30 @@ services:
       --max-requests 1000
       --max-requests-jitter 300
 
+  # ── MCP 服务（单 worker，独占 8001 端口）──
+  # MCP 会话（SSE 流 + POST 消息）依赖进程内 SessionManager，
+  # 必须保证同一会话的所有请求落在同一 worker。多 worker 轮询会导致
+  # POST 消息找不到 SSE 流（400 Invalid Session）。故独立单 worker 运行，
+  # nginx 将 /mcp/ 反向代理到此服务，与业务流量（3 worker）隔离。
+  mcp:
+    image: ${DOCKERHUB_USERNAME:-django-manage}/django-manage:latest
+    container_name: django-mcp
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      <<: *app-env
+    volumes:
+      - logs:/app/logs
+      - upload_files:/app/upload_files
+    command: >
+      gunicorn Django_manage.asgi:application
+      --bind 0.0.0.0:8001
+      --workers 1
+      --worker-class uvicorn.workers.UvicornWorker
+      --timeout 120
+
   # ── Nginx 反向代理 ──
   nginx:
     image: nginx:1.27-alpine
@@ -102,6 +131,7 @@ services:
       - staticfiles:/opt/staticfiles:ro
     depends_on:
       - web
+      - mcp
 
 volumes:
   postgres_data:

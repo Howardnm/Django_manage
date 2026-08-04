@@ -81,7 +81,9 @@ USER django-user
 RUN python manage.py collectstatic --noinput
 
 # 暴露端口
-EXPOSE 8000
+# 8000: 业务应用 (gunicorn 3 worker)
+# 8001: MCP 单 worker 服务 (nginx 反向代理 /mcp/ 到此)
+EXPOSE 8000 8001
 
 # 启动命令 (ASGI 模式：gunicorn + uvicorn worker)
 # --max-requests-jitter 300: 给 worker 重启阈值加 0~300 随机抖动，
