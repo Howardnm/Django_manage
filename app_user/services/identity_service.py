@@ -182,6 +182,10 @@ def _get_or_reload(cache_name, load_fn):
             return entry[1]
         data = load_fn()
         globals()[cache_name] = (_cached_version, data)
+        logger.info(
+            "L1 缓存 %s 重新加载完成: %d 条 (版本 %s)",
+            cache_name, len(data), _cached_version,
+        )
         return data
 
 
@@ -298,16 +302,24 @@ class IdentityService:
     # ── 缓存管理 ───────────────────────────────────────────
 
     @staticmethod
-    def invalidate_cache():
+    def invalidate_cache(trigger=None):
         """清除所有 RBAC 缓存（Admin 保存/删除模型时调用）。
 
+        Args:
+            trigger: 触发源描述（如 'UserRole.post_save'、'RoleGroup.roles.post_add'）。
+                     用于日志审计，定位是哪个配置修改触发了缓存版本变更。
         - 清除当前 Worker 的 L1 内存缓存（即时生效）
         - 更新 L2 版本号（通知其他 Worker，5 秒内生效）
         在锁内执行，保证清空与版本号更新原子性。
         """
         global _cache_roles, _cache_groups, _cache_modules, _cached_version
+        logger.info("RBAC 缓存失效: %s", trigger or "手动调用")
         with _reload_lock:
             _cache_roles = None
             _cache_groups = None
             _cache_modules = None
             _cached_version = _bump_version()
+            logger.info(
+                "RBAC 缓存失效完成，L2 版本号: %s (触发源: %s)",
+                _cached_version, trigger or "手动调用",
+            )

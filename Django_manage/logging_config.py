@@ -85,6 +85,8 @@ HANDLERS = {
     'file_workflow': _file_handler('workflow.log'),
     'file_catalog': _file_handler('catalog.log'),
     'file_material_api': _file_handler('material_api.log'),
+    # RBAC 权限缓存独立日志（缓存失效/重载/版本变更审计）
+    'file_rbac': _file_handler('rbac.log'),
 }
 
 # ==============================================================================
@@ -107,6 +109,11 @@ MODULE_LOGGERS = {
     'app_project': {'handlers': ['console', 'file_app'], 'level': INFO},
     'app_repository': {'handlers': ['console', 'file_app'], 'level': INFO},
     'app_user': {'handlers': ['console', 'file_app'], 'level': INFO},
+    # RBAC 缓存服务：独立 rbac.log 归档（缓存失效/重载/版本变更审计）。
+    # propagate=False：避免与父级 app_user 的 console/file_app 重复输出。
+    'app_user.services.identity_service': {
+        'handlers': ['console', 'file_rbac'], 'level': INFO, 'propagate': False,
+    },
     'common_utils': {'handlers': ['console', 'file_app'], 'level': INFO},
 
     # ======== 基础模块（本次适配新增）========
@@ -147,7 +154,7 @@ def build_logging(*, debug=False):
         loggers[name] = {
             'handlers': cfg['handlers'],
             'level': env_level or (DEBUG if debug else cfg['level']),
-            'propagate': True,
+            'propagate': cfg.get('propagate', True),
         }
 
     return {

@@ -22,7 +22,12 @@ from .services.identity_service import IdentityService
 @receiver([post_save, post_delete], sender=SidebarSubItem)
 def invalidate_rbac_cache(sender, instance, **kwargs):
     """UserRole / RoleGroup / ModuleAccessConfig / SidebarModule / SidebarSubItem 变更时清除缓存。"""
-    IdentityService.invalidate_cache()
+    # post_save 信号带 created 布尔值；post_delete 无 created 键
+    if 'created' in kwargs:
+        action = 'post_create' if kwargs['created'] else 'post_update'
+    else:
+        action = 'post_delete'
+    IdentityService.invalidate_cache(trigger=f"{sender.__name__}.{action}")
 
 
 @receiver(m2m_changed, sender=RoleGroup.roles.through)
@@ -33,4 +38,5 @@ def invalidate_rbac_cache_m2m(sender, instance, action, **kwargs):
     m2m_changed 对每次操作触发 pre/post 两轮，仅处理 post_* 实际生效的动作。
     """
     if action in ('post_add', 'post_remove', 'post_clear'):
-        IdentityService.invalidate_cache()
+        model_name = instance.__class__.__name__
+        IdentityService.invalidate_cache(trigger=f"{model_name}.{action}")
