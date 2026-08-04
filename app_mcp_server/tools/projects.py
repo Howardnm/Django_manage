@@ -16,7 +16,7 @@ from app_mcp_server.serializers import serialize_project, serialize_project_full
     }
 )
 async def search_projects(keyword: str = "", is_terminated: bool = False):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         qs = Project.objects.select_related('manager', 'repository', 'repository__customer', 'repository__oem').all()
         if keyword:
@@ -48,7 +48,7 @@ async def search_projects(keyword: str = "", is_terminated: bool = False):
     }
 )
 async def get_project_details(project_id: int = None, project_name: str = ""):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         try:
             qs = Project.objects.select_related('manager', 'repository', 'repository__customer', 'repository__oem', 'repository__salesperson') \

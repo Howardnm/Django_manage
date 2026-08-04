@@ -17,7 +17,7 @@ from app_mcp_server.serializers import serialize_material, serialize_formula
     }
 )
 async def search_material_library(keyword: str = "", category: str = ""):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         qs = MaterialLibrary.objects.select_related('category').all()
         if keyword:
@@ -41,7 +41,7 @@ async def search_material_library(keyword: str = "", category: str = ""):
     }
 )
 async def get_material_and_formulas(grade_name: str):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         try:
             material = MaterialLibrary.objects.select_related('category').prefetch_related('properties').get(grade_name=grade_name)

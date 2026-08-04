@@ -15,7 +15,7 @@ from app_mcp_server.serializers import serialize_formula
     }
 )
 async def search_formulas(keyword: str = ""):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         qs = LabFormula.objects.select_related('material_type').all()
         if keyword:
@@ -37,7 +37,7 @@ async def search_formulas(keyword: str = ""):
     }
 )
 async def get_formula_detail(code: str):
-    @sync_to_async
+    @sync_to_async(thread_sensitive=False)
     def query():
         try:
             formula = LabFormula.objects.select_related('material_type', 'creator').get(code=code)
