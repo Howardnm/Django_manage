@@ -84,9 +84,13 @@ RUN python manage.py collectstatic --noinput
 EXPOSE 8000
 
 # 启动命令 (ASGI 模式：gunicorn + uvicorn worker)
+# --max-requests-jitter 300: 给 worker 重启阈值加 0~300 随机抖动，
+# 避免 3 个 worker 同时达到 1000 请求而集体重启（惊群效应），
+# 错峰重启可避免 L1 缓存与 DB 连接同时重建的瞬时峰值。
 CMD ["gunicorn", "Django_manage.asgi:application", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "3", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--timeout", "120", \
-     "--max-requests", "1000"]
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "300"]

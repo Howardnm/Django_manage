@@ -30,6 +30,10 @@ python manage.py makemigrations --noinput
 echo "[4/6] Applying migrations..."
 python manage.py migrate --noinput
 
+# ── 4.5 创建 RBAC 缓存表（幂等；缓存表不会随 migrate 自动创建）──
+echo "[4.5/6] Creating rbac cache table..."
+python manage.py init_rbac_cache
+
 # ── 5. 创建管理员（仅首次） ──
 echo "[5/6] Checking superuser..."
 python manage.py shell -c "

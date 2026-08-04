@@ -88,6 +88,7 @@ services:
       --worker-class uvicorn.workers.UvicornWorker
       --timeout 120
       --max-requests 1000
+      --max-requests-jitter 300
 
   # ── Nginx 反向代理 ──
   nginx:

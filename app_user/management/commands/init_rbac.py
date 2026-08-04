@@ -6,8 +6,9 @@ RBAC 一键初始化 — 按正确顺序依次执行全部初始化步骤。
     python manage.py init_rbac --dry-run # 仅预览，不写入
 
 执行顺序（每步失败则终止）:
-    1. sync_rbac_modules — 扫描 mixin → 同步 ModuleAccessConfig
-    2. sync_menus        — 读取 menu_modules.py → 同步 SidebarModule
+    1. init_rbac_cache  — 创建 rbac_cache 缓存表（幂等）
+    2. sync_rbac_modules — 扫描 mixin → 同步 ModuleAccessConfig
+    3. sync_menus        — 读取 menu_modules.py → 同步 SidebarModule
 """
 
 from django.core.management import call_command
@@ -15,6 +16,7 @@ from django.core.management.base import BaseCommand
 
 
 STEPS = [
+    ('init_rbac_cache',  '创建 rbac_cache 缓存表（幂等）'),
     ('sync_rbac_modules', '扫描 mixin → 同步 ModuleAccessConfig'),
     ('sync_menus',        '读取 menu_modules.py → 同步 SidebarModule'),
 ]

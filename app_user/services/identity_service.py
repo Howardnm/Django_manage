@@ -50,6 +50,14 @@ VERSION_CHECK_INTERVAL = 5  # 每 5 秒检查一次 L2 版本号
 _last_version_check = 0
 _cached_version = ''
 
+# ── RBAC 变更风暴监测 — 排查多余的 invalidate_cache 调用 ──
+# 聚合窗口内统计"检测到版本变化的次数"，帮助定位周期性 bump 源
+# （Admin 操作、sync 命令、定时任务、外部进程等）。
+VERSION_CHANGE_REPORT_INTERVAL = 60   # 每 60 秒聚合报告一次
+VERSION_CHANGE_STORM_THRESHOLD = 8    # 60 秒内超过 8 次视为"变更风暴"（约每 7.5 秒一次）
+_version_change_count = 0
+_version_change_report_at = time.time()  # 模块加载时开始计时，避免冷启动误报
+
 
 def _rbac_cache():
     """获取 rbac 缓存后端；若不可用，回退到 default。"""
@@ -78,10 +86,52 @@ def _is_cache_stale():
         current_version = cache.get(RBAC_VERSION_KEY, '')
         if current_version != _cached_version:
             _cached_version = current_version
+            _record_version_change(now)
             return True
+        # 无变化时也检查报告窗口，确保窗口内变化后无新变化时仍能输出
+        _flush_version_report_if_due(now)
     except Exception as e:
         _handle_cache_error(e, "version check")
     return False
+
+
+def _record_version_change(now):
+    """检测到版本变化时计数，并在窗口到期时输出聚合报告。"""
+    global _version_change_count
+    _version_change_count += 1
+    _flush_version_report_if_due(now)
+
+
+def _flush_version_report_if_due(now):
+    """聚合报告 RBAC 版本变化次数，用于排查周期性 bump 源。
+
+    每 VERSION_CHANGE_REPORT_INTERVAL 秒输出一次统计：窗口内变化次数
+    超过阈值时以 warning 提示（疑似"变更风暴"），便于检索日志定位
+    多余的 invalidate_cache() 调用（Admin 操作 / sync 命令 / 定时任务）。
+    """
+    global _version_change_count, _version_change_report_at
+    if now - _version_change_report_at < VERSION_CHANGE_REPORT_INTERVAL:
+        return
+    if _version_change_count == 0:
+        # 窗口内无变化：仅推进计时，不输出，避免日志噪音
+        _version_change_report_at = now
+        return
+    count = _version_change_count
+    window = now - _version_change_report_at
+    if count >= VERSION_CHANGE_STORM_THRESHOLD:
+        logger.warning(
+            "RBAC 缓存版本在 %.0f 秒内变化 %d 次（阈值 %d），疑似变更风暴。"
+            "请排查是否有多余的 invalidate_cache() 调用："
+            "Admin 频繁操作 / 定时运行 sync 命令 / 外部进程周期写 RBAC 表。",
+            window, count, VERSION_CHANGE_STORM_THRESHOLD,
+        )
+    else:
+        logger.info(
+            "RBAC 缓存版本在 %.0f 秒内变化 %d 次。",
+            window, count,
+        )
+    _version_change_count = 0
+    _version_change_report_at = now
 
 
 def _bump_version():
