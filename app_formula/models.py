@@ -1,7 +1,5 @@
 from django.db import models
 from django.conf import settings
-from django.db.models import GeneratedField, F, Value
-from django.db.models.functions import Cast, Coalesce
 import calendar
 from decimal import Decimal
 from django.utils import timezone
@@ -393,15 +391,15 @@ class FormulaTestResult(models.Model):
     test_date = models.DateField("测试日期", null=True, blank=True)
     remark = models.CharField("备注", max_length=50, blank=True)
 
-    # MySQL 生成列：将 production_order 的 NULL/非NULL 状态映射为字符串，用于唯一约束
-    unique_key = GeneratedField(
-        expression=Coalesce(
-            Cast(F('production_order'), output_field=models.CharField(max_length=100)),
-            Value('MANUAL'),
-        ),
-        output_field=models.CharField(max_length=100),
-        db_persist=True,
-    )
+    # production_order 为 NULL 时 = 'MANUAL'，否则 = FK 值的字符串形式
+    unique_key = models.CharField(max_length=100, blank=True, default='')
+
+    def save(self, *args, **kwargs):
+        if self.production_order_id:
+            self.unique_key = str(self.production_order_id)
+        else:
+            self.unique_key = 'MANUAL'
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = "实验测试结果"
