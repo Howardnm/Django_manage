@@ -9,4 +9,5 @@ class ColorCenterAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'color_center'
+    module_name = '材料配色中心'
     user_link_fields = ['operator']

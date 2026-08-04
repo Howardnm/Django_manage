@@ -10,6 +10,7 @@ class ProjectAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'project'
+    module_name = '项目管理中心'
     user_link_fields = ['manager']
 
     def get_queryset(self):
@@ -45,15 +46,18 @@ class PerformanceManagementMixin(ProjectAccessMixin):
     """绩效管理写操作权限 — 高职级人员操作评分规则。"""
 
     module_code = 'project.performance_management'
+    module_name = '绩效管理'
 
 
 class PerformanceRuleReadMixin(ProjectAccessMixin):
     """绩效规则查看权限 — 研发工程师 + 业务经理查看。"""
 
     module_code = 'project.performance_read'
+    module_name = '绩效规则查看'
 
 
 class SharedConfigMixin(ProjectAccessMixin):
     """全局配置表权限 — 组织级共享资源。"""
 
     module_code = 'project.shared_config'
+    module_name = '全局配置表'

@@ -7,3 +7,4 @@ class RawMaterialAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'raw_material'
+    module_name = '原材料/供应商'

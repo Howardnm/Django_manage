@@ -7,4 +7,5 @@ class ProcessAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'process'
+    module_name = '生产工艺库'
     user_link_fields = ['creator']

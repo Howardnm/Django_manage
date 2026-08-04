@@ -25,7 +25,7 @@ class Command(BaseCommand):
     def _discover_module_codes(self):
         """扫描所有已安装 app 的 mixins 模块，发现所有声明的 module_code。
 
-        Returns: {module_code: {'app_label': ..., 'class_name': ...}} 字典。
+        Returns: {module_code: {'app_label': ..., 'class_name': ..., 'module_name': ...}} 字典。
         """
         discovered = {}
         for app_config in apps.get_app_configs():
@@ -41,9 +41,11 @@ class Command(BaseCommand):
                 code = getattr(cls, 'module_code', None)
                 if not code:
                     continue
+                module_name = getattr(cls, 'module_name', None) or code
                 discovered[code] = {
                     'app_label': app_config.label,
                     'class_name': name,
+                    'module_name': module_name,
                 }
         return discovered
 
@@ -64,19 +66,28 @@ class Command(BaseCommand):
             return
 
         discovered = self._discover_module_codes()
-        existing = set(ModuleAccessConfig.objects.values_list('module_code', flat=True))
+        existing_qs = ModuleAccessConfig.objects.all()
+        existing_map = {mac.module_code: mac for mac in existing_qs}
 
-        to_create = {k: v for k, v in discovered.items() if k not in existing}
-        orphaned = existing - set(discovered.keys())
+        to_create = {k: v for k, v in discovered.items() if k not in existing_map}
+        orphaned = set(existing_map) - set(discovered.keys())
+
+        # 回填：已有记录且 module_name 仍为占位值（等于 module_code）时，更新为 mixin 声明的中文名
+        to_backfill = {
+            k: v for k, v in discovered.items()
+            if k in existing_map and existing_map[k].module_name == k
+        }
+        # 缺失提示：声明了 module_code 但未声明 module_name 的 mixin
+        missing_name = {k: v for k, v in discovered.items() if v['module_name'] == k}
 
         if dry_run:
             self.stdout.write(self.style.WARNING(
                 '\n=== DRY RUN 模式 — 以下为预览，未实际写入 ===\n'))
 
         self.stdout.write(f'发现 {len(discovered)} 个 module_code，'
-                          f'DB 已有 {len(existing)} 个记录')
+                          f'DB 已有 {len(existing_map)} 个记录')
 
-        if not to_create and not orphaned:
+        if not to_create and not to_backfill and not orphaned:
             self.stdout.write(self.style.SUCCESS('全部同步，无需变更。'))
             return
 
@@ -86,20 +97,32 @@ class Command(BaseCommand):
                 f'\n[新增] {len(to_create)} 个 ModuleAccessConfig:'))
             for code, info in sorted(to_create.items()):
                 self.stdout.write(
-                    f'  + {code} (app={info["app_label"]}, mixin={info["class_name"]})')
+                    f'  + {code} ({info["module_name"]}, '
+                    f'app={info["app_label"]}, mixin={info["class_name"]})')
                 if not dry_run:
                     ModuleAccessConfig.objects.create(
                         module_code=code,
-                        module_name=code,  # 默认名称为 module_code，管理员可在 Admin 中修改
+                        module_name=info['module_name'],
                         min_level=1,
                         enforce_dept_isolation=True,
                         enforce_group_isolation=False,
                     )
             if not dry_run:
                 self.stdout.write(self.style.WARNING(
-                    f'\n  ⚠️ 以上 {len(to_create)} 个新模块未分配任何角色组（role_groups 留空），'
+                    f'\n  注意: 以上 {len(to_create)} 个新模块未分配任何角色组（role_groups 留空），'
                     f'当前为 fail-closed：仅超管可访问。'
                     f'请手动在 Admin 中为这些模块配置允许访问的角色组。'))
+
+        # ── 回填已有记录的占位模块名 ──
+        if to_backfill:
+            self.stdout.write(self.style.MIGRATE_HEADING(
+                f'\n[回填] {len(to_backfill)} 个已有记录模块名（原为占位值 module_code）:'))
+            for code, info in sorted(to_backfill.items()):
+                self.stdout.write(
+                    f'  ~ {code} -> {info["module_name"]}')
+                if not dry_run:
+                    ModuleAccessConfig.objects.filter(module_code=code).update(
+                        module_name=info['module_name'])
 
         # ── 报告孤立记录 ──
         if orphaned:
@@ -108,9 +131,18 @@ class Command(BaseCommand):
             for code in sorted(orphaned):
                 self.stdout.write(f'  ! {code}')
 
-        if not dry_run and to_create:
+        # ── 提示未声明中文名的 mixin ──
+        if missing_name:
+            self.stdout.write(self.style.WARNING(
+                f'\n[提示] {len(missing_name)} 个 mixin 声明了 module_code 但未声明 '
+                f'module_name（仍以 code 作为名称），建议补全:'))
+            for code, info in sorted(missing_name.items()):
+                self.stdout.write(
+                    f'  ? {code} (app={info["app_label"]}, mixin={info["class_name"]})')
+
+        if not dry_run and (to_create or to_backfill):
             IdentityService.invalidate_cache()
             self.stdout.write(self.style.SUCCESS(
-                f'\n完成: 新增 {len(to_create)} 个，跳过 '
-                f'{len(discovered) - len(to_create)} 个（已存在）。'
+                f'\n完成: 新增 {len(to_create)} 个，回填 {len(to_backfill)} 个，'
+                f'跳过 {len(discovered) - len(to_create)} 个（已存在）。'
             ))

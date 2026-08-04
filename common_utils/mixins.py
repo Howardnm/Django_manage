@@ -23,6 +23,7 @@ class InternalUserRequiredMixin(UnifiedAccessMixin):
     """
 
     module_code = 'common.user_tree'
+    module_name = '用户树'
 
     # 通用 API 视图不涉及 L4/L5 数据隔离
     enforce_dept_isolation = False

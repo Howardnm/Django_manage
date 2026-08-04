@@ -5,6 +5,7 @@ class PanelAccessMixin(UnifiedAccessMixin):
     """工作台看板模块基础权限 — L1/L2/L4/L5 通过 module_code 从 DB 动态读取。"""
 
     module_code = 'panel'
+    module_name = '看板工作台'
 
 
 class HomeAccessMixin(UnifiedAccessMixin):
@@ -19,6 +20,7 @@ class HomeAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'home'
+    module_name = '系统首页'
     permission_required = []  # 纯静态页面，零数据查询
 
 

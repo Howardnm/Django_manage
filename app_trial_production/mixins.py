@@ -9,6 +9,7 @@ class TrialProductionAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'trial_production'
+    module_name = '试验排产中心'
     user_link_fields = ['creator', 'extruder_operator', 'operator',
                         'assigned_to', 'recorded_by']
 
@@ -17,18 +18,21 @@ class ExtrusionTaskAccessMixin(TrialProductionAccessMixin):
     """挤出任务 — 仅挤出操作员。"""
 
     module_code = 'trial_production.extrusion_task'
+    module_name = '挤出任务'
 
 
 class DashboardAccessMixin(TrialProductionAccessMixin):
     """排产总览 — 仅研发工程师。"""
 
     module_code = 'trial_production.dashboard'
+    module_name = '排产总览'
 
 
 class RndAccessMixin(TrialProductionAccessMixin):
     """排产发起/审批 — 仅研发工程师，按项目负责人隔离。"""
 
     module_code = 'trial_production.rnd'
+    module_name = '排产发起/审批'
     user_link_fields = ['manager']
 
     @staticmethod
@@ -48,3 +52,4 @@ class SampleInventoryAccessMixin(TrialProductionAccessMixin):
     """样品库存 — 研发工程师 + 操作员可访问。"""
 
     module_code = 'trial_production.sample_inventory'
+    module_name = '样品库存'

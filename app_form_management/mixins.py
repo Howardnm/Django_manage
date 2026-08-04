@@ -9,6 +9,7 @@ class FormManagementAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'form_management'
+    module_name = '表单管理中心'
     user_link_fields = ['submitted_by', 'manager', 'creator', 'user', 'owner', 'uploader', 'salesperson']
 
     def check_object_permission(self, obj):

@@ -9,4 +9,5 @@ class TestingAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'material_testing'
+    module_name = '材料测试中心'
     user_link_fields = ['assigned_to']

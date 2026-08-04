@@ -7,6 +7,7 @@ class NotificationAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'notification'
+    module_name = '通知消息'
     user_link_fields = ['recipient']
 
     def get_queryset(self):

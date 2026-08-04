@@ -7,4 +7,5 @@ class FormulaAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'formula'
+    module_name = '实验配方库'
     user_link_fields = ['creator']

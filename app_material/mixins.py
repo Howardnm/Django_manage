@@ -7,3 +7,4 @@ class MaterialAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'material'
+    module_name = '材料成品库'

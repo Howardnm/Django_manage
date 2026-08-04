@@ -34,6 +34,8 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     Attributes:
         module_code: 模块标识符，对应 ModuleAccessConfig.module_code。
                      子类声明此属性后，L1/L2/L4/L5 自动从 DB 读取。
+        module_name: 模块中文名，与 module_code 配套声明，
+                     供 sync_rbac_modules 初始化注册时写入 ModuleAccessConfig.module_name。
         identity_required: 直接声明 L1 角色白名单（不使用 module_code 时）。
         min_level_required: L2 最低用户等级（默认 1）。
         permission_required: L3 Django 原生权限码（空列表 = 跳过）。
@@ -43,6 +45,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     """
     # —— 模块标识（声明后 L1/L2/L4/L5 从 ModuleAccessConfig 动态读取）——
     module_code = None
+    module_name = None  # 模块中文名，与 module_code 配套声明，供 sync_rbac_modules 注册使用
 
     # —— 准入控制（module_code 模式下从 DB 读取，否则从以下 class attribute 读取）——
     identity_required = []

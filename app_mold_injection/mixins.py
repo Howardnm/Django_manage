@@ -9,6 +9,7 @@ class InjectionTaskAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'mold_injection.task'
+    module_name = '注塑任务'
     user_link_fields = ['operator']
 
 
@@ -19,3 +20,4 @@ class MoldManageAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'mold_injection.mold'
+    module_name = '模具台账'

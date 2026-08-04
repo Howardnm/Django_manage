@@ -9,6 +9,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
     """
 
     module_code = 'repository'
+    module_name = '客户档案中心'
     user_link_fields = ['salesperson', 'project__manager']
 
     def get_queryset(self):
