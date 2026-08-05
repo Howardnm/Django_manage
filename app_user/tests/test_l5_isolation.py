@@ -12,7 +12,7 @@ from app_user.models import Department, WorkGroup, ModuleAccessConfig
 from app_user.mixins import UnifiedAccessMixin
 from common_utils.autocomplete_registry import make_autocomplete_access_filter
 from app_project.mixins import ProjectAccessMixin
-from app_project.models import Project, ProjectMember
+from app_project.models import Project, ProjectMember, ProjectSalesMember
 
 User = get_user_model()
 
@@ -305,3 +305,60 @@ class ModuleAccessConfigValidationTest(TestCase):
 
     def test_neither_configured_ok(self):
         self._make(None, None).full_clean()  # 都不启用
+
+
+class SalesMemberAccessTest(TestCase):
+    """协作：销售成员（ProjectSalesMember）同样可穿透查看项目。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.dept = Department.objects.create(name="研发部")
+        ModuleAccessConfig.objects.create(
+            module_code='project',
+            module_name='项目管理中心',
+            enforce_dept_isolation=False,
+            enforce_group_isolation=True,
+        )
+        cls.owner = User.objects.create_user(
+            username='owner', email='so@x.com', password='x', department=cls.dept)
+        cls.sales_user = User.objects.create_user(
+            username='sales', email='sales@x.com', password='x', department=cls.dept)
+        # 无关用户（既不是负责人/成员/销售成员）→ 应看不到
+        cls.outsider = User.objects.create_user(
+            username='outsider', email='out@x.com', password='x', department=cls.dept)
+
+        # 负责人加入工作组 → L5 会排除其负责的项目，仅靠销售成员穿透才能看到
+        wg = WorkGroup.objects.create(name="组A", department=cls.dept, is_active=True)
+        wg.members.add(cls.owner)
+
+        cls.sales_project = Project.objects.create(code='SP', name='销售项目', manager=cls.owner)
+        ProjectSalesMember.objects.create(project=cls.sales_project, user=cls.sales_user)
+
+    def _qs_for(self, user):
+        view = ProjectAccessMixin()
+        view.queryset = Project.objects.all()
+        view.request = RequestFactory().get('/')
+        view.request.user = user
+        return view.get_queryset()
+
+    def test_sales_member_sees_project_in_list(self):
+        """无工作组的销售成员 → 穿透看到自己作为销售成员的项目。"""
+        qs = self._qs_for(self.sales_user)
+        self.assertIn(self.sales_project, qs)
+
+    def test_sales_member_outsider_not_seen(self):
+        """既非负责人/成员/销售成员的无关用户 → 不可见。"""
+        qs = self._qs_for(self.outsider)
+        self.assertNotIn(self.sales_project, qs)
+
+    def test_sales_member_object_access(self):
+        """销售成员 → 对象级校验放行；无关用户 → 拒绝。"""
+        from django.core.exceptions import PermissionDenied
+        view = ProjectAccessMixin()
+        view.request = RequestFactory().get('/')
+        view.request.user = self.sales_user
+        self.assertTrue(view.check_object_permission(self.sales_project))
+
+        view.request.user = self.outsider
+        with self.assertRaises(PermissionDenied):
+            view.check_object_permission(self.sales_project)

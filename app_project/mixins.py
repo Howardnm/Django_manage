@@ -14,7 +14,7 @@ class ProjectAccessMixin(UnifiedAccessMixin):
     user_link_fields = ['manager']
 
     def get_queryset(self):
-        """L4/L5 隔离结果 ∪ 协同成员穿透。"""
+        """L4/L5 隔离结果 ∪ 协同成员/销售成员穿透。"""
         user = self.request.user
         qs = super().get_queryset()
 
@@ -23,6 +23,9 @@ class ProjectAccessMixin(UnifiedAccessMixin):
 
         if hasattr(qs.model, 'members'):
             member_q = Q(members__user=user)
+            # 销售成员同样可穿透查看（了解自己的销售项目）
+            if hasattr(qs.model, 'sales_members'):
+                member_q |= Q(sales_members__user=user)
             # `super().get_queryset()` 的 distinct 状态不确定：
             #   - 超管路径直接返回 qs（非 distinct）
             #   - L5 隔离开启时返回 .distinct()
@@ -33,7 +36,7 @@ class ProjectAccessMixin(UnifiedAccessMixin):
         return qs
 
     def check_object_permission(self, obj):
-        """对象级检查：(负责人/同部门) OR 协同成员。"""
+        """对象级检查：(负责人/同部门) OR 协同成员/销售成员。"""
         user = self.request.user
         if user.is_superuser:
             return True
@@ -41,9 +44,12 @@ class ProjectAccessMixin(UnifiedAccessMixin):
         try:
             return super().check_object_permission(obj)
         except PermissionDenied:
-            if hasattr(obj, 'members'):
-                if obj.members.filter(user=user).exists():
-                    return True
+            # 协同成员穿透查看
+            if hasattr(obj, 'members') and obj.members.filter(user=user).exists():
+                return True
+            # 销售成员穿透查看（了解自己的销售项目）
+            if hasattr(obj, 'sales_members') and obj.sales_members.filter(user=user).exists():
+                return True
             raise
 
 
