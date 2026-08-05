@@ -91,20 +91,29 @@ class L5WorkGroupIsolationTest(TestCase):
 
 
 class ProjectAccessUnionTest(TestCase):
-    """回归：ProjectAccessMixin 的协同成员穿透合并（distinct ∪ 非 distinct）不应抛 TypeError。"""
+    """回归：ProjectAccessMixin 的协同成员穿透合并（distinct ∪ 非 distinct）不应抛 TypeError。
+
+    super().get_queryset() 的 distinct 状态随场景变化：
+      - 超管路径：直接返回 qs（非 distinct）
+      - 非超管 + L5 开：返回 .distinct()
+      - 非超管 + L5 关：返回非 distinct
+    无论哪种，`|` 合并两侧都须 distinct 状态一致。
+    """
 
     @classmethod
     def setUpTestData(cls):
         cls.dept = Department.objects.create(name="研发部")
-        ModuleAccessConfig.objects.create(
+        cls.cfg = ModuleAccessConfig.objects.create(
             module_code='project',
             module_name='项目管理中心',
             enforce_dept_isolation=False,
-            enforce_group_isolation=True,   # 开启 L5 → super().get_queryset() 返回 .distinct()
+            enforce_group_isolation=True,
         )
 
         cls.member_user = User.objects.create_user(
             username='member_user', email='member@x.com', password='x', department=cls.dept)
+        cls.admin = User.objects.create_superuser(
+            username='admin', email='admin@x.com', password='x')
         cls.owner = User.objects.create_user(
             username='owner', email='owner@x.com', password='x', department=cls.dept)
 
@@ -123,9 +132,34 @@ class ProjectAccessUnionTest(TestCase):
         view.request.user = user
         return view.get_queryset()
 
-    def test_member_penetration_union_no_typeerror(self):
-        """L5 开启时，成员穿透的 distinct|非distinct 合并不再抛 TypeError。"""
+    def _set_l5(self, enabled):
+        self.cfg.enforce_group_isolation = enabled
+        self.cfg.save(update_fields=['enforce_group_isolation'])
+        from app_user.services.identity_service import IdentityService
+        IdentityService.invalidate_cache()
+
+    def test_union_no_typeerror_all_combinations(self):
+        """L5 开/关 × 超管/非超管 四种组合都不应抛 TypeError。"""
+        from app_user.services.identity_service import IdentityService
+
+        # 1) L5 关 + 非超管（super() 返回非 distinct）
+        self._set_l5(False)
+        IdentityService.invalidate_cache()
         qs = self._qs_for(self.member_user)
-        # 无工作组用户走 L5 else 分支 → super() 返回 .distinct() → 触发合并
-        self.assertIn(self.membered, qs)  # 作为协同成员可见（仅靠穿透合并）
-        self.assertNotIn(self.owned, qs)  # 非负责人、非成员、负责人有组 → 不可见
+        self.assertIn(self.membered, qs)  # 成员穿透可见
+        self.assertIn(self.owned, qs)     # L5 关闭 → 全部可见
+
+        # 2) L5 关 + 超管（super() 返回非 distinct）
+        qs = self._qs_for(self.admin)
+        self.assertEqual(qs.count(), 2)
+
+        # 3) L5 开 + 非超管无工作组（super() 返回 .distinct()）
+        self._set_l5(True)
+        IdentityService.invalidate_cache()
+        qs = self._qs_for(self.member_user)
+        self.assertIn(self.membered, qs)  # 仅靠成员穿透合并可见
+        self.assertNotIn(self.owned, qs)  # 负责人有组、非成员 → 不可见
+
+        # 4) L5 开 + 超管（super() 返回非 distinct，因超管绕过隔离）
+        qs = self._qs_for(self.admin)
+        self.assertEqual(qs.count(), 2)

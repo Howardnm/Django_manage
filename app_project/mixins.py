@@ -23,9 +23,12 @@ class ProjectAccessMixin(UnifiedAccessMixin):
 
         if hasattr(qs.model, 'members'):
             member_q = Q(members__user=user)
-            # super() 在 L5 隔离时已返回 .distinct() 查询；| 要求两侧 distinct 状态一致，
-            # 故右侧也需 .distinct()，整体再去重。
-            return (qs | qs.model.objects.filter(member_q).distinct()).distinct()
+            # `super().get_queryset()` 的 distinct 状态不确定：
+            #   - 超管路径直接返回 qs（非 distinct）
+            #   - L5 隔离开启时返回 .distinct()
+            # Django 的 `|` 合并要求两侧 distinct 状态一致，故两侧都显式 .distinct()，
+            # 再整体去重（对已 distinct 的查询，.distinct() 幂等）。
+            return (qs.distinct() | qs.model.objects.filter(member_q).distinct()).distinct()
 
         return qs
 
