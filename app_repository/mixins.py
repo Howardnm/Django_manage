@@ -1,6 +1,7 @@
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from app_user.mixins import UnifiedAccessMixin
+from app_project.mixins import ProjectAccessMixin
 
 class RepositoryAccessMixin(UnifiedAccessMixin):
     """档案中心权限管控 (双重负责制适配)。
@@ -63,7 +64,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
         # 2. 备选：双重负责制穿透检查
         if not hasattr(obj, 'salesperson'):
             # 没有 salesperson 字段的对象，无法走双重负责制逻辑，直接拒绝
-            raise
+            raise PermissionDenied("您的账号无权操作该档案（无法匹配双重负责制）")
 
         is_sales_dept = (
             user.department
@@ -85,3 +86,25 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
             raise PermissionDenied("您的账号无权操作该档案（跨部门保护中）")
 
         return True
+
+
+class ProjectRepositoryFileAccessMixin(ProjectAccessMixin):
+    """项目仓库附件权限（按项目访问 + 写操作仅限负责人）。
+
+    查看/下载：沿用 ProjectAccessMixin 的项目访问（负责人 + 协同/销售成员）。
+    上传/删除：仅项目负责人（obj.manager）可执行。
+    依赖 PermissionAdapter 在调用前注入 self.action（'view' | 'add' | 'delete'）。
+    """
+
+    def check_object_permission(self, obj):
+        user = self.request.user
+        if user.is_superuser:
+            return True
+
+        action = getattr(self, 'action', 'view')
+        if action in ('add', 'delete'):
+            if getattr(obj, 'manager', None) != user:
+                raise PermissionDenied("仅项目负责人可上传/删除该附件")
+            return True
+
+        return super().check_object_permission(obj)

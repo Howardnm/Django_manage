@@ -69,6 +69,8 @@ class PermissionAdapter:
         # ---- Step 2: 实例化 Mixin 并设置 request ----
         mixin = self.config.access_mixin()
         mixin.request = request
+        # 传入当前操作动作，供 check_object_permission 区分查看/写操作（如仅负责人可上传）
+        mixin.action = action
 
         # ---- Step 3: 身份角色检查 (L1) — 从 _resolve_config() 动态读取 ----
         cfg = mixin._resolve_config()

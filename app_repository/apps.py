@@ -33,11 +33,11 @@ class AppRepositoryConfig(AppConfig):
         from app_attachment.registry import register_attachment
         from app_attachment.configs import AttachmentConfig
         from app_repository.models import ProjectRepository, OEM
-        from app_repository.mixins import RepositoryAccessMixin
+        from app_repository.mixins import RepositoryAccessMixin, ProjectRepositoryFileAccessMixin
 
         register_attachment(AttachmentConfig(
             parent_model=ProjectRepository,
-            access_mixin=RepositoryAccessMixin,
+            access_mixin=ProjectRepositoryFileAccessMixin,
             view_permission='app_repository.view_projectrepository',
             add_permission='app_repository.change_projectrepository',
             delete_permission='app_repository.change_projectrepository',

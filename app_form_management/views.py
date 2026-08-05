@@ -18,7 +18,7 @@ from app_project.models import Project, ProjectNode
 from app_project.mixins import ProjectAccessMixin
 from .mixins import FormManagementAccessMixin
 from .services import submission_service
-from .registry import get_target, get_module_choices, search_entities
+from .registry import get_target, get_module_choices
 from .filters import FormTemplateFilter, MyDraftsFilter, MySubmissionsFilter
 from .rule_injector import inject_upload_config, enrich_upload_form_data
 
@@ -174,16 +174,14 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
         return None
 
     def _check_target_access(self, obj):
-        """验证用户对目标对象的访问权限"""
+        """验证用户对目标对象的访问权限（仅项目负责人可将表单关联到项目/项目节点）"""
         from app_project.models import Project, ProjectNode
+        if self.request.user.is_superuser:
+            return
         if isinstance(obj, Project):
-            if self.request.user.is_superuser:
-                return
             if obj.manager_id == self.request.user.pk:
                 return
-            if obj.members.filter(user=self.request.user).exists():
-                return
-            raise PermissionDenied("您无权访问该目标项目")
+            raise PermissionDenied("仅项目负责人可将表单关联到项目")
         elif isinstance(obj, ProjectNode):
             self._check_target_access(obj.project)
 
@@ -787,7 +785,17 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
                 initial_module_label = cfg.label if cfg else ''
                 try:
                     obj = target_model.objects.get(pk=int(initial_entity_pk))
-                    initial_entity_label = cfg.display(obj) if cfg else str(obj)
+                    # 项目/项目节点预绑定仅限负责人可用，否则清除预绑定（仍可创建独立表单）
+                    from app_project.models import Project, ProjectNode
+                    if isinstance(obj, (Project, ProjectNode)):
+                        proj = obj if isinstance(obj, Project) else obj.project
+                        if not (request.user.is_superuser or proj.manager_id == request.user.pk):
+                            initial_module = ''
+                            initial_entity_pk = ''
+                        else:
+                            initial_entity_label = cfg.display(obj) if cfg else str(obj)
+                    else:
+                        initial_entity_label = cfg.display(obj) if cfg else str(obj)
                 except Exception:
                     initial_module = ''
                     initial_entity_pk = ''
@@ -826,16 +834,6 @@ class FormCreateWizardView(FormManagementAccessMixin, View):
             'initial_entity_label': initial_entity_label,
             'is_bound_target': bool(initial_module and initial_entity_pk),
         })
-
-
-class EntitySearchView(FormManagementAccessMixin, View):
-    permission_required = 'app_form_management.view_formsubmission'
-
-    def get(self, request):
-        alias = request.GET.get('alias', '')
-        search = request.GET.get('search', '')
-        results = search_entities(alias, search, user=request.user)
-        return JsonResponse({'results': results})
 
 
 # ==========================================
