@@ -90,7 +90,8 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
 
         Returns:
             {'role_codes': [...], 'min_level': int,
-             'enforce_dept_isolation': bool, 'enforce_group_isolation': bool}
+             'enforce_dept_isolation': bool, 'enforce_group_isolation': bool,
+             'l4_bypass_min_level': int|None, 'l5_bypass_min_level': int|None}
         """
         if not hasattr(self, '_cached_config'):
             if self.module_code:
@@ -101,6 +102,8 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                     'min_level': self.min_level_required,
                     'enforce_dept_isolation': self.enforce_dept_isolation,
                     'enforce_group_isolation': self.enforce_group_isolation,
+                    'l4_bypass_min_level': None,
+                    'l5_bypass_min_level': None,
                 }
         return self._cached_config
 
@@ -212,7 +215,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         cfg = self._resolve_config()
 
         # L4: 部门级数据隔离
-        if cfg['enforce_dept_isolation']:
+        if cfg['enforce_dept_isolation'] and not self._bypass_level(cfg, 'l4', user):
             user_field = self._detect_user_link_field(qs.model)
             if user_field:
                 if user.department:
@@ -229,7 +232,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                 )
 
         # L5: 工作组级数据隔离
-        if cfg['enforce_group_isolation']:
+        if cfg['enforce_group_isolation'] and not self._bypass_level(cfg, 'l5', user):
             user_field = (self._detect_user_link_field(qs.model)
                           if hasattr(qs, 'model') and qs.model else None)
             if user_field:
@@ -266,6 +269,20 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
             if field in model_fields:
                 return field
         return None
+
+    def _bypass_level(self, cfg, layer, user):
+        """用户等级是否达到某层隔离的跳过门槛（用于泛化 L4/L5 等级跳过）。
+
+        Args:
+            cfg: _resolve_config() 返回的模块权限配置 dict。
+            layer: 'l4' | 'l5'，对应 l4/l5_bypass_min_level 字段。
+            user: 当前请求用户。
+        Returns:
+            bool — 配置了门槛且 user_level >= 门槛则为 True（跳过该层隔离）。
+            门槛未配置（None/0）→ False（不跳过，保持原有隔离）。
+        """
+        threshold = cfg.get(f'{layer}_bypass_min_level')
+        return bool(threshold and user.user_level >= threshold)
 
     # ══════════════════════════════════════════════════════════
     #  对象级权限
@@ -330,7 +347,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         cfg = self._resolve_config()
 
         # 3. L4: 部门级检查
-        if cfg['enforce_dept_isolation']:
+        if cfg['enforce_dept_isolation'] and not self._bypass_level(cfg, 'l4', user):
             is_same_dept = (
                 user.department
                 and getattr(owner, 'department', None) == user.department
@@ -339,7 +356,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                 raise PermissionDenied("您的账号无权操作其他部门的数据资产")
 
         # 4. L5: 工作组级检查
-        if cfg['enforce_group_isolation']:
+        if cfg['enforce_group_isolation'] and not self._bypass_level(cfg, 'l5', user):
             user_wg_ids = set(
                 user.work_groups.filter(is_active=True).values_list('id', flat=True)
             )

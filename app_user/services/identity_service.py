@@ -281,6 +281,8 @@ class IdentityService:
                     'min_level': cfg.min_level,
                     'enforce_dept_isolation': cfg.enforce_dept_isolation,
                     'enforce_group_isolation': cfg.enforce_group_isolation,
+                    'l4_bypass_min_level': cfg.l4_bypass_min_level,
+                    'l5_bypass_min_level': cfg.l5_bypass_min_level,
                 }
             return modules
         return _get_or_reload('_cache_modules', _load)
@@ -300,6 +302,8 @@ class IdentityService:
             'min_level': 1,
             'enforce_dept_isolation': True,
             'enforce_group_isolation': False,
+            'l4_bypass_min_level': None,
+            'l5_bypass_min_level': None,
         })
 
     @staticmethod

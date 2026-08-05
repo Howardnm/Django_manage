@@ -393,6 +393,14 @@ class ModuleAccessConfig(models.Model):
                                             help_text="L2 用户等级门槛。")
     enforce_dept_isolation = models.BooleanField("部门隔离 (L4)", default=True)
     enforce_group_isolation = models.BooleanField("工作组隔离 (L5)", default=False)
+    l4_bypass_min_level = models.PositiveIntegerField(
+        "部门隔离跳过等级(L4)", null=True, blank=True,
+        help_text="用户等级 ≥ 该值则跳过 L4 部门隔离。留空或 0 = 不启用。",
+    )
+    l5_bypass_min_level = models.PositiveIntegerField(
+        "工作组隔离跳过等级(L5)", null=True, blank=True,
+        help_text="用户等级 ≥ 该值则跳过 L5 工作组隔离。留空或 0 = 不启用。",
+    )
     is_active = models.BooleanField("启用", default=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
     updated_at = models.DateTimeField("更新时间", auto_now=True)
@@ -401,6 +409,16 @@ class ModuleAccessConfig(models.Model):
         verbose_name = "[L1~L5] 模块权限配置"
         verbose_name_plural = "[L1~L5] 模块权限配置"
         ordering = ['module_code']
+
+    def clean(self):
+        """跨字段校验：L4 跳过等级 ≥ L5 跳过等级（防配置倒挂）。"""
+        super().clean()
+        if (self.l4_bypass_min_level and self.l5_bypass_min_level
+                and self.l4_bypass_min_level < self.l5_bypass_min_level):
+            from django.core.exceptions import ValidationError
+            raise ValidationError({
+                'l4_bypass_min_level': '部门隔离跳过等级(L4)必须大于等于工作组隔离跳过等级(L5)。',
+            })
 
     def __str__(self):
         return f"{self.module_name} ({self.module_code})"

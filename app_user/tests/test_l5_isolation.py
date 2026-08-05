@@ -163,3 +163,145 @@ class ProjectAccessUnionTest(TestCase):
         # 4) L5 开 + 超管（super() 返回非 distinct，因超管绕过隔离）
         qs = self._qs_for(self.admin)
         self.assertEqual(qs.count(), 2)
+
+
+class LevelBypassTest(TestCase):
+    """泛化：L4/L5 隔离的「等级跳过」门槛（可后台配置）。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.deptA = Department.objects.create(name="研发部")
+        cls.deptB = Department.objects.create(name="市场部")
+        cls.cfg = ModuleAccessConfig.objects.create(
+            module_code='project_bypass_test',
+            module_name='项目(等级跳过测试)',
+            enforce_dept_isolation=True,
+            enforce_group_isolation=True,
+        )
+        # 默认不配置任何跳过门槛
+
+        cls.ownerA = User.objects.create_user(
+            username='owner_a', email='oa@x.com', password='x', department=cls.deptA)
+        cls.wgA = WorkGroup.objects.create(name="组A", department=cls.deptA, is_active=True)
+        cls.wgA.members.add(cls.ownerA)
+
+        cls.low_user = User.objects.create_user(
+            username='low', email='low@x.com', password='x', department=cls.deptA, user_level=10)
+        cls.mid_user = User.objects.create_user(
+            username='mid', email='mid@x.com', password='x', department=cls.deptA, user_level=15)
+        cls.high_user = User.objects.create_user(
+            username='high', email='high@x.com', password='x', department=cls.deptB, user_level=20)
+        # 15 级但在另一个部门 → 用于验证「未到 L4 门槛时仍受部门限制」
+        cls.cross_mid_user = User.objects.create_user(
+            username='cross_mid', email='cm@x.com', password='x', department=cls.deptB, user_level=15)
+
+        # pA1: 负责人 ownerA 在 deptA 且属于工作组 → 低等级同部门无组用户看不到它
+        cls.pA1 = Project.objects.create(code='PA1', name='A部门有组项目', manager=cls.ownerA)
+
+    def _apply_config(self, **kwargs):
+        self.cfg.enforce_dept_isolation = kwargs.get('l4', True)
+        self.cfg.enforce_group_isolation = kwargs.get('l5', True)
+        self.cfg.l4_bypass_min_level = kwargs.get('l4_bypass')
+        self.cfg.l5_bypass_min_level = kwargs.get('l5_bypass')
+        self.cfg.save()
+        from app_user.services.identity_service import IdentityService
+        IdentityService.invalidate_cache()
+
+    def _qs(self, user):
+        view = UnifiedAccessMixin()
+        view.module_code = 'project_bypass_test'
+        view.queryset = Project.objects.all()
+        view.request = RequestFactory().get('/')
+        view.request.user = user
+        return view.get_queryset()
+
+    def _can_access(self, user, obj):
+        view = UnifiedAccessMixin()
+        view.module_code = 'project_bypass_test'
+        view.request = RequestFactory().get('/')
+        view.request.user = user
+        return view.check_object_permission(obj)
+
+    # ── L5 跳过 ──
+    def test_l5_bypass_high_level_sees_others_workgroup_record(self):
+        self._apply_config(l5_bypass=15)
+        # 15 级同部门、无组用户 → 跳过 L5 → 能看到负责人有组的 pA1
+        self.assertIn(self.pA1, self._qs(self.mid_user))
+
+    def test_l5_no_bypass_low_level_still_restricted(self):
+        self._apply_config(l5_bypass=15)
+        # 10 级同部门、无组用户 → 未到门槛 → 仍受 L5，看不到负责人有组的 pA1
+        self.assertNotIn(self.pA1, self._qs(self.low_user))
+
+    # ── L4 跳过 ──
+    def test_l4_bypass_high_level_sees_other_department(self):
+        # 为聚焦 L4，同时关闭 L5：20 级不同部门 → 跳过 L4 → 跨部门可见 pA1
+        self._apply_config(l4_bypass=20, l5=False)
+        self.assertIn(self.pA1, self._qs(self.high_user))
+
+    def test_l4_no_bypass_low_level_other_department_restricted(self):
+        self._apply_config(l4_bypass=20, l5=False)
+        # 15 级不同部门 → 未到 L4 门槛 → 仍受 L4，看不到他部门 pA1
+        self.assertNotIn(self.pA1, self._qs(self.cross_mid_user))
+
+    # ── 层级递进（L4=20 ≥ L5=15）──
+    def test_progression_levels(self):
+        self._apply_config(l4_bypass=20, l5_bypass=15)
+        # 15 级同部门 → 跳过 L5、仍受 L4 → 部门内可见 pA1
+        self.assertIn(self.pA1, self._qs(self.mid_user))
+        # 20 级不同部门 → 两层都跳过 → 跨部门可见 pA1
+        self.assertIn(self.pA1, self._qs(self.high_user))
+
+    # ── 未配置 → 保持原有行为 ──
+    def test_unconfigured_preserves_existing_behavior(self):
+        self._apply_config(l4_bypass=None, l5_bypass=None)
+        # 15 级同部门、无组用户 → L5 生效 → 看不到负责人有组的 pA1（与改造前一致）
+        self.assertNotIn(self.pA1, self._qs(self.mid_user))
+
+    # ── 对象级 ──
+    def test_object_level_l5_bypass(self):
+        self._apply_config(l5_bypass=15)
+        # 15 级同部门用户 → 跳过 L5 → 对象级放行
+        self.assertTrue(self._can_access(self.mid_user, self.pA1))
+        # 10 级同部门用户 → 未到门槛 → 对象级拒绝（L5 工作组不匹配）
+        from django.core.exceptions import PermissionDenied
+        with self.assertRaises(PermissionDenied):
+            self._can_access(self.low_user, self.pA1)
+
+    def test_object_level_l4_bypass(self):
+        self._apply_config(l4_bypass=20, l5=False)
+        # 20 级不同部门 → 跳过 L4 → 对象级放行
+        self.assertTrue(self._can_access(self.high_user, self.pA1))
+        # 15 级不同部门 → 未到门槛 → 对象级拒绝（L4 部门不匹配）
+        from django.core.exceptions import PermissionDenied
+        with self.assertRaises(PermissionDenied):
+            self._can_access(self.cross_mid_user, self.pA1)
+
+
+class ModuleAccessConfigValidationTest(TestCase):
+    """ModuleAccessConfig.clean() 的 L4/L5 跳过等级校验。"""
+
+    def _make(self, l4, l5):
+        return ModuleAccessConfig(
+            module_code='validation_test', module_name='校验测试',
+            enforce_dept_isolation=True, enforce_group_isolation=True,
+            l4_bypass_min_level=l4, l5_bypass_min_level=l5,
+        )
+
+    def test_l4_less_than_l5_raises(self):
+        from django.core.exceptions import ValidationError
+        with self.assertRaises(ValidationError):
+            self._make(10, 15).full_clean()
+
+    def test_l4_equal_l5_ok(self):
+        self._make(15, 15).full_clean()  # 不应抛异常
+
+    def test_l4_greater_than_l5_ok(self):
+        self._make(20, 15).full_clean()  # 不应抛异常
+
+    def test_single_layer_configured_ok(self):
+        self._make(20, None).full_clean()  # 只有 L4
+        self._make(None, 15).full_clean()  # 只有 L5
+
+    def test_neither_configured_ok(self):
+        self._make(None, None).full_clean()  # 都不启用
