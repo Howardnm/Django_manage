@@ -113,6 +113,7 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
         context = self.get_context_data()
         data_formset = context['data_formset']
         with transaction.atomic():
+            form.instance.creator = self.request.user  # 记录录入人
             self.object = form.save()
             if data_formset.is_valid():
                 data_formset.instance = self.object
@@ -172,6 +173,7 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)  # 仅创建人或超管可编辑
         context = self.get_context_data()
         data_formset = context['data_formset']
         with transaction.atomic():
@@ -262,9 +264,13 @@ class MaterialBulkPublishView(MaterialAccessMixin, View):
 
             is_published = (action == 'publish')
             qs = self.get_queryset()
+            objs = list(qs.filter(pk__in=ids))
+            # 仅创建人或超管可发布/下架归属材料
+            for obj in objs:
+                self.check_edit_permission(obj)
             with transaction.atomic():
                 updated_count = qs.filter(pk__in=ids).update(is_published=is_published)
-                for obj in qs.filter(pk__in=ids):
+                for obj in objs:
                     send_material_webhook('material_updated', obj)
 
             return JsonResponse({'status': 'success', 'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'})

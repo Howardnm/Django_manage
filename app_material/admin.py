@@ -42,9 +42,9 @@ class MaterialDataPointInline(admin.TabularInline):
 
 @admin.register(MaterialLibrary)
 class MaterialLibraryAdmin(admin.ModelAdmin):
-    list_display = ('grade_name', 'manufacturer', 'category', 'flammability', 'is_published', 'created_at')
+    list_display = ('grade_name', 'manufacturer', 'category', 'creator', 'flammability', 'is_published', 'created_at')
     list_editable = ('is_published',)
-    search_fields = ('grade_name', 'manufacturer')
+    search_fields = ('grade_name', 'manufacturer', 'creator__username')
     list_filter = ('is_published', 'category', 'flammability', 'scenarios', 'characteristics', 'created_at')
     filter_horizontal = ('scenarios', 'characteristics')
     inlines = [MaterialDataPointInline]
