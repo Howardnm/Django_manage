@@ -264,6 +264,13 @@ class ProjectNode(models.Model):
         return is_current_node and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK', 'AWAITING_APPROVAL']
 
     @property
+    def can_manage_content(self):
+        """当前节点是否允许新增表单/上传资料（审批期间也允许，终态隐藏）"""
+        project_current_node = self.project.current_active_node
+        is_current_node = (project_current_node and project_current_node.pk == self.pk)
+        return is_current_node and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
+
+    @property
     def can_report_failure(self):
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
