@@ -10,7 +10,7 @@ User = get_user_model()
 
 class ProductionOrderTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='test')
+        self.user = User.objects.create_user(username='testuser', email='tp_models@trial.dev', password='test')
 
     def test_code_auto_generation(self):
         """工单号自动生成格式 TP{YYYYMMDD}-{seq:02d}"""
@@ -55,7 +55,7 @@ class TrialProductionConfigTests(TestCase):
 
 class SampleInventoryTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='testuser', password='test')
+        self.user = User.objects.create_user(username='testuser', email='tp_samples@trial.dev', password='test')
 
     def test_can_sap_entry(self):
         """仅 FINISHED 颗粒 IN_LAB 状态可 SAP 入库"""

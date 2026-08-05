@@ -44,11 +44,11 @@ class HomeAccessTests(TestCase):
         IdentityService.invalidate_cache()
 
         # ── 用户 ──
-        self.rnd_user = User.objects.create_user(username='engineer', password='test')
+        self.rnd_user = User.objects.create_user(username='engineer', email='engineer@test.dev', password='test')
         self.rnd_user.user_type = rnd
         self.rnd_user.save()
 
-        self.sales_user = User.objects.create_user(username='sales', password='test')
+        self.sales_user = User.objects.create_user(username='sales', email='sales@test.dev', password='test')
         self.sales_user.user_type = sales
         self.sales_user.save()
 

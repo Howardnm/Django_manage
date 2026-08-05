@@ -246,7 +246,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                     ).distinct()
                 else:
                     owner_has_wg = WorkGroup.members.through.objects.filter(
-                        **{f"{user_field}_id": OuterRef(user_field)}
+                        user=OuterRef(user_field)
                     )
                     qs = qs.filter(
                         Q(**{user_field: user}) |

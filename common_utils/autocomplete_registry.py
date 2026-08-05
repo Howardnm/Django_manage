@@ -130,7 +130,7 @@ def make_autocomplete_access_filter(access_mixin_class):
                 )
             else:
                 owner_has_wg = WorkGroup.members.through.objects.filter(
-                    **{f'{user_link_field}_id': OuterRef(user_link_field)}
+                    user=OuterRef(user_link_field)
                 )
                 qs = qs.filter(
                     Q(**{user_link_field: user}) |

@@ -3,14 +3,16 @@ from django.test import TestCase
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 
+from app_user.models import UserRole
+
 User = get_user_model()
 
 
 class DashboardViewTests(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(username='engineer', password='test')
+        self.user = User.objects.create_user(username='engineer', email='engineer@trial.dev', password='test')
         # 设置为研发工程师身份以访问 dashboard
-        self.user.user_type = 'R_ENGINEER'
+        self.user.user_type = UserRole.objects.create(code='R_ENGINEER', name='研发工程师')
         self.user.save()
 
     def test_dashboard_redirects_anonymous(self):
