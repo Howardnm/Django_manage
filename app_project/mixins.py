@@ -23,7 +23,9 @@ class ProjectAccessMixin(UnifiedAccessMixin):
 
         if hasattr(qs.model, 'members'):
             member_q = Q(members__user=user)
-            return (qs | qs.model.objects.filter(member_q)).distinct()
+            # super() 在 L5 隔离时已返回 .distinct() 查询；| 要求两侧 distinct 状态一致，
+            # 故右侧也需 .distinct()，整体再去重。
+            return (qs | qs.model.objects.filter(member_q).distinct()).distinct()
 
         return qs
 

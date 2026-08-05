@@ -11,7 +11,8 @@ from django.contrib.auth import get_user_model
 from app_user.models import Department, WorkGroup, ModuleAccessConfig
 from app_user.mixins import UnifiedAccessMixin
 from common_utils.autocomplete_registry import make_autocomplete_access_filter
-from app_project.models import Project
+from app_project.mixins import ProjectAccessMixin
+from app_project.models import Project, ProjectMember
 
 User = get_user_model()
 
@@ -87,3 +88,44 @@ class L5WorkGroupIsolationTest(TestCase):
         qs = access_filter(self.viewer_no_wg, Project.objects.all())
         self.assertIn(self.p_no_wg, qs)       # 负责人无组 → 可见
         self.assertNotIn(self.p_with_wg, qs)  # 负责人有组且非本人 → 不可见
+
+
+class ProjectAccessUnionTest(TestCase):
+    """回归：ProjectAccessMixin 的协同成员穿透合并（distinct ∪ 非 distinct）不应抛 TypeError。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.dept = Department.objects.create(name="研发部")
+        ModuleAccessConfig.objects.create(
+            module_code='project',
+            module_name='项目管理中心',
+            enforce_dept_isolation=False,
+            enforce_group_isolation=True,   # 开启 L5 → super().get_queryset() 返回 .distinct()
+        )
+
+        cls.member_user = User.objects.create_user(
+            username='member_user', email='member@x.com', password='x', department=cls.dept)
+        cls.owner = User.objects.create_user(
+            username='owner', email='owner@x.com', password='x', department=cls.dept)
+
+        # 让 owner 加入工作组 → L5 会排除其负责的项目，仅靠协同成员穿透才能看到
+        wg = WorkGroup.objects.create(name="组A", department=cls.dept, is_active=True)
+        wg.members.add(cls.owner)
+
+        cls.owned = Project.objects.create(code='PO', name='负责人项目', manager=cls.owner)
+        cls.membered = Project.objects.create(code='PM', name='协同成员项目', manager=cls.owner)
+        ProjectMember.objects.create(project=cls.membered, user=cls.member_user)
+
+    def _qs_for(self, user):
+        view = ProjectAccessMixin()
+        view.queryset = Project.objects.all()  # 模拟 ProjectListView 注入 queryset
+        view.request = RequestFactory().get('/')
+        view.request.user = user
+        return view.get_queryset()
+
+    def test_member_penetration_union_no_typeerror(self):
+        """L5 开启时，成员穿透的 distinct|非distinct 合并不再抛 TypeError。"""
+        qs = self._qs_for(self.member_user)
+        # 无工作组用户走 L5 else 分支 → super() 返回 .distinct() → 触发合并
+        self.assertIn(self.membered, qs)  # 作为协同成员可见（仅靠穿透合并）
+        self.assertNotIn(self.owned, qs)  # 非负责人、非成员、负责人有组 → 不可见
