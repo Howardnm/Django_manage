@@ -10,7 +10,7 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = MaterialLibrary
         fields = '__all__'
-        exclude = ['creator']  # 录入人由视图程序化赋值，不渲染到表单
+        exclude = ['creator']  # 创建人由视图程序化赋值，不渲染到表单
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
             # 应用场景多选

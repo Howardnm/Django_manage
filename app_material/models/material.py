@@ -116,10 +116,10 @@ class MaterialLibrary(models.Model):
     description = models.TextField("特性描述", blank=True)
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
 
-    # 录入人：创建该材料的用户；存量数据可能为空（L4/L5 隔离与编辑归属依赖此字段）
+    # 创建人：创建该材料的用户；存量数据可能为空（L4/L5 隔离与编辑归属依赖此字段）
     creator = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
-        null=True, blank=True, verbose_name="录入人",
+        null=True, blank=True, verbose_name="创建人",
         help_text="创建该材料的用户；存量数据可能为空",
     )
 

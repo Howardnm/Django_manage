@@ -113,7 +113,7 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
         context = self.get_context_data()
         data_formset = context['data_formset']
         with transaction.atomic():
-            form.instance.creator = self.request.user  # 记录录入人
+            form.instance.creator = self.request.user  # 记录创建人
             self.object = form.save()
             if data_formset.is_valid():
                 data_formset.instance = self.object
@@ -199,7 +199,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related(
-            'category'
+            'category', 'creator'
         ).prefetch_related(
             'characteristics', 'scenarios'
         )
