@@ -273,6 +273,7 @@ class ProjectDetailView(ProjectAccessMixin, DetailView):
             'project_form_count': project_form_count,
             'total_form_count': project_form_count + sum(node_form_counts.values()),
             'field_changes': project.field_changes.all()[:5],
+            'user_can_manage_content': project.user_can_manage_content(self.request.user),
         })
         return context
 

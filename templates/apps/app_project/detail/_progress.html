@@ -141,7 +141,7 @@
                             </form>
                         {% endif %}
 
-                        {% if node.can_manage_content %}
+                        {% if node.can_manage_content and user_can_manage_content %}
                         <!-- 表单填写入口 -->
                         <a href="{% url 'form_create_wizard' %}?module=project-node&entity={{ node.pk }}"
                            class="btn btn-sm btn-outline-info ms-auto">

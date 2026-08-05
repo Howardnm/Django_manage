@@ -76,6 +76,10 @@ class Project(AbstractProjectFields):
     def cached_nodes(self):
         return sorted(self.nodes.all(), key=lambda x: x.order)
 
+    def user_can_manage_content(self, user):
+        """当前用户是否可向本项目新增内容（如创建表单、上传附件），仅项目负责人或超管。"""
+        return bool(user and (user.is_superuser or user.pk == self.manager_id))
+
     @cached_property
     def current_active_node(self):
         for node in self.cached_nodes:
