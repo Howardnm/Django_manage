@@ -1,6 +1,6 @@
 """认证视图模块。处理登录、注册、个人资料、密码重置、验证码生成和浏览器验证。
 
-导出: CustomLoginView, RegisterView, ProfileView, PasswordResetView, captcha_view, verify_browser, send_email_code。"""
+导出: CustomLoginView, RegisterView, ProfileView, PasswordResetView, ChangePasswordView, captcha_view, verify_browser, send_email_code。"""
 import json
 from django.shortcuts import render
 from django.contrib.auth.views import LoginView
@@ -9,12 +9,12 @@ from django.views.generic import CreateView, TemplateView, FormView
 from django.urls import reverse_lazy
 from django.contrib import messages
 from django.http import HttpResponse, JsonResponse
-from django.contrib.auth import get_user_model
+from django.contrib.auth import get_user_model, update_session_auth_hash
 from django.conf import settings
 from django.core.cache import cache
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
-from .forms import UserLoginForm, UserRegisterForm, PasswordResetForm
+from .forms import UserLoginForm, UserRegisterForm, PasswordResetForm, PasswordChangeForm
 from .services.identity_service import IdentityService
 from .utils import generate_captcha, send_verification_email, send_register_success_email
 from app_panel.mixins import HomeAccessMixin
@@ -314,5 +314,46 @@ class PasswordResetView(FormView):
             for msg in e.messages:
                 form.add_error('new_password', msg)
             return self.form_invalid(form)
+
+        return super().form_valid(form)
+
+
+# 5. 修改密码视图（已登录用户）
+class ChangePasswordView(HomeAccessMixin, FormView):
+    """修改密码视图。已登录用户通过旧密码 + 图形验证码修改密码。
+
+    L1/L2: 继承 HomeAccessMixin (module_code='home')，与 ProfileView 权限完全一致，
+           未登录/无权限用户在前置准入即被拦截，防止穿透访问。
+    L3: 显式声明 [] — 纯表单页，无数据查询。
+    """
+    permission_required = []  # 纯表单页，无适用 L3 权限码
+    template_name = 'apps/app_user/change_password.html'
+    form_class = PasswordChangeForm
+    success_url = reverse_lazy('user_profile')
+
+    def get_form_kwargs(self):
+        """将当前用户与请求注入表单，供旧密码校验与图形验证码校验使用。"""
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['request'] = self.request
+        return kwargs
+
+    def form_valid(self, form):
+        """密码强度校验 + 更新密码。改密后保持登录并跳回个人中心。"""
+        user = self.request.user
+        new_password = form.cleaned_data['new_password']
+
+        try:
+            validate_password(new_password, user)
+        except ValidationError as e:
+            for msg in e.messages:
+                form.add_error('new_password', msg)
+            return self.form_invalid(form)
+
+        user.set_password(new_password)
+        user.save()
+        # 更新会话认证哈希，保持本次登录会话有效，避免改密后被自动登出
+        update_session_auth_hash(self.request, user)
+        messages.success(self.request, "密码修改成功")
 
         return super().form_valid(form)

@@ -1,6 +1,6 @@
 """认证表单模块。定义登录、注册和密码重置的表单类。
 
-导出: UserLoginForm, UserRegisterForm, PasswordResetForm。"""
+导出: UserLoginForm, UserRegisterForm, PasswordResetForm, PasswordChangeForm。"""
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 from django.contrib.auth import get_user_model, authenticate
@@ -173,4 +173,53 @@ class PasswordResetForm(forms.Form):
         confirm_password = cleaned_data.get("confirm_password")
         if new_password and confirm_password and new_password != confirm_password:
             raise forms.ValidationError("两次输入的密码不一致")
+        return cleaned_data
+
+
+# 5. 修改密码表单（已登录用户）
+class PasswordChangeForm(forms.Form):
+    """修改密码表单。旧密码 + 新密码 + 确认密码 + 图形验证码。
+
+    构造时需通过 kwargs 传入 user（用于校验旧密码）与 request（用于读取 session 中的图形验证码）。
+    """
+    old_password = forms.CharField(label="旧密码", widget=forms.PasswordInput, required=True)
+    new_password = forms.CharField(label="新密码", widget=forms.PasswordInput, required=True)
+    confirm_password = forms.CharField(label="确认新密码", widget=forms.PasswordInput, required=True)
+    captcha = forms.CharField(label="图形验证码", required=True)
+
+    def __init__(self, *args, **kwargs):
+        """接收 user/request，并为所有字段注入 form-control CSS 类。"""
+        self.user = kwargs.pop('user', None)
+        self.request = kwargs.pop('request', None)
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'form-control'})
+
+    def clean_old_password(self):
+        """校验旧密码是否正确。Raises: ValidationError。Returns: old_password。"""
+        old_password = self.cleaned_data.get("old_password")
+        if old_password and self.user and not self.user.check_password(old_password):
+            raise forms.ValidationError("旧密码错误")
+        return old_password
+
+    def clean_captcha(self):
+        """校验图形验证码（与 session 中 captcha_code 比对，大小写不敏感）。Raises: ValidationError。Returns: captcha。"""
+        captcha = self.cleaned_data.get("captcha")
+        session_captcha = self.request.session.get('captcha_code', '') if self.request else ''
+        if not captcha:
+            raise forms.ValidationError("请输入图形验证码")
+        if not session_captcha or session_captcha.lower() != captcha.lower():
+            raise forms.ValidationError("图形验证码错误")
+        return captcha
+
+    def clean(self):
+        """校验新密码与旧密码不同、两次输入的新密码一致。Raises: ValidationError。Returns: cleaned_data。"""
+        cleaned_data = super().clean()
+        old_password = cleaned_data.get("old_password")
+        new_password = cleaned_data.get("new_password")
+        confirm_password = cleaned_data.get("confirm_password")
+        if new_password and confirm_password and new_password != confirm_password:
+            raise forms.ValidationError("两次输入的新密码不一致")
+        if old_password and new_password and old_password == new_password:
+            raise forms.ValidationError("新密码不能与旧密码相同")
         return cleaned_data
