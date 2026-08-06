@@ -193,6 +193,9 @@
                 </span>
                 提交人：{{ submission.submitted_by.username|default:"—" }}
                 &nbsp;·&nbsp; 提交时间：{{ submission.created_at|date:"Y-m-d H:i" }}
+                {% if submission.code %}
+                &nbsp;·&nbsp; 业务编码：<strong>{{ submission.code }}</strong>
+                {% endif %}
             </div>
         </div>
         <div class="header-right">

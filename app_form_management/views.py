@@ -17,7 +17,7 @@ from app_workflow.models import WorkflowDefinition
 from app_project.models import Project, ProjectNode
 from app_project.mixins import ProjectAccessMixin
 from .mixins import FormManagementAccessMixin
-from .services import submission_service
+from .services import submission_service, assign_submission_code
 from .registry import get_target, get_module_choices
 from .filters import FormTemplateFilter, MyDraftsFilter, MySubmissionsFilter
 from .rule_injector import inject_upload_config, enrich_upload_form_data
@@ -327,6 +327,11 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     submission.content_type = ContentType.objects.get_for_model(target)
                     submission.object_id = target.pk
                     submission.save()
+
+        # 提交时生成业务编码（模板配置了 codeConfig 时），放在启动工作流之前，
+        # 确保注入 targetField 的编码已写入 form_data，随流程 context_data 传递
+        if status == 'SUBMITTED':
+            assign_submission_code(submission)
 
         # 提交时如果模板关联了审批流程，自动启动流程实例
         if status == 'SUBMITTED' and template.workflow_id:
@@ -753,11 +758,12 @@ class FormUploadDeleteView(FormManagementAccessMixin, View):
                 status=403,
             )
 
-        attachment.is_deleted = True
-        attachment.save(update_fields=['is_deleted'])
-
         # 同步移除 form_data 中的对应条目
         _sync_form_data_remove(attachment)
+
+        # 真实删除：移除数据库行 + 磁盘文件
+        # （django-cleanup 与 app_attachment 的 post_delete 信号会清理物理文件）
+        attachment.delete()
 
         return JsonResponse({'status': 'success'})
 

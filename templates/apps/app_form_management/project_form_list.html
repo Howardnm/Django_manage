@@ -39,6 +39,7 @@
                             <table class="table table-vcenter card-table">
                                 <thead>
                                     <tr>
+                                        <th>业务编码</th>
                                         <th>表单模板</th>
                                         <th>提交人</th>
                                         <th>审核状态</th>
@@ -49,6 +50,13 @@
                                 <tbody>
                                     {% for sub in project_submissions %}
                                         <tr>
+                                            <td>
+                                                {% if sub.code %}
+                                                <span class="text-secondary">{{ sub.code }}</span>
+                                                {% else %}
+                                                <span class="text-muted">—</span>
+                                                {% endif %}
+                                            </td>
                                             <td>
                                                 <a href="{% url 'form_submission_detail' pk=sub.pk %}" class="text-reset">
                                                     <strong>{{ sub.template.name }}</strong>
@@ -120,6 +128,7 @@
                                             <table class="table table-vcenter card-table table-sm">
                                                 <thead>
                                                     <tr>
+                                                        <th>业务编码</th>
                                                         <th>表单模板</th>
                                                         <th>提交人</th>
                                                         <th>审核状态</th>
@@ -130,6 +139,13 @@
                                                 <tbody>
                                                     {% for sub in group.submissions %}
                                                         <tr>
+                                                            <td>
+                                                                {% if sub.code %}
+                                                                <span class="text-secondary">{{ sub.code }}</span>
+                                                                {% else %}
+                                                                <span class="text-muted">—</span>
+                                                                {% endif %}
+                                                            </td>
                                                             <td>
                                                                 <a href="{% url 'form_submission_detail' pk=sub.pk %}" class="text-reset">
                                                                     <strong>{{ sub.template.name }}</strong>

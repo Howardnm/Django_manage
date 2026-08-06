@@ -109,6 +109,8 @@ class FormSubmission(models.Model):
 
     submitted_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, verbose_name='提交人')
     form_data = models.JSONField(default=dict, verbose_name='表单数据')
+    code = models.CharField('业务编码', max_length=64, blank=True, default='',
+        help_text='在模板设置中配置，提交时自动生成，如 IQC20260806-001')
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, verbose_name='关联审批实例')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='DRAFT', verbose_name='状态')
     remark = models.TextField(blank=True, default='', verbose_name='备注')
@@ -121,6 +123,7 @@ class FormSubmission(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['content_type', 'object_id']),
+            models.Index(fields=['code']),
         ]
 
     @property

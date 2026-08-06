@@ -33,12 +33,47 @@
                 {% endfor %}
             </select>
             <el-button @click="goBack">返回列表</el-button>
+            <el-button @click="openCodeConfig">编码设置</el-button>
             <el-button type="primary" @click="doSave" :loading="saving">保存表单</el-button>
         </div>
     </div>
     <div class="designer-wrap">
         <fc-designer ref="designerRef" height="100%" />
     </div>
+
+    <el-dialog v-model="codeDialogVisible" title="表单业务编码设置" width="480px">
+        <el-form label-width="90px" label-position="left">
+            <el-form-item label="启用编码">
+                <el-switch v-model="codeConfig.enabled"></el-switch>
+                <span style="margin-left:8px;color:#909399;font-size:12px;">提交时自动生成业务编码</span>
+            </el-form-item>
+            <el-form-item label="前缀">
+                <el-input v-model="codeConfig.prefix" placeholder="如 IQC" style="width:200px;"></el-input>
+            </el-form-item>
+            <el-form-item label="日期格式">
+                <el-select v-model="codeConfig.dateFormat" style="width:260px;">
+                    <el-option value="" label="不包含日期"></el-option>
+                    <el-option v-for="f in dateFormats" :key="f.value" :value="f.value" :label="f.label"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="分隔符">
+                <el-input v-model="codeConfig.separator" placeholder="-" style="width:80px;"></el-input>
+            </el-form-item>
+            <el-form-item label="序号位数">
+                <el-input-number v-model="codeConfig.seqLength" :min="2" :max="6"></el-input-number>
+            </el-form-item>
+            <el-form-item label="写入字段">
+                <el-select v-model="codeConfig.targetField" clearable placeholder="不写入表单字段" style="width:260px;">
+                    <el-option v-for="f in fieldOptions" :key="f.value" :value="f.value" :label="f.label"></el-option>
+                </el-select>
+                <span style="margin-left:8px;color:#909399;font-size:12px;">将编码写入该字段值</span>
+            </el-form-item>
+        </el-form>
+        <template #footer>
+            <el-button @click="codeDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="saveCodeConfig">确定</el-button>
+        </template>
+    </el-dialog>
 </div>
 
 <script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
@@ -59,7 +94,24 @@
             return {
                 saving: false,
                 existingName: existingName,
-                existingDesc: existingDesc
+                existingDesc: existingDesc,
+                codeDialogVisible: false,
+                dateFormats: [
+                    { value: '%Y%m%d', label: 'YYYYMMDD  例:20260806' },
+                    { value: '%y%m%d', label: 'YYMMDD  例:260806' },
+                    { value: '%Y-%m-%d', label: 'YYYY-MM-DD  例:2026-08-06' },
+                    { value: '%Y-%m', label: 'YYYY-MM  例:2026-08' },
+                    { value: '%Y', label: 'YYYY  例:2026' }
+                ],
+                codeConfig: {
+                    enabled: false,
+                    prefix: '',
+                    dateFormat: '%Y%m%d',
+                    separator: '-',
+                    seqLength: 3,
+                    targetField: ''
+                },
+                fieldOptions: []
             };
         },
 
@@ -83,8 +135,13 @@
                     if (option && Object.keys(option).length > 0) {
                         designer.setOption(option);
                     }
+                    if (option && option.codeConfig) {
+                        this.codeConfig = Object.assign({}, this.codeConfig, option.codeConfig);
+                    }
                 } catch(e) {}
             }
+
+            this.refreshFieldOptions();
         },
 
         methods: {
@@ -97,6 +154,9 @@
                 }
 
                 const option = designer ? designer.getOption() : {};
+
+                // 合并业务编码配置到 option，随 form_option 一并持久化
+                option.codeConfig = this.codeConfig;
 
                 // 表单名称从设计器 option.formName 读取
                 let name = option.formName || this.existingName;
@@ -142,6 +202,41 @@
                 } finally {
                     this.saving = false;
                 }
+            },
+
+            refreshFieldOptions() {
+                const designer = this.$refs.designerRef;
+                const rule = designer ? designer.getRule() : [];
+                const seen = new Set();
+                this.fieldOptions = [];
+                for (const r of rule) {
+                    const field = r.field, title = r.title;
+                    if (field && !seen.has(field)) {
+                        seen.add(field);
+                        this.fieldOptions.push({ value: field, label: (title || field) + ' (' + field + ')' });
+                    }
+                }
+            },
+
+            openCodeConfig() {
+                this.refreshFieldOptions();
+                this.codeDialogVisible = true;
+            },
+
+            saveCodeConfig() {
+                if (this.codeConfig.enabled) {
+                    const seqLen = this.codeConfig.seqLength;
+                    if (seqLen < 2 || seqLen > 6) {
+                        ElementPlus.ElMessage.warning('序号位数需在 2~6 之间');
+                        return;
+                    }
+                    if (!this.codeConfig.prefix && !this.codeConfig.dateFormat) {
+                        ElementPlus.ElMessage.warning('前缀和日期格式至少填写一项');
+                        return;
+                    }
+                }
+                this.codeDialogVisible = false;
+                ElementPlus.ElMessage.success('编码设置已保存，保存表单时生效');
             },
 
             goBack() {
