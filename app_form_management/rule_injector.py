@@ -70,7 +70,9 @@ def _configure_upload_rule(
     # 基础配置（无论是否可编辑都注入）
     props['action'] = '/forms/api/upload/'
     props['withCredentials'] = True
-    props['autoUpload'] = True
+    # 是否选取后立即上传：尊重设计器配置（默认 true）。
+    # 设为 false 时，文件不会立即上传，需在提交前由前端 flushPendingUploads() 统一上传。
+    props.setdefault('autoUpload', True)
     props['headers'] = {
         'X-CSRFToken': csrf_token,
         'X-Requested-With': 'XMLHttpRequest',
@@ -80,6 +82,16 @@ def _configure_upload_rule(
         'field_name': field_name,
         'csrfmiddlewaretoken': csrf_token,
     }
+
+    # onChange: 记录该字段当前的文件列表（含未上传的原始文件），
+    # 供提交时 flushPendingUploads() 检测并上传"选择了但未上传"的文件。
+    # Element Plus on-change 回调签名 (uploadFile, uploadFiles)，
+    # $inject.args[1] 为完整文件列表。
+    props['onChange'] = (
+        '$FNX:var files = $inject.args[1];\n'
+        'window.__fcPendingUploads__ = window.__fcPendingUploads__ || {};\n'
+        f'window.__fcPendingUploads__["{field_name}"] = files;'
+    )
 
     # onSuccess: 从服务端响应提取 url 和 name 存入文件对象
     # $FNX: form-create 将函数体包装为 function($inject){...}
@@ -115,10 +127,18 @@ def _build_before_remove(csrf_token: str) -> str:
 
     beforeRemove 接收 (uploadFile, uploadFiles)，通过 $inject.args 传入。
     必须返回 Promise：resolve(true) 移除文件，resolve(false) 保留文件。
+
+    延迟上传（autoUpload=false）时，文件可能尚未上传到后端：
+    此时文件对象有 raw 但无服务器下载 URL/token，直接本地移除即可，
+    无需（也无法）调用后端删除端点，否则 token 为空会阻止删除。
     """
     return (
         # file = $inject.args[0], files = $inject.args[1]
         '$FNX:var file = $inject.args[0];\n'
+        # 尚未上传的待上传文件：有 raw 且无服务器下载 URL → 直接本地移除
+        'var isPending = !!(file && file.raw) && !(file.url'
+        ' && file.url.indexOf("/attachment/download/") > -1);\n'
+        'if (isPending) return true;\n'
         'var parts = (file.url || "").split("/").filter(function(p)'
         ' { return p !== ""; });\n'
         'var token = parts.length > 0 ? parts[parts.length - 1] : "";\n'

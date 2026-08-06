@@ -184,6 +184,75 @@
         },
 
         methods: {
+            _readSubmissionId() {
+                var submissionEl = document.getElementById('submission-id');
+                var subId = null;
+                if (submissionEl) {
+                    try { subId = JSON.parse(submissionEl.textContent.trim()); } catch(e) {}
+                }
+                return subId;
+            },
+
+            // 单个待上传文件通过上传端点上传，返回 {url, name}
+            async uploadOne(file, field, subId, csrfToken) {
+                var fd = new FormData();
+                fd.append('file', file);
+                fd.append('submission_id', subId || '');
+                fd.append('field_name', field);
+                fd.append('csrfmiddlewaretoken', csrfToken);
+                var resp = await fetch('/forms/api/upload/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: fd
+                });
+                var result = await resp.json();
+                if (!result.data) {
+                    throw new Error(result.message || '文件上传失败');
+                }
+                return result.data; // {url, name}
+            },
+
+            // 提交/保存前，将设计为"选取后不立即上传"的字段中待上传文件统一上传
+            async flushPendingUploads() {
+                var reg = window.__fcPendingUploads__ || {};
+                var csrfToken = '{{ csrf_token }}';
+                var subId = this._readSubmissionId();
+                for (var field in reg) {
+                    var files = reg[field];
+                    if (!Array.isArray(files)) continue;
+                    // 找出"选择了但尚未上传"的文件（有 raw 且无服务器下载 URL）
+                    var pending = files.filter(function(f) {
+                        return f && f.raw &&
+                            !(f.url && f.url.indexOf('/attachment/download/') > -1);
+                    });
+                    if (!pending.length) continue;
+
+                    var uploaded = [];
+                    for (var i = 0; i < pending.length; i++) {
+                        var res = await this.uploadOne(pending[i].raw, field, subId, csrfToken);
+                        uploaded.push({ url: res.url, name: res.name });
+                    }
+
+                    // 合并字段值：保留已上传项（有 url、无 raw），追加新上传项，去掉未上传的 raw 项
+                    var existing = this.fApi.form[field];
+                    if (!Array.isArray(existing)) existing = [];
+                    var seen = {};
+                    existing.forEach(function(e) {
+                        if (e && e.url && !e.raw) seen[e.url] = 1;
+                    });
+                    var merged = existing.filter(function(e) {
+                        return e && e.url && !e.raw;
+                    });
+                    uploaded.forEach(function(up) {
+                        if (!seen[up.url]) { seen[up.url] = 1; merged.push(up); }
+                    });
+                    this.fApi.setValue({ [field]: merged });
+                }
+            },
+
             async sendData(formData, status) {
                 var remark = document.getElementById('remark-input').value.trim();
                 var url = '{{ submit_url|escapejs }}';
@@ -217,6 +286,7 @@
                 if (!this.fApi) return;
                 this.saving = true;
                 try {
+                    await this.flushPendingUploads();
                     var result = await this.sendData(this.fApi.form, 'DRAFT');
                     if (result && result.status === 'success') {
                         ElementPlus.ElMessage.success('草稿已保存');
@@ -232,6 +302,7 @@
                 if (!this.fApi) return;
                 this.saving = true;
                 try {
+                    await this.flushPendingUploads();
                     await this.fApi.validate();
                     var data = this.fApi.form;
                     if (data && Object.keys(data).length > 0) {
