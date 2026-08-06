@@ -22,9 +22,14 @@
 """
 
 import logging
+from django.dispatch import Signal
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+# 状态转换成功信号 — 跨 app 通用，发出参数: obj, old_status, user
+# 各 app 可在 AppConfig.ready() 中监听，用于状态变更后的联动（如发通知）。
+state_changed = Signal()
 
 
 class InvalidStateTransition(Exception):
@@ -135,6 +140,9 @@ class StateMachine:
             f"[StateMachine] {model_name} {obj} : "
             f"{old_status} → {target_status}{user_info}"
         )
+
+        # 状态转换成功后发出信号，供各 app 联动（如通知项目成员）
+        state_changed.send(sender=model_class, obj=obj, old_status=old_status, user=user)
 
         return obj
 

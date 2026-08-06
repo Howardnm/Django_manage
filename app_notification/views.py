@@ -5,26 +5,19 @@ from django.views import View
 from django.http import HttpResponseRedirect
 
 from .models import Notification
-from app_project.models import ProjectNode
 from .mixins import NotificationAccessMixin
 
 # 1. 标记已读
 class MarkAsReadView(NotificationAccessMixin, View):
-    """将单条通知标记为已读，然后智能重定向。Mixin 已确保 recipient 隔离。"""
+    """将单条通知标记为已读，然后跳转到通知的落地页。Mixin 已确保 recipient 隔离。"""
     permission_required = []  # 仅依赖 L1 角色 + L2 等级准入，不做 L3 权限码校验
 
     def get(self, request, pk):
         notification = get_object_or_404(Notification, pk=pk, recipient=request.user)
         notification.mark_as_read()
 
-        target = notification.target
-        if isinstance(target, ProjectNode):
-            project_url = reverse('project_detail', kwargs={'pk': target.project.pk})
-            next_url = f"{project_url}#node-{target.pk}"
-        else:
-            next_url = reverse('panel_home')
-
-        return redirect(next_url)
+        # 跳转到创建时快照的落地页；无落地页则回首页
+        return redirect(notification.url or reverse('panel_home'))
 
 
 # 2. 全部标记已读
@@ -50,5 +43,8 @@ class NotificationListView(NotificationAccessMixin, ListView):
 
     def get_queryset(self):
         # 1. 调用 Mixin 的本人隔离过滤
-        qs = super().get_queryset().select_related('actor').prefetch_related('target', 'action_object')
-        return qs
+        qs = super().get_queryset()
+        # 2. actor 是普通外键可 select_related；target/action_object 是 GFK，
+        #    但模板只读快照字段（url/title/verb/type/icon），从未访问 target/action_object，
+        #    故无需 prefetch。
+        return qs.select_related('actor')

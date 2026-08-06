@@ -8,6 +8,8 @@ class AppProjectConfig(AppConfig):
 
     def ready(self):
         import app_project.utils.signals
+        # 声明式接入通知：注册项目节点更新类型 + 绑定 post_save（import 即完成）
+        import app_project.notifications
 
         # 注册自动补全
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter

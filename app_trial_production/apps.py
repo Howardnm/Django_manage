@@ -7,7 +7,8 @@ class AppTrialProductionConfig(AppConfig):
     verbose_name = '试验排产'
 
     def ready(self):
-        import app_trial_production.signals  # noqa: F401
+        # 声明式接入通知：注册排产工单状态类型 + 绑定 state_changed（import 即完成）
+        import app_trial_production.notifications
 
         # 注册关联对象路由器 — 审批流程中可跳转回工单详情
         from django.urls import reverse

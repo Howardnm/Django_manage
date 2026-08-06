@@ -4,16 +4,18 @@ from .models import Notification
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = (
-        'recipient', 
-        'actor', 
-        'verb', 
-        'target', 
-        'unread', 
-        'timestamp'
+        'recipient',
+        'actor',
+        'type',
+        'title',
+        'verb',
+        'channel',
+        'unread',
+        'timestamp',
     )
-    list_filter = ('unread', 'timestamp')
-    search_fields = ('recipient__username', 'actor__username', 'verb')
-    
+    list_filter = ('type', 'channel', 'unread', 'timestamp')
+    search_fields = ('recipient__username', 'actor__username', 'verb', 'title')
+
     # 将所有字段设为只读，因为通知是系统生成的，不应手动修改
     readonly_fields = [field.name for field in Notification._meta.get_fields()]
 

@@ -1,5 +1,4 @@
 {% load static %}
-{% load project_extras %}
 <!-- 消息通知 (Notifications) -->
 <link rel="stylesheet" href="{% static 'css/common/header_notifications.css' %}">
 
@@ -22,44 +21,32 @@
             <div class="list-group list-group-flush list-group-hoverable notifications-list">
 
                 {% for notification in unread_notifications %}
-                    <a href="{% url 'notification_mark_as_read' notification.pk %}" class="list-group-item list-group-item-action">
+                    <a href="{{ notification.url|default:'#' }}" class="list-group-item list-group-item-action">
                         <div class="row align-items-center">
                             <div class="col-auto">
                                 <span class="status-dot status-dot-animated bg-red d-block"></span>
                             </div>
                             <div class="col">
-                                {# --- 第一行：谁，关于什么项目 --- #}
+                                {# --- 第一行：作者 + 类型 --- #}
                                 <div class="d-flex align-items-center mb-1">
                                     <span class="fw-bold text-truncate notification-actor">{{ notification.actor.username|default:"系统" }}</span>
-                                    {% if notification.action_object %}
-                                        <span class="badge bg-blue-lt ms-2 me-auto text-truncate" title="项目名称">
-                                            <i class="ti ti-folder-filled opacity-50"></i>{{ notification.action_object.name }}
-                                        </span>
-                                        <span class="badge bg-orange-lt text-truncate" title="项目负责人">
-                                            <i class="ti ti-user-circle opacity-50"></i>{{ notification.action_object.manager.username }}
-                                        </span>
-                                    {% endif %}
+                                    <span class="badge bg-blue-lt ms-2 me-auto text-truncate" title="{{ notification.type_label }}">
+                                        <i class="ti {{ notification.type_icon }} opacity-50"></i>{{ notification.type_label }}
+                                    </span>
                                 </div>
 
-                                {# --- 第二行：核心动作 --- #}
+                                {# --- 第二行：标题（如业务对象名） --- #}
+                                {% if notification.title %}
+                                    <div class="fw-semibold text-truncate mb-1">{{ notification.title }}</div>
+                                {% endif %}
+
+                                {# --- 核心动作 --- #}
                                 <div class="text-secondary text-truncate mb-1">
                                     {{ notification.verb }}
                                 </div>
 
-                                {# --- 第三行：状态与时间 --- #}
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <div class="text-secondary">
-                                        {% if notification.target %}
-                                            <span class="badge bg-purple-lt">
-                                                第{{ notification.target.round }}轮
-                                            </span>
-                                            <span class="badge {{ notification.target.status_css_class }} notification-status-badge">
-                                                {{ notification.target.get_status_display }}
-                                            </span>
-                                        {% endif %}
-                                    </div>
-                                    <div class="small">{{ notification.timestamp|timesince }}前</div>
-                                </div>
+                                {# --- 时间 --- #}
+                                <div class="small">{{ notification.timestamp|timesince }}前</div>
                             </div>
                         </div>
                     </a>

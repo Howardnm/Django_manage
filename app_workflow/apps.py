@@ -8,3 +8,5 @@ class AppWorkflowConfig(AppConfig):
 
     def ready(self):
         import app_workflow.signals
+        # 声明式接入通知：注册审批通知类型 + 绑定信号（import 即完成）
+        import app_workflow.notifications
