@@ -14,7 +14,7 @@
                         <i class="ti ti-pencil icon"></i>
                         创建表单
                     </a>
-                    {% if request.user.is_superuser %}
+                    {% if can_create_template %}
                     <a href="{% url 'form_template_create' %}" class="btn btn-white d-none d-sm-inline-block">
                         <i class="ti ti-plus icon"></i>
                         新建表单模板
@@ -78,7 +78,7 @@
                                     <a href="{% url 'form_template_detail' pk=tpl.pk %}" class="btn btn-white btn-sm">
                                         预览
                                     </a>
-                                    {% if request.user.is_superuser %}
+                                    {% if can_change_template %}
                                     <button class="btn btn-white btn-sm edit-info-btn"
                                             data-bs-toggle="modal"
                                             data-bs-target="#modal-edit-info"
@@ -93,6 +93,8 @@
                                     <a href="{% url 'form_template_edit' pk=tpl.pk %}" class="btn btn-white btn-sm">
                                         设计
                                     </a>
+                                    {% endif %}
+                                    {% if can_delete_template %}
                                     <button class="btn btn-danger btn-sm"
                                             hx-post="{% url 'form_template_delete' pk=tpl.pk %}"
                                             hx-confirm="确定要永久删除这个表单模板吗？"

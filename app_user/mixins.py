@@ -81,6 +81,31 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
             return False
         return user.user_type_id in role_codes
 
+    @classmethod
+    def user_can(cls, user, perm=None) -> bool:
+        """模板/UI 权限判断：user 能否执行本模块内某操作（对齐 has_permission 的 L1→L2→L3）。
+
+        与 has_permission() 唯一差异：perm 为显式传入的权限码（而非实例的 permission_required）。
+        供 View.get_context_data() 计算按钮显隐等，避免在模板里硬编码权限码。
+        """
+        if not user.is_authenticated:
+            return False
+        if user.is_superuser:
+            return True
+        if cls.module_code:
+            cfg = IdentityService.get_module_config(cls.module_code)
+            role_codes = cfg['role_codes']
+            # L1: 角色白名单（空 = 未配置 → 拒绝，与 has_permission() 一致）
+            if not role_codes or user.user_type_id not in role_codes:
+                return False
+            # L2: 用户等级
+            if user.user_level < cfg['min_level']:
+                return False
+        # L3: Django 原生权限码
+        if perm and not user.has_perm(perm):
+            return False
+        return True
+
     # ══════════════════════════════════════════════════════════
     #  统一配置解析入口（单请求内缓存）
     # ══════════════════════════════════════════════════════════

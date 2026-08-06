@@ -40,6 +40,9 @@ class FormTemplateListView(FormManagementAccessMixin, View):
             'page_obj': page_obj,
             'filter': filter_set,
             'workflows': workflows,
+            'can_create_template': FormManagementAccessMixin.user_can(request.user, 'app_form_management.add_formtemplate'),
+            'can_change_template': FormManagementAccessMixin.user_can(request.user, 'app_form_management.change_formtemplate'),
+            'can_delete_template': FormManagementAccessMixin.user_can(request.user, 'app_form_management.delete_formtemplate'),
         })
 
 
@@ -152,6 +155,7 @@ class FormTemplateDetailView(FormManagementAccessMixin, View):
             'template': template,
             'form_config_json': json.dumps(template.form_config or [], ensure_ascii=False),
             'form_option_json': json.dumps(template.form_option or {}, ensure_ascii=False),
+            'can_change_template': FormManagementAccessMixin.user_can(request.user, 'app_form_management.change_formtemplate'),
         })
 
 
