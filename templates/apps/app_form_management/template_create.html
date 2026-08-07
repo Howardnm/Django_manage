@@ -204,18 +204,28 @@
                 }
             },
 
+            // 递归收集规则树中所有含 field 的输入字段（含表格/分组等容器内字段）
+            collectFields(rules, seen, result) {
+                for (const r of rules) {
+                    if (!r || typeof r !== 'object') continue;
+                    const field = r.field;
+                    if (field && !seen.has(field)) {
+                        seen.add(field);
+                        result.push({ value: field, label: (r.title || field) + ' (' + field + ')' });
+                    }
+                    // 表格/行/列等容器：子规则在 children 中
+                    if (Array.isArray(r.children)) this.collectFields(r.children, seen, result);
+                    // group/subForm 等容器：子规则在 control 中
+                    if (Array.isArray(r.control)) this.collectFields(r.control, seen, result);
+                }
+            },
+
             refreshFieldOptions() {
                 const designer = this.$refs.designerRef;
                 const rule = designer ? designer.getRule() : [];
                 const seen = new Set();
                 this.fieldOptions = [];
-                for (const r of rule) {
-                    const field = r.field, title = r.title;
-                    if (field && !seen.has(field)) {
-                        seen.add(field);
-                        this.fieldOptions.push({ value: field, label: (title || field) + ' (' + field + ')' });
-                    }
-                }
+                this.collectFields(rule, seen, this.fieldOptions);
             },
 
             openCodeConfig() {
