@@ -442,7 +442,11 @@ def build_workflow_status_map(instance):
 
     # 4. 构建任务节点状态映射
     status_map = {}
-    all_bpmn_ids = set(camunda_assignments.keys()) | set(db_tasks.keys())
+    # 纳入所有 userTask 节点（含 org_role 等无 camunda 属性、且尚未生成 WorkflowTask 的未来节点）
+    all_bpmn_ids = (set(camunda_assignments.keys())
+                    | set(db_tasks.keys())
+                    | set(bpmn_task_names.keys()))
+    engine = WorkflowEngine(instance.definition)
     for bpmn_id in all_bpmn_ids:
         entry = {}
         camunda_info = camunda_assignments.get(bpmn_id, {})
@@ -465,6 +469,22 @@ def build_workflow_status_map(instance):
                     }
         else:
             entry['status'] = 'pending'
+            # 未来节点（无 WorkflowTask 记录）：按 user_task ID 机制预解析审批人，
+            # 与运行时 sync_tasks 的 resolve_assignee 同源，保持显示与最终指派一致。
+            try:
+                from types import SimpleNamespace
+                stub_task = SimpleNamespace(task_spec=SimpleNamespace(bpmn_id=bpmn_id))
+                stub_workflow = SimpleNamespace(data=dict(instance.context_data or {}))
+                assigned, cand_users, cand_groups = engine.resolve_assignee(
+                    stub_task, stub_workflow, instance)
+            except Exception:
+                assigned, cand_users, cand_groups = None, [], []
+            if assigned:
+                entry['pre_assigned_name'] = assigned.username
+            elif cand_users:
+                entry['pre_assigned_candidates'] = [u.username for u in cand_users]
+            elif cand_groups:
+                entry['pre_assigned_groups'] = list(cand_groups)
 
         if camunda_info.get('assignee'):
             entry['assignee_label'] = camunda_info['assignee']
@@ -544,6 +564,65 @@ def build_workflow_status_map(instance):
                 'task_name': gw.get('name') or gw_id,
                 'is_gateway': True,
             }
+
+    return status_map
+
+
+def build_workflow_preview_status_map(definition, initiator):
+    """构建流程预览状态图（用于提交前展示审批流及各节点预分配审批人）。
+
+    与 build_workflow_status_map 的未来节点预解析逻辑同源，但不依赖 WorkflowInstance：
+    所有 userTask 节点都按传入的发起人预先解析审批人，统一置为 pending（待处理），
+    供表单填写页在提交前预览"该表单的审批流是怎么样的"。
+
+    Args:
+        definition: WorkflowDefinition（表单模板关联的流程定义）
+        initiator: User（当前发起人，用于 org_role 等模式的解析）
+
+    Returns:
+        dict: {bpmn_user_task_id: {...}}，含 pre_assigned_name / pre_assigned_candidates /
+        pre_assigned_groups 等预分配字段。
+    """
+    from types import SimpleNamespace
+
+    nsmap = {'bpmn': 'http://www.omg.org/spec/BPMN/20100524/MODEL'}
+    try:
+        root = etree.fromstring(definition.bpmn_xml.encode('utf-8'))
+    except Exception:
+        return {}
+
+    engine = WorkflowEngine(definition)
+    # 轻量伪实例，供 resolve_assignee 读取 started_by（context_data 为空，无 assignee_map）
+    instance = SimpleNamespace(
+        started_by=initiator, context_data={}, definition=definition,
+    )
+
+    status_map = {}
+    for ut in root.xpath('//bpmn:userTask', namespaces=nsmap):
+        tid = ut.get('id')
+        if not tid:
+            continue
+        stub_task = SimpleNamespace(task_spec=SimpleNamespace(bpmn_id=tid))
+        stub_workflow = SimpleNamespace(data={})
+        try:
+            assigned, cand_users, cand_groups = engine.resolve_assignee(
+                stub_task, stub_workflow, instance)
+        except Exception:
+            assigned, cand_users, cand_groups = None, [], []
+
+        entry = {
+            'status': 'pending',
+            'display_status': 'pending',
+            'status_label': '待处理',
+            'task_name': ut.get('name') or tid,
+        }
+        if assigned:
+            entry['pre_assigned_name'] = assigned.username
+        elif cand_users:
+            entry['pre_assigned_candidates'] = [u.username for u in cand_users]
+        elif cand_groups:
+            entry['pre_assigned_groups'] = list(cand_groups)
+        status_map[tid] = entry
 
     return status_map
 

@@ -548,6 +548,11 @@ document.addEventListener('DOMContentLoaded', function() {
                         overlayHtml += '<span class="overlay-badge badge-assignee">' + info.assigned_to_name + '</span>';
                     } else if (candidateUsernames.length > 0 || Object.keys(candidateGroupMembers).length > 0) {
                         overlayHtml += '<span class="overlay-badge badge-candidate">待签收</span>';
+                    } else if (info.pre_assigned_name) {
+                        overlayHtml += '<span class="overlay-badge badge-pending">' + info.pre_assigned_name + '</span>';
+                    } else if ((info.pre_assigned_candidates && info.pre_assigned_candidates.length > 0) ||
+                               (info.pre_assigned_groups && info.pre_assigned_groups.length > 0)) {
+                        overlayHtml += '<span class="overlay-badge badge-pending">待签收</span>';
                     } else if (assigneeLabel) {
                         overlayHtml += '<span class="overlay-badge badge-pending">' + assigneeLabel + '</span>';
                     }

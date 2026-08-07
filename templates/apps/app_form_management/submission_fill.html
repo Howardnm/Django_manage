@@ -6,6 +6,10 @@
     <title>{{ template.name }} - 表单填写</title>
     {% load static %}
     <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    {% if has_workflow %}
+    <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
+    <link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
+    {% endif %}
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f7fa; overflow-x: auto; }
@@ -23,6 +27,15 @@
         .btn-row { display: flex; justify-content: space-between; margin-top: 16px; }
         .step-card { min-height: 200px; }
         .workflow-notice { display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #ecf5ff; border: 1px solid #b3d8ff; border-radius: 6px; font-size: 13px; color: #409eff; margin-bottom: 16px; }
+
+        /* ── 审批流程预览（bpmn-js）── */
+        #bpmn-preview-canvas { width: 100%; height: 420px; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+        .bpmn-preview-loading { display: flex; align-items: center; justify-content: center; height: 420px; color: #909399; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+        .bpmn-preview-error { display: none; align-items: center; justify-content: center; height: 420px; color: #d63939; background: #fcfcfc; border-radius: 6px; border: 1px solid #e6e8e9; }
+        .bpmn-preview-overlay { font-size: 11px; max-width: 240px; pointer-events: auto; }
+        .bpmn-preview-overlay .preview-badge-row { display: flex; flex-wrap: wrap; gap: 2px; margin-top: 2px; }
+        .bpmn-preview-overlay .preview-badge { display: inline-block; padding: 1px 6px; border-radius: 10px; font-size: 10px; font-weight: 500; white-space: nowrap; }
+        .preview-badge.badge-pending { background: #e6f0ff; color: #0054a6; }
 
         /* ── Django Messages ── */
         .django-messages { margin-bottom: 16px; }
@@ -58,7 +71,12 @@
             <div class="meta">{{ target_display }}</div>
             {% endif %}
         </div>
-        <button onclick="goBack()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
+        <div style="display:flex;gap:8px;">
+            <button v-if="hasWorkflow" @click="openFlowPreview" style="padding:8px 16px;border:1px solid #409eff;border-radius:4px;background:#fff;color:#409eff;cursor:pointer;">
+                <span style="font-size:14px;">&#128200;</span> 查看审批流程
+            </button>
+            <button onclick="goBack()" style="padding:8px 16px;border:1px solid #dcdfe6;border-radius:4px;background:#fff;cursor:pointer;">返回</button>
+        </div>
     </div>
 
     <div v-if="allRules.length === 0" class="card">
@@ -101,24 +119,86 @@
             </div>
         </div>
     </div>
+
+    <!-- 审批流程预览弹窗 -->
+    <el-dialog v-model="showFlow" title="审批流程预览" width="760px" top="6vh" append-to-body>
+        <div v-if="flowLoading" class="bpmn-preview-loading">正在加载流程图...</div>
+        <div id="bpmn-preview-canvas"></div>
+        <div class="bpmn-preview-error" id="bpmn-preview-error">流程图加载失败，请检查流程定义。</div>
+    </el-dialog>
 </div>
 
 <script id="form-config-data" type="application/json">{{ form_config_json|safe }}</script>
 <script id="form-option-data" type="application/json">{{ form_option_json|safe }}</script>
 <script id="existing-data" type="application/json">{{ existing_data_json|safe }}</script>
 <script id="submission-id" type="application/json">{{ existing.pk }}</script>
+<script id="workflow-preview-data" type="application/json">{{ workflow_preview_json|default:'null'|safe }}</script>
 
 <script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
 <script src="{% static 'js/apps/app_form_management/form_readonly.js' %}"></script>
+{% if has_workflow %}
+<script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-navigated-viewer.development.js' %}"></script>
+{% endif %}
 
 <script>
     // 服务端预计算的业务数据
     var stepGroups = {{ step_groups_json|safe }};
     var hasSteps = {{ is_multi_step|yesno:"true,false" }};
     var workflowRestricted = {{ workflow_restricted|yesno:"true,false" }};
+    var hasWorkflow = {{ has_workflow|yesno:"true,false" }};
+    var workflowPreview = null;
+    var previewEl = document.getElementById('workflow-preview-data');
+    if (previewEl) {
+        try { workflowPreview = JSON.parse(previewEl.textContent.trim()); } catch(e) {}
+    }
+
+    // ── 审批流程预览：bpmn-js 渲染 ──
+    var flowViewer = null;
+    function initFlowViewer() {
+        var canvasEl = document.getElementById('bpmn-preview-canvas');
+        var errorEl = document.getElementById('bpmn-preview-error');
+        if (!canvasEl || !workflowPreview || !workflowPreview.bpmn_xml) return;
+        if (flowViewer) { flowViewer.destroy(); flowViewer = null; }
+        errorEl.style.display = 'none';
+
+        flowViewer = new BpmnJS({ container: '#bpmn-preview-canvas' });
+        flowViewer.importXML(workflowPreview.bpmn_xml).then(function() {
+            var canvas = flowViewer.get('canvas');
+            var overlays = flowViewer.get('overlays');
+            var elementRegistry = flowViewer.get('elementRegistry');
+            var statusMap = workflowPreview.status_map || {};
+
+            Object.keys(statusMap).forEach(function(bpmnId) {
+                var info = statusMap[bpmnId];
+                var element = elementRegistry.get(bpmnId);
+                if (!element) return;
+                canvas.addMarker(bpmnId, 'status-pending');
+
+                var name = info.pre_assigned_name || '';
+                var hasCandidates = (info.pre_assigned_candidates && info.pre_assigned_candidates.length) ||
+                                    (info.pre_assigned_groups && info.pre_assigned_groups.length);
+                if (!name && !hasCandidates) return;
+
+                var html = '<div class="bpmn-preview-overlay"><div class="preview-badge-row">';
+                if (name) {
+                    html += '<span class="preview-badge badge-pending">' + name + '</span>';
+                } else {
+                    html += '<span class="preview-badge badge-pending">待签收</span>';
+                }
+                html += '</div></div>';
+                try {
+                    overlays.add(bpmnId, { position: { bottom: -5, left: 0 }, html: html });
+                } catch(e) {}
+            });
+
+            try { canvas.zoom('fit-viewport'); } catch(e) {}
+        }).catch(function() {
+            errorEl.style.display = 'flex';
+        });
+    }
 
     const { createApp } = Vue;
 
@@ -153,11 +233,14 @@
                 allRules: allRules,
                 stepGroups: stepGroups,
                 hasSteps: hasSteps,
+                hasWorkflow: hasWorkflow,
                 workflowRestricted: workflowRestricted,
                 activeStep: 0,
                 formData: formData,
                 fApi: null,
                 saving: false,
+                showFlow: false,
+                flowLoading: false,
                 formOption: formOption
             };
         },
@@ -173,10 +256,27 @@
                 if (api && this.formData && Object.keys(this.formData).length > 0) {
                     api.setValue(this.formData);
                 }
+            },
+            showFlow(v) {
+                if (v) {
+                    this.flowLoading = true;
+                    this.$nextTick(function() {
+                        initFlowViewer();
+                        setTimeout(function() { this.flowLoading = false; }.bind(this), 300);
+                    }.bind(this));
+                }
             }
         },
 
         methods: {
+            openFlowPreview() {
+                if (!workflowPreview || !workflowPreview.bpmn_xml) {
+                    ElementPlus.ElMessage.warning('该表单未关联审批流程');
+                    return;
+                }
+                this.showFlow = true;
+            },
+
             _readSubmissionId() {
                 var submissionEl = document.getElementById('submission-id');
                 var subId = null;

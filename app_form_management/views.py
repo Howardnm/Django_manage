@@ -283,6 +283,16 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                 existing_data, configured_rules, existing,
             )
 
+        # ── 提交前审批流预览：模板关联流程的 BPMN + 各节点预分配审批人 ──
+        workflow_preview_json = None
+        if template.has_workflow:
+            from app_workflow.views import build_workflow_preview_status_map
+            workflow_preview_json = json.dumps({
+                'bpmn_xml': template.workflow.bpmn_xml,
+                'status_map': build_workflow_preview_status_map(
+                    template.workflow, request.user),
+            }, ensure_ascii=False)
+
         return render(request, 'apps/app_form_management/submission_fill.html', {
             'template': template,
             'target': target,
@@ -296,6 +306,7 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             'has_workflow': template.has_workflow,
             'is_multi_step': template.is_multi_step,
             'workflow_restricted': template.is_multi_step and template.has_workflow,
+            'workflow_preview_json': workflow_preview_json,
         })
 
     def post(self, request, template_pk, target_alias=None, obj_pk=None, submission_pk=None):
