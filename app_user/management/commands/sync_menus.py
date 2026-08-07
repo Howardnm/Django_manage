@@ -8,7 +8,7 @@
 
 同步策略:
     代码覆盖: code, name, icon, url_name, sub_items 结构, permissions
-    保留 DB:  sort_order, is_active, sub_items.role_group, sub_items.min_level
+    保留 DB:  sort_order, is_active, sub_items.role_groups, sub_items.min_level
     刷脏数据: 子项自动清理（代码中删除 → DB 也删除）
               模块需 --prune 才会删除（避免误删）
 """

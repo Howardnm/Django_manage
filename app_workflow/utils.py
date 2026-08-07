@@ -1,3 +1,36 @@
+from django.contrib.contenttypes.models import ContentType
+
+
+def _batch_resolve_content_objects(instances):
+    """
+    通用批量解析 GenericForeignKey 的 content_object。
+    按 content_type 分组后批量获取，避免 N+1 查询。
+    将结果作为 _content_object 附加到每个 instance 上。
+    """
+    if not instances:
+        return
+
+    groups = {}
+    for obj in instances:
+        if obj.content_type_id and obj.object_id:
+            groups.setdefault(obj.content_type_id, []).append(obj.object_id)
+
+    results = {}
+    for ct_id, obj_ids in groups.items():
+        try:
+            ct = ContentType.objects.get_for_id(ct_id)
+            model = ct.model_class()
+            if model:
+                for fetched in model.objects.filter(pk__in=set(obj_ids)):
+                    results[(ct_id, fetched.pk)] = fetched
+        except Exception:
+            pass
+
+    for obj in instances:
+        key = (obj.content_type_id, obj.object_id)
+        obj._content_object = results.get(key)
+
+
 class RelatedObjectRouter:
     """关联对象元数据路由器。
 

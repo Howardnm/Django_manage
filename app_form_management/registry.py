@@ -1,4 +1,5 @@
 from app_project.models import Project, ProjectNode
+from app_workflow.utils import related_object_router
 
 
 class TargetConfig:
@@ -55,3 +56,18 @@ def get_alias_for_model(model_class):
 
 def get_module_choices():
     return [(alias, cfg.label) for alias, cfg in _TARGET_REGISTRY.items()]
+
+
+def resolve_form_target(submission):
+    """解析表单提交的关联业务对象，返回 (关联模块, 关联内容, 关联链接)。
+
+    复用 _TARGET_REGISTRY（模块标签/内容展示）与 related_object_router（详情链接）。
+    """
+    if not submission.content_type_id:
+        return '—', '—', None
+    model_class = submission.content_type.model_class()
+    cfg = _TARGET_REGISTRY.get(get_alias_for_model(model_class))
+    module = cfg.label if cfg else str(submission.content_type)
+    target_obj = submission.target_object
+    display = cfg.display(target_obj) if cfg and target_obj else (str(target_obj) if target_obj else '—')
+    return module, display, related_object_router.resolve(target_obj)

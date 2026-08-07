@@ -4,14 +4,13 @@ from django.http import JsonResponse
 from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from django.contrib.contenttypes.models import ContentType
 from django.core.paginator import Paginator
 from django.contrib.auth import get_user_model
 from app_user.models import ReviewGroup
 from .models import WorkflowDefinition, WorkflowInstance, WorkflowTask, ApprovalHistory
 from .services import WorkflowService
 from .engine import WorkflowEngine
-from .utils import related_object_router, workflow_feature_registry
+from .utils import related_object_router, workflow_feature_registry, _batch_resolve_content_objects
 from .filters import WorkflowTaskFilter, WorkflowInstanceFilter, WorkflowDefinitionFilter
 from .mixins import WorkflowAccessMixin
 from .exceptions import (TaskNotFoundError, CancelNotAllowedError, InvalidActionError,
@@ -20,36 +19,6 @@ from lxml import etree
 import json
 
 User = get_user_model()
-
-
-def _batch_resolve_content_objects(instances):
-    """
-    通用批量解析 GenericForeignKey 的 content_object。
-    按 content_type 分组后批量获取，避免 N+1 查询。
-    将结果作为 _content_object 附加到每个 instance 上。
-    """
-    if not instances:
-        return
-
-    groups = {}
-    for obj in instances:
-        if obj.content_type_id and obj.object_id:
-            groups.setdefault(obj.content_type_id, []).append(obj.object_id)
-
-    results = {}
-    for ct_id, obj_ids in groups.items():
-        try:
-            ct = ContentType.objects.get_for_id(ct_id)
-            model = ct.model_class()
-            if model:
-                for fetched in model.objects.filter(pk__in=set(obj_ids)):
-                    results[(ct_id, fetched.pk)] = fetched
-        except Exception:
-            pass
-
-    for obj in instances:
-        key = (obj.content_type_id, obj.object_id)
-        obj._content_object = results.get(key)
 
 
 def _resolve_task_names_from_bpmn(tasks):

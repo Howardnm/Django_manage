@@ -508,8 +508,9 @@ class SidebarSubItemInline(admin.TabularInline):
     model = SidebarSubItem
     extra = 0
     can_delete = False
-    fields = ('name', 'url_name', 'role_group', 'min_level', 'permissions', 'sort_order', 'is_active')
-    # menu_modules.py 控制的字段只读；管理员只能调整 role_group / min_level / sort_order / is_active
+    fields = ('name', 'url_name', 'role_groups', 'min_level', 'permissions', 'sort_order', 'is_active')
+    # menu_modules.py 控制的字段只读；管理员只能调整 role_groups / min_level / sort_order / is_active
+    filter_horizontal = ('role_groups',)
 
     def has_add_permission(self, request, obj=None):
         return False

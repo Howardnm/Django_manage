@@ -462,9 +462,9 @@ class SidebarSubItem(models.Model):
                                related_name='sub_items', verbose_name="所属模块")
     name = models.CharField("子项名称", max_length=50)
     url_name = models.CharField("URL 名称", max_length=200)
-    role_group = models.ForeignKey(RoleGroup, on_delete=models.SET_NULL,
-                                   null=True, blank=True, verbose_name="L1 角色覆盖",
-                                   help_text="留空则继承父模块的可见角色。")
+    role_groups = models.ManyToManyField(RoleGroup, blank=True, verbose_name="L1 角色覆盖",
+                                         related_name="sub_items",
+                                         help_text="任一勾选组命中即对本子项可见。留空则继承父模块的可见角色。")
     min_level = models.PositiveIntegerField("最低等级 (L2)", null=True, blank=True,
                                             help_text="留空则不检查等级。")
     permissions = models.JSONField("权限码 (L3)", default=list, blank=True,

@@ -3,7 +3,7 @@
 通过 `python manage.py sync_menus` 同步到 DB：
 
     - code / name / icon / url_name / sub_items.* — 代码覆盖（编程时确定）
-    - sort_order / is_active / sub_items.role_group — 保留 DB 值（管理员可调整）
+    - sort_order / is_active / sub_items.role_groups — 保留 DB 值（管理员可调整）
 
 数据结构约定:
     顶级模块 dict:

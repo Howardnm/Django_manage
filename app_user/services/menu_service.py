@@ -89,11 +89,15 @@ class MenuService:
         if user.is_superuser:
             return True
 
-        # L1: 子项声明了 role_group 则用自身的；否则继承父模块
-        if sub_item.role_group_id:
+        # L1: 子项声明了 role_groups 则用自身（任一命中即放行）；否则继承父模块
+        sub_groups = list(sub_item.role_groups.filter(is_active=True))
+        if sub_groups:
             from app_user.services.identity_service import IdentityService
-            role_codes = IdentityService.get_role_codes(sub_item.role_group.code)
-            if user.user_type_id not in role_codes:
+            allowed = any(
+                user.user_type_id in IdentityService.get_role_codes(rg.code)
+                for rg in sub_groups
+            )
+            if not allowed:
                 return False
 
         # L2: 用户等级门槛

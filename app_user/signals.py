@@ -32,8 +32,9 @@ def invalidate_rbac_cache(sender, instance, **kwargs):
 
 @receiver(m2m_changed, sender=RoleGroup.roles.through)
 @receiver(m2m_changed, sender=ModuleAccessConfig.role_groups.through)
+@receiver(m2m_changed, sender=SidebarSubItem.role_groups.through)
 def invalidate_rbac_cache_m2m(sender, instance, action, **kwargs):
-    """RoleGroup.roles / ModuleAccessConfig.role_groups 的 M2M 关系变更时清除缓存。
+    """RoleGroup.roles / ModuleAccessConfig.role_groups / SidebarSubItem.role_groups 的 M2M 关系变更时清除缓存。
 
     m2m_changed 对每次操作触发 pre/post 两轮，仅处理 post_* 实际生效的动作。
     """

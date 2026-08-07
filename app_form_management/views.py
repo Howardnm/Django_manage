@@ -863,23 +863,10 @@ class MyDraftsView(FormManagementAccessMixin, View):
         paginator = Paginator(filter_set.qs, 10)
         page_obj = paginator.get_page(request.GET.get('page'))
 
-        from .registry import get_alias_for_model, _TARGET_REGISTRY
-        from app_workflow.utils import related_object_router
+        from .registry import resolve_form_target
 
         for d in page_obj.object_list:
-            if d.content_type_id:
-                model_class = d.content_type.model_class()
-                alias = get_alias_for_model(model_class)
-                d.target_alias = alias
-                cfg = _TARGET_REGISTRY.get(alias)
-                d.target_module = cfg.label if cfg else str(d.content_type)
-                target_obj = d.target_object
-                d.target_display = cfg.display(target_obj) if cfg and target_obj else str(target_obj) if target_obj else '—'
-                d.target_url = related_object_router.resolve(target_obj)
-            else:
-                d.target_module = '—'
-                d.target_display = '—'
-                d.target_url = None
+            d.target_module, d.target_display, d.target_url = resolve_form_target(d)
 
         return render(request, 'apps/app_form_management/my_drafts.html', {
             'page_obj': page_obj,
@@ -898,25 +885,13 @@ class MySubmissionsView(FormManagementAccessMixin, View):
 
         filter_set = MySubmissionsFilter(request.GET, queryset=qs)
 
-        from .registry import get_alias_for_model, _TARGET_REGISTRY
-        from app_workflow.utils import related_object_router
+        from .registry import resolve_form_target
 
         paginator = Paginator(filter_set.qs, 10)
         page_obj = paginator.get_page(request.GET.get('page'))
 
         for sub in page_obj.object_list:
-            if sub.content_type_id:
-                model_class = sub.content_type.model_class()
-                alias = get_alias_for_model(model_class)
-                cfg = _TARGET_REGISTRY.get(alias)
-                sub.target_module = cfg.label if cfg else str(sub.content_type)
-                target_obj = sub.target_object
-                sub.target_display = cfg.display(target_obj) if cfg and target_obj else str(target_obj) if target_obj else '—'
-                sub.target_url = related_object_router.resolve(target_obj)
-            else:
-                sub.target_module = '—'
-                sub.target_display = '—'
-                sub.target_url = None
+            sub.target_module, sub.target_display, sub.target_url = resolve_form_target(sub)
 
         return render(request, 'apps/app_form_management/my_submissions.html', {
             'page_obj': page_obj,
