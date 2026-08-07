@@ -121,6 +121,53 @@ class AssignSubmissionCodeTest(TestCase):
         self.assertEqual(sub.form_data['inspection_code'], sub.code if sub.code else '')
 
 
+class FormTemplateStepMethodsTest(TestCase):
+    """验证步骤相关方法对表格/分组等嵌套字段的递归处理。"""
+
+    def _nested_template(self):
+        # 表格布局（fcTable）：children 中嵌套了不同步骤的字段
+        # 顶层另有普通字段
+        return FormTemplate.objects.create(
+            name='嵌套表单',
+            form_config=[
+                {
+                    'type': 'fcTable',
+                    'props': {'rule': {'row': 2, 'col': 2}},
+                    'children': [
+                        {'type': 'input', 'field': 'tbl_a', 'title': '表内A', 'props': {'step': 1}},
+                        {'type': 'input', 'field': 'tbl_b', 'title': '表内B', 'props': {'step': 2}},
+                    ],
+                },
+                {'type': 'input', 'field': 'top_field', 'title': '顶层', 'props': {'step': 2}},
+                {'type': 'fcRow', 'props': {}, 'children': [
+                    {'type': 'col', 'props': {}, 'children': [
+                        {'type': 'select', 'field': 'nested_sel', 'title': '列内', 'props': {'step': 3}},
+                    ]},
+                ]},
+            ],
+        )
+
+    def test_get_field_step_map_includes_nested(self):
+        t = self._nested_template()
+        m = t.get_field_step_map()
+        self.assertEqual(m['tbl_a'], 1)
+        self.assertEqual(m['tbl_b'], 2)
+        self.assertEqual(m['top_field'], 2)
+        self.assertEqual(m['nested_sel'], 3)
+
+    def test_get_step_fields_includes_nested(self):
+        t = self._nested_template()
+        self.assertEqual(sorted(t.get_step_fields(1)), ['tbl_a'])
+        self.assertEqual(sorted(t.get_step_fields(2)), ['tbl_b', 'top_field'])
+        self.assertEqual(t.get_step_fields(3), ['nested_sel'])
+
+    def test_step_groups_reflects_nested_max_step(self):
+        t = self._nested_template()
+        groups = t.step_groups
+        self.assertEqual([g['step'] for g in groups], [1, 2, 3])
+        self.assertTrue(t.is_multi_step)
+
+
 class FormSubmissionViewIntegrationTest(TestCase):
     """端到端：通过真实 POST 提交链路验证编码生成。"""
 

@@ -198,6 +198,32 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             return f'{model_name}：{target.name}'
         return f'{model_name} #{target.pk}'
 
+    @staticmethod
+    def _filter_initiator_form_data(form_data, template, existing):
+        """发起人填写数据的白名单过滤（防篡改，服务端强制）。
+
+        前端 readonly/disabled 仅是表现层控制，发起人可绕过直接提交任意字段。
+        - 工作流受限模板（多步 + 关联流程）：发起人只允许写步骤1字段；
+          步骤2+ 字段为审批人填写，此处保留既有值——修订重提时前端会携带这些
+          只读副本，直接覆盖会丢失已有数据。
+        - 非受限模板（单步 / 无流程）：仅丢弃表单中不存在的伪字段。
+        伪字段 / 越权字段一律静默丢弃。
+        """
+        if not isinstance(form_data, dict):
+            form_data = {}
+        existing_data = (existing.form_data or {}) if existing else {}
+        if not (template.is_multi_step and template.has_workflow):
+            allowed = set(template.get_field_step_map().keys())
+            return {k: v for k, v in form_data.items() if k in allowed} if allowed else {}
+        step1 = set(template.get_step_fields(1))
+        # 起点：保留既有数据，但排除步骤1旧值（以本次提交为准）
+        result = {k: v for k, v in existing_data.items() if k not in step1}
+        # 写入本次提交的步骤1字段，丢弃非步骤1及伪字段
+        for k, v in form_data.items():
+            if k in step1:
+                result[k] = v
+        return result
+
     def get(self, request, template_pk, target_alias=None, obj_pk=None, submission_pk=None):
         template = get_object_or_404(FormTemplate, pk=template_pk)
         target = self._resolve_target(target_alias=target_alias, object_id=obj_pk)
@@ -282,11 +308,14 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             return JsonResponse({'status': 'error', 'message': '无效的JSON数据。'}, status=400)
 
         form_data = data.get('form_data', {})
+        if not isinstance(form_data, dict):
+            form_data = {}
         status = data.get('status', 'SUBMITTED')
         remark = data.get('remark', '')
 
+        # ── 解析目标提交记录（编辑或草稿） ──
         if submission_pk:
-            # ── 编辑模式：按 PK 精确更新 ──
+            # 编辑模式：按 PK 精确更新
             submission = get_object_or_404(
                 FormSubmission, pk=submission_pk, template=template,
             )
@@ -295,38 +324,39 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
                     {'status': 'error', 'message': '您没有权限编辑该提交'},
                     status=403,
                 )
+        else:
+            # 新建模式：用 submission_id 定位 get() 阶段创建的草稿
+            submission_id = data.get('submission_id')
+            submission = (get_object_or_404(FormSubmission, pk=submission_id)
+                          if submission_id else None)
+            if submission and submission.submitted_by_id != request.user.pk:
+                return JsonResponse(
+                    {'status': 'error', 'message': '您没有权限编辑该提交'},
+                    status=403,
+                )
+
+        # 防篡改：发起人严格限制为只能写步骤1字段；步骤2+ 字段保留既有值
+        # （修订重提时前端会携带只读副本，直接覆盖会丢数据）；伪字段一律丢弃。
+        form_data = self._filter_initiator_form_data(form_data, template, submission)
+
+        if submission:
             submission.form_data = form_data
             submission.remark = remark
             submission.status = status
             submission.save()
         else:
-            # ── 新建模式：用 submission_id 定位 get() 阶段创建的草稿 ──
-            submission_id = data.get('submission_id')
-            submission = (get_object_or_404(FormSubmission, pk=submission_id)
-                          if submission_id else None)
-            if submission:
-                if submission.submitted_by_id != request.user.pk:
-                    return JsonResponse(
-                        {'status': 'error', 'message': '您没有权限编辑该提交'},
-                        status=403,
-                    )
-                submission.form_data = form_data
-                submission.remark = remark
-                submission.status = status
+            # 兜底：submission_id 丢失时创建新记录
+            submission = FormSubmission.objects.create(
+                template=template,
+                submitted_by=request.user,
+                form_data=form_data,
+                status=status,
+                remark=remark,
+            )
+            if target:
+                submission.content_type = ContentType.objects.get_for_model(target)
+                submission.object_id = target.pk
                 submission.save()
-            else:
-                # 兜底：submission_id 丢失时创建新记录
-                submission = FormSubmission.objects.create(
-                    template=template,
-                    submitted_by=request.user,
-                    form_data=form_data,
-                    status=status,
-                    remark=remark,
-                )
-                if target:
-                    submission.content_type = ContentType.objects.get_for_model(target)
-                    submission.object_id = target.pk
-                    submission.save()
 
         # 提交时生成业务编码（模板配置了 codeConfig 时），放在启动工作流之前，
         # 确保注入 targetField 的编码已写入 form_data，随流程 context_data 传递

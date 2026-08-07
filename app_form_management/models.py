@@ -37,12 +37,30 @@ class FormTemplate(models.Model):
         """是否为多步骤表单"""
         return len(self.step_groups) > 1
 
+    def _iter_fields(self):
+        """递归遍历 form_config 中所有含 field 的规则（含表格/分组等容器内字段）。
+
+        表格布局（fcTable）内的字段存在 children 中，group/subForm 的存在 control 中，
+        仅遍历顶层会漏掉它们。参考 rule_injector.py 的递归模式。
+        """
+        def walk(rules):
+            for r in rules or []:
+                if not isinstance(r, dict):
+                    continue
+                if r.get('field'):
+                    yield r
+                for key in ('children', 'control'):
+                    child = r.get(key)
+                    if isinstance(child, list):
+                        yield from walk(child)
+        yield from walk(self.form_config or [])
+
     @property
     def step_groups(self):
         """从 form_config 中提取步骤分组信息。
         返回 [{'step': 1, 'label': '基本信息', 'description': ''}, ...]
         """
-        rules = self.form_config or []
+        rules = list(self._iter_fields())
         if not rules:
             return []
         step_map = {}
@@ -81,7 +99,7 @@ class FormTemplate(models.Model):
     def get_step_fields(self, step):
         """获取指定步骤的所有字段名列表，用于审批时校验和过滤数据"""
         return [
-            r.get('field') for r in (self.form_config or [])
+            r.get('field') for r in self._iter_fields()
             if r.get('field') and int((r.get('props') or {}).get('step', 1)) == step
         ]
 
@@ -89,7 +107,7 @@ class FormTemplate(models.Model):
         """返回 {field_name: step_number} 映射"""
         return {
             r.get('field'): int((r.get('props') or {}).get('step', 1))
-            for r in (self.form_config or [])
+            for r in self._iter_fields()
             if r.get('field')
         }
 

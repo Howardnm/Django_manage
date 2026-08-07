@@ -445,6 +445,7 @@
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-ui-3.2.42/dist/form-create.min.js' %}"></script>
 <script src="{% static 'designer-3.4.0/dist/index.umd.js' %}"></script>
+<script src="{% static 'js/apps/app_form_management/form_readonly.js' %}"></script>
 <script src="{% static 'js/common/user_picker_modal.js' %}"></script>
 
 <script>
@@ -477,25 +478,13 @@
 
             // 字段编辑权限：仅当前审批人可以编辑其负责步骤的字段
             if (canEditStep) {
-                // 当前用户是活跃审批人 → 启用其负责步骤的字段，其余步骤 disabled
-                allRules = allRules.map(function(r) {
-                    var ruleStep = (r.props && r.props.step != null) ? parseInt(r.props.step) : 1;
-                    if (ruleStep !== currentTaskFormStep) {
-                        return Object.assign({}, r, {
-                            $required: false,
-                            validate: undefined,
-                            props: Object.assign({}, r.props || {}, { disabled: true })
-                        });
-                    }
-                    return r;
+                // 当前用户是活跃审批人 → 启用其负责步骤的字段，其余字段只读
+                FCReadonly.apply(allRules, function(r) {
+                    return FCReadonly.stepOf(r) !== currentTaskFormStep;
                 });
             } else {
                 // 非活跃审批人（仅查看 / 流程已结束 / 单步骤表单审批中）→ 全部只读
-                allRules = allRules.map(function(r) {
-                    return Object.assign({}, r, {
-                        props: Object.assign({}, r.props || {}, { disabled: true })
-                    });
-                });
+                FCReadonly.apply(allRules, function() { return true; });
             }
 
             return {

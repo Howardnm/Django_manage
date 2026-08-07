@@ -96,6 +96,37 @@ class WorkflowService:
     # ── 审批 ──────────────────────────────────────────────────
 
     @staticmethod
+    def _merge_step_form_data(related, task, extra_data):
+        """将当前步骤的 step_form_data 合并进 FormSubmission，带字段级白名单过滤。
+
+        前端的 readonly/disabled 仅是表现层控制，恶意客户端可绕过并直接提交
+        其他步骤的只读字段或伪字段。此处做服务端静默过滤（fail-closed）：
+        - 多步骤流程：仅允许 task.form_step 对应步骤的字段名；
+        - 单步骤流程：仅允许表单中已配置的字段名；
+        - 越权字段被静默丢弃，不报错、不抛异常。
+        """
+        step_form_data = (extra_data or {}).get('step_form_data')
+        if not step_form_data:
+            return
+        from app_form_management.models import FormSubmission
+        if not isinstance(related, FormSubmission):
+            return
+        template = related.template
+        if template and template.is_multi_step:
+            allowed = set(template.get_step_fields(task.form_step or 1))
+        else:
+            allowed = set(template.get_step_fields(1)) if template else set()
+        if not allowed:
+            # 模板未配置可编辑字段（异常情形）→ 丢弃全部，避免伪字段写入
+            return
+        merged = dict(related.form_data or {})
+        for key, value in step_form_data.items():
+            if key in allowed:
+                merged[key] = value
+        related.form_data = merged
+        related.save(update_fields=['form_data'])
+
+    @staticmethod
     def complete_task(task: WorkflowTask, user, action: str, remark: str = None,
                       extra_data: dict | None = None) -> WorkflowInstance:
         """处理审批任务: 引擎推进 + DB 更新 + 信号 + 回调"""
@@ -149,16 +180,10 @@ class WorkflowService:
 
             instance.spiff_workflow_data = engine.serialize(workflow)
 
-            # 合并分步表单数据 → FormSubmission.form_data
-            step_form_data = (extra_data or {}).get('step_form_data')
-            if step_form_data and instance.content_object:
-                from app_form_management.models import FormSubmission
-                related = instance.content_object
-                if isinstance(related, FormSubmission):
-                    merged = dict(related.form_data or {})
-                    merged.update(step_form_data)
-                    related.form_data = merged
-                    related.save(update_fields=['form_data'])
+            # 合并分步表单数据 → FormSubmission.form_data（服务端白名单过滤，防篡改）
+            if instance.content_object:
+                WorkflowService._merge_step_form_data(
+                    instance.content_object, task, extra_data)
 
             workflow_completed_status = None
             if action == 'REJECT':
@@ -245,16 +270,10 @@ class WorkflowService:
         engine = WorkflowEngine(instance.definition)
 
         with transaction.atomic():
-            # 2. 合并当前步骤的表单数据（如有）
-            step_form_data = (extra_data or {}).get('step_form_data')
-            if step_form_data and instance.content_object:
-                from app_form_management.models import FormSubmission
-                related = instance.content_object
-                if isinstance(related, FormSubmission):
-                    merged = dict(related.form_data or {})
-                    merged.update(step_form_data)
-                    related.form_data = merged
-                    related.save(update_fields=['form_data'])
+            # 合并当前步骤的表单数据（服务端白名单过滤，防篡改）
+            if instance.content_object:
+                WorkflowService._merge_step_form_data(
+                    instance.content_object, task, extra_data)
 
             if is_initiator_target:
                 # 退回到发起人：取消所有待处理任务，标记需要发起人重新填写
