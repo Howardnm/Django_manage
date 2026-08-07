@@ -371,7 +371,9 @@ class SubmissionDetailRenderTest(TestCase):
         resp = self.client.get(reverse('form_submission_detail', kwargs={'pk': sub.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'form_readonly.js')
-        # 全部只读（无流程 → can_edit_step 为 False → 页面注入 FCReadonly.apply 全只读）
-        self.assertContains(resp, 'FCReadonly.apply(allRules, function() { return true; })')
+        self.assertContains(resp, 'submission_detail.js')
+        # 全部只读（无流程 → can_edit_step 为 False → 静态 JS detail-config 驱动 FCReadonly 全只读）
+        detail_config = json.loads(resp.context['detail_config_json'])
+        self.assertIs(detail_config['canEditStep'], False)
         injected = json.loads(resp.context['form_config_json'])
         self.assertEqual(injected[0]['type'], 'fcTable')

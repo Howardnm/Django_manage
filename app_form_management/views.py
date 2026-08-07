@@ -307,6 +307,17 @@ class FormSubmissionCreateView(FormManagementAccessMixin, View):
             'is_multi_step': template.is_multi_step,
             'workflow_restricted': template.is_multi_step and template.has_workflow,
             'workflow_preview_json': workflow_preview_json,
+            # 静态 JS 所需的动态业务配置（避免模板内联变量/硬编码 URL）
+            'fill_config_json': json.dumps({
+                'stepGroups': json.loads(template.step_group_json or '[]'),
+                'hasSteps': template.is_multi_step,
+                'workflowRestricted': template.is_multi_step and template.has_workflow,
+                'hasWorkflow': template.has_workflow,
+                'csrfToken': get_token(request),
+                'submitUrl': submit_url,
+                'mySubmissionsUrl': reverse('my_submissions'),
+                'uploadUrl': reverse('form_upload'),
+            }, ensure_ascii=False),
         })
 
     def post(self, request, template_pk, target_alias=None, obj_pk=None, submission_pk=None):
@@ -538,6 +549,22 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             ).select_related('uploader').order_by('-uploaded_at')
         )
 
+        # 静态 JS 所需的动态业务配置（避免模板内联变量/硬编码 URL）
+        detail_config = {
+            'stepGroups': json.loads(template.step_group_json or '[]'),
+            'canEditStep': can_edit_step,
+            'editableStepLabel': editable_step_label,
+            'activeStepIndex': active_step_index,
+            'currentTaskFormStep': current_task_form_step or 0,
+            'fieldStepMap': template.get_field_step_map(),
+        }
+        if workflow_data:
+            wi = workflow_data['instance']
+            detail_config['approveUrl'] = reverse('workflow_instance_detail', kwargs={'pk': wi.pk})
+        if current_task:
+            detail_config['returnUrl'] = reverse('workflow_task_return', kwargs={'pk': current_task.pk})
+            detail_config['reassignUrl'] = reverse('workflow_task_reassign', kwargs={'pk': current_task.pk})
+
         return render(request, 'apps/app_form_management/submission_detail.html', {
             'submission': submission,
             'current_task_name': current_task_name,
@@ -554,6 +581,7 @@ class FormSubmissionDetailView(FormManagementAccessMixin, View):
             'submission_data_json': json.dumps(submission_data, ensure_ascii=False),
             'step_groups_json': template.step_group_json,
             'field_step_map_json': json.dumps(template.get_field_step_map(), ensure_ascii=False),
+            'detail_config_json': json.dumps(detail_config, ensure_ascii=False),
             'related_module': related_module,
             'related_entity': related_entity,
             'related_entity_url': related_entity_url,
