@@ -13,7 +13,7 @@ from app_raw_material.utils.filters import RawMaterialFilter
 from app_raw_material.mixins import RawMaterialAccessMixin
 
 class RawMaterialListView(RawMaterialAccessMixin, ListView):
-    """原材料列表：全员(内部)可见，不设部门隔离"""
+    """原材料列表：仅限定的研发中心角色组可见，L4/L5 关闭"""
     permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/list.html'
@@ -93,7 +93,7 @@ class RawMaterialListView(RawMaterialAccessMixin, ListView):
         return context
 
 class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
-    """详情：全员内部可见"""
+    """详情：仅限定的研发中心角色组可见"""
     permission_required = 'app_raw_material.view_rawmaterial'
     model = RawMaterial
     template_name = 'apps/app_raw_material/material/detail.html'
@@ -234,7 +234,7 @@ class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
     template_name = 'apps/app_raw_material/material/form.html'
 
     def get_object(self, queryset=None):
-        return super().get_object(queryset)
+        return self.get_object_or_deny()
 
     @property
     def original_material(self):
@@ -298,6 +298,9 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
     form_class = RawMaterialForm
     template_name = 'apps/app_raw_material/material/form.html'
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '编辑原材料'
@@ -310,6 +313,7 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
         return context
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)
         context = self.get_context_data()
         property_formset = context['property_formset']
         with transaction.atomic():

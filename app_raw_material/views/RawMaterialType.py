@@ -9,7 +9,7 @@ from app_raw_material.mixins import RawMaterialAccessMixin
 
 
 class RawMaterialTypeListView(RawMaterialAccessMixin, ListView):
-    """类型管理：全员(内部)可见"""
+    """类型管理：仅限定的研发中心角色组可见"""
     permission_required = 'app_raw_material.view_rawmaterialtype'
     model = RawMaterialType
     template_name = 'apps/app_raw_material/type/list.html'
@@ -57,11 +57,15 @@ class RawMaterialTypeUpdateView(RawMaterialAccessMixin, UpdateView):
     template_name = 'apps/app_raw_material/type/form.html'
     success_url = reverse_lazy('raw_type_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '编辑原材料类型'
         return context
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)
         messages.success(self.request, "类型已更新")
         return super().form_valid(form)

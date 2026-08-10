@@ -11,7 +11,7 @@ from app_raw_material.mixins import RawMaterialAccessMixin
 
 
 class SupplierListView(RawMaterialAccessMixin, ListView):
-    """供应商列表：全员(内部)可见"""
+    """供应商列表：仅限定的研发中心角色组可见"""
     permission_required = 'app_raw_material.view_supplier'
     model = Supplier
     template_name = 'apps/app_raw_material/supplier/list.html'
@@ -37,6 +37,9 @@ class SupplierDetailView(RawMaterialAccessMixin, DetailView):
     model = Supplier
     template_name = 'apps/app_raw_material/supplier/detail.html'
     context_object_name = 'supplier'
+
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -81,11 +84,15 @@ class SupplierUpdateView(RawMaterialAccessMixin, UpdateView):
     template_name = 'apps/app_raw_material/supplier/form.html'
     success_url = reverse_lazy('raw_supplier_list')
 
+    def get_object(self, queryset=None):
+        return self.get_object_or_deny()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '编辑供应商'
         return context
 
     def form_valid(self, form):
+        self.check_edit_permission(self.object)
         messages.success(self.request, "供应商已更新")
         return super().form_valid(form)
