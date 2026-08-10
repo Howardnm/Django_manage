@@ -44,6 +44,7 @@ class MenuModule:
                  "permissions": ["app_project.view_project"]},
                 {"name": "客户行为分析", "url_name": "customer_activity_overview",
                  "permissions": ["app_repository.view_customer"]},
+                {"name": "排产日历", "url_name": "scheduling_calendar"},
             ],
         }
 

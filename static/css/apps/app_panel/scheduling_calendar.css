@@ -1,0 +1,113 @@
+/* ==========================================
+   看板工作台 — 只读排产日历 scheduling_calendar.html
+   依赖: FullCalendar 6.1.21, Tabler 1.4.0
+   仅包含展示所需的 FullCalendar 覆盖样式；
+   自定义组件（事件卡片、弹窗）使用 Tabler 类
+   ========================================== */
+
+/* ===== FullCalendar 全局变量 ===== */
+#scheduling-calendar {
+    --fc-border-color: var(--tblr-border-color);
+    --fc-page-bg-color: #fff;
+    --fc-neutral-bg-color: rgba(0, 0, 0, 0.02);
+    --fc-today-bg-color: rgba(var(--tblr-primary-rgb), 0.04);
+    --fc-button-bg-color: var(--tblr-light);
+    --fc-button-border-color: var(--tblr-border-color);
+    --fc-button-text-color: var(--tblr-body-color);
+    --fc-button-hover-bg-color: var(--tblr-primary-lt);
+    --fc-button-active-bg-color: var(--tblr-primary);
+    --fc-button-active-border-color: var(--tblr-primary);
+    --fc-button-active-text-color: #fff;
+}
+
+/* ===== 工具栏按钮 ===== */
+.fc .fc-button {
+    font-size: 13px;
+    padding: 0.375rem 0.75rem;
+    border-radius: var(--tblr-border-radius);
+    font-weight: 500;
+}
+.fc .fc-button-primary:not(:disabled):hover {
+    background: var(--fc-button-hover-bg-color);
+    border-color: var(--fc-button-hover-bg-color);
+    color: var(--fc-button-text-color);
+}
+.fc .fc-button-primary:not(:disabled).fc-button-active {
+    background: var(--fc-button-active-bg-color);
+    border-color: var(--fc-button-active-border-color);
+    color: var(--fc-button-active-text-color);
+}
+.fc .fc-toolbar-title { font-size: 1rem; font-weight: 600; }
+
+/* ===== 日历表头 ===== */
+.fc .fc-col-header-cell {
+    padding: 8px 0;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--tblr-muted);
+    background: var(--fc-neutral-bg-color);
+}
+.fc .fc-col-header-cell-cushion { padding: 4px 8px; text-decoration: none !important; color: inherit; }
+
+/* ===== 日期格子 ===== */
+.fc .fc-daygrid-day-frame { min-height: 90px; display: flex; flex-direction: column; }
+.fc .fc-daygrid-day-events { flex: 1; }
+.fc .fc-daygrid-day-bottom { margin-top: auto; }
+.fc .fc-daygrid-day-number { font-size: 12px; font-weight: 500; padding: 6px 8px; color: var(--tblr-black); }
+.fc .fc-day-today .fc-daygrid-day-number { color: var(--tblr-primary); font-weight: 700; }
+.fc .fc-daygrid-more-link { font-size: 11px; font-weight: 500; color: var(--tblr-primary); }
+.fc .fc-daygrid-day:hover { background: rgba(var(--tblr-primary-rgb), 0.02); }
+.fc .fc-day:active { background: rgba(var(--tblr-primary-rgb), 0.05); }
+
+/* ===== 事件卡片（Tabler 类承担大部分样式，此处仅 FC 特有覆盖） ===== */
+.fc .fc-daygrid-event { margin-top: 2px; border-radius: var(--tblr-border-radius); border: none; background: transparent; padding: 1px 2px; }
+.fc-tabler-event { min-height: 22px; }
+.fc-tabler-event .fc-ev-code {
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    direction: rtl;
+}
+.fc-tabler-event .badge { flex-shrink: 0; }
+
+/* ===== 时间网格视图 ===== */
+.fc .fc-timegrid-slot { height: 2.4em; }
+.fc .fc-timegrid-slot:hover { background: rgba(var(--tblr-primary-rgb), 0.02); }
+.fc .fc-timegrid-slot-label { font-size: 11px; color: var(--tblr-muted); font-weight: 500; }
+.fc .fc-timegrid-axis-cushion { font-size: 11px; font-weight: 500; color: var(--tblr-muted); }
+.fc .fc-timegrid-axis-frame { background: var(--fc-neutral-bg-color); }
+.fc .fc-timegrid-col-frame { border-left: 1px solid var(--fc-border-color); }
+.fc .fc-timegrid-now-indicator-line { border-color: var(--tblr-danger); border-width: 2px 0 0; }
+.fc .fc-timegrid-now-indicator-arrow { border-color: var(--tblr-danger); border-width: 5px; }
+.fc .fc-timegrid-allday { border-bottom: 2px solid var(--fc-border-color); }
+.fc .fc-timegrid-allday .fc-daygrid-event { margin-bottom: 2px; }
+
+/* 时间网格事件 — 移除 FullCalendar 默认样式，由卡片接管 */
+.fc .fc-timegrid-event { border-radius: var(--tblr-border-radius); border: none; background: transparent; padding: 0; box-shadow: none; }
+.fc .fc-timegrid-event:hover { box-shadow: none; }
+.fc .fc-timegrid-event .fc-event-main { padding: 0; height: 100%; }
+.fc .fc-timegrid-event .fc-tabler-event { width: 100%; height: 100%; }
+.fc .fc-timegrid-event-harness { min-height: 22px; box-sizing: border-box; }
+.fc .fc-timegrid-event-harness-inset { padding: 0 1px; }
+
+/* ===== 悬浮弹窗（仅位置/动画，其余用 Tabler card 类） ===== */
+.fc-event-popover {
+    position: fixed;
+    z-index: 9999;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 0.15s, transform 0.15s;
+    min-width: 200px;
+    width: max-content;
+    font-size: 12px;
+    white-space: nowrap;
+}
+.fc-event-popover.active { opacity: 1; transform: translateY(0); }
+.fc-event-popover .fc-popover-label { min-width: 56px; }

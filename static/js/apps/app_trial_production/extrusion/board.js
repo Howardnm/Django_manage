@@ -154,7 +154,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // ===== FullCalendar 初始化 =====
     var calendar = new FullCalendar.Calendar(calendarEl, {
-        initialView: 'timeGridWeek',
+        initialView: 'dayGridMonth',
         locale: 'zh-cn',
         firstDay: 0,
         scrollTime: '08:00:00',               // 初始滚动到 8:00
