@@ -2,6 +2,7 @@ import json
 
 from django.core.paginator import Paginator
 from django.http import JsonResponse
+from django.db import IntegrityError, transaction
 from django.conf import settings
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
@@ -71,24 +72,41 @@ class ProjectCreateView(ProjectAccessMixin, CreateView):
     form_class = ProjectForm
     template_name = 'apps/app_project/project_form.html'
 
+    def _generate_project_code(self):
+        """自动生成项目编码：PRJ-YYYYMMDD-NNN（当天最大流水号 + 1）"""
+        from django.utils import timezone
+        today = timezone.localdate()
+        prefix = f"PRJ-{today.strftime('%Y%m%d')}-"
+        # 取当天已有编码的最大流水号，避免 count()+1 在并发/删除后冲突或复用序号
+        last = Project.objects.filter(
+            code__startswith=prefix
+        ).order_by('code').last()
+        seq = 1
+        if last:
+            try:
+                seq = int(last.code.split('-')[-1]) + 1
+            except (ValueError, IndexError):
+                seq = 1
+        return f"{prefix}{seq:03d}"
+
     def form_valid(self, form):
         form.instance.manager = self.request.user
-
-        # 自动生成项目编码（如果未填写）
-        if not form.instance.code:
-            from django.utils import timezone
-            today = timezone.localdate()
-            date_prefix = today.strftime('%Y%m%d')
-            # 统计当天已创建的项目数，用于生成序号
-            count_today = Project.objects.filter(
-                created_at__date=today
-            ).count() + 1
-            form.instance.code = f'PRJ-{date_prefix}-{count_today:03d}'
 
         config = ProjectConfig.get()
         if config.default_approval_workflow_id:
             form.instance.approval_workflow = config.default_approval_workflow
-        return super().form_valid(form)
+
+        # 自动生成项目编码（如果未填写）。并发下编码可能冲突，用事务 + 重试保证唯一。
+        for _ in range(5):
+            try:
+                with transaction.atomic():
+                    if not form.instance.code:
+                        form.instance.code = self._generate_project_code()
+                    return super().form_valid(form)
+            except IntegrityError:
+                form.instance.code = ''  # 重置，下次循环重新生成
+                continue
+        raise RuntimeError("项目编码生成发生并发冲突，请重试")
 
     def get_success_url(self):
         return reverse('project_detail', kwargs={'pk': self.object.pk})
