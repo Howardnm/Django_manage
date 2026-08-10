@@ -19,17 +19,21 @@
         <div class="card mb-3">
             <div class="card-body">
                 <form id="stats-filter-form" class="row g-3">
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">立项开始日期</label>
                         {{ filter.form.start_date }}
                     </div>
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <label class="form-label">立项结束日期</label>
                         {{ filter.form.end_date }}
                     </div>
                     <div class="col-md-2">
-                        <label class="form-label">成员组</label>
-                        {{ filter.form.group }}
+                        <label class="form-label">子公司基地</label>
+                        {{ filter.form.subsidiary }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">工作组</label>
+                        {{ filter.form.workgroup }}
                     </div>
                     <div class="col-md-2">
                         <label class="form-label">成员</label>

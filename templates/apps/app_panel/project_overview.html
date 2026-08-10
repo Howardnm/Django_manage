@@ -10,14 +10,19 @@
                 <div class="page-pretitle">Overview</div>
                 <h2 class="page-title">项目进度看板</h2>
             </div>
-            <!-- 【新增】右侧筛选器 (日期 + 用户组) -->
+            <!-- 【新增】右侧筛选器 (日期 + 子公司基地 + 工作组) -->
             <div class="col-auto ms-auto d-print-none">
                 <!-- 【修复】添加 flex-wrap 类以允许在小屏幕上换行 -->
                 <form method="GET" class="d-flex flex-wrap gap-2 align-items-center">
 
-                    <!-- 用户组筛选 -->
+                    <!-- 子公司基地筛选 -->
                     <div class="d-inline-block" style="width: 150px;">
-                        {{ filter.form.group }}
+                        {{ filter.form.subsidiary }}
+                    </div>
+
+                    <!-- 工作组筛选 -->
+                    <div class="d-inline-block" style="width: 150px;">
+                        {{ filter.form.workgroup }}
                     </div>
 
                     <!-- 日期筛选 -->

@@ -1,28 +1,33 @@
 import django_filters
 from django import forms
-from django.contrib.auth.models import Group
-from django.contrib.auth import get_user_model
 from app_project.models import Project, ProjectNode
+from app_user.models import Subsidiary, WorkGroup
 from common_utils.filters import DateRangeFilterMixin, TablerFilterMixin
-
-User = get_user_model()
+from common_utils.forms import UserPickerWidget
 
 class PanelFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """
     全景面板过滤器
-    包含日期范围筛选 (created_at) 和 用户组筛选
+    包含日期范围筛选 (created_at)、子公司基地筛选 和 工作组筛选
     """
-    group = django_filters.ModelChoiceFilter(
-        queryset=Group.objects.all(),
-        field_name='manager__groups',  # 筛选项目负责人的组
-        label='用户组',
-        empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '用户组'})
+    subsidiary = django_filters.ModelChoiceFilter(
+        queryset=Subsidiary.objects.all(),
+        field_name='manager__subsidiary',
+        label='子公司基地',
+        empty_label="全部子公司",
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '子公司基地'})
+    )
+    workgroup = django_filters.ModelChoiceFilter(
+        queryset=WorkGroup.objects.all(),
+        field_name='manager__work_groups',
+        label='工作组',
+        empty_label="全部工作组",
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '工作组'})
     )
 
     class Meta:
         model = Project
-        fields = ['start_date', 'end_date', 'group']
+        fields = ['start_date', 'end_date', 'subsidiary', 'workgroup']
 
 
 class ProjectStatisticsFilter(TablerFilterMixin, django_filters.FilterSet):
@@ -39,24 +44,41 @@ class ProjectStatisticsFilter(TablerFilterMixin, django_filters.FilterSet):
         widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
         method='filter_init_time'
     )
-    group = django_filters.ModelChoiceFilter(
-        queryset=Group.objects.all(),
-        field_name='manager__groups',
-        label='成员组',
-        empty_label="所有组",
-        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '成员组'})
+    subsidiary = django_filters.ModelChoiceFilter(
+        queryset=Subsidiary.objects.all(),
+        field_name='manager__subsidiary',
+        label='子公司基地',
+        empty_label="全部子公司",
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '子公司基地'})
     )
-    manager = django_filters.ModelChoiceFilter(
-        queryset=User.objects.all().order_by('username'),
-        field_name='manager',
+    workgroup = django_filters.ModelChoiceFilter(
+        queryset=WorkGroup.objects.all(),
+        field_name='manager__work_groups',
+        label='工作组',
+        empty_label="全部工作组",
+        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '工作组'})
+    )
+    manager = django_filters.CharFilter(
+        method='filter_manager',
         label='成员',
-        empty_label="所有成员",
-        widget=forms.Select(attrs={'class': 'form-select form-select-search', 'placeholder': '成员'})
+        widget=UserPickerWidget(
+            attrs={'placeholder': '点击选择成员'},
+            title='选择成员',
+            multi=False,
+        ),
     )
 
     class Meta:
         model = Project
-        fields = ['start_date', 'end_date', 'group', 'manager']
+        fields = ['start_date', 'end_date', 'subsidiary', 'workgroup', 'manager']
+
+    def filter_manager(self, queryset, name, value):
+        if not value:
+            return queryset
+        try:
+            return queryset.filter(manager_id=int(value))
+        except (ValueError, TypeError):
+            return queryset
 
     def filter_init_time(self, queryset, name, value):
         """
