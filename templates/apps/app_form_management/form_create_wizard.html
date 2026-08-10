@@ -43,7 +43,7 @@
                                         <label class="form-check">
                                             <input type="radio" name="template" value="{{ tpl.pk }}"
                                                    class="form-check-input template-radio">
-                                            <span class="form-check-label">{{ tpl.name }}{% if tpl.pk in user_draft_template_ids %} <span class="badge bg-yellow-lt text-yellow">有草稿</span>{% endif %}</span>
+                                            <span class="form-check-label">{{ tpl.name }}{% if tpl.pk in user_draft_template_ids %} <a href="{% url 'my_drafts' %}" class="badge bg-yellow-lt text-yellow text-decoration-none" title="查看我的草稿" onclick="event.stopPropagation();"><i class="ti ti-file-text me-1"></i>有草稿</a>{% endif %}</span>
                                         </label>
                                         {% endfor %}
                                     </div>
