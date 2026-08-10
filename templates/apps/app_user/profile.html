@@ -76,6 +76,16 @@
                     </div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label">工作组</label>
+                    <div>
+                        {% for wg in user.work_groups.all %}
+                            <span class="badge bg-cyan-lt">{{ wg.name }}</span>
+                        {% empty %}
+                            <span class="badge bg-secondary-lt">暂无工作组</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">所属客户公司</label>
                     <div>{% if user.associated_customer %}<span class="badge bg-amber-lt">{{ user.associated_customer }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
                 </div>
