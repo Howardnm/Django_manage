@@ -7,7 +7,7 @@ from app_panel.mixins import (
     WorkspaceWorkflowCardMixin,
 )
 
-MAX_ITEMS = 5  # 每张卡片最多展示的记录数
+MAX_ITEMS = 8  # 每张卡片最多展示的记录数（紧凑型卡片可容纳更多）
 
 
 class PersonalWorkspaceView(PanelAccessMixin, View):

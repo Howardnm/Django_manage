@@ -38,7 +38,7 @@
     {# ── 卡片 1a：我的表单草稿 ── #}
     <div class="col-sm-6">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header py-2 bg-secondary-lt">
                 <div class="card-title">
                     <i class="ti ti-pencil text-secondary me-2"></i>我的表单草稿
                 </div>
@@ -48,7 +48,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table card-table table-vcenter text-nowrap">
+                <table class="table card-table table-vcenter text-nowrap table-sm">
                     <thead>
                         <tr>
                             <th>表单模板</th>
@@ -75,7 +75,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
+                            <td colspan="4" class="text-center text-muted py-2">暂无数据</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -87,7 +87,7 @@
     {# ── 卡片 1b：我提交的表单 ── #}
     <div class="col-sm-6">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header py-2 bg-primary-lt">
                 <div class="card-title">
                     <i class="ti ti-file-text text-primary me-2"></i>我提交的表单
                 </div>
@@ -97,7 +97,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table card-table table-vcenter text-nowrap">
+                <table class="table card-table table-vcenter text-nowrap table-sm">
                     <thead>
                         <tr>
                             <th>表单模板</th>
@@ -132,7 +132,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="5" class="text-center text-muted py-3">暂无数据</td>
+                            <td colspan="5" class="text-center text-muted py-2">暂无数据</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -143,10 +143,104 @@
     {% endif %}
 
     {% if has_workflow %}
-    {# ── 卡片 2：我已发的流程 ── #}
+    {# ── 卡片 2：待办任务 ── #}
     <div class="col-sm-6">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header py-2 bg-warning-lt">
+                <div class="card-title">
+                    <i class="ti ti-clock-hour-4 text-warning me-2"></i>待办任务
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-warning text-white me-2">{{ pending_count }} 个待处理</span>
+                    <a href="{% url 'workflow_my_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap table-sm">
+                    <thead>
+                        <tr>
+                            <th>关联内容</th>
+                            <th>发起人</th>
+                            <th>创建时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in pending_tasks %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
+                            <td>
+                                {% if task.related_object_url %}
+                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
+                                {% else %}
+                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge bg-azure-lt text-white">{{ task.instance.started_by.username }}</span>
+                            </td>
+                            <td class="text-muted small">{{ task.created_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-2">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── 卡片 3：已办任务 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header py-2 bg-info-lt">
+                <div class="card-title">
+                    <i class="ti ti-checklist text-info me-2"></i>已办任务
+                </div>
+                <div class="card-actions">
+                    <span class="badge bg-info text-white me-2">{{ completed_count }} 条</span>
+                    <a href="{% url 'workflow_completed_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
+                </div>
+            </div>
+            <div class="table-responsive">
+                <table class="table card-table table-vcenter text-nowrap table-sm">
+                    <thead>
+                        <tr>
+                            <th>关联内容</th>
+                            <th>处理结果</th>
+                            <th>完成时间</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in completed_tasks %}
+                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
+                            <td>
+                                {% if task.related_object_url %}
+                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
+                                {% else %}
+                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <span class="badge {{ task.status_css_class }} text-white">{{ task.get_status_display }}</span>
+                            </td>
+                            <td class="text-muted small">{{ task.completed_at|date:"Y-m-d" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-2">暂无数据</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    {# ── 卡片 4：我已发的流程 ── #}
+    <div class="col-sm-6">
+        <div class="card">
+            <div class="card-header py-2 bg-success-lt">
                 <div class="card-title">
                     <i class="ti ti-git-pull-request text-success me-2"></i>我已发的流程
                 </div>
@@ -156,7 +250,7 @@
                 </div>
             </div>
             <div class="table-responsive">
-                <table class="table card-table table-vcenter text-nowrap">
+                <table class="table card-table table-vcenter text-nowrap table-sm">
                     <thead>
                         <tr>
                             <th>关联内容</th>
@@ -195,101 +289,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-3">暂无数据</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {# ── 卡片 3：待办任务 ── #}
-    <div class="col-sm-6">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="ti ti-clock-hour-4 text-warning me-2"></i>待办任务
-                </div>
-                <div class="card-actions">
-                    <span class="badge bg-warning text-white me-2">{{ pending_count }} 个待处理</span>
-                    <a href="{% url 'workflow_my_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table card-table table-vcenter text-nowrap">
-                    <thead>
-                        <tr>
-                            <th>关联内容</th>
-                            <th>发起人</th>
-                            <th>创建时间</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for task in pending_tasks %}
-                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
-                            <td>
-                                {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
-                                {% else %}
-                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge bg-azure-lt text-white">{{ task.instance.started_by.username }}</span>
-                            </td>
-                            <td class="text-muted small">{{ task.created_at|date:"Y-m-d" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="text-center text-muted py-3">暂无数据</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    {# ── 卡片 4：已办任务 ── #}
-    <div class="col-sm-6">
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">
-                    <i class="ti ti-checklist text-info me-2"></i>已办任务
-                </div>
-                <div class="card-actions">
-                    <span class="badge bg-info text-white me-2">{{ completed_count }} 条</span>
-                    <a href="{% url 'workflow_completed_tasks' %}" class="text-muted small">查看全部 <i class="ti ti-arrow-right"></i></a>
-                </div>
-            </div>
-            <div class="table-responsive">
-                <table class="table card-table table-vcenter text-nowrap">
-                    <thead>
-                        <tr>
-                            <th>关联内容</th>
-                            <th>处理结果</th>
-                            <th>完成时间</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for task in completed_tasks %}
-                        <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
-                            <td>
-                                {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
-                                {% else %}
-                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <span class="badge {{ task.status_css_class }} text-white">{{ task.get_status_display }}</span>
-                            </td>
-                            <td class="text-muted small">{{ task.completed_at|date:"Y-m-d" }}</td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="3" class="text-center text-muted py-3">暂无数据</td>
+                            <td colspan="4" class="text-center text-muted py-2">暂无数据</td>
                         </tr>
                         {% endfor %}
                     </tbody>
