@@ -60,12 +60,12 @@
                     <tbody>
                         {% for draft in recent_drafts %}
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'form_submission_edit' draft.template_id draft.pk %}'">
-                            <td>{{ draft.template.name }}</td>
+                            <td><a href="{% url 'form_submission_edit' draft.template_id draft.pk %}" class="text-reset">{{ draft.template.name }}</a></td>
                             <td>
                                 {% if draft.target_url %}
-                                <a href="{{ draft.target_url }}" class="text-reset"><strong>{{ draft.target_module }} - {{ draft.target_display }}</strong></a>
+                                <a href="{{ draft.target_url }}" class="text-reset">{{ draft.target_module }} - {{ draft.target_display }}</a>
                                 {% else %}
-                                <strong>{{ draft.target_module }} - {{ draft.target_display }}</strong>
+                                <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -110,12 +110,12 @@
                     <tbody>
                         {% for sub in recent_submissions %}
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'form_submission_detail' sub.pk %}'">
-                            <td>{{ sub.template.name }}</td>
+                            <td><a href="{% url 'form_submission_detail' sub.pk %}" class="text-reset">{{ sub.template.name }}</a></td>
                             <td>
                                 {% if sub.target_url %}
-                                <a href="{{ sub.target_url }}" class="text-reset"><strong>{{ sub.target_module }} - {{ sub.target_display }}</strong></a>
+                                <a href="{{ sub.target_url }}" class="text-reset">{{ sub.target_module }} - {{ sub.target_display }}</a>
                                 {% else %}
-                                <strong>{{ sub.target_module }} - {{ sub.target_display }}</strong>
+                                <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td>
@@ -169,9 +169,9 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
                                 {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
+                                <a href="{{ task.related_object_url }}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
-                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
+                                {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
                                 {% endif %}
                             </td>
                             <td>
@@ -216,9 +216,9 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
                                 {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset"><strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong></a>
+                                <a href="{{ task.related_object_url }}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
-                                <strong>{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</strong>
+                                {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
                                 {% endif %}
                             </td>
                             <td>
@@ -264,9 +264,9 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' inst.pk %}'">
                             <td>
                                 {% if inst.related_object_url %}
-                                <a href="{{ inst.related_object_url }}" class="text-reset"><strong>{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</strong></a>
+                                <a href="{{ inst.related_object_url }}" class="text-reset">{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</a>
                                 {% else %}
-                                <strong>{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</strong>
+                                {{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}
                                 {% endif %}
                             </td>
                             <td>
