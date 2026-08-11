@@ -232,6 +232,9 @@ class RfcSchema(metaclass=RfcSchemaMeta):
             if key in cls._output_tables and isinstance(value, list):
                 output_cls = cls._output_tables[key]
                 result[key] = output_cls.map_records(value)
+            elif key in cls._output_tables and isinstance(value, dict):
+                # 单结构 Export（如校验类函数的 ES_LFA1）→ 类型化单条记录
+                result[key] = cls._output_tables[key].map_record(value)
             else:
                 result[key] = value
         return result

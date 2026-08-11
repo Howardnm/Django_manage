@@ -79,6 +79,32 @@ class SAPGateway:
         """
         return self.rfc(schema_class).filter(**kwargs).call()
 
+    def call_structured(self, schema_class: Type["RfcSchema"], **kwargs) -> Dict[str, Any]:
+        """
+        快捷调用：执行 RFC 并返回完整解析结果 dict。
+
+        用于返回「单结构 Export」（如 ES_LFA1）或「返回表」（如 ET_RETURN）的
+        校验类函数，区别于面向表格列表输出的 .call()。
+
+        Args:
+            schema_class: RfcSchema 子类
+            **kwargs: 参数，格式为 param=value / param__op=value
+
+        Returns:
+            dict: {输出结构/表名 → 类型化记录或记录列表}，未声明键原样保留
+
+        Example:
+            result = sap.call_structured(
+                VendorCheckQuery,
+                i_vendor="0000203100", i_pur_org="1000", i_comp_code="1000",
+            )
+            lfa1 = result["ES_LFA1"]      # 类型化单结构 (OutputRecord) 或 None
+            msgs = result["ET_RETURN"]    # 返回消息列表
+        """
+        params = schema_class.build_params(**kwargs)
+        raw = self._conn_mgr.call_rfc(schema_class.function_name, **params)
+        return schema_class.parse_response(raw)
+
     # =========================================================================
     # 连接管理
     # =========================================================================

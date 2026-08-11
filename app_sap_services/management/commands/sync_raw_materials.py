@@ -123,7 +123,7 @@ class Command(BaseCommand):
 
         # ── 4. 同步 ──
         if dry_run:
-            self._dry_run(df)
+            self._dry_run(df, default_category)
         else:
             self._live_sync(df, default_category)
 
@@ -131,9 +131,19 @@ class Command(BaseCommand):
     # dry-run
     # ------------------------------------------------------------------
 
-    def _dry_run(self, df: pl.DataFrame):
+    def _dry_run(self, df: pl.DataFrame, default_category):
         will_create = 0
         will_update = 0
+        will_skip = 0
+
+        # 预加载 物料编码 -> (当前分类ID, 当前名称), 用于跳过已清洗记录并展示当前名称
+        rm_map = {
+            rm.warehouse_code: (rm.category_id, rm.name)
+            for rm in RawMaterial.objects.only(
+                "warehouse_code", "category_id", "name"
+            ).all()
+            if rm.warehouse_code
+        }
 
         for row in df.iter_rows(named=True):
             matnr = row["MATNR"]
@@ -141,15 +151,21 @@ class Command(BaseCommand):
             if not matnr:
                 continue
 
-            if RawMaterial.objects.filter(warehouse_code=matnr).exists():
-                will_update += 1
-                existing = RawMaterial.objects.only("name").get(
-                    warehouse_code=matnr
-                )
-                self.stdout.write(
-                    f"   [~] 将更新: {maktx} ({matnr}) "
-                    f"(当前: {existing.name})"
-                )
+            current = rm_map.get(matnr)
+            if current is not None:
+                cur_cat_id, cur_name = current
+                if cur_cat_id != default_category.pk:
+                    will_skip += 1
+                    self.stdout.write(
+                        f"   [~] 将跳过(已清洗): {maktx} ({matnr}) "
+                        f"(当前: {cur_name})"
+                    )
+                else:
+                    will_update += 1
+                    self.stdout.write(
+                        f"   [~] 将更新: {maktx} ({matnr}) "
+                        f"(当前: {cur_name})"
+                    )
             else:
                 will_create += 1
                 self.stdout.write(
@@ -159,8 +175,9 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
-                f"[OK] 预览完成！共 {will_create + will_update} 条 "
-                f"(将创建 {will_create}, 将更新 {will_update})"
+                f"[OK] 预览完成！共 {will_create + will_update + will_skip} 条 "
+                f"(将创建 {will_create}, 将更新 {will_update}, "
+                f"将跳过(已清洗) {will_skip})"
             )
         )
 
@@ -172,8 +189,16 @@ class Command(BaseCommand):
         total = df.height
         created = 0
         updated = 0
+        skipped_cleaned = 0
         errors = 0
         processed = 0
+
+        # 预加载 物料编码 -> 当前分类ID, 用于跳过已清洗记录 (避免逐条查询)
+        cat_map = {
+            rm.warehouse_code: rm.category_id
+            for rm in RawMaterial.objects.only("warehouse_code", "category_id").all()
+            if rm.warehouse_code
+        }
 
         for chunk_df in df.iter_slices(CHUNK_SIZE):
             for row in chunk_df.iter_rows(named=True):
@@ -190,6 +215,12 @@ class Command(BaseCommand):
                     continue
 
                 try:
+                    # 已清洗关联的记录 (category 不再是"未分类") 跳过, 保留文员数据
+                    current_cat_id = cat_map.get(matnr)
+                    if current_cat_id is not None and current_cat_id != default_category.pk:
+                        skipped_cleaned += 1
+                        continue
+
                     with transaction.atomic():
                         obj, is_new = RawMaterial.objects.update_or_create(
                             warehouse_code=matnr,
@@ -199,6 +230,7 @@ class Command(BaseCommand):
                             },
                         )
                     if is_new:
+                        cat_map[matnr] = default_category.pk
                         created += 1
                     else:
                         updated += 1
@@ -213,14 +245,15 @@ class Command(BaseCommand):
             processed += chunk_df.height
             self.stdout.write(
                 f"   进度: {processed}/{total} "
-                f"(新建 {created}, 更新 {updated})"
+                f"(新建 {created}, 更新 {updated}, 跳过已清洗 {skipped_cleaned})"
             )
 
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
                 f"[OK] 同步完成！总计 {processed} 条, "
-                f"新建 {created} 个, 更新 {updated} 个, 错误 {errors} 个"
+                f"新建 {created} 个, 更新 {updated} 个, "
+                f"跳过已清洗 {skipped_cleaned} 个, 错误 {errors} 个"
             )
         )
 
