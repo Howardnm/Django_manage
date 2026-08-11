@@ -23,6 +23,9 @@
             </div>
             <div class="col-auto ms-auto d-print-none">
                 <div class="btn-list">
+                    <a href="{% url 'personal_workspace' %}" class="btn btn-outline-secondary btn-sm">
+                        <i class="ti ti-arrow-left me-1"></i>返回个人工作台
+                    </a>
                     <span class="badge {{ instance.status_css_class }} text-white">
                         {{ instance.get_status_display }}
                     </span>
