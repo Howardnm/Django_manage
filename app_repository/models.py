@@ -89,7 +89,7 @@ class AbstractProjectRepositoryFields(models.Model):
 
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
-    estimated_order_volume = models.DecimalField("预估市场订单用量 (kg/年)", max_digits=10, decimal_places=2, null=True, blank=True)
+    estimated_order_volume = models.DecimalField("预估市场订单用量 (吨/年)", max_digits=10, decimal_places=2, null=True, blank=True)
 
     # 项目计划时间节点
     first_sample_date = models.DateField("第一次客户送样时间", null=True, blank=True)
