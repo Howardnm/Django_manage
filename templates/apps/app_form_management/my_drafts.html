@@ -49,13 +49,11 @@
                             <td>
                                 <div class="btn-list flex-nowrap">
                                     <a href="{% url 'form_submission_edit' template_pk=draft.template_id submission_pk=draft.pk %}"
-                                       class="btn btn-sm btn-primary">继续填写</a>
-                                    <button class="btn btn-sm btn-danger"
-                                            hx-post="{% url 'form_submission_delete' pk=draft.pk %}"
-                                            hx-confirm="确定要删除这条草稿吗？"
-                                            hx-swap="none">
-                                        删除
-                                    </button>
+                                       class="btn btn-sm btn-icon btn-ghost-primary" title="继续填写"><i class="ti ti-pencil"></i></a>
+                                    <a href="javascript:void(0)" class="btn btn-sm btn-icon btn-ghost-danger"
+                                       hx-post="{% url 'form_submission_delete' pk=draft.pk %}"
+                                       hx-confirm="确定要删除这条草稿吗？"
+                                       hx-swap="none" title="删除"><i class="ti ti-trash"></i></a>
                                 </div>
                             </td>
                         </tr>

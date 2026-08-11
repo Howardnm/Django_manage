@@ -55,6 +55,7 @@
                             <th>关联内容</th>
                             <th>状态</th>
                             <th>更新时间</th>
+                            <th class="w-1">操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -72,10 +73,17 @@
                                 <span class="badge bg-secondary text-white">{{ draft.get_status_display }}</span>
                             </td>
                             <td class="text-muted small">{{ draft.updated_at|date:"Y-m-d" }}</td>
+                            <td>
+                                <a href="javascript:void(0)" class="text-danger small"
+                                   onclick="event.stopPropagation()"
+                                   hx-post="{% url 'form_submission_delete' pk=draft.pk %}"
+                                   hx-confirm="确定要删除这条草稿吗？"
+                                   hx-swap="none">删除</a>
+                            </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="4" class="text-center text-muted py-2">暂无数据</td>
+                            <td colspan="5" class="text-center text-muted py-2">暂无数据</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -300,4 +308,19 @@
     {% endif %}
 </div>
 {% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.body.addEventListener('htmx:afterRequest', function(evt) {
+        try {
+            const result = JSON.parse(evt.detail.xhr.responseText);
+            if (result.status === 'success') {
+                window.location.reload();
+            } else if (result.message) {
+                alert(result.message);
+            }
+        } catch(e) {}
+    });
+</script>
 {% endblock %}
