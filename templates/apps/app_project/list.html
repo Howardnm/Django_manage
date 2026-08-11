@@ -24,7 +24,7 @@
                 {% for project in page_obj %}
                     <tr>
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 180px;" title="{{ project.name }}">
+                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 220px;" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
                             <div class="text-muted small mt-1">
