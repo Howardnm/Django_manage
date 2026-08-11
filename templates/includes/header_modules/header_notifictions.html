@@ -21,7 +21,7 @@
             <div class="list-group list-group-flush list-group-hoverable notifications-list">
 
                 {% for notification in unread_notifications %}
-                    <a href="{{ notification.url|default:'#' }}" class="list-group-item list-group-item-action">
+                    <a href="{% url 'notification_mark_as_read' notification.pk %}" class="list-group-item list-group-item-action">
                         <div class="row align-items-center">
                             <div class="col-auto">
                                 <span class="status-dot status-dot-animated bg-red d-block"></span>
