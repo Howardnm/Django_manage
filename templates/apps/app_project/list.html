@@ -24,7 +24,7 @@
                 {% for project in page_obj %}
                     <tr>
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 220px;" title="{{ project.name }}">
+                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 240px;" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
                             <div class="text-muted small mt-1">
@@ -118,7 +118,7 @@
                             </div>
                         </td>
                         
-                        <td class="text-muted text-wrap" style="max-width: 250px;">
+                        <td class="text-muted text-wrap" style="max-width: 200px;">
                             {% if project.latest_remark %}
                                 <div class="text-truncate" title="{{ project.latest_remark }}">
                                     <i class="ti ti-message-dots me-1"></i>
