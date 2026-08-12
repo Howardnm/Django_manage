@@ -63,6 +63,7 @@ class PersonalWorkspaceView(PanelAccessMixin, View):
         if has_workflow:
             from app_workflow.models import WorkflowInstance, WorkflowTask
             from app_workflow.utils import related_object_router, _batch_resolve_content_objects
+            from app_form_management.models import FormSubmission
 
             # 我发起的流程（最近 5 条）
             recent_instances = list(
@@ -78,6 +79,8 @@ class PersonalWorkspaceView(PanelAccessMixin, View):
                 inst.related_model_name = obj._meta.verbose_name if obj else None
                 inst.related_display_name = related_object_router.get_display_name(obj)
                 inst.related_object_url = related_object_router.resolve(obj)
+                # 关联内容是表单时，点击应直达表单审批页（而非流程实例页）
+                inst.is_form_related = isinstance(obj, FormSubmission)
             context['recent_instances'] = recent_instances
             context['initiated_count'] = (
                 WorkflowInstance.objects.filter(started_by=user).count()
@@ -127,6 +130,8 @@ class PersonalWorkspaceView(PanelAccessMixin, View):
                 task.related_model_name = obj._meta.verbose_name if obj else None
                 task.related_display_name = related_object_router.get_display_name(obj)
                 task.related_object_url = related_object_router.resolve(obj)
+                # 关联内容是表单时，点击应直达表单审批页（而非流程实例页）
+                task.is_form_related = isinstance(obj, FormSubmission)
 
         context['has_form'] = has_form
         context['has_workflow'] = has_workflow

@@ -176,7 +176,9 @@
                         {% for task in pending_tasks %}
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
-                                {% if task.related_object_url %}
+                                {% if task.is_form_related %}
+                                <a href="{{ task.related_object_url }}" class="text-reset" onclick="event.stopPropagation()">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
+                                {% elif task.related_object_url %}
                                 <a href="{% url 'workflow_instance_detail' task.instance_id %}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
@@ -223,7 +225,9 @@
                         {% for task in completed_tasks %}
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
-                                {% if task.related_object_url %}
+                                {% if task.is_form_related %}
+                                <a href="{{ task.related_object_url }}" class="text-reset" onclick="event.stopPropagation()">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
+                                {% elif task.related_object_url %}
                                 <a href="{% url 'workflow_instance_detail' task.instance_id %}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
@@ -271,7 +275,9 @@
                         {% for inst in recent_instances %}
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' inst.pk %}'">
                             <td>
-                                {% if inst.related_object_url %}
+                                {% if inst.is_form_related %}
+                                <a href="{{ inst.related_object_url }}" class="text-reset" onclick="event.stopPropagation()">{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</a>
+                                {% elif inst.related_object_url %}
                                 <a href="{% url 'workflow_instance_detail' inst.pk %}" class="text-reset">{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}
