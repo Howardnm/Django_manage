@@ -2,7 +2,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint,
-                               TestConfig, MaterialType, MaterialCharacteristic)
+                               TestConfig, MaterialType, MaterialCharacteristic, MaterialProcessingCondition)
 from common_utils.filters import TablerFormMixin
 
 
@@ -134,6 +134,42 @@ class MaterialDataPointForm(TablerFormMixin, forms.ModelForm):
 
 
 MaterialDataFormSet = inlineformset_factory(MaterialLibrary, MaterialDataPoint, form=MaterialDataPointForm, extra=0, can_delete=True)
+
+
+# 典型加工条件表单（与材料一对一，编辑时随材料一并保存）
+
+
+class MaterialProcessingConditionForm(TablerFormMixin, forms.ModelForm):
+    class Meta:
+        model = MaterialProcessingCondition
+        fields = ['melt_temp_value', 'melt_temp_range',
+                  'barrel_rear_value', 'barrel_rear_range',
+                  'barrel_center_value', 'barrel_center_range',
+                  'barrel_front_value', 'barrel_front_range',
+                  'mold_temp_value', 'mold_temp_range',
+                  'temp_limit_value', 'temp_limit_range',
+                  'injection_speed_value', 'injection_speed_range',
+                  'pre_dry_value', 'pre_dry_range']
+        widgets = {
+            # 温度类：典型值/范围分开提示
+            'melt_temp_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：220℃'}),
+            'melt_temp_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：210℃ - 230℃'}),
+            'barrel_rear_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：190℃'}),
+            'barrel_rear_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：180℃ - 200℃'}),
+            'barrel_center_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：200℃'}),
+            'barrel_center_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：190℃ - 210℃'}),
+            'barrel_front_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：210℃'}),
+            'barrel_front_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：200℃ - 220℃'}),
+            'mold_temp_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：60℃'}),
+            'mold_temp_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：40℃ - 70℃'}),
+            'temp_limit_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：240℃'}),
+            'temp_limit_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': ''}),
+            # 文本类：提示填写内容而非示例值
+            'injection_speed_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：低速到中速'}),
+            'injection_speed_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': ''}),
+            'pre_dry_value': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：80~90℃, 3h'}),
+            'pre_dry_range': forms.TextInput(attrs={'class': 'form-control', 'placeholder': ''}),
+        }
 
 
 class MaterialTypeForm(TablerFormMixin, forms.ModelForm):

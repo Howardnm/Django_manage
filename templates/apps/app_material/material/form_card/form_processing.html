@@ -1,0 +1,86 @@
+<!-- ============================================================ -->
+<!-- 典型加工条件 (材料级，TDS 导出加工条件表数据源) -->
+<!-- 紧凑型：无 card-body，表格贴合卡片边缘，参照物性指标卡片 -->
+<!-- ============================================================ -->
+<div class="card mb-3">
+    <div class="card-header bg-blue-lt">
+        <h3 class="card-title text-blue"><i class="ti ti-tool me-2"></i>典型加工条件</h3>
+    </div>
+    <style>
+        #processing-table .form-control {
+            padding: 2px 6px;
+            font-size: 12px;
+            height: auto;
+            min-height: 28px;
+        }
+        #processing-table td {
+            padding: 4px 4px;
+            vertical-align: middle;
+        }
+        #processing-table th {
+            padding: 4px 6px;
+            white-space: nowrap;
+        }
+    </style>
+    {% if processing_form.errors %}
+        <div class="alert alert-danger py-2 mb-0">
+            {% for field, errs in processing_form.errors.items %}
+                <div>{{ field }}: {{ errs.0 }}</div>
+            {% endfor %}
+        </div>
+    {% endif %}
+    <div class="table-responsive">
+        <table class="table table-vcenter table-bordered card-table table-sm" id="processing-table" style="font-size: 13px; margin-bottom: 0;">
+            <thead>
+            <tr>
+                <th style="width: 40%;">参数</th>
+                <th style="width: 30%;">典型值</th>
+                <th style="width: 30%;">范围</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr>
+                <td class="fw-bold">熔体温度 <span class="text-muted">Melt Temperature</span></td>
+                <td>{{ processing_form.melt_temp_value }}</td>
+                <td>{{ processing_form.melt_temp_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">料筒温度-后段 <span class="text-muted">Barrel Zone - Rear</span></td>
+                <td>{{ processing_form.barrel_rear_value }}</td>
+                <td>{{ processing_form.barrel_rear_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">料筒温度-中段 <span class="text-muted">Barrel Zone - Center</span></td>
+                <td>{{ processing_form.barrel_center_value }}</td>
+                <td>{{ processing_form.barrel_center_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">料筒温度-前段 <span class="text-muted">Barrel Zone - Front</span></td>
+                <td>{{ processing_form.barrel_front_value }}</td>
+                <td>{{ processing_form.barrel_front_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">模具温度 <span class="text-muted">Mold Temperature</span></td>
+                <td>{{ processing_form.mold_temp_value }}</td>
+                <td>{{ processing_form.mold_temp_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">加工温度上限 <span class="text-muted">Processing Temperature Limit</span></td>
+                <td>{{ processing_form.temp_limit_value }}</td>
+                <td>{{ processing_form.temp_limit_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">注塑速度 <span class="text-muted">Injection Speed</span></td>
+                <td>{{ processing_form.injection_speed_value }}</td>
+                <td>{{ processing_form.injection_speed_range }}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold">预干燥 <span class="text-muted">Pre-Dry Requirements</span></td>
+                <td>{{ processing_form.pre_dry_value }}</td>
+                <td>{{ processing_form.pre_dry_range }}</td>
+            </tr>
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer text-muted small">留空表示该项不写入导出的物性表加工条件；典型值/范围直接填写显示文本，如 <code>220℃</code>、<code>210℃ - 230℃</code>、<code>低速到中速</code>、<code>80~90℃, 3h</code>。</div>
+</div>

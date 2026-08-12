@@ -1,0 +1,52 @@
+<!-- ======================================================= -->
+<!-- 导出物性表模态框：选择典型值填写方式 -->
+<!-- ======================================================= -->
+<div class="modal modal-blur fade" id="tdsExportModal" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
+        <div class="modal-content">
+            <div class="modal-body">
+                <div class="modal-title">导出物性表</div>
+                <p class="text-muted mb-3">请选择物性数据典型值的填写方式：</p>
+                <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column">
+                    <label class="form-selectgroup-item flex-fill">
+                        <input type="radio" name="tds_value_mode" value="range" class="form-selectgroup-input" checked>
+                        <div class="form-selectgroup-label d-flex align-items-center p-3">
+                            <div class="me-3">
+                                <span class="form-selectgroup-check"></span>
+                            </div>
+                            <div>
+                                <div class="fw-bold">优先范围值</div>
+                                <div class="text-muted small">有范围填范围，无范围填默认数值</div>
+                            </div>
+                        </div>
+                    </label>
+                    <label class="form-selectgroup-item flex-fill">
+                        <input type="radio" name="tds_value_mode" value="single" class="form-selectgroup-input">
+                        <div class="form-selectgroup-label d-flex align-items-center p-3">
+                            <div class="me-3">
+                                <span class="form-selectgroup-check"></span>
+                            </div>
+                            <div>
+                                <div class="fw-bold">只填默认数值</div>
+                                <div class="text-muted small">忽略范围，仅填典型单值</div>
+                            </div>
+                        </div>
+                    </label>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-link me-auto" data-bs-dismiss="modal">取消</button>
+                <button type="button" class="btn btn-primary" id="confirmTdsExport">
+                    <i class="ti ti-file-download me-1"></i>确认导出
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('confirmTdsExport').addEventListener('click', function () {
+        const mode = document.querySelector('input[name="tds_value_mode"]:checked').value;
+        window.location.href = "{% url 'material_export_tds' material.pk %}?value_mode=" + mode;
+    });
+</script>

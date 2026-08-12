@@ -167,6 +167,49 @@ class MaterialLibrary(models.Model):
         ordering = ['-created_at']
         verbose_name = "材料库"
 
+
+# ==========================================
+# 6.1 典型加工条件 (TDS 导出加工条件表数据源)
+# ==========================================
+class MaterialProcessingCondition(models.Model):
+    """材料典型加工条件（TDS docx 导出 Table 1 的数据源，与材料一对一）。
+
+    每行对应模板「典型值 | 范围」两列，值直接存显示文本，
+    如 220℃、210℃ - 230℃、低速到中速、80~90℃, 3h。
+    """
+    material = models.OneToOneField(MaterialLibrary, on_delete=models.CASCADE,
+                                    related_name='processing_condition', verbose_name="材料")
+
+    # 熔体温度
+    melt_temp_value = models.CharField("熔体温度", max_length=60, blank=True)
+    melt_temp_range = models.CharField("熔体温度范围", max_length=60, blank=True)
+    # 料筒温度 - 后段 / 中段 / 前段
+    barrel_rear_value = models.CharField("料筒温度-后段", max_length=60, blank=True)
+    barrel_rear_range = models.CharField("料筒温度-后段范围", max_length=60, blank=True)
+    barrel_center_value = models.CharField("料筒温度-中段", max_length=60, blank=True)
+    barrel_center_range = models.CharField("料筒温度-中段范围", max_length=60, blank=True)
+    barrel_front_value = models.CharField("料筒温度-前段", max_length=60, blank=True)
+    barrel_front_range = models.CharField("料筒温度-前段范围", max_length=60, blank=True)
+    # 模具温度
+    mold_temp_value = models.CharField("模具温度", max_length=60, blank=True)
+    mold_temp_range = models.CharField("模具温度范围", max_length=60, blank=True)
+    # 加工温度上限
+    temp_limit_value = models.CharField("加工温度上限", max_length=60, blank=True)
+    temp_limit_range = models.CharField("加工温度上限范围", max_length=60, blank=True)
+    # 注塑速度（文本）
+    injection_speed_value = models.CharField("注塑速度", max_length=60, blank=True)
+    injection_speed_range = models.CharField("注塑速度范围", max_length=60, blank=True)
+    # 预干燥（文本）
+    pre_dry_value = models.CharField("预干燥", max_length=60, blank=True)
+    pre_dry_range = models.CharField("预干燥范围", max_length=60, blank=True)
+
+    class Meta:
+        verbose_name = "典型加工条件"
+        verbose_name_plural = "典型加工条件"
+
+    def __str__(self):
+        return f"{self.material.grade_name} 加工条件" if self.material_id else "加工条件"
+
 # ==========================================
 # 7. 性能数据子表
 # ==========================================

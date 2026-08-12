@@ -13,7 +13,7 @@
                     <button type="button" class="btn btn-outline-warning" onclick="addToCompare({{ material.pk }})">
                         <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
                     </button>
-                    <a href="{% url 'material_export_tds' material.pk %}" class="btn btn-white">
+                    <a href="#" class="btn btn-white" data-bs-toggle="modal" data-bs-target="#tdsExportModal">
                         <i class="ti ti-file-download me-1"></i> 导出物性表
                     </a>
 <a href="{% url 'material_edit' material.pk %}" class="btn btn-primary">
@@ -95,4 +95,9 @@
             });
         }
     </script>
+
+    <!-- ======================================================= -->
+    <!-- 导出物性表模态框（独立子模板，保持主模板整洁） -->
+    <!-- ======================================================= -->
+    {% include 'apps/app_material/material/detail_card/card_tds_export_modal.html' %}
 {% endblock %}

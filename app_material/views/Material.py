@@ -8,7 +8,7 @@ from django.views.generic import ListView, CreateView, UpdateView, DetailView
 from django.http import JsonResponse
 import json
 
-from app_material.forms import MaterialForm, MaterialDataFormSet
+from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialProcessingConditionForm
 from app_material.models.material import MaterialLibrary, MaterialDataPoint
 from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult, LabFormula
@@ -103,15 +103,18 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
         context = super().get_context_data(**kwargs)
         if self.request.POST:
             context['data_formset'] = MaterialDataFormSet(self.request.POST)
+            context['processing_form'] = MaterialProcessingConditionForm(self.request.POST)
         else:
             MaterialDataFormSet.extra = 6
             context['data_formset'] = MaterialDataFormSet(queryset=MaterialDataPoint.objects.none())
+            context['processing_form'] = MaterialProcessingConditionForm()
         context.update({'page_title': '录入新材料', 'is_edit': False})
         return context
 
     def form_valid(self, form):
         context = self.get_context_data()
         data_formset = context['data_formset']
+        processing_form = context['processing_form']
         with transaction.atomic():
             form.instance.creator = self.request.user  # 记录创建人
             self.object = form.save()
@@ -120,6 +123,9 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
                 data_formset.save()
             else:
                 return self.render_to_response(self.get_context_data(form=form))
+            if processing_form.is_valid():
+                processing_form.instance.material = self.object
+                processing_form.save()
         return super().form_valid(form)
 
     def get_success_url(self):
@@ -135,11 +141,14 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        processing_instance = getattr(self.object, 'processing_condition', None)
         if self.request.POST:
             context['data_formset'] = MaterialDataFormSet(self.request.POST, instance=self.object)
+            context['processing_form'] = MaterialProcessingConditionForm(self.request.POST, instance=processing_instance)
         else:
             MaterialDataFormSet.extra = 1
             context['data_formset'] = MaterialDataFormSet(instance=self.object)
+            context['processing_form'] = MaterialProcessingConditionForm(instance=processing_instance)
         context.update({'page_title': f'编辑: {self.object.grade_name}', 'is_edit': True})
         return context
 
@@ -176,6 +185,7 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
         self.check_edit_permission(self.object)  # 仅创建人或超管可编辑
         context = self.get_context_data()
         data_formset = context['data_formset']
+        processing_form = context['processing_form']
         with transaction.atomic():
             self.object = form.save()
             if data_formset.is_valid():
@@ -183,6 +193,9 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
             else:
                 messages.error(self.request, self._build_error_message(form, data_formset))
                 return self.render_to_response(self.get_context_data(form=form))
+            if processing_form.is_valid():
+                processing_form.instance.material = self.object
+                processing_form.save()
         messages.success(self.request, f'材料 "{self.object.grade_name}" 保存成功。')
         return super().form_valid(form)
 

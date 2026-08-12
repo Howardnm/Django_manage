@@ -27,6 +27,39 @@ CATEGORY_EN = {
 }
 
 
+# 加工条件表（Table 1）固定行序 R1-R8 对应的模型字段组（典型值, 范围）
+PROCESSING_ROW_FIELDS = [
+    ('melt_temp_value', 'melt_temp_range'),
+    ('barrel_rear_value', 'barrel_rear_range'),
+    ('barrel_center_value', 'barrel_center_range'),
+    ('barrel_front_value', 'barrel_front_range'),
+    ('mold_temp_value', 'mold_temp_range'),
+    ('temp_limit_value', 'temp_limit_range'),
+    ('injection_speed_value', 'injection_speed_range'),
+    ('pre_dry_value', 'pre_dry_range'),
+]
+
+
+def _fill_processing_table(table, material):
+    """填充加工条件表（Table 1）：按模板固定行序 R1-R8 写入「典型值」「范围」两列。
+
+    无数据写空字符串——清空模板示例占位值（220℃ 等），避免误导。
+    模板 R6-R8 的典型值/范围两列是合并单元格（cells[2] is cells[3]），只写一次。
+    若模板行数多于 8（用户人工增行），多出的行保留模板原样。
+    """
+    pc = getattr(material, 'processing_condition', None)
+    for row, (val_field, range_field) in zip(table.rows[1:], PROCESSING_ROW_FIELDS):
+        val = getattr(pc, val_field, '') if pc else ''
+        rng = getattr(pc, range_field, '') if pc else ''
+        cells = row.cells
+        if cells[2] is cells[3]:
+            # 合并单元格：只写一次（优先典型值，典型值空则写范围）
+            _write_cell(cells[2], val or rng)
+        else:
+            _write_cell(cells[2], val)
+            _write_cell(cells[3], rng)
+
+
 def _replace_para_text(p, text):
     """替换段落文本：保留含图形（w:drawing，如蓝色色带）的 run，仅收拢文本 run 改写。
 
@@ -73,12 +106,13 @@ def _write_cell(cell, text, *, bold=False, white=False, left=False, size=9):
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
 
-def _build_property_table(table, grouped_properties):
+def _build_property_table(table, grouped_properties, value_mode='range'):
     """重建物性表：保留表头，删除正文行，按分类分组写入。
 
     典型值规则（NUMBER）：
-      1. min_value 与 max_value 都存在 → 优先写范围值；min == max 时只显示单值；
-      2. 无范围时退化写 value；
+      range 模式（默认）：min_value 与 max_value 都存在 → 优先写范围值；min == max 时只显示单值；
+                           无范围时退化写 value；
+      single 模式：只写默认数值 value（不合成范围）；
     TEXT/SELECT 用 value_text。
     """
     # 1. 删除除表头外的所有正文行
@@ -110,11 +144,14 @@ def _build_property_table(table, grouped_properties):
 
             # 典型值
             if item['data_type'] == 'NUMBER':
-                min_v, max_v = item['min_value'], item['max_value']
-                if min_v is not None and max_v is not None:
-                    val_text = _fmt_num(min_v) if min_v == max_v else f"{_fmt_num(min_v)} ~ {_fmt_num(max_v)}"
-                else:
+                if value_mode == 'single':
                     val_text = _fmt_num(item['value'])
+                else:
+                    min_v, max_v = item['min_value'], item['max_value']
+                    if min_v is not None and max_v is not None:
+                        val_text = _fmt_num(min_v) if min_v == max_v else f"{_fmt_num(min_v)} ~ {_fmt_num(max_v)}"
+                    else:
+                        val_text = _fmt_num(item['value'])
             else:
                 # get_grouped_properties 对 TEXT/SELECT 已把 value_text 存入 value 键
                 val_text = item['value'] or ''
@@ -133,7 +170,7 @@ class MaterialTdsExportView(MaterialAccessMixin, View):
 
     def get(self, request, pk):
         material = get_object_or_404(
-            MaterialLibrary.objects.select_related('category').prefetch_related(
+            MaterialLibrary.objects.select_related('category', 'processing_condition').prefetch_related(
                 'characteristics', 'scenarios', 'properties__test_config__category'
             ),
             pk=pk,
@@ -158,8 +195,11 @@ class MaterialTdsExportView(MaterialAccessMixin, View):
             elif t.startswith('主要应用'):
                 _replace_para_text(p, f"主要应用：{applications}")
 
-        # 3. 物性表（Table 0）动态重建；加工条件表（Table 1）保持模板原样
-        _build_property_table(document.tables[0], material.get_grouped_properties())
+        # 3. 物性表（Table 0）动态重建；加工条件表（Table 1）按固定 8 行填充
+        #    典型值策略：range=优先范围值（默认），single=只填默认数值
+        value_mode = self.request.GET.get('value_mode', 'range')
+        _build_property_table(document.tables[0], material.get_grouped_properties(), value_mode)
+        _fill_processing_table(document.tables[1], material)
 
         # 4. 输出文件流
         buffer = io.BytesIO()

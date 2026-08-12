@@ -1,5 +1,5 @@
 from .material import (
     MaterialType, ApplicationScenario, MetricCategory, TestConfig,
-    MaterialLibrary, MaterialDataPoint
+    MaterialLibrary, MaterialProcessingCondition, MaterialDataPoint
 )
 from .sync import WebhookTask
