@@ -13,6 +13,9 @@
                     <button type="button" class="btn btn-outline-warning" onclick="addToCompare({{ material.pk }})">
                         <i class="ti ti-shopping-cart-plus me-1"></i> 加入对比
                     </button>
+                    <a href="{% url 'material_export_tds' material.pk %}" class="btn btn-white">
+                        <i class="ti ti-file-download me-1"></i> 导出物性表
+                    </a>
 <a href="{% url 'material_edit' material.pk %}" class="btn btn-primary">
                         <i class="ti ti-edit"></i> 编辑资料
                     </a>

@@ -167,9 +167,10 @@ class MaterialCharacteristicForm(TablerFormMixin, forms.ModelForm):
 class TestConfigForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = TestConfig
-        fields = ['category', 'name', 'standard', 'condition', 'unit', 'order', 'data_type', 'options_config']
+        fields = ['category', 'name', 'name_en', 'standard', 'condition', 'unit', 'order', 'data_type', 'options_config']
         widgets = {
             'category': forms.Select(attrs={'class': 'form-select'}),
+            'name_en': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如: Tensile Strength'}),
             'order': forms.NumberInput(attrs={'placeholder': '排序权重，越小越靠前'}),
             'data_type': forms.Select(attrs={'class': 'form-select'}),
             'options_config': forms.Textarea(attrs={'rows': 2, 'placeholder': '仅当类型为选择时有效，用逗号分隔，如: V-0,V-1,HB'}),

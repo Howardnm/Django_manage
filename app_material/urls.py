@@ -1,5 +1,6 @@
 from django.urls import path
 from .views.Material import *
+from .views.MaterialTds import *
 from .views.MaterialType import *
 from .views.Scenario import *
 from .views.TestConfig import *
@@ -13,6 +14,7 @@ urlpatterns = [
     path('materials/add/', MaterialCreateView.as_view(), name='material_add'),
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='material_detail'),
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='material_edit'),
+    path('materials/<int:pk>/export-tds/', MaterialTdsExportView.as_view(), name='material_export_tds'),
 
     # 【新增】批量发布/下架
     path('materials/bulk-publish/', MaterialBulkPublishView.as_view(), name='material_bulk_publish'),

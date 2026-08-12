@@ -24,7 +24,7 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
         fields = ['code', 'name', 'grade', 'material', 'description']
         widgets = {
             'code': forms.TextInput(attrs={'placeholder': '请输入项目编码，留空则自动生成'}),
-            'name': forms.TextInput(attrs={'placeholder': '请输入项目名称，格式：【客户 - 材料 - 制件（EVEA/T0/其他）】'}),
+            'name': forms.TextInput(attrs={'placeholder': '请输入项目名称，格式：【客户 - 材料 - 制件（VAVE/T0/其他）】'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
             'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),

@@ -32,6 +32,15 @@
                     </div>
 
                     <div class="col-md-6 mb-3">
+                        <label class="form-label">英文名称</label>
+                        {{ form.name_en }}
+                        <small class="form-hint">有英文则物性表导出中英文，为空则只显示中文</small>
+                        {% if form.name_en.errors %}
+                            <div class="invalid-feedback d-block">{{ form.name_en.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-md-6 mb-3">
                         <label class="form-label required">测试标准</label>
                         {{ form.standard }}
                         {% if form.standard.errors %}

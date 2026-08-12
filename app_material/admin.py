@@ -30,9 +30,9 @@ class MetricCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(TestConfig)
 class TestConfigAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'standard', 'condition', 'unit', 'data_type', 'order')
+    list_display = ('name', 'name_en', 'category', 'standard', 'condition', 'unit', 'data_type', 'order')
     list_filter = ('category', 'data_type')
-    search_fields = ('name', 'standard')
+    search_fields = ('name', 'name_en', 'standard')
     ordering = ('category__order', 'order')
 
 class MaterialDataPointInline(admin.TabularInline):

@@ -71,6 +71,7 @@ class MetricCategory(models.Model):
 class TestConfig(models.Model):
     category = models.ForeignKey(MetricCategory, on_delete=models.CASCADE, verbose_name="所属分类")
     name = models.CharField("指标名称", max_length=100)
+    name_en = models.CharField("英文名称", max_length=200, blank=True, help_text="有英文则物性表导出中英文，为空则只显示中文")
     standard = models.CharField("测试标准", max_length=50)
     condition = models.CharField("测试条件", max_length=50, blank=True)
     unit = models.CharField("单位", max_length=20, blank=True)
@@ -135,6 +136,7 @@ class MaterialLibrary(models.Model):
             val = point.value_text if point.test_config.data_type != 'NUMBER' else point.value
             grouped[cat_name].append({
                 'name': point.test_config.name,
+                'name_en': point.test_config.name_en,
                 'value': val,
                 'unit': point.test_config.unit,
                 'standard': point.test_config.standard,
