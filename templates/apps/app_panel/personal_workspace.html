@@ -177,7 +177,7 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
                                 {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
+                                <a href="{% url 'workflow_instance_detail' task.instance_id %}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
                                 {% endif %}
@@ -224,7 +224,7 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' task.instance_id %}'">
                             <td>
                                 {% if task.related_object_url %}
-                                <a href="{{ task.related_object_url }}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
+                                <a href="{% url 'workflow_instance_detail' task.instance_id %}" class="text-reset">{{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ task.related_model_name|default:"—" }} - {{ task.related_display_name|default:"—" }}
                                 {% endif %}
@@ -272,7 +272,7 @@
                         <tr class="cursor-pointer" onclick="window.location.href='{% url 'workflow_instance_detail' inst.pk %}'">
                             <td>
                                 {% if inst.related_object_url %}
-                                <a href="{{ inst.related_object_url }}" class="text-reset">{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</a>
+                                <a href="{% url 'workflow_instance_detail' inst.pk %}" class="text-reset">{{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}</a>
                                 {% else %}
                                 {{ inst.related_model_name|default:"—" }} - {{ inst.related_display_name|default:"—" }}
                                 {% endif %}
