@@ -4,6 +4,7 @@
 4;;熔融指数;;Melt Flow Rate;;ASTM D1238;;230℃/2.16kg;;g/10min;;物理性能;;22;;NUMBER;;
 5;;熔融指数;;Melt Flow Rate;;ISO 1133;;300℃/1.2kg;;g/10min;;物理性能;;23;;NUMBER;;
 60;;熔融指数;;Melt Flow Rate;;ISO 1133;;220℃/10kg;;g/10min;;物理性能;;24;;NUMBER;;
+61;;熔融指数;;Melt Flow Rate;;ISO 1133;;230℃/2.16kg;;g/10min;;物理性能;;25;;NUMBER;;
 6;;成型收缩率 (流动方向);;Mold Shrinkage (Flow);;ISO 294-4;;23℃/48h;;%;;物理性能;;30;;NUMBER;;
 7;;成型收缩率 (垂直方向);;Mold Shrinkage (Transverse);;ISO 294-4;;23℃/48h;;%;;物理性能;;31;;NUMBER;;
 8;;成型收缩率;;Mold Shrinkage;;ASTM D955;;Flow;;%;;物理性能;;32;;NUMBER;;
@@ -58,3 +59,17 @@
 57;;耐水解 (力学保持率);;Hydrolysis Resistance (Mechanical Retention);;Internal;;85℃/85%RH/1000h;;%;;老化/耐候;;30;;NUMBER;;
 58;;气味等级;;Odor Rating;;VDA 270;;C3;;Grade;;老化/耐候;;40;;NUMBER;;
 59;;总碳挥发 (VOC);;Total Carbon Emission (VOC);;VDA 277;;;;µgC/g;;老化/耐候;;41;;NUMBER;;
+62;;气味等级;;Odor Rating;;Q/JLY J7110538 干法;;70℃/24hr;;级;;其他性能;;60;;NUMBER;;
+63;;气味等级;;Odor Rating;;QJ/JAC 1510.006;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+64;;气味等级;;Odor Rating;;Q/DH-C000011.02;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+65;;气味等级;;Odor Rating;;VDA 270;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+66;;气味等级;;Odor Rating;;EQCL-64;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+67;;气味等级;;Odor Rating;;Q/BAIC C220019;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+68;;气味等级;;Odor Rating;;Q/BYDQ-A1901.404;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+69;;气味等级;;Odor Rating;;Q/CAM-685;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+70;;气味等级;;Odor Rating;;Q/LP YSY 0001;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+71;;气味等级;;Odor Rating;;Q/SQR ST1-8.4;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+72;;气味等级;;Odor Rating;;NIO-TP.GS.002;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+73;;气味等级;;Odor Rating;;QJ/XP 16BZ.011;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+74;;气味等级;;Odor Rating;;VS-00.28-L-06021;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
+75;;气味等级;;Odor Rating;;Q/SK J05.52;;80℃/2hr;;级;;其他性能;;61;;NUMBER;;
