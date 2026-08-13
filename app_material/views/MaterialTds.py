@@ -111,7 +111,8 @@ def _build_property_table(table, grouped_properties, value_mode='range'):
 
     典型值规则（NUMBER）：
       range 模式（默认）：min_value 与 max_value 都存在 → 优先写范围值；min == max 时只显示单值；
-                           无范围时退化写 value；
+                           仅 min 存在 → 写 ≥ min；仅 max 存在 → 写 ≤ max；
+                           两者皆无 → 退化写 value；
       single 模式：只写默认数值 value（不合成范围）；
     TEXT/SELECT 用 value_text。
     """
@@ -150,6 +151,10 @@ def _build_property_table(table, grouped_properties, value_mode='range'):
                     min_v, max_v = item['min_value'], item['max_value']
                     if min_v is not None and max_v is not None:
                         val_text = _fmt_num(min_v) if min_v == max_v else f"{_fmt_num(min_v)} ~ {_fmt_num(max_v)}"
+                    elif min_v is not None:
+                        val_text = f"≥ {_fmt_num(min_v)}"
+                    elif max_v is not None:
+                        val_text = f"≤ {_fmt_num(max_v)}"
                     else:
                         val_text = _fmt_num(item['value'])
             else:
