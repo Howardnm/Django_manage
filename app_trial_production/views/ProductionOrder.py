@@ -14,7 +14,10 @@ from app_formula.models import LabFormula
 from app_material.models import TestConfig
 from app_mold_injection.models import MoldRequirement, MoldRequirementFormulaDetail, MoldType
 from app_project.models import Project
-from app_trial_production.mixins import TrialProductionAccessMixin, RndAccessMixin, ExtrusionTaskAccessMixin
+from app_trial_production.mixins import (
+    TrialProductionAccessMixin, RndAccessMixin, ExtrusionTaskAccessMixin,
+    OrderManageAccessMixin,
+)
 from app_trial_production.models import ProductionOrder, SampleInventory, TrialProductionConfig
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
@@ -205,8 +208,8 @@ def _build_mold_formset_error_message(formset):
 
 # ---- 视图 ----
 
-class ProductionOrderDetailView(TrialProductionAccessMixin, DetailView):
-    """排产工单详情"""
+class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
+    """排产工单详情 — 工单管理权限"""
     model = ProductionOrder
     template_name = 'apps/app_trial_production/order/detail.html'
     context_object_name = 'order'
@@ -686,8 +689,8 @@ class ProductionOrderInitiateView(RndAccessMixin, View):
         return redirect('trial_order_create')
 
 
-class ProductionOrderDeleteView(TrialProductionAccessMixin, View):
-    """删除草稿工单 — 仅创建人或超级用户可操作"""
+class ProductionOrderDeleteView(RndAccessMixin, View):
+    """删除草稿工单 — 研发发起人权限，且仅创建人或超级用户可操作"""
 
     def post(self, request, pk):
         order = get_object_or_404(ProductionOrder, pk=pk)
@@ -705,8 +708,8 @@ class ProductionOrderDeleteView(TrialProductionAccessMixin, View):
         return redirect('trial_dashboard')
 
 
-class ProductionOrderPrintView(TrialProductionAccessMixin, DetailView):
-    """排产工单打印 — 输出 A4 HTML 打印页面"""
+class ProductionOrderPrintView(OrderManageAccessMixin, DetailView):
+    """排产工单打印 — 工单管理权限，输出 A4 HTML 打印页面"""
     model = ProductionOrder
     template_name = 'apps/app_trial_production/order/print_sheet.html'
     context_object_name = 'order'
