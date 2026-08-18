@@ -1,5 +1,5 @@
 /* ==========================================
-   看板工作台 — 只读排产日历 scheduling_calendar.html
+   试验排产中心 — 只读排产日历 scheduling_calendar.html
    依赖: FullCalendar 6.1.21, Tabler 1.4.0
    仅包含展示所需的 FullCalendar 覆盖样式；
    自定义组件（事件卡片、弹窗）使用 Tabler 类

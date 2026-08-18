@@ -5,8 +5,6 @@ from .views.ProjectStatisticsView import ProjectStatisticsView
 from .views.CustomerActivityView import CustomerActivityOverviewView
 from .views.PersonalWorkspaceView import PersonalWorkspaceView
 from .views.SystemOverviewView import SystemOverviewView
-from .views.SchedulingCalendarView import SchedulingCalendarView
-from .views.SchedulingCalendarEventsView import SchedulingCalendarEventsView
 
 urlpatterns = [
     # 首页（纯静态系统介绍）
@@ -24,8 +22,4 @@ urlpatterns = [
 
     # 客户行为分析
     path('customer-activity/', CustomerActivityOverviewView.as_view(), name='customer_activity_overview'),
-
-    # 只读排产日历（看板工作台）
-    path('scheduling-calendar/', SchedulingCalendarView.as_view(), name='scheduling_calendar'),
-    path('scheduling-calendar/events/', SchedulingCalendarEventsView.as_view(), name='scheduling_calendar_events'),
 ]

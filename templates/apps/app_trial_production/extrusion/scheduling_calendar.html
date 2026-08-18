@@ -4,14 +4,14 @@
 {% block title %}排产日历{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{% static 'css/apps/app_panel/scheduling_calendar.css' %}">
+<link rel="stylesheet" href="{% static 'css/apps/app_trial_production/scheduling_calendar.css' %}">
 {% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
     <div class="row align-items-center">
         <div class="col">
-            <div class="page-pretitle">看板工作台</div>
+            <div class="page-pretitle">试验排产中心</div>
             <h2 class="page-title">排产日历</h2>
         </div>
     </div>
@@ -41,9 +41,9 @@
 
 {% block extra_js %}
 <script>
-    window.EVENTS_URL = "{% url 'scheduling_calendar_events' %}";
+    window.EVENTS_URL = "{% url 'trial_scheduling_calendar_events' %}";
 </script>
 <script src="{% static 'fullcalendar-6.1.21/package/index.global.min.js' %}"></script>
 <script src="{% static 'fullcalendar-6.1.21/package/zh-cn.global.min.js' %}"></script>
-<script src="{% static 'js/apps/app_panel/scheduling_calendar.js' %}"></script>
+<script src="{% static 'js/apps/app_trial_production/extrusion/scheduling_calendar.js' %}"></script>
 {% endblock %}

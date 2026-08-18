@@ -1,5 +1,5 @@
 /**
- * 看板工作台 — 只读排产日历 (FullCalendar 6.1.21)
+ * 试验排产中心 — 只读排产日历 (FullCalendar 6.1.21)
  *
  * 仅用于查看：排产单不可点击跳转、不可拖拽/调整/取消排期，
  * 只允许在 月 (dayGridMonth) / 周 (timeGridWeek) / 日 (timeGridDay) /

@@ -44,7 +44,6 @@ class MenuModule:
                  "permissions": ["app_project.view_project"]},
                 {"name": "客户行为分析", "url_name": "customer_activity_overview",
                  "permissions": ["app_repository.view_customer"]},
-                {"name": "排产日历", "url_name": "scheduling_calendar"},
             ],
         }
 
@@ -134,9 +133,11 @@ class MenuModule:
             "name": "试验排产中心",
             "icon": "building-factory",
             "url_name": "trial_dashboard",
-            "module_access_code": "trial_production",
+            "module_access_code": "trial_production.dashboard",
             "sub_items": [
                 {"name": "排产总览", "url_name": "trial_dashboard"},
+                {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
+                {"name": "排产日历", "url_name": "trial_scheduling_calendar"},
             ],
         }
 
@@ -147,11 +148,10 @@ class MenuModule:
             "name": "挤出排产中心",
             "icon": "stack",
             "url_name": "trial_extrusion_board",
-            "module_access_code": "trial_production",
+            "module_access_code": "trial_production.extrusion_task",
             "sub_items": [
                 {"name": "排产工作台", "url_name": "trial_extrusion_board"},
                 {"name": "挤出任务", "url_name": "trial_extrusion_task_list"},
-                {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
             ],
         }
 

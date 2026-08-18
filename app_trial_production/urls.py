@@ -24,6 +24,8 @@ from .views.SampleInventory import (
 )
 from .views.PelletSplit import PelletSplitView
 from .views.Autocomplete import TrialAutocompleteView
+from .views.SchedulingCalendar import SchedulingCalendarView
+from .views.SchedulingCalendarApi import SchedulingCalendarEventsView
 
 urlpatterns = [
     # Dashboard
@@ -56,6 +58,10 @@ urlpatterns = [
 
     # Pellet Split (挤出后颗粒分拨)
     path('orders/<int:pk>/split/', PelletSplitView.as_view(), name='trial_pellet_split'),
+
+    # Readonly Scheduling Calendar (只读排产日历)
+    path('calendar/', SchedulingCalendarView.as_view(), name='trial_scheduling_calendar'),
+    path('calendar/events/', SchedulingCalendarEventsView.as_view(), name='trial_scheduling_calendar_events'),
 
     # Sample Inventory
     path('samples/', SampleInventoryListView.as_view(), name='trial_sample_list'),

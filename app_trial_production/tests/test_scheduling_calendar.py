@@ -1,12 +1,12 @@
-"""看板工作台只读排产日历 — 回归测试。
+"""试验排产中心只读排产日历 — 回归测试。
 
 覆盖范围:
-    1. 路由解析 (scheduling_calendar / scheduling_calendar_events / 原 trial_extrusion_board_events)
+    1. 路由解析 (trial_scheduling_calendar / trial_scheduling_calendar_events / 原 trial_extrusion_board_events)
     2. 共享序列化函数 build_extrusion_calendar_events（从原事件接口提取）
     3. 原挤出排产工作台事件接口重构后无回归（与原实现输出一致）
     4. 新的只读事件接口（数据与原接口完全一致 / 权限控制）
     5. 只读页面视图（渲染 / 权限控制）
-    6. 侧边栏菜单入口（menu_modules 定义 + 同步后位于看板工作台下）
+    6. 侧边栏菜单入口（menu_modules 定义 + 同步后位于试验排产中心下）
 """
 import json
 
@@ -39,10 +39,10 @@ class UrlReverseTests(TestCase):
     """路由解析回归。"""
 
     def test_readonly_page_url(self):
-        self.assertEqual(reverse('scheduling_calendar'), '/scheduling-calendar/')
+        self.assertEqual(reverse('trial_scheduling_calendar'), '/trial-production/calendar/')
 
     def test_readonly_events_url(self):
-        self.assertEqual(reverse('scheduling_calendar_events'), '/scheduling-calendar/events/')
+        self.assertEqual(reverse('trial_scheduling_calendar_events'), '/trial-production/calendar/events/')
 
     def test_original_board_events_url_still_resolves(self):
         """原排产工作台事件接口未被破坏。"""
@@ -165,24 +165,24 @@ class ReadonlyEventsEndpointTests(TestCase):
         self.end = (timezone.now() + timezone.timedelta(days=7)).isoformat()
 
     def test_anonymous_redirected(self):
-        resp = self.client.get(reverse('scheduling_calendar_events'))
+        resp = self.client.get(reverse('trial_scheduling_calendar_events'))
         self.assertIn(resp.status_code, [302, 403])
 
     def test_superuser_returns_events(self):
         self.client.force_login(self.superuser)
         _make_scheduled_order('RO-1', timezone.now())
         resp = self.client.get(
-            reverse('scheduling_calendar_events'),
+            reverse('trial_scheduling_calendar_events'),
             {'start': self.start, 'end': self.end},
         )
         self.assertEqual(resp.status_code, 200)
         self.assertEqual(len(resp.json()), 1)
 
-    def test_regular_user_without_panel_role_denied(self):
-        """无 panel 权限的普通用户被拒绝（PanelAccessMixin 生效）。"""
+    def test_regular_user_without_dashboard_role_denied(self):
+        """无 trial_production.dashboard 权限的普通用户被拒绝（DashboardAccessMixin 生效）。"""
         dummy = User.objects.create_user(username='plain', password='x')
         self.client.force_login(dummy)
-        resp = self.client.get(reverse('scheduling_calendar_events'))
+        resp = self.client.get(reverse('trial_scheduling_calendar_events'))
         self.assertIn(resp.status_code, [302, 403])
 
     def test_parity_with_board_endpoint(self):
@@ -190,7 +190,7 @@ class ReadonlyEventsEndpointTests(TestCase):
         self.client.force_login(self.superuser)
         _make_scheduled_order('RO-parity', timezone.now())
         ro = self.client.get(
-            reverse('scheduling_calendar_events'),
+            reverse('trial_scheduling_calendar_events'),
             {'start': self.start, 'end': self.end},
         ).json()
         board = self.client.get(
@@ -208,18 +208,18 @@ class ReadonlyPageViewTests(TestCase):
             username='admin', email='a@t.dev', password='x')
 
     def test_anonymous_redirected(self):
-        resp = self.client.get(reverse('scheduling_calendar'))
+        resp = self.client.get(reverse('trial_scheduling_calendar'))
         self.assertIn(resp.status_code, [302, 403])
 
-    def test_regular_user_without_panel_role_denied(self):
+    def test_regular_user_without_dashboard_role_denied(self):
         dummy = User.objects.create_user(username='plain', password='x')
         self.client.force_login(dummy)
-        resp = self.client.get(reverse('scheduling_calendar'))
+        resp = self.client.get(reverse('trial_scheduling_calendar'))
         self.assertIn(resp.status_code, [302, 403])
 
     def test_superuser_page_renders_calendar(self):
         self.client.force_login(self.superuser)
-        resp = self.client.get(reverse('scheduling_calendar'))
+        resp = self.client.get(reverse('trial_scheduling_calendar'))
         self.assertEqual(resp.status_code, 200)
         content = resp.content.decode()
         self.assertIn('id="scheduling-calendar"', content)
@@ -239,40 +239,44 @@ class SidebarMenuTests(TestCase):
             username='admin', email='a@t.dev', password='x')
 
     def test_menu_definition_contains_readonly_calendar(self):
-        """menu_modules.get_dashboard() 代码定义含「排产日历」子项（sync_menus 数据源）。"""
+        """menu_modules.get_trial_production() 代码定义含「排产日历」子项（sync_menus 数据源）。"""
         from app_user.services.menu_modules import MenuModule
-        dash = MenuModule.get_dashboard()
-        names = [s['name'] for s in dash['sub_items']]
+        trial = MenuModule.get_trial_production()
+        names = [s['name'] for s in trial['sub_items']]
         self.assertIn('排产日历', names)
-        sub = next(s for s in dash['sub_items'] if s['name'] == '排产日历')
-        self.assertEqual(sub['url_name'], 'scheduling_calendar')
+        sub = next(s for s in trial['sub_items'] if s['name'] == '排产日历')
+        self.assertEqual(sub['url_name'], 'trial_scheduling_calendar')
+        # 已从看板工作台移除
+        dash = MenuModule.get_dashboard()
+        dash_names = [s['name'] for s in dash['sub_items']]
+        self.assertNotIn('排产日历', dash_names)
 
-    def test_synced_subitem_lives_under_dashboard_module(self):
-        """按 sync_menus 的写入形态自建数据，验证挂在「看板工作台」下且可被菜单服务渲染。"""
+    def test_synced_subitem_lives_under_trial_production_module(self):
+        """按 sync_menus 的写入形态自建数据，验证挂在「试验排产中心」下且可被菜单服务渲染。"""
         from app_user.models import SidebarModule, SidebarSubItem
         from app_user.services.menu_service import MenuService
 
-        # 模拟 sync_menus 对 get_dashboard() 的写入结果
-        dash = SidebarModule.objects.create(
-            code='dashboard', name='看板工作台', icon='smart-home',
-            url_name='panel_home', module_access=None, sort_order=0,
+        # 模拟 sync_menus 对 get_trial_production() 的写入结果
+        trial = SidebarModule.objects.create(
+            code='trial_production', name='试验排产中心', icon='building-factory',
+            url_name='trial_dashboard', module_access=None, sort_order=0,
         )
         SidebarSubItem.objects.create(
-            module=dash, name='排产日历',
-            url_name='scheduling_calendar', permissions=[],
+            module=trial, name='排产日历',
+            url_name='trial_scheduling_calendar', permissions=[],
         )
-        sub = SidebarSubItem.objects.get(module=dash, name='排产日历')
-        self.assertEqual(sub.url_name, 'scheduling_calendar')
+        sub = SidebarSubItem.objects.get(module=trial, name='排产日历')
+        self.assertEqual(sub.url_name, 'trial_scheduling_calendar')
 
         # 超管菜单应渲染出该子项且激活态正确
         class R:
             user = self.superuser
-            resolver_match = type('RM', (), {'view_name': 'scheduling_calendar'})()
+            resolver_match = type('RM', (), {'view_name': 'trial_scheduling_calendar'})()
 
         menu = MenuService.get_user_menu(R())
-        dash_rendered = next((m for m in menu if m['name'] == '看板工作台'), None)
-        self.assertIsNotNone(dash_rendered)
-        names = [s['name'] for s in dash_rendered['sub_items']]
+        trial_rendered = next((m for m in menu if m['name'] == '试验排产中心'), None)
+        self.assertIsNotNone(trial_rendered)
+        names = [s['name'] for s in trial_rendered['sub_items']]
         self.assertIn('排产日历', names)
-        active = next(s for s in dash_rendered['sub_items'] if s['name'] == '排产日历')
+        active = next(s for s in trial_rendered['sub_items'] if s['name'] == '排产日历')
         self.assertTrue(active['is_active'])
