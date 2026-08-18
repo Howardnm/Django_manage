@@ -3,8 +3,6 @@ from django.db import models
 
 class ExternalMemberActivity(models.Model):
     """外部行为回流记录。
-
-    自 app_repository 迁入：通过 db_table 锁定物理表名，迁移过程零数据搬移。
     """
     member_token = models.CharField("会员令牌", max_length=100, db_index=True)
     action = models.CharField("操作类型", max_length=50)
@@ -12,7 +10,6 @@ class ExternalMemberActivity(models.Model):
     timestamp = models.DateTimeField("发生时间")
 
     class Meta:
-        db_table = 'app_repository_externalmemberactivity'
         verbose_name = "外部行为日志"
         ordering = ['-timestamp']
 
