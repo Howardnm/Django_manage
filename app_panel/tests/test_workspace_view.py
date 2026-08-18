@@ -3,6 +3,7 @@
 覆盖改动：
 - app_panel/views/PersonalWorkspaceView.py 解析并附加关联字段
 - templates/apps/app_panel/personal_workspace.html 新增「关联内容」列、移除流程/任务名称列
+- 五组列表合并为表单/流程两张大卡，用 card-header-tabs 切换
 """
 from django.test import TestCase
 from django.test import Client
@@ -67,9 +68,18 @@ class PersonalWorkspaceViewRegressionTest(TestCase):
         self.assertEqual(resp.status_code, 200)
         body = resp.content.decode('utf-8')
 
-        # 卡片标题
+        # 卡片标题（现为 tab 文案）
         for title in ('我的表单草稿', '我提交的表单', '我已发的流程', '待办任务', '已办任务'):
             self.assertIn(title, body, f'缺少卡片标题 {title}')
+
+        # 两张大卡 + Tabler tab 头
+        self.assertEqual(body.count('card-header-tabs'), 2)
+        self.assertIn('id="ws-form-drafts"', body)
+        self.assertIn('id="ws-form-submissions"', body)
+        self.assertIn('id="ws-wf-pending"', body)
+        self.assertIn('id="ws-wf-completed"', body)
+        self.assertIn('id="ws-wf-initiated"', body)
+        self.assertIn('tab-pane active show', body)
 
         # 关联内容列存在
         self.assertIn('关联内容', body)
