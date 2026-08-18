@@ -42,6 +42,8 @@
 {% block extra_js %}
 <script>
     window.EVENTS_URL = "{% url 'trial_scheduling_calendar_events' %}";
+    {# 工单详情页 URL，占位 pk=0，点击事件时替换为实际工单 id #}
+    window.ORDER_DETAIL_URL = "{% url 'trial_order_detail' 0 %}";
 </script>
 <script src="{% static 'fullcalendar-6.1.21/package/index.global.min.js' %}"></script>
 <script src="{% static 'fullcalendar-6.1.21/package/zh-cn.global.min.js' %}"></script>

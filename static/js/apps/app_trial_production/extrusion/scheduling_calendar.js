@@ -1,7 +1,7 @@
 /**
  * 试验排产中心 — 只读排产日历 (FullCalendar 6.1.21)
  *
- * 仅用于查看：排产单不可点击跳转、不可拖拽/调整/取消排期，
+ * 仅用于查看：排产单可点击跳转详情页，但不可拖拽/调整/取消排期，
  * 只允许在 月 (dayGridMonth) / 周 (timeGridWeek) / 日 (timeGridDay) /
  * 日程 (listWeek) 四种视图间切换，默认月视图。
  *
@@ -119,9 +119,12 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         },
 
-        // ===== 点击事件 → 仅展示，不跳转 =====
+        // ===== 点击事件 → 跳转工单详情 =====
         eventClick: function (info) {
             info.jsEvent.preventDefault();
+            if (window.ORDER_DETAIL_URL) {
+                window.location.href = window.ORDER_DETAIL_URL.replace('0', info.event.id);
+            }
         },
 
         // ===== 悬浮弹窗：显示工单详细信息（仅展示） =====
