@@ -104,7 +104,7 @@ MODULE_LOGGERS = {
     'app_trial_production': {'handlers': ['console', 'file_trial'], 'level': INFO},
     'app_workflow': {'handlers': ['console', 'file_workflow'], 'level': INFO},
     'app_catalog': {'handlers': ['console', 'file_catalog'], 'level': INFO},
-    'app_material_api': {'handlers': ['console', 'file_material_api'], 'level': INFO},
+    'app_external_api': {'handlers': ['console', 'file_material_api'], 'level': INFO},
 
     # ======== 轻量模块（共用 app.log）========
     'app_color_center': {'handlers': ['console', 'file_app'], 'level': INFO},

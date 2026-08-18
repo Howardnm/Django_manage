@@ -12,8 +12,8 @@ from app_material.forms import MaterialForm, MaterialDataFormSet, MaterialProces
 from app_material.models.material import MaterialLibrary, MaterialDataPoint
 from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult, LabFormula
-from app_material_api.integration.webhooks import send_material_webhook
 from app_material.mixins import MaterialAccessMixin
+from app_material.services.material_cache import MaterialCache
 
 
 class MaterialListView(MaterialAccessMixin, ListView):
@@ -283,8 +283,8 @@ class MaterialBulkPublishView(MaterialAccessMixin, View):
                 self.check_edit_permission(obj)
             with transaction.atomic():
                 updated_count = qs.filter(pk__in=ids).update(is_published=is_published)
-                for obj in objs:
-                    send_material_webhook('material_updated', obj)
+                # .update() 不触发 post_save，需手动刷新对外数据缓存
+                MaterialCache.invalidate(trigger='MaterialBulkPublishView')
 
             return JsonResponse({'status': 'success', 'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'})
         except Exception as e:

@@ -1,0 +1,105 @@
+{% extends "app_catalog/layouts/base.html" %}
+{% load static %}
+
+{% block title %}产品目录 - 材料产品电子手册{% endblock %}
+
+{% block content %}
+<div class="container-xl">
+    <div class="row g-4">
+
+        <aside class="col-lg-3">
+            {% include "app_catalog/includes/sidebar.html" %}
+        </aside>
+
+        <div class="col-lg-9">
+            <!-- 动态路径标题 -->
+            <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <nav aria-label="breadcrumb">
+                            <ol class="breadcrumb breadcrumb-arrows mb-2">
+                                <li class="breadcrumb-item"><a href="?">产品库</a></li>
+                                {% if current_s_obj %}
+                                    <li class="breadcrumb-item active">{{ current_s_obj.name }}</li>
+                                {% endif %}
+                                {% if current_t_obj %}
+                                    <li class="breadcrumb-item active">{{ current_t_obj.name }}</li>
+                                {% endif %}
+                            </ol>
+                        </nav>
+                        <h1 class="h2 mb-0 fw-bold">
+                            {% if current_c_obj %}
+                                {{ current_c_obj.name }} 特征 -
+                            {% endif %}
+                            {% if current_t_obj %}
+                                {{ current_t_obj.name }} 牌号列表
+                            {% elif current_s_obj %}
+                                {{ current_s_obj.name }} 适用方案
+                            {% else %}
+                                全线牌号目录
+                            {% endif %}
+                        </h1>
+                    </div>
+                    <div class="text-muted small">
+                        共 <strong>{{ page_obj.paginator.count }}</strong> 款材料
+                    </div>
+                </div>
+            </div>
+
+            <div class="vstack gap-3">
+                {% for product in products %}
+                <div class="product-card card shadow-none">
+                    <div class="card-body p-0">
+                        <div class="row g-0 align-items-stretch">
+                            <div class="col-md-3 pane-divider p-4">
+                                <div class="brand-tag mb-1">{{ product.manufacturer|default:"SUNWILL" }}</div>
+                                <h3 class="product-title mb-3">
+                                    <a href="{% url 'app_catalog:product_detail' product.pk %}" class="text-dark text-decoration-none">{{ product.display_name }}</a>
+                                </h3>
+                                <div class="vstack gap-2">
+                                    <div><span class="badge bg-blue text-white w-100">系列: {{ product.category.name }}</span></div>
+                                    <div class="d-flex flex-column gap-1">
+                                        {% for s in product.scenarios|slice:":2" %}
+                                            <span class="badge bg-azure-lt small w-100 text-start px-2 py-1"><i class="ti ti-map-pin me-1"></i>{{ s.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                    <div class="d-flex flex-wrap gap-1 mt-1">
+                                        {% for c in product.characteristics|slice:":3" %}
+                                            <span class="badge bg-purple-lt small">{{ c.name }}</span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6 pane-divider p-4 d-flex flex-column justify-content-center">
+                                <div class="desc-text line-clamp-3">
+                                    {{ product.description|default:"暂无详细特性描述。该牌号是经过严格测试的高性能改性材料，具备优异的综合机械性能与加工稳定性。" }}
+                                </div>
+                                <div class="mt-3">
+                                    <small class="text-muted"><i class="ti ti-clock me-1"></i>更新日期: {{ product.published_at|date:"Y-m-d" }}</small>
+                                </div>
+                            </div>
+                            <div class="col-md-3 p-4 bg-light-lt d-flex flex-column justify-content-center text-center">
+                                <a href="{% url 'app_catalog:product_detail' product.pk %}" class="btn btn-primary btn-view w-100 mb-2">查看详情</a>
+                                <div class="brand-tag mt-2 text-uppercase" style="font-size: 9px;">Technical data sheet</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="card p-5 text-center border-dashed">
+                    <p class="h3">当前目录下暂无产品</p>
+                    <a href="?" class="btn btn-outline-primary mt-3">重置筛选条件</a>
+                </div>
+                {% endfor %}
+            </div>
+
+            {% if is_paginated %}
+            <div class="mt-5 d-flex justify-content-center">
+                {# 【已解耦】使用 app_catalog 内部的分页模板 #}
+                {% include "app_catalog/includes/paginator_catalog.html" %}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

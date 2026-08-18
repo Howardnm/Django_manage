@@ -31,8 +31,8 @@ urlpatterns = [
     path('common/', include('common_utils.urls')),
     path('notifications/', include('app_notification.urls')),
     
-    # 核心 API 重构：由 app_material_api 管控
-    path('api/material/', include('app_material_api.urls')),
+    # 对外数据接口：由 app_external_api 管控
+    path('api/external/', include('app_external_api.urls')),
 
     # 试验排产模块
     path('trial-production/', include('app_trial_production.urls')),

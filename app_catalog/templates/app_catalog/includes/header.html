@@ -1,0 +1,52 @@
+<header class="navbar navbar-expand-md navbar-light bg-white border-bottom d-print-none shadow-sm" style="height: 80px;">
+    <div class="container-xl">
+        <a href="{% url 'app_catalog:home' %}" class="navbar-brand d-flex align-items-center">
+            <span class="avatar bg-primary-lt text-primary me-2 rounded">
+                <i class="ti ti-book-2"></i>
+            </span>
+            <div class="d-flex flex-column lh-1">
+                <span class="h2 m-0 fw-bold text-dark">材料产品电子手册</span>
+                <small class="text-muted" style="font-size: 10px; letter-spacing: 1px;">MATERIAL SOLUTIONS</small>
+            </div>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbar-menu">
+            <div class="d-flex flex-column flex-md-row flex-fill align-items-stretch align-items-md-center">
+                <ul class="navbar-nav ms-auto fw-bold align-items-center">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'app_catalog:home' %}">
+                            <i class="ti ti-smart-home me-1"></i> 首页
+                        </a>
+                    </li>
+
+                    <!-- 会员身份逻辑显示 -->
+                    {% if request.session.is_member_authenticated %}
+                        <li class="nav-item dropdown ms-md-3">
+                            <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" data-bs-toggle="dropdown">
+                                <span class="avatar avatar-sm bg-blue-lt text-blue rounded-circle me-2">
+                                    <i class="ti ti-user"></i>
+                                </span>
+                                <div class="d-none d-xl-block ps-2">
+                                    <div>{{ request.session.member_name }}</div>
+                                </div>
+                            </a>
+                            <div class="dropdown-menu dropdown-menu-end">
+                                <a href="{% url 'app_catalog:logout' %}" class="dropdown-item text-danger">
+                                    <i class="ti ti-logout me-2"></i> 安全退出
+                                </a>
+                            </div>
+                        </li>
+                    {% else %}
+                        <li class="nav-item ms-md-3">
+                            <a href="{% url 'app_catalog:login' %}" class="btn btn-outline-primary px-4">
+                                <i class="ti ti-login me-1"></i> 会员登录
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</header>

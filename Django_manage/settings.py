@@ -65,7 +65,7 @@ INSTALLED_APPS = [
     'app_user.apps.AppUserConfig',
     'app_repository.apps.AppRepositoryConfig',
     'app_material.apps.AppMaterialConfig',
-    'app_material_api.apps.AppMaterialApiConfig',
+    'app_external_api.apps.AppExternalApiConfig',
     'app_notification.apps.AppNotificationConfig',
     'app_raw_material.apps.AppRawMaterialConfig',
     'app_process.apps.AppProcessConfig',
@@ -262,19 +262,33 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登�
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_RATES': {
+        'auth_verify': '10/min',
+    },
 }
 
 
 # ==============================================================================
-# 内部集成 — API Token & Webhook
+# 主系统 ↔ 电子手册子系统（app_catalog）集成配置
 # ==============================================================================
-# 通信安全 Token (必须与主系统 INTERNAL_API_TOKEN 保持一致)
+# 当前为「单工程双实例」部署：主系统与手册系统共用本 settings.py。
+# 手册系统（app_catalog）设计为可独立迁移，迁移时按下侧标注摘取配置。
+
+# 通信安全 Token（两侧必须一致）：
+#   主系统侧 —— InternalApiTokenPermission 校验入站请求头 X-Internal-Api-Token
+#   手册系统侧 —— CatalogGateway 出站请求携带该头
 INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
-# Webhook 校验密钥 (必须与主系统 WEBHOOK_SECRET_KEY 保持一致)
-WEBHOOK_SECRET_KEY = os.environ.get('WEBHOOK_SECRET_KEY', 'change-me-in-production')
-CATALOG_WEBHOOK_URL = os.environ.get('CATALOG_WEBHOOK_URL', 'http://127.0.0.1:8001/catalog/api/webhook/material/')
-# 主系统 API 的基础地址 (结尾需带斜杠)
-REMOTE_API_BASE_URL = os.environ.get('REMOTE_API_BASE_URL', 'http://127.0.0.1:8000/api/material/')
+
+# ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────
+# 主系统对外接口基础地址：手册系统连接主系统的入口（结尾需带斜杠）
+EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:8000/api/external/')
+# 手册系统本地 worker 内存缓存：轮询主系统数据版本号的间隔（秒）
+CATALOG_CACHE_VERSION_CHECK_INTERVAL = int(os.environ.get('CATALOG_CACHE_VERSION_CHECK_INTERVAL', '5'))
+# 手册系统请求主系统的超时（秒）
+REMOTE_API_TIMEOUT = float(os.environ.get('REMOTE_API_TIMEOUT', '15'))
+
+# ── 主系统侧配置（本实例作为主系统对外提供数据时使用）──────────────
+# 材料库对外接口的 L2 版本号缓存见下方 CACHES['material']，无需在此额外配置。
 
 
 # ==============================================================================
@@ -326,5 +340,11 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
         'LOCATION': 'rbac_cache',
         'TIMEOUT': 3600,  # 1 小时 TTL，兜底保护：即使缓存失效遗漏，1 小时后自动过期
+    },
+    # [主系统侧] 材料库对外接口数据缓存：L2 版本号（跨 Worker 失效信号），L1 为各 Worker 进程内存
+    'material': {
+        'BACKEND': 'django.core.cache.backends.db.DatabaseCache',
+        'LOCATION': 'material_cache',
+        'TIMEOUT': 3600,
     },
 }

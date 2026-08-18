@@ -6,6 +6,9 @@ class AppMaterialConfig(AppConfig):
     verbose_name = '材料库'
 
     def ready(self):
+        # 挂载材料库缓存失效信号
+        import app_material.signals  # noqa: F401
+
         # 注册自动补全（供 common_utils MaterialAutocompleteView 使用）
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
         from app_material.mixins import MaterialAccessMixin

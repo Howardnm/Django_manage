@@ -26,7 +26,6 @@ COUNT_RESEARCH_PROJECTS = 6
 COUNT_FORMULAS = 20
 COUNT_WORKFLOW_DEFS = 3
 COUNT_FORM_TEMPLATES = 4
-COUNT_CATALOG_PRODUCTS = 10
 COUNT_NOTIFICATIONS = 30
 COUNT_PRODUCTION_ORDERS = 8
 COUNT_MOLD_TYPES = 6
@@ -187,8 +186,6 @@ def print_summary(ctx: FakeContext) -> None:
     from app_basic_research.models import ResearchProject
     from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
     from app_form_management.models import FormTemplate, FormSubmission
-    from app_catalog.models.catalog import CatalogProduct
-    from app_catalog.models.member import CatalogMember
     from app_notification.models import Notification
     from app_trial_production.models import (
         ProductionOrder, ProductionOrderFormulaDetail, ExtrusionTask, SampleInventory,
@@ -234,8 +231,6 @@ def print_summary(ctx: FakeContext) -> None:
         ("TrialTestResult", TrialTestResult.objects.count()),
         ("FormTemplate", FormTemplate.objects.count()),
         ("FormSubmission", FormSubmission.objects.count()),
-        ("CatalogProduct", CatalogProduct.objects.count()),
-        ("CatalogMember", CatalogMember.objects.count()),
         ("Notification", Notification.objects.count()),
         ("WorkflowInstance", WorkflowInstance.objects.count()),
         ("WorkflowTask", WorkflowTask.objects.count()),

@@ -1,6 +1,6 @@
 from django.db.models import Count
 from django.views.generic import ListView
-from app_repository.models import ExternalMemberActivity, Customer, OEM
+from app_external_api.models import ExternalMemberActivity
 from app_panel.mixins import PanelAccessMixin
 
 class CustomerActivityOverviewView(PanelAccessMixin, ListView):

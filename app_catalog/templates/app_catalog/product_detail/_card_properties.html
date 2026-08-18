@@ -1,0 +1,77 @@
+<div class="card mb-3 shadow-sm border-0">
+    <div class="card-header border-0 d-flex justify-content-between align-items-center">
+        <h3 class="card-title">详细物理/机械性能</h3>
+        {% if not request.session.is_member_authenticated %}
+            <span class="badge bg-warning-lt"><i class="ti ti-lock me-1"></i>部分数据已隐藏</span>
+        {% endif %}
+    </div>
+    <div class="table-responsive" style="position: relative;{% if not request.session.is_member_authenticated %} min-height: 400px;{% endif %}">
+
+        <table class="table table-vcenter card-table table-hover">
+            <thead>
+                <tr>
+                    <th>测试项目</th>
+                    <th>测试标准</th>
+                    <th>测试条件</th>
+                    <th class="text-end">典型值</th>
+                    <th>单位</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if remote_material.grouped_properties %}
+                    {% for group in remote_material.grouped_properties %}
+                    <tr class="bg-light">
+                        <td colspan="5" class="fw-bold text-dark"><i class="ti ti-list-check me-1"></i>{{ group.category_name }}</td>
+                    </tr>
+                    {% for item in group.items %}
+                    <tr>
+                        <td class="ps-4">{{ item.test_config.name }}</td>
+                        <td class="small text-muted">{{ item.test_config.standard|default:"-" }}</td>
+                        <td class="small text-muted">{{ item.test_config.condition|default:"-" }}</td>
+
+                        <td class="text-end fw-bold">
+                            {% if request.session.is_member_authenticated %}
+                                <span class="text-primary">
+                                    {% if item.test_config.data_type == 'NUMBER' %}
+                                        {{ item.value|floatformat:2 }}
+                                    {% else %}
+                                        {{ item.value_text }}
+                                    {% endif %}
+                                </span>
+                            {% else %}
+                                <!-- 未登录显示星号占位 -->
+                                <span class="text-muted opacity-25">**.**</span>
+                            {% endif %}
+                        </td>
+
+                        <td class="small">
+                            {% if request.session.is_member_authenticated %}
+                                {{ item.unit|default:"-" }}
+                            {% else %}
+                                <span class="text-muted opacity-25">***</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="5" class="text-center py-5 text-muted">
+                        {% if request.session.is_member_authenticated %}暂未同步物性指标数据{% else %}登录后查看物性数据{% endif %}
+                    </td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+
+        <!-- 未登录时的覆盖遮罩 -->
+        {% if not request.session.is_member_authenticated %}
+        <div class="d-flex align-items-center justify-content-center" style="position: absolute; top: 100px; left: 0; width: 100%; height: calc(100% - 100px); background: rgba(255,255,255,0.6); backdrop-filter: blur(4px); z-index: 10;">
+            <div class="text-center p-4 bg-white shadow-lg rounded border">
+                <div class="mb-3"><i class="ti ti-lock-access fs-1 text-primary"></i></div>
+                <h3>会员专享数据</h3>
+                <p class="text-muted small">为了保护技术知识产权，详细的性能数值仅对认证客户公开。</p>
+                <a href="{% url 'app_catalog:login' %}" class="btn btn-primary px-5">登录解锁全量物性表</a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

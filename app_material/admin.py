@@ -1,11 +1,6 @@
-import json
 from django.contrib import admin
-from django.utils.html import format_html
-from django.urls import reverse, path
-from django.shortcuts import get_object_or_404, redirect
 from .models.material import (MaterialType, ApplicationScenario, MetricCategory, TestConfig,
                     MaterialDataPoint, MaterialLibrary, MaterialCharacteristic)
-from .models.sync import WebhookTask
 
 @admin.register(MaterialCharacteristic)
 class MaterialCharacteristicAdmin(admin.ModelAdmin):
@@ -49,53 +44,3 @@ class MaterialLibraryAdmin(admin.ModelAdmin):
     filter_horizontal = ('scenarios', 'characteristics')
     inlines = [MaterialDataPointInline]
     autocomplete_fields = ['category']
-
-@admin.register(WebhookTask)
-class WebhookTaskAdmin(admin.ModelAdmin):
-    list_display = ('id', 'event_type', 'status', 'retry_count', 'display_payload_summary', 'created_at', 'updated_at', 'requeue_action')
-    list_filter = ('status', 'event_type')
-    readonly_fields = ('event_type', 'payload', 'last_error', 'created_at', 'updated_at', 'retry_count', 'max_retries')
-    search_fields = ('event_type', 'payload', 'last_error')
-    
-    fieldsets = (
-        (None, {'fields': ('event_type', 'status', 'retry_count', 'max_retries', 'created_at', 'updated_at')}),
-        ('Payload 详情', {'fields': ('formatted_payload',), 'classes': ('collapse',)}),
-        ('错误信息', {'fields': ('last_error',), 'classes': ('collapse',)}),
-    )
-
-    def formatted_payload(self, obj):
-        try:
-            return format_html('<pre style="background-color:#f8f8f8; padding:10px; border:1px solid #eee; white-space:pre-wrap; word-break:break-all;">{}</pre>', json.dumps(json.loads(obj.payload), indent=2, ensure_ascii=False))
-        except Exception:
-            return obj.payload
-    formatted_payload.short_description = 'Payload 内容'
-
-    def display_payload_summary(self, obj):
-        try:
-            data = json.loads(obj.payload).get('data', {})
-            return f"ID: {data.get('id')} | {data.get('grade_name') or data.get('name')}"
-        except Exception:
-            return obj.payload[:50]
-    display_payload_summary.short_description = '摘要'
-
-    def requeue_action(self, obj):
-        if obj.status == 'FAILED':
-            url = reverse('admin:app_material_webhooktask_requeue', args=[obj.pk])
-            return format_html('<a class="button" href="{}">手动重试</a>', url)
-        return "-"
-    requeue_action.short_description = '操作'
-
-    def get_urls(self):
-        urls = super().get_urls()
-        custom_urls = [
-            path('<path:object_id>/requeue/', self.admin_site.admin_view(self.requeue_view), name='app_material_webhooktask_requeue'),
-        ]
-        return custom_urls + urls
-
-    def requeue_view(self, request, object_id):
-        task = get_object_or_404(WebhookTask, pk=object_id)
-        task.status = 'PENDING'
-        task.retry_count = 0
-        task.save()
-        self.message_user(request, f"任务 {object_id} 已重置。")
-        return redirect('admin:app_material_webhooktask_changelist')

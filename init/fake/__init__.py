@@ -35,7 +35,6 @@ def run_all():
     from .app_color_center import run as run_app_color_center
     from .app_material_testing import run as run_app_material_testing
     from .app_form_management import run as run_app_form_management
-    from .app_catalog import run as run_app_catalog
     from .app_notification import run as run_app_notification
 
     run_app_user(ctx)              # 1. 用户与部门
@@ -55,7 +54,6 @@ def run_all():
     run_app_material_testing(ctx)  # 13. 测试任务 + 测试结果
 
     run_app_form_management(ctx)   # 14. 表单模板与提交
-    run_app_catalog(ctx)           # 15. 电子手册
-    run_app_notification(ctx)      # 16. 通知 + 审批实例
+    run_app_notification(ctx)      # 15. 通知 + 审批实例
 
     print_summary(ctx)

@@ -11,12 +11,12 @@
 | `app_project` | `/project/` | 项目管理（9 阶段生命周期）、绩效考核 |
 | `app_repository` | `/repository/` | 项目物料仓库、OEM/客户管理 |
 | `app_material` | `/material/` | 物料主数据、性能指标、测试标准 |
-| `app_material_api` | `/api/material/` | 物料 REST API、Webhook 同步 |
+| `app_external_api` | `/api/external/` | 对外数据接口（只读资源 · 鉴权 · 下载） |
 | `app_raw_material` | `/raw-material/` | 原材料类型、供应商、批次管理 |
 | `app_process` | `/process/` | 挤出工艺参数、螺杆组合、设备管理 |
 | `app_formula` | `/formula/` | 实验配方 BOM、测试结果、配色粉配方 |
 | `app_basic_research` | `/research/` | 基础预研项目（6 阶段独立生命周期） |
-| `app_catalog` | `/catalog/` | 产品电子手册（外部系统同步） |
+| `app_catalog` | `/catalog/` | 产品电子手册（纯前端展示，实时拉取主系统） |
 | `app_workflow` | `/workflow/` | BPMN 工作流引擎、任务分配（4 种指派模式） |
 | `app_form_management` | `/forms/` | 动态表单生成器（分步骤流程适配） |
 | `app_trial_production` | `/trial-production/` | 试验排产、挤出注塑任务、样品库存 |
@@ -375,11 +375,9 @@ MCP_API_KEY = os.environ.get('MCP_API_KEY')
 | `import_raw_material_types` | 数据导入 | 导入原材料类型 |
 | `import_suppliers` | 数据导入 | 导入供应商 |
 | `import_oems` | 数据导入 | 导入 OEM 厂商 |
-| `sync_catalog` | 数据同步 | 同步产品目录 |
 | `init_permissions` | 权限 | 初始化 L3 权限组 |
 | `init_performance_rules` | 项目 | 初始化 RD+SALES 双轨绩效规则 |
 | `cleanup_notifications` | 运维 | 清理过期通知 |
-| `process_webhooks` | 运维 | 处理待发送 Webhook |
 | `sap_test` | SAP | 连接健康检查 + 物料查询测试 |
 | `run_mcp_server` | MCP | 独立 stdio 模式 MCP Server（Claude Desktop 本地模式） |
 
@@ -400,12 +398,12 @@ Django_manage/
 ├── app_project/                # 项目 · 绩效
 ├── app_repository/             # OEM · 客户 · 项目档案
 ├── app_material/               # 物料主数据
-├── app_material_api/           # 物料 REST API · Webhook
+├── app_external_api/           # 对外数据接口
 ├── app_raw_material/           # 原材料
 ├── app_process/                # 工艺参数
 ├── app_formula/                # 配方 BOM
 ├── app_basic_research/         # 基础研究
-├── app_catalog/                # 产品目录同步
+├── app_catalog/                # 产品电子手册（纯前端）
 ├── app_workflow/               # 工作流引擎
 ├── app_form_management/        # 动态表单
 ├── app_trial_production/       # 试验排产
