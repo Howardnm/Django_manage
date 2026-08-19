@@ -1,14 +1,16 @@
 import logging
 from collections import OrderedDict
 from itertools import groupby
+
 from django.db import transaction
-from django.db.models import Count
 from django.views.generic import ListView, View
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
-from app_color_center.mixins import ColorCenterAccessMixin
-from app_trial_production.mixins import RndAccessMixin
+from app_color_center.mixins import (
+    ColorCenterAccessMixin, ColorCenterReadMixin, ColorCenterWriteMixin,
+)
 from app_trial_production.models import ProductionOrder
 from app_color_center.models import ColorMatchingTask
 from app_project.models import Project, ProjectStage
@@ -20,127 +22,12 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
-class TaskListView(ColorCenterAccessMixin, ListView):
-    """配色任务列表 — 按排产工单展示配色任务状态"""
-    model = ProductionOrder
-    template_name = 'apps/app_color_center/task_list.html'
-    context_object_name = 'orders'
-    paginate_by = 20
+class _ColorProjectContextMixin:
+    """项目配色页共享上下文构建逻辑（非权限，仅供 GET 详情 / POST 失败重渲染复用）。
 
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if qs is None:
-            qs = self.model.objects.all()
-        qs = qs.filter(
-            formula_details__needs_color_matching=True,
-            status__in=[ProductionOrder.Status.EXTRUDING,
-                        ProductionOrder.Status.INJECTION_MOLDING,
-                        ProductionOrder.Status.TESTING],
-        ).select_related('project', 'creator').distinct()
-        from app_color_center.filters import ColorTaskFilter
-        self.filter = ColorTaskFilter(self.request.GET, queryset=qs)
-        qs = self.filter.qs
-        if not self.request.GET.get('sort'):
-            qs = qs.order_by('-created_at')
-        return qs
+    与权限无关，故不以（外部）权限 Mixin 形式存在；下划线前缀表示模块内部私有。
+    """
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filter
-        context['current_sort'] = self.request.GET.get('sort', '')
-        # 预计算当前页工单的配色完成进度 + 跳转参数
-        context['order_stats'], context['order_redirect_params'] = \
-            self._compute_order_stats(context['page_obj'])
-        return context
-
-    @staticmethod
-    def _compute_order_stats(page_obj):
-        order_stats = {}
-        order_redirect_params = {}
-        for o in page_obj:
-            total = 0
-            done = 0
-            first_formula_id = None
-            first_formula_node = None
-            for fd in o.formula_details.filter(needs_color_matching=True):
-                total += 1
-                formula = LabFormula.objects.filter(
-                    pk=fd.formula_id).select_related('project_node').first()
-                bom = getattr(formula, 'color_powder_bom', None)
-                if bom and bom.entries.exists():
-                    done += 1
-                elif first_formula_id is None and formula:
-                    first_formula_id = formula.pk
-                    first_formula_node = formula.project_node
-            order_stats[o.pk] = {'total': total, 'done': done}
-            if first_formula_id and first_formula_node:
-                order_redirect_params[o.pk] = (
-                    f"stage={first_formula_node.stage}"
-                    f"&round={first_formula_node.round}"
-                    f"&formula_id={first_formula_id}"
-                )
-            else:
-                order_redirect_params[o.pk] = ''
-        return order_stats, order_redirect_params
-
-
-class ProjectListPageView(ColorCenterAccessMixin, ListView):
-    """配色项目列表 — 按项目维度聚合"""
-    model = Project
-    template_name = 'apps/app_color_center/project_list.html'
-    context_object_name = 'projects'
-    paginate_by = 10
-
-    def get_queryset(self):
-        project_ids = ProductionOrder.objects.filter(
-            formula_details__needs_color_matching=True,
-            status__in=[ProductionOrder.Status.EXTRUDING,
-                        ProductionOrder.Status.INJECTION_MOLDING,
-                        ProductionOrder.Status.TESTING],
-            project__isnull=False,
-        ).values_list('project_id', flat=True).distinct()
-        qs = Project.objects.filter(
-            pk__in=project_ids,
-        ).select_related('manager', 'material')
-        from app_color_center.filters import ColorProjectFilter
-        self.filter = ColorProjectFilter(self.request.GET, queryset=qs)
-        qs = self.filter.qs.order_by('-created_at')
-        return qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filter
-        context['current_sort'] = self.request.GET.get('sort', '')
-        context['project_stats'] = self._compute_project_stats(context['page_obj'])
-        return context
-
-    @staticmethod
-    def _compute_project_stats(page_obj):
-        project_stats = {}
-        for p in page_obj:
-            orders = ProductionOrder.objects.filter(
-                project=p,
-                formula_details__needs_color_matching=True,
-            ).distinct()
-            total = 0
-            done = 0
-            for o in orders:
-                for fd in o.formula_details.filter(needs_color_matching=True):
-                    total += 1
-                    bom = getattr(
-                        LabFormula.objects.filter(pk=fd.formula_id).first(),
-                        'color_powder_bom', None,
-                    )
-                    if bom and bom.entries.exists():
-                        done += 1
-            project_stats[p.pk] = {'total': total, 'done': done}
-        return project_stats
-
-
-
-class ProjectColorView(ColorCenterAccessMixin, View):
-    """项目配色页 — 含配方侧边栏 + BOM 填写 + 对比模式"""
-    template_name = 'apps/app_color_center/fill.html'
     STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
 
     def _resolve_project(self):
@@ -148,8 +35,6 @@ class ProjectColorView(ColorCenterAccessMixin, View):
             self._project = get_object_or_404(
                 Project.objects.select_related('material'),
                 pk=self.kwargs['project_pk'])
-            RndAccessMixin.check_project_ownership(
-                self._project, self.request.user)
         return self._project
 
     def _fetch_formulas(self, project, material):
@@ -320,6 +205,132 @@ class ProjectColorView(ColorCenterAccessMixin, View):
             'color_formula_ids': color_formula_ids,
         }
 
+
+class TaskListView(ColorCenterAccessMixin, ListView):
+    """配色任务列表 — 按排产工单展示配色任务状态"""
+    permission_required = 'app_color_center.view_colormatchingtask'
+    model = ProductionOrder
+    template_name = 'apps/app_color_center/task_list.html'
+    context_object_name = 'orders'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        if qs is None:
+            qs = self.model.objects.all()
+        qs = qs.filter(
+            formula_details__needs_color_matching=True,
+            status__in=[ProductionOrder.Status.EXTRUDING,
+                        ProductionOrder.Status.INJECTION_MOLDING,
+                        ProductionOrder.Status.TESTING],
+        ).select_related('project', 'creator').distinct()
+        from app_color_center.filters import ColorTaskFilter
+        self.filter = ColorTaskFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs
+        if not self.request.GET.get('sort'):
+            qs = qs.order_by('-created_at')
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filter
+        context['current_sort'] = self.request.GET.get('sort', '')
+        # 预计算当前页工单的配色完成进度 + 跳转参数
+        context['order_stats'], context['order_redirect_params'] = \
+            self._compute_order_stats(context['page_obj'])
+        return context
+
+    @staticmethod
+    def _compute_order_stats(page_obj):
+        order_stats = {}
+        order_redirect_params = {}
+        for o in page_obj:
+            total = 0
+            done = 0
+            first_formula_id = None
+            first_formula_node = None
+            for fd in o.formula_details.filter(needs_color_matching=True):
+                total += 1
+                formula = LabFormula.objects.filter(
+                    pk=fd.formula_id).select_related('project_node').first()
+                bom = getattr(formula, 'color_powder_bom', None)
+                if bom and bom.entries.exists():
+                    done += 1
+                elif first_formula_id is None and formula:
+                    first_formula_id = formula.pk
+                    first_formula_node = formula.project_node
+            order_stats[o.pk] = {'total': total, 'done': done}
+            if first_formula_id and first_formula_node:
+                order_redirect_params[o.pk] = (
+                    f"stage={first_formula_node.stage}"
+                    f"&round={first_formula_node.round}"
+                    f"&formula_id={first_formula_id}"
+                )
+            else:
+                order_redirect_params[o.pk] = ''
+        return order_stats, order_redirect_params
+
+
+class ProjectListPageView(ColorCenterAccessMixin, ListView):
+    """配色项目列表 — 按项目维度聚合"""
+    permission_required = 'app_color_center.view_colormatchingtask'
+    model = Project
+    template_name = 'apps/app_color_center/project_list.html'
+    context_object_name = 'projects'
+    paginate_by = 10
+
+    def get_queryset(self):
+        # 配色中心已关闭部门隔离（enforce_dept_isolation=False），此处按角色全量可见，无需 L4 过滤
+        project_ids = ProductionOrder.objects.filter(
+            formula_details__needs_color_matching=True,
+            status__in=[ProductionOrder.Status.EXTRUDING,
+                        ProductionOrder.Status.INJECTION_MOLDING,
+                        ProductionOrder.Status.TESTING],
+            project__isnull=False,
+        ).values_list('project_id', flat=True).distinct()
+        qs = Project.objects.filter(
+            pk__in=project_ids,
+        ).select_related('manager', 'material')
+        from app_color_center.filters import ColorProjectFilter
+        self.filter = ColorProjectFilter(self.request.GET, queryset=qs)
+        qs = self.filter.qs.order_by('-created_at')
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filter
+        context['current_sort'] = self.request.GET.get('sort', '')
+        context['project_stats'] = self._compute_project_stats(context['page_obj'])
+        return context
+
+    @staticmethod
+    def _compute_project_stats(page_obj):
+        project_stats = {}
+        for p in page_obj:
+            orders = ProductionOrder.objects.filter(
+                project=p,
+                formula_details__needs_color_matching=True,
+            ).distinct()
+            total = 0
+            done = 0
+            for o in orders:
+                for fd in o.formula_details.filter(needs_color_matching=True):
+                    total += 1
+                    bom = getattr(
+                        LabFormula.objects.filter(pk=fd.formula_id).first(),
+                        'color_powder_bom', None,
+                    )
+                    if bom and bom.entries.exists():
+                        done += 1
+            project_stats[p.pk] = {'total': total, 'done': done}
+        return project_stats
+
+
+class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
+    """项目配色页（GET）— 含配方侧边栏 + BOM 展示/填写 + 对比模式"""
+    permission_required = 'app_color_center.view_colormatchingtask'
+    template_name = 'apps/app_color_center/fill.html'
+
     def get(self, request, *args, **kwargs):
         ctx = self._build_base_context()
         stage_round_items = ctx['stage_round_items']
@@ -385,6 +396,12 @@ class ProjectColorView(ColorCenterAccessMixin, View):
             'color_formula_ids': ctx['color_formula_ids'],
         }
         return render(request, self.template_name, context)
+
+
+class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, View):
+    """项目配色页（POST）— 保存色粉 BOM + 批量复制 + 推进配色任务"""
+    permission_required = 'app_color_center.change_colormatchingtask'
+    template_name = 'apps/app_color_center/fill.html'
 
     def post(self, request, *args, **kwargs):
         formula_id = request.POST.get('formula_id')
@@ -464,9 +481,10 @@ class ProjectColorView(ColorCenterAccessMixin, View):
             messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
 
             # 保留现有 query 参数（如 stage/round/order_pk），覆盖 formula_id
+            url = reverse('color_center:project', kwargs={'project_pk': project.pk})
             params = request.GET.copy()
             params['formula_id'] = str(selected_formula.pk)
-            return redirect(f'{request.path}?{params.urlencode()}')
+            return redirect(f'{url}?{params.urlencode()}')
 
         # POST 失败：完整重建上下文，保留阶段/轮次导航和已有 BOM 数据
         ctx = self._build_base_context()
