@@ -212,7 +212,6 @@ document.addEventListener('DOMContentLoaded', function () {
             var props = arg.event.extendedProps;
             var orderPk = arg.event.id;
             var formulaCount = props.formula_count || 0;
-            var isReadonly = !arg.event.startEditable;
 
             // 颜色胶囊：有 RGB 色值则用，否则回退到默认灰
             var rgbValue = props.rgb_value || '';
@@ -233,8 +232,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return {
                 html:
                     '<div class="fc-tabler-event d-flex flex-row align-items-start gap-1 p-1 rounded border ' +
-                            (props.border_css || 'border-blue') + ' text-nowrap overflow-hidden' +
-                            (isReadonly ? ' fc-tabler-event-readonly' : '') + '" ' +
+                            (props.border_css || 'border-blue') + ' text-nowrap overflow-hidden" ' +
                             'data-order-pk="' + orderPk + '" ' +
                             'data-trial-code="' + (props.trial_code || '') + '" ' +
                             'data-quantity="' + (props.quantity || '') + '" ' +

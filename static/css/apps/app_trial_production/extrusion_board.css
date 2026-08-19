@@ -71,7 +71,7 @@
 
 /* ===== 事件卡片（Tabler 类承担大部分样式，此处仅 FC 特有覆盖） ===== */
 .fc .fc-daygrid-event { margin-top: 2px; border-radius: var(--tblr-border-radius); border: none; background: transparent; padding: 1px 2px; }
-.fc-tabler-event { min-height: 22px; }
+.fc-tabler-event { min-height: 22px; background: transparent; }
 .fc-tabler-event .fc-ev-code {
     font-weight: 600;
     font-size: 12px;
@@ -83,7 +83,6 @@
     direction: rtl;
 }
 .fc-tabler-event .badge { flex-shrink: 0; }
-.fc-tabler-event-readonly { opacity: 0.85; }
 
 /* ===== 时间网格视图 ===== */
 .fc .fc-timegrid-slot { height: 2.4em; }
