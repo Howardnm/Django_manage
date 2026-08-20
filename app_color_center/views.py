@@ -35,6 +35,16 @@ def _first_unfilled_formula(formula_details_qs):
     return None
 
 
+def _first_formula_with_node(formula_details_qs):
+    """首个带 project_node 的配方（不区分是否已填 BOM），用于「查看详情」跳转定位。"""
+    for fd in formula_details_qs.filter(needs_color_matching=True):
+        formula = LabFormula.objects.filter(
+            pk=fd.formula_id).select_related('project_node').first()
+        if formula and formula.project_node:
+            return formula
+    return None
+
+
 def _fill_redirect_params(formula):
     """由未填配方生成 fill 页跳转参数（stage/round/formula_id）。"""
     if not formula or not formula.project_node:
@@ -207,18 +217,7 @@ class _ColorProjectContextMixin:
             ).values_list('formula_id', flat=True).distinct()
         )
 
-        # 可选：通过 ?order_pk= 传入工单上下文（从工单详情跳转时定位对应实验单号）
-        order = None
-        order_pk = self.request.GET.get('order_pk')
-        if order_pk:
-            try:
-                order = ProductionOrder.objects.select_related('project').get(
-                    pk=order_pk, project=project)
-            except ProductionOrder.DoesNotExist:
-                pass
-
         return {
-            'production_order': order,
             'project': project,
             'material': material,
             'stage_round_items': stage_round_items,
@@ -268,7 +267,7 @@ class TaskListView(ColorCenterAccessMixin, ListView):
         context['current_sort'] = self.request.GET.get('sort', '')
         context['current_status'] = self.request.GET.get('status', 'ALL')
         # 预计算当前页工单的配色完成进度 + 跳转参数
-        context['order_stats'], context['order_redirect_params'] = \
+        context['order_stats'], context['order_redirect_params'], context['order_detail_params'] = \
             self._compute_order_stats(context['page_obj'])
         return context
 
@@ -276,6 +275,7 @@ class TaskListView(ColorCenterAccessMixin, ListView):
     def _compute_order_stats(page_obj):
         order_stats = {}
         order_redirect_params = {}
+        order_detail_params = {}
         for o in page_obj:
             total = 0
             done = 0
@@ -289,7 +289,10 @@ class TaskListView(ColorCenterAccessMixin, ListView):
             order_stats[o.pk] = {'total': total, 'done': done}
             order_redirect_params[o.pk] = _fill_redirect_params(
                 _first_unfilled_formula(o.formula_details))
-        return order_stats, order_redirect_params
+            # 「查看详情」跳转定位：优先未填配方，已完成时回退首个带节点配方
+            order_detail_params[o.pk] = order_redirect_params[o.pk] or _fill_redirect_params(
+                _first_formula_with_node(o.formula_details))
+        return order_stats, order_redirect_params, order_detail_params
 
 
 class ProjectListPageView(ColorCenterAccessMixin, ListView):
@@ -321,15 +324,12 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filter
         context['current_sort'] = self.request.GET.get('sort', '')
-        stats, redirect_params = self._compute_project_stats(context['page_obj'])
-        context['project_stats'] = stats
-        context['project_redirect_params'] = redirect_params
+        context['project_stats'] = self._compute_project_stats(context['page_obj'])
         return context
 
     @staticmethod
     def _compute_project_stats(page_obj):
         project_stats = {}
-        project_redirect_params = {}
         for p in page_obj:
             orders = ProductionOrder.objects.filter(
                 project=p,
@@ -347,17 +347,7 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
                     if bom and bom.entries.exists():
                         done += 1
             project_stats[p.pk] = {'total': total, 'done': done}
-            # 聚合该项目下所有 formula_details 定位首个未填配方
-            from app_trial_production.models import ProductionOrderFormulaDetail
-            all_details = (
-                ProductionOrderFormulaDetail.objects.filter(
-                    production_order__project=p,
-                    needs_color_matching=True,
-                )
-            )
-            project_redirect_params[p.pk] = _fill_redirect_params(
-                _first_unfilled_formula(all_details))
-        return project_stats, project_redirect_params
+        return project_stats
 
 
 class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
@@ -425,7 +415,6 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
                 readonly = True
 
         context = {
-            'production_order': ctx['production_order'],
             'project': ctx['project'],
             'material': ctx['material'],
             'stage_round_items': stage_round_items,
@@ -535,7 +524,7 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
 
             messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
 
-            # 保留现有 query 参数（如 stage/round/order_pk），覆盖 formula_id
+            # 保留现有 query 参数（如 stage/round），覆盖 formula_id
             url = reverse('color_center:project', kwargs={'project_pk': project.pk})
             params = request.GET.copy()
             params['formula_id'] = str(selected_formula.pk)
@@ -569,7 +558,6 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
             bom_entries = existing_bom.entries.select_related('raw_material__category').order_by('id')
 
         return render(request, self.template_name, {
-            'production_order': ctx['production_order'],
             'project': ctx['project'],
             'material': ctx['material'],
             'stage_round_items': stage_round_items,

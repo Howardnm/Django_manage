@@ -13,9 +13,9 @@
         <div class="col">
             <div class="page-pretitle">色粉配比BOM</div>
             <h2 class="page-title">{{ project.name }}</h2>
-            {% if production_order %}
+            {% if selected_formula %}
             <div class="text-muted mt-1">
-                实验单号: {{ production_order.trial_code }}
+                实验单号: {{ selected_formula.code }}
             </div>
             {% endif %}
         </div>

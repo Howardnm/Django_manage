@@ -99,8 +99,12 @@
                         <td class="text-muted">{{ order.created_at|date:"Y-m-d H:i" }}</td>
                         <td>
                             {% if order.project and stats and stats.done < stats.total %}
-                            <a href="{% url 'color_center:project' order.project_id %}?order_pk={{ order.pk }}&{% with params=order_redirect_params|get_item:order.pk %}{{ params }}{% endwith %}" class="btn btn-sm btn-outline-orange">
+                            <a href="{% url 'color_center:project' order.project_id %}?{% with params=order_redirect_params|get_item:order.pk %}{{ params }}{% endwith %}" class="btn btn-sm btn-outline-orange">
                                 填写配色
+                            </a>
+                            {% elif order.project %}
+                            <a href="{% url 'color_center:project' order.project_id %}?{% with params=order_detail_params|get_item:order.pk %}{{ params }}{% endwith %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="ti ti-eye me-1"></i>查看详情
                             </a>
                             {% endif %}
                         </td>

@@ -54,11 +54,9 @@
                             {% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
                         <td>
-                            {% if stats and stats.done < stats.total %}
-                            <a href="{% url 'color_center:project' p.pk %}?{% with params=project_redirect_params|get_item:p.pk %}{{ params }}{% endwith %}" class="btn btn-sm btn-outline-orange">
-                                填写配色
+                            <a href="{% url 'color_center:project' p.pk %}" class="btn btn-sm btn-outline-secondary">
+                                <i class="ti ti-eye me-1"></i>查看详情
                             </a>
-                            {% endif %}
                         </td>
                     </tr>
                     {% endwith %}

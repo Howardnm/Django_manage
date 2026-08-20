@@ -268,21 +268,23 @@ class BOMFillButtonAndRedirectTests(BOMSaveBase):
         self.assertContains(resp, 'formula_id=')       # 携带配方定位参数
         self.assertContains(resp, f'formula_id={self.formula.pk}')
 
-    def test_project_list_button_hidden_when_all_filled(self):
-        """已填完 → 项目列表不再显示「填写配色」按钮。"""
+    def test_project_list_button_shows_detail_when_all_filled(self):
+        """已填完 → 项目列表显示「查看详情」按钮，不带配方定位参数。"""
         self._post_bom(total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
         self.client.force_login(self.viewer)
         resp = self.client.get(self._project_list_url())
         self.assertEqual(resp.status_code, 200)
-        self.assertNotContains(resp, '填写配色')
+        self.assertContains(resp, '查看详情')
+        self.assertNotContains(resp, 'formula_id=')
 
-    def test_project_list_button_shown_with_unfilled_and_redirect(self):
-        """未填 → 项目列表显示按钮，跳转参数指向首个未填配方。"""
+    def test_project_list_button_shows_detail_when_unfilled(self):
+        """未填 → 项目列表显示「查看详情」按钮，不带配方定位参数。"""
         self.client.force_login(self.viewer)
         resp = self.client.get(self._project_list_url())
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '填写配色')
-        self.assertContains(resp, f'formula_id={self.formula.pk}')
+        self.assertNotContains(resp, '填写配色')
+        self.assertContains(resp, '查看详情')
+        self.assertNotContains(resp, 'formula_id=')
 
 
 class ColorTaskStatusTabTests(BOMSaveBase):
