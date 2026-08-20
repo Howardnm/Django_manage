@@ -40,6 +40,9 @@
                         <td>
                             {% if p.material %}
                             <span class="text-reset">{{ p.material.grade_name }}</span>
+                            {% if p.material.sap_material_code %}
+                            <div class="text-muted small">{{ p.material.sap_material_code }}</div>
+                            {% endif %}
                             {% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
                         <td>{{ p.manager.realname|default:p.manager.username }}</td>

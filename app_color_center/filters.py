@@ -48,12 +48,13 @@ class ColorProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs['placeholder'] = '检索项目名称 / 成品材料'
+            self.filters['q'].field.widget.attrs['placeholder'] = '检索项目名称 / 成品材料 / SAP编码'
 
     def filter_search(self, queryset, name, value):
         if not value:
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(material__grade_name__icontains=value)
+            Q(material__grade_name__icontains=value) |
+            Q(material__sap_material_code__icontains=value)
         )
