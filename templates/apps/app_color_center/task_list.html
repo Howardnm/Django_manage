@@ -74,7 +74,7 @@
                         <td><span class="text-muted">{{ order.trial_code }}</span></td>
                         <td>
                             {% if order.project %}
-                            <a href="{% url 'project_detail' order.project.pk %}" class="text-reset text-truncate d-block" style="max-width: 160px;" title="{{ order.project.name }}">
+                            <a href="{% url 'project_detail' order.project.pk %}" class="text-reset text-truncate d-block" style="max-width: 400px;" title="{{ order.project.name }}">
                                 {{ order.project.name }}
                             </a>
                             {% else %}<span class="text-muted">-</span>{% endif %}

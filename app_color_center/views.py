@@ -1,6 +1,7 @@
 import logging
 from collections import OrderedDict
 from itertools import groupby
+from urllib.parse import urlencode
 
 from django.db import transaction
 from django.views.generic import ListView, View
@@ -524,11 +525,16 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
 
             messages.success(request, f'配方 {selected_formula.name} v{selected_formula.version} 色粉BOM已保存')
 
-            # 保留现有 query 参数（如 stage/round），覆盖 formula_id
+            # 保存后回跳：携带 stage/round/formula_id 定位到刚保存的配方
             url = reverse('color_center:project', kwargs={'project_pk': project.pk})
-            params = request.GET.copy()
-            params['formula_id'] = str(selected_formula.pk)
-            return redirect(f'{url}?{params.urlencode()}')
+            node = selected_formula.project_node
+            params = {
+                'formula_id': str(selected_formula.pk),
+            }
+            if node:
+                params['stage'] = node.stage
+                params['round'] = node.round
+            return redirect(f'{url}?{urlencode(params)}')
 
         # POST 失败：完整重建上下文，保留阶段/轮次导航和已有 BOM 数据
         ctx = self._build_base_context()
