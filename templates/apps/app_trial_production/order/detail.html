@@ -445,7 +445,7 @@
                             <div class="text-muted small">配色任务</div>
                             <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
                         </div>
-                        <a href="{% url 'color_center:project' order.project_id %}" class="btn btn-sm btn-outline-orange ms-auto px-2">
+                        <a href="{% url 'color_center:project' order.project_id %}{% if color_formula_redirect %}?{{ color_formula_redirect }}{% endif %}" class="btn btn-sm btn-outline-orange ms-auto px-2">
                             <i class="ti ti-arrow-right"></i>
                         </a>
                     </div>

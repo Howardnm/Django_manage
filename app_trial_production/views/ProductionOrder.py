@@ -245,6 +245,18 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
         # 测试任务
         context['testing_tasks'] = order.testing_tasks.all()
 
+        # 配色任务跳转定位参数：首个需配色且带 project_node 的配方
+        context['color_formula_redirect'] = ''
+        for fd in order.formula_details.filter(needs_color_matching=True):
+            f = LabFormula.objects.filter(pk=fd.formula_id).select_related('project_node').first()
+            if f and f.project_node:
+                context['color_formula_redirect'] = (
+                    f'stage={f.project_node.stage}'
+                    f'&round={f.project_node.round}'
+                    f'&formula_id={f.pk}'
+                )
+                break
+
         # 配方信息
         formulas = list(LabFormula.objects.filter(
             code=order.trial_code, project=order.project,
