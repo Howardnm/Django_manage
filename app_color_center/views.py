@@ -360,19 +360,35 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
         if compare_mode and compare_formulas:
             cpbom_columns, cpbom_matrix = self._build_color_powder_bom_matrix(compare_formulas)
 
-        # BOM 表单
+        # 写权限：无 change_colormatchingtask 权限的用户不展示填写/编辑表单。
+        # 复用 WriteMixin 的 L1/L2 管控 + 写视图已声明的 L3 权限码，避免重复硬编码。
+        can_write = ColorCenterWriteMixin.user_can(
+            request.user, ProjectColorSaveView.permission_required)
+
+        # BOM 表单 / 只读展示
         bom_form = None
         entry_formset = None
         bom_entries = None
         readonly = False
         if selected_formula:
             bom = getattr(selected_formula, 'color_powder_bom', None)
-            if bom and request.GET.get('edit') != '1':
-                readonly = True
+            if bom:
                 bom_entries = bom.entries.select_related('raw_material__category').order_by('id')
+                # 有写权限且显式进入编辑态时才展示表单，否则只读
+                if can_write and request.GET.get('edit') == '1':
+                    bom_form = ColorPowderBOMForm(instance=bom)
+                    entry_formset = ColorPowderBOMEntryFormSet(instance=bom, prefix='entries')
+                    readonly = False
+                else:
+                    readonly = True
+            elif can_write:
+                # 无 BOM 且有写权限 → 首次填写表单
+                bom_form = ColorPowderBOMForm(instance=None)
+                entry_formset = ColorPowderBOMEntryFormSet(instance=None, prefix='entries')
+                readonly = False
             else:
-                bom_form = ColorPowderBOMForm(instance=bom)
-                entry_formset = ColorPowderBOMEntryFormSet(instance=bom, prefix='entries')
+                # 无 BOM 且无写权限 → 无表单、无只读条目
+                readonly = True
 
         context = {
             'production_order': ctx['production_order'],
@@ -393,6 +409,7 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
             'entry_formset': entry_formset,
             'bom_entries': bom_entries,
             'readonly': readonly,
+            'can_write': can_write,
             'color_formula_ids': ctx['color_formula_ids'],
         }
         return render(request, self.template_name, context)

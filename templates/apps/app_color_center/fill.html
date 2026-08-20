@@ -111,7 +111,9 @@
 
             <!-- 色粉BOM（仅当该配方关联的工单需要配色时才显示） -->
             {% if selected_formula.pk in color_formula_ids %}
-                {% if readonly %}
+                {% if not readonly %}
+                {% include 'apps/app_color_center/_color_bom_form.html' %}
+                {% elif bom_entries %}
                 <div class="card mb-3">
                     <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
                         <h3 class="card-title text-orange mb-0">
@@ -121,9 +123,11 @@
                             <span class="badge bg-yellow-lt ms-1">¥{{ selected_formula.color_powder_bom.cost }}/kg</span>
                             {% endif %}
                         </h3>
+                        {% if can_write %}
                         <a href="?stage={{ active_stage }}&round={{ active_round }}&formula_id={{ selected_formula.pk }}&edit=1" class="btn btn-sm btn-outline-orange">
                             <i class="ti ti-edit me-1"></i>修改
                         </a>
+                        {% endif %}
                     </div>
                     <div class="table-responsive">
                         <table class="table table-vcenter card-table compact-table">
@@ -171,7 +175,15 @@
                     {% endif %}
                 </div>
                 {% else %}
-                {% include 'apps/app_color_center/_color_bom_form.html' %}
+                <div class="card mb-3">
+                    <div class="card-body text-center py-4 text-muted">
+                        <i class="ti ti-palette fs-1 d-block mb-2 opacity-50"></i>
+                        <p class="mb-0">尚未填写色粉配比BOM</p>
+                        {% if not can_write %}
+                        <p class="small">您当前账号仅有查看权限，无法填写。</p>
+                        {% endif %}
+                    </div>
+                </div>
                 {% endif %}
             {% else %}
                 <div class="card mb-3">

@@ -1,14 +1,25 @@
 """app_color_center 权限重构回归测试。
 
-验证本次改造引入的权限契约：
+背景：本模块原存在三处权限缺陷——三视图均缺 L3 权限码、user_link_fields 与
+列表视图模型字段错配导致 L4 隔离静默失效、写路径借用 app_trial_production 的
+RndAccessMixin 做项目负责人/成员校验且读/写共用同一视图。本次重构后需回归的契约：
+
 1. L3 权限码真正生效（改造前被跳过）：访问列表/项目页需 view_colormatchingtask，
    提交保存 BOM 需 change_colormatchingtask。
-2. 读写分离：ProjectColorView（GET）与 ProjectColorSaveView（POST）各自控权。
-3. 对象级权限收回：非项目负责人/成员的配色操作员（有 L1+L3）也能打开项目配色页。
-4. BOM 写入路径回归：保存 BOM、回填 filled_by、推进 ColorMatchingTask。
-5. 跨项目 POST 仍被业务校验拦截。
-6. Mixin 结构：Read 继承 color_center、Write 独立注册 color_center.write。
+2. 读写分离：ProjectColorView（GET，view_*）与 ProjectColorSaveView（POST，change_*）
+   分别继承 ColorCenterReadMixin / ColorCenterWriteMixin 各自控权。
+3. 对象级权限收回：删除 RndAccessMixin 调用后，非项目负责人/成员的配色操作员
+   （有 L1 角色 + L3 权限码）也能打开项目配色页并提交 BOM——仅靠模块准入把关。
+4. BOM 写入路径回归：保存 BOM、回填 filled_by、推进 ColorMatchingTask、成功回跳详情页。
+5. 跨项目 POST 仍被业务校验拦截（配方不属于当前项目 → PermissionDenied）。
+6. 关闭部门隔离后：配色操作员跨部门可见配色工单，且后端不再有 user_link_field 告警。
+7. 表单卡片显隐：无 change_* 写权限的用户浏览配色页时不展示填写表单（退化为
+   只读表格或占位提示）；「修改」按钮仅对写权限用户可见。
+8. Mixin 结构回归：Read 继承 color_center、Write 独立注册 color_center.write，
+   且 Mixin 均不声明 permission_required（L3 由视图层声明）。
 """
+
+from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
@@ -22,9 +33,10 @@ from app_color_center.mixins import (
     ColorCenterAccessMixin, ColorCenterReadMixin, ColorCenterWriteMixin,
 )
 from app_color_center.models import ColorMatchingTask
-from app_formula.models import LabFormula, ColorPowderBOM
+from app_formula.models import LabFormula, ColorPowderBOM, ColorPowderBOMEntry
 from app_material.models import MaterialType, MaterialLibrary
 from app_project.models import Project, ProjectNode
+from app_raw_material.models import RawMaterial, RawMaterialType
 from app_trial_production.models import ProductionOrder, ProductionOrderFormulaDetail
 
 User = get_user_model()
@@ -177,6 +189,76 @@ class ColorCenterAccessTests(TestCase):
         self.assertEqual(self.client.get(self._list_url()).status_code, 200)
         self.assertEqual(self.client.get(self._project_list_url()).status_code, 200)
         self.assertEqual(self.client.get(self._project_url()).status_code, 200)
+
+    # ── 表单卡片显隐：无写权限不展示填写表单 ──
+
+    def _post_bom(self, user, formula=None):
+        """以 user 身份提交一条含单个色粉 entry 的 BOM，返回响应。"""
+        raw_type = RawMaterialType.objects.create(name='色粉', code='PIGMENT', order=1)
+        raw = RawMaterial.objects.create(
+            name='炭黑', model_name='CB-01', category=raw_type)
+        self.client.force_login(user)
+        return self.client.post(self._save_url(), {
+            'formula_id': (formula or self.formula).pk,
+            'batch_save_mode': '',
+            'remark': '回归测试-表单显隐',
+            'entries-TOTAL_FORMS': '1',
+            'entries-INITIAL_FORMS': '0',
+            'entries-MIN_NUM_FORMS': '0',
+            'entries-MAX_NUM_FORMS': '1000',
+            'entries-0-feeding_port': '1_MAIN',
+            'entries-0-weighing_scale': 'D',
+            'entries-0-raw_material': raw.pk,
+            'entries-0-percentage': '0.500',
+            'entries-0-is_pre_mix': '',
+            'entries-0-pre_mix_order': '0',
+            'entries-0-pre_mix_time': '0',
+        })
+
+    def test_no_bom_no_write_permission_shows_placeholder_not_form(self):
+        """配方尚无 BOM 且用户无写权限 → 展示占位提示，不含填写表单。"""
+        self.client.force_login(self.viewer)
+        resp = self.client.get(self._project_url())
+        self.assertEqual(resp.status_code, 200)
+        # 表单卡片不应出现
+        self.assertNotContains(resp, 'id="bom-form"')
+        # 展示「尚未填写」占位提示
+        self.assertContains(resp, '尚未填写色粉配比BOM')
+
+    def test_no_bom_write_permission_shows_form(self):
+        """配方尚无 BOM 且用户有写权限 → 展示填写表单。"""
+        self.client.force_login(self.writer)
+        resp = self.client.get(self._project_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'id="bom-form"')
+
+    def test_existing_bom_write_permission_needs_edit_to_show_form(self):
+        """已填 BOM + 写权限：默认只读表格，?edit=1 才展示表单。"""
+        self._post_bom(self.writer)
+
+        self.client.force_login(self.writer)
+        resp = self.client.get(self._project_url())
+        self.assertEqual(resp.status_code, 200)
+        # 未带 edit=1 → 只读表格 + 修改按钮，无表单
+        self.assertNotContains(resp, 'id="bom-form"')
+        self.assertContains(resp, '修改')
+
+        resp_edit = self.client.get(self._project_url() + '?edit=1')
+        self.assertEqual(resp_edit.status_code, 200)
+        self.assertContains(resp_edit, 'id="bom-form"')
+
+    def test_existing_bom_no_write_permission_hides_edit_button(self):
+        """已填 BOM + 无写权限 → 只读表格可见，但「修改」按钮不展示。"""
+        self._post_bom(self.writer)
+
+        self.client.force_login(self.viewer)
+        resp = self.client.get(self._project_url())
+        self.assertEqual(resp.status_code, 200)
+        # 只读表格可见（有 entry 数据）
+        self.assertContains(resp, '已填写')
+        # 修改按钮不显示（can_write=False）
+        self.assertNotContains(resp, '修改')
+        self.assertNotContains(resp, 'id="bom-form"')
 
     # ── 读写分离：写需 change 权限码 ──
 

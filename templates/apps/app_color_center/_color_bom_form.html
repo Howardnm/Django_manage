@@ -94,6 +94,13 @@
                 </div>
             </div>
         </div>
+        <div class="card-footer text-muted small">
+            <ul class="list-unstyled mb-0">
+                <li><i class="ti ti-check me-1 text-primary"></i><strong>保存</strong>：仅提交当前配方的色粉BOM，不影响其他配方。</li>
+                <li><i class="ti ti-copy me-1 text-purple"></i><strong>批量保存</strong>：将当前BOM复制到同实验单号下其他需配色的配方，<span class="text-muted">已填写BOM的配方将被跳过</span>。</li>
+                <li><i class="ti ti-refresh me-1 text-red"></i><strong>覆盖保存</strong>：将当前BOM强制覆盖到同实验单号下其他需配色的配方，<span class="text-red">已有BOM将被覆盖且不可撤销</span>。</li>
+            </ul>
+        </div>
     </div>
 
     {# 批量保存模态框（跳过已有BOM） #}
