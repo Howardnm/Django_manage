@@ -10,7 +10,7 @@ class AppRawMaterialConfig(AppConfig):
 
         # 注册自动补全
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
-        from app_raw_material.mixins import RawMaterialAccessMixin
+        from app_raw_material.mixins import RawMaterialAccessMixin, RawMaterialPickerAccessMixin
         from app_raw_material.models import RawMaterial
         from django.db.models import Q
 
@@ -24,7 +24,7 @@ class AppRawMaterialConfig(AppConfig):
                                + (f' (￥{r._latest_price})' if r._latest_price is not None else ''),
                        'category_name': r.category.name},
             'raw_material_detail',
-            access_filter=make_autocomplete_access_filter(RawMaterialAccessMixin),
+            access_filter=make_autocomplete_access_filter(RawMaterialPickerAccessMixin),
         )
 
         # 注册附件配置
