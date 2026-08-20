@@ -285,6 +285,71 @@ class BOMFillButtonAndRedirectTests(BOMSaveBase):
         self.assertContains(resp, f'formula_id={self.formula.pk}')
 
 
+class ColorTaskStatusTabTests(BOMSaveBase):
+    """配色任务列表卡片头部的「配色状态」tab 筛选器回归。"""
+
+    def _create_second_order(self, status):
+        """创建第二个工单 + 配色任务（指定状态），用于验证 tab 过滤。"""
+        mt = MaterialType.objects.get(pk=self.formula.material_type_id)
+        creator = self._make_user(f'creator_{status}', self.sales)
+        formula = LabFormula.objects.create(
+            code=f'BOMT-F-{status}', name='对照配方', material_type=mt,
+            project=self.project, project_node=self.node, creator=creator)
+        order = ProductionOrder.objects.create(
+            creator=creator, code=f'BOMT-O-{status}', trial_code=formula.code,
+            quantity_planned=100, status=ProductionOrder.Status.EXTRUDING,
+            project=self.project)
+        ProductionOrderFormulaDetail.objects.create(
+            production_order=order, formula=formula,
+            planned_quantity=100, needs_color_matching=True)
+        ColorMatchingTask.objects.create(
+            production_order=order, status=status)
+        return order
+
+    def test_tab_ui_renders_all_statuses(self):
+        """列表页渲染 5 个状态 tab，默认高亮「全部状态」。"""
+        self.client.force_login(self.viewer)
+        resp = self.client.get(self._list_url())
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '全部状态')
+        self.assertContains(resp, '待配色')
+        self.assertContains(resp, '配色中')
+        self.assertContains(resp, '已完成')
+        self.assertContains(resp, '无需配色')
+        # 默认 current_status=ALL → 「全部状态」tab active
+        self.assertContains(resp, 'status=ALL')
+        # tab 链接携带 page=1 归位
+        self.assertContains(resp, 'page=1')
+
+    def test_filter_by_status_returns_only_matching(self):
+        """?status=COMPLETED 仅返回配色任务 COMPLETED 的工单。"""
+        completed_order = self._create_second_order(ColorMatchingTask.Status.COMPLETED)
+        # 基准任务为 PENDING
+        self.client.force_login(self.viewer)
+
+        resp = self.client.get(f"{self._list_url()}?status=COMPLETED")
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, completed_order.code)
+        self.assertNotContains(resp, self.order.code)  # PENDING 工单被排除
+
+    def test_filter_all_and_invalid_defaults_to_all(self):
+        """?status=ALL 或非法值 → 不施加状态过滤（返回全部）。"""
+        self._create_second_order(ColorMatchingTask.Status.COMPLETED)
+        self.client.force_login(self.viewer)
+
+        for param in ('ALL', 'BOGUS'):
+            resp = self.client.get(f"{self._list_url()}?status={param}")
+            self.assertEqual(resp.status_code, 200)
+            self.assertContains(resp, self.order.code)           # PENDING
+            self.assertContains(resp, f'BOMT-O-{ColorMatchingTask.Status.COMPLETED}')
+
+    def test_current_status_context_defaults_to_all(self):
+        """无 status 参数时 current_status 默认 ALL（「全部状态」高亮）。"""
+        self.client.force_login(self.viewer)
+        resp = self.client.get(self._list_url())
+        self.assertEqual(resp.context['current_status'], 'ALL')
+
+
 class BOMRedirectHelperTests(TestCase):
     """跳转参数工具函数单元回归。"""
 

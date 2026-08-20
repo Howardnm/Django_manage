@@ -30,7 +30,7 @@
                     {% with stats=project_stats|get_item:p.pk %}
                     <tr>
                         <td>
-                            <a href="{% url 'color_center:project' p.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 200px;" title="{{ p.name }}">
+                            <a href="{% url 'color_center:project' p.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 400px;" title="{{ p.name }}">
                                 {{ p.name }}
                             </a>
                             <div class="text-muted small mt-1">

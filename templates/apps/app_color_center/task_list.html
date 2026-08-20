@@ -13,6 +13,42 @@
     </div>
 </div>
 <div class="card mt-3">
+        {# ── 配色状态筛选 Tab（card-header-tabs） ── #}
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
+                       href="?{% url_replace status='ALL' page=1 %}">
+                        <i class="ti ti-filter me-1"></i>全部状态
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'PENDING' %}active{% endif %}"
+                       href="?{% url_replace status='PENDING' page=1 %}">
+                        <i class="ti ti-clock me-1"></i>待配色
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'IN_PROGRESS' %}active{% endif %}"
+                       href="?{% url_replace status='IN_PROGRESS' page=1 %}">
+                        <i class="ti ti-palette me-1"></i>配色中
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'COMPLETED' %}active{% endif %}"
+                       href="?{% url_replace status='COMPLETED' page=1 %}">
+                        <i class="ti ti-check me-1"></i>已完成
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'NOT_REQUIRED' %}active{% endif %}"
+                       href="?{% url_replace status='NOT_REQUIRED' page=1 %}">
+                        <i class="ti ti-x me-1"></i>无需配色
+                    </a>
+                </li>
+            </ul>
+        </div>
+
         {% include 'apps/list_modules/tools_search_filter.html' %}
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
