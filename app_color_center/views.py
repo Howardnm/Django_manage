@@ -22,6 +22,28 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
+def _first_unfilled_formula(formula_details_qs):
+    """首个『未填写色粉BOM』且带 project_node 的配方（用于跳转定位）；无则 None。"""
+    for fd in formula_details_qs.filter(needs_color_matching=True):
+        formula = LabFormula.objects.filter(
+            pk=fd.formula_id).select_related('project_node').first()
+        if not formula or not formula.project_node:
+            continue  # 无 project_node 的配方无法在 fill 页定位，跳过
+        bom = getattr(formula, 'color_powder_bom', None)
+        if not bom or not bom.entries.exists():
+            return formula
+    return None
+
+
+def _fill_redirect_params(formula):
+    """由未填配方生成 fill 页跳转参数（stage/round/formula_id）。"""
+    if not formula or not formula.project_node:
+        return ''
+    return (f"stage={formula.project_node.stage}"
+            f"&round={formula.project_node.round}"
+            f"&formula_id={formula.pk}")
+
+
 class _ColorProjectContextMixin:
     """项目配色页共享上下文构建逻辑（非权限，仅供 GET 详情 / POST 失败重渲染复用）。
 
@@ -247,8 +269,6 @@ class TaskListView(ColorCenterAccessMixin, ListView):
         for o in page_obj:
             total = 0
             done = 0
-            first_formula_id = None
-            first_formula_node = None
             for fd in o.formula_details.filter(needs_color_matching=True):
                 total += 1
                 formula = LabFormula.objects.filter(
@@ -256,18 +276,9 @@ class TaskListView(ColorCenterAccessMixin, ListView):
                 bom = getattr(formula, 'color_powder_bom', None)
                 if bom and bom.entries.exists():
                     done += 1
-                elif first_formula_id is None and formula:
-                    first_formula_id = formula.pk
-                    first_formula_node = formula.project_node
             order_stats[o.pk] = {'total': total, 'done': done}
-            if first_formula_id and first_formula_node:
-                order_redirect_params[o.pk] = (
-                    f"stage={first_formula_node.stage}"
-                    f"&round={first_formula_node.round}"
-                    f"&formula_id={first_formula_id}"
-                )
-            else:
-                order_redirect_params[o.pk] = ''
+            order_redirect_params[o.pk] = _fill_redirect_params(
+                _first_unfilled_formula(o.formula_details))
         return order_stats, order_redirect_params
 
 
@@ -300,12 +311,15 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['filter'] = self.filter
         context['current_sort'] = self.request.GET.get('sort', '')
-        context['project_stats'] = self._compute_project_stats(context['page_obj'])
+        stats, redirect_params = self._compute_project_stats(context['page_obj'])
+        context['project_stats'] = stats
+        context['project_redirect_params'] = redirect_params
         return context
 
     @staticmethod
     def _compute_project_stats(page_obj):
         project_stats = {}
+        project_redirect_params = {}
         for p in page_obj:
             orders = ProductionOrder.objects.filter(
                 project=p,
@@ -323,7 +337,17 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
                     if bom and bom.entries.exists():
                         done += 1
             project_stats[p.pk] = {'total': total, 'done': done}
-        return project_stats
+            # 聚合该项目下所有 formula_details 定位首个未填配方
+            from app_trial_production.models import ProductionOrderFormulaDetail
+            all_details = (
+                ProductionOrderFormulaDetail.objects.filter(
+                    production_order__project=p,
+                    needs_color_matching=True,
+                )
+            )
+            project_redirect_params[p.pk] = _fill_redirect_params(
+                _first_unfilled_formula(all_details))
+        return project_stats, project_redirect_params
 
 
 class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
@@ -438,7 +462,11 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
         if not has_color_task:
             raise PermissionDenied("该配方关联的工单未下发配色任务，不允许提交色粉BOM")
 
-        bom, _ = ColorPowderBOM.objects.get_or_create(formula=selected_formula)
+        # 绑定到已有 BOM（或带 formula 的未保存实例），待校验通过后才真正落库，
+        # 避免校验失败时留下 0 条目的空 BOM。
+        bom = getattr(selected_formula, 'color_powder_bom', None)
+        if bom is None:
+            bom = ColorPowderBOM(formula=selected_formula)
         bom_form = ColorPowderBOMForm(request.POST, instance=bom)
         entry_formset = ColorPowderBOMEntryFormSet(request.POST, instance=bom, prefix='entries')
 
@@ -524,10 +552,10 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
 
         formula_groups = self._build_formula_groups(active_formulas, selected_formula)
 
-        # 已有的 BOM entries（从已保存的 BOM 读取）
+        # 已有的 BOM entries（从已保存的 BOM 读取；未落库的实例无法访问反向关系）
         existing_bom = getattr(selected_formula, 'color_powder_bom', None)
         bom_entries = None
-        if existing_bom:
+        if existing_bom and existing_bom.pk:
             bom_entries = existing_bom.entries.select_related('raw_material__category').order_by('id')
 
         return render(request, self.template_name, {

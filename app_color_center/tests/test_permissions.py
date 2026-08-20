@@ -136,6 +136,25 @@ class ColorCenterAccessTests(TestCase):
             _grant(user, *perms)
         return user
 
+    def _raw_material(self):
+        """返回一个可用于 BOM 明细的原材料实例（含分类），供有效提交使用。"""
+        raw_type = RawMaterialType.objects.create(
+            name='色粉', code='PIGMENT', order=1)
+        return RawMaterial.objects.create(
+            name='炭黑', model_name='CB-01', category=raw_type)
+
+    def _valid_entry_fields(self, idx, raw_pk):
+        """构造第 idx 行有效明细的 POST 字段。"""
+        return {
+            f'entries-{idx}-feeding_port': '1_MAIN',
+            f'entries-{idx}-weighing_scale': 'D',
+            f'entries-{idx}-raw_material': str(raw_pk),
+            f'entries-{idx}-percentage': '0.500',
+            f'entries-{idx}-is_pre_mix': '',
+            f'entries-{idx}-pre_mix_order': '0',
+            f'entries-{idx}-pre_mix_time': '0',
+        }
+
     def assert_denied(self, response):
         """非 AJAX 请求被拒 → 302 重定向到 /permission-denied/。"""
         self.assertEqual(response.status_code, 302)
@@ -270,25 +289,29 @@ class ColorCenterAccessTests(TestCase):
         self.assertFalse(ColorPowderBOM.objects.filter(formula=self.formula).exists())
 
     def test_writer_can_post_save(self):
-        """有 change 权限码 → POST 保存成功，写入 BOM 并推进任务。"""
+        """有 change 权限码 → POST 保存成功，写入 BOM 并推进任务到完成。"""
+        raw = self._raw_material()
         self.client.force_login(self.writer)
         resp = self.client.post(self._save_url(), {
             'formula_id': self.formula.pk,
             'batch_save_mode': '',
             'remark': '回归测试',
-            'entries-TOTAL_FORMS': '0',
+            'entries-TOTAL_FORMS': '1',
             'entries-INITIAL_FORMS': '0',
             'entries-MIN_NUM_FORMS': '0',
             'entries-MAX_NUM_FORMS': '1000',
+            **self._valid_entry_fields(0, raw.pk),
         })
         self.assertEqual(resp.status_code, 302)
         self.assertIn(self._project_url(), resp.url)  # 回跳详情页，而非 /save/
 
         bom = ColorPowderBOM.objects.get(formula=self.formula)
         self.assertEqual(bom.filled_by, self.writer)
+        self.assertEqual(bom.entries.count(), 1)
 
+        # 单一配方全部填完 → complete_task → COMPLETED
         self.task.refresh_from_db()
-        self.assertEqual(self.task.status, ColorMatchingTask.Status.IN_PROGRESS)
+        self.assertEqual(self.task.status, ColorMatchingTask.Status.COMPLETED)
         self.assertEqual(self.task.operator, self.writer)
 
     # ── 对象级收回：非负责人/成员也可打开配色页 ──
@@ -303,16 +326,20 @@ class ColorCenterAccessTests(TestCase):
 
     def test_non_member_can_post_save(self):
         """非负责人/成员的配色操作员也能提交 BOM（对象级不再限制负责人/成员）。"""
+        raw = self._raw_material()
         self.client.force_login(self.writer)
         resp = self.client.post(self._save_url(), {
             'formula_id': self.formula.pk,
-            'entries-TOTAL_FORMS': '0',
+            'entries-TOTAL_FORMS': '1',
             'entries-INITIAL_FORMS': '0',
             'entries-MIN_NUM_FORMS': '0',
             'entries-MAX_NUM_FORMS': '1000',
+            **self._valid_entry_fields(0, raw.pk),
         })
         self.assertEqual(resp.status_code, 302)
         self.assertTrue(ColorPowderBOM.objects.filter(formula=self.formula).exists())
+        bom = ColorPowderBOM.objects.get(formula=self.formula)
+        self.assertEqual(bom.entries.count(), 1)
 
     # ── 关闭部门隔离：跨部门可见 ──
 

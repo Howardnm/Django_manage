@@ -1,6 +1,11 @@
 <form method="post" action="{% url 'color_center:project_save' project.pk %}" id="bom-form">
     {% csrf_token %}
     <input type="hidden" name="formula_id" value="{{ selected_formula.pk }}">
+    {% if entry_formset.non_form_errors %}
+    <div class="alert alert-danger">
+        {% for error in entry_formset.non_form_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+    {% endif %}
     <div class="card mb-3">
         <div class="card-header bg-orange-lt">
             <h3 class="card-title text-orange mb-0">
