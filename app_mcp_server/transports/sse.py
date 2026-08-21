@@ -34,10 +34,9 @@ async def mcp_sse_generator(request, session_id: str) -> AsyncGenerator[str, Non
     # 确保路径拼接正确
     # 将当前的 /mcp/sse/ 路径替换为 /mcp/messages/
     base_path = request.path.replace('/sse/', '/messages/')
-    messages_url = f"{scheme}://{host}{base_path}?sessionId={session_id}"
+    messages_url = f"{base_path}?sessionId={session_id}"
     
-    logger.info(f"SSE [{session_id}]: Transport Protocol: {scheme}, Host: {host}")
-    logger.info(f"SSE [{session_id}]: Endpoint URL: {messages_url}")
+    logger.info(f"SSE [{session_id}]: Relative Endpoint URL: {messages_url}")
 
     yield f"event: endpoint\ndata: {messages_url}\n\n"
     
