@@ -33,9 +33,13 @@
                             </p>
                             <div class="empty-action">
                                 <a href="{% url 'panel_home' %}" class="btn btn-primary">
-                                    <i class="ti ti-arrow-left me-2"></i>
+                                    <i class="ti ti-home me-2"></i>
                                     返回首页
                                 </a>
+                                <button type="button" class="btn btn-outline-secondary" onclick="history.back()">
+                                    <i class="ti ti-arrow-back-up me-2"></i>
+                                    返回上一页
+                                </button>
                                 {% if request.user.is_authenticated %}
                                 <form action="{% url 'logout' %}" method="post" class="d-inline ms-3">
                                     {% csrf_token %}
