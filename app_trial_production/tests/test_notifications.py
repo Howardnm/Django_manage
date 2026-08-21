@@ -30,7 +30,10 @@ class ProductionOrderNotificationsTests(TestCase):
         order = ProductionOrder.objects.create(creator=operator, project=project)
 
         # 触发状态流转（DRAFT → WORKFLOW_RUNNING）
-        StateMachine.transition(order, 'WORKFLOW_RUNNING', operator)
+        # state_changed 信号现走 transaction.on_commit，需显式捕获回调。
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            StateMachine.transition(order, 'WORKFLOW_RUNNING', operator)
+        self.assertEqual(len(callbacks), 1)
 
         qs = Notification.objects.filter(type='production_order.state_changed')
         # 每个接收者一条通知（负责人 + 协同成员 + 销售成员 = 3）
@@ -49,6 +52,8 @@ class ProductionOrderNotificationsTests(TestCase):
     def test_order_state_change_skipped_without_project(self):
         creator = _make_user('creator')
         order = ProductionOrder.objects.create(creator=creator)  # 无 project
-        StateMachine.transition(order, 'WORKFLOW_RUNNING', creator)
+        with self.captureOnCommitCallbacks(execute=True) as callbacks:
+            StateMachine.transition(order, 'WORKFLOW_RUNNING', creator)
+        self.assertEqual(len(callbacks), 1)
         self.assertEqual(
             Notification.objects.filter(type='production_order.state_changed').count(), 0)

@@ -22,6 +22,7 @@
 """
 
 import logging
+from django.db import transaction
 from django.dispatch import Signal
 from django.utils import timezone
 
@@ -141,8 +142,15 @@ class StateMachine:
             f"{old_status} → {target_status}{user_info}"
         )
 
-        # 状态转换成功后发出信号，供各 app 联动（如通知项目成员）
-        state_changed.send(sender=model_class, obj=obj, old_status=old_status, user=user)
+        # 状态转换成功后发出信号，供各 app 联动（如通知项目成员）。
+        # 延迟到事务提交后（transaction.on_commit）触发：保证任何非事务性
+        # 副作用（邮件/外部 API/消息投递）只在事务真正落库、不会回滚时才执行；
+        # 若当前不在事务中（autocommit），on_commit 回调会立即执行，行为不变。
+        transaction.on_commit(
+            lambda: state_changed.send(
+                sender=model_class, obj=obj, old_status=old_status, user=user,
+            )
+        )
 
         return obj
 

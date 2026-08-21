@@ -7,18 +7,9 @@ from app_mold_injection.models import InjectionTask
 
 
 class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    """注塑任务筛选器"""
+    """注塑任务筛选器 — 状态筛选由列表卡片头部 tab 承载，不在此处作为下拉。"""
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
-
-    status = django_filters.ChoiceFilter(
-        choices=InjectionTask.Status.choices,
-        widget=forms.Select(attrs={
-            'class': 'form-select form-select-search',
-            'placeholder': '任务状态',
-            'style': 'width: 150px;',
-        }),
-    )
 
     source = django_filters.ChoiceFilter(
         choices=InjectionTask.Source.choices,
@@ -40,7 +31,7 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
     class Meta:
         model = InjectionTask
-        fields = ['q', 'status', 'source', 'start_date', 'end_date']
+        fields = ['q', 'source', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

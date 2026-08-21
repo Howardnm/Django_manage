@@ -215,6 +215,7 @@ class ProductionOrderService:
                 logger.info(f"Order {order.code} unscheduled, deleted PENDING extrusion task")
 
     @staticmethod
+    @transaction.atomic
     def check_and_advance(order):
         """
         检查子任务完成情况，自动推进工单状态。

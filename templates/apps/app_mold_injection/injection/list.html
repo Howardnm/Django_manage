@@ -5,31 +5,47 @@
 
 {% block content %}
 <div class="page-header d-print-none">
-    <div class="container-xl">
-        <div class="page-pretitle">
-            <nav aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{% url 'trial_dashboard' %}">排产总览</a></li>
-                    <li class="breadcrumb-item active">注塑任务</li>
-                </ol>
-            </nav>
-        </div>
-        <div class="row align-items-center">
-            <div class="col">
-                <h2 class="page-title">
-                    <i class="ti ti-injection me-2 text-blue"></i>注塑任务列表
-                </h2>
-            </div>
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">注塑任务</h2>
+            <div class="text-muted mt-1">共找到 {{ page_obj.paginator.count }} 条记录</div>
         </div>
     </div>
 </div>
+<div class="card mt-3">
+        {# ── 注塑状态筛选 Tab（card-header-tabs） ── #}
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
+                       href="?{% url_replace status='ALL' page=1 %}">
+                        <i class="ti ti-filter me-1"></i>全部状态
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'PENDING' %}active{% endif %}"
+                       href="?{% url_replace status='PENDING' page=1 %}">
+                        <i class="ti ti-clock me-1"></i>待生产
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'IN_PROGRESS' %}active{% endif %}"
+                       href="?{% url_replace status='IN_PROGRESS' page=1 %}">
+                        <i class="ti ti-injection me-1"></i>注塑中
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'COMPLETED' %}active{% endif %}"
+                       href="?{% url_replace status='COMPLETED' page=1 %}">
+                        <i class="ti ti-check me-1"></i>已完成
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-<div class="container-xl mt-3">
-    <div class="card">
         {% include 'apps/list_modules/tools_search_filter.html' %}
-
         <div class="table-responsive">
-            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+            <table class="table card-table table-vcenter text-nowrap datatable table-hover" style="font-size: 13px;">
                 <thead>
                     <tr>
                         <th>状态</th>
@@ -76,34 +92,26 @@
                         <td class="text-muted small">{{ obj.created_at|date:"Y-m-d H:i" }}</td>
                         <td>
                             <a href="{% url 'mold_injection:task_detail' obj.pk %}"
-                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
-                                <i class="ti ti-eye"></i>
+                               class="btn btn-sm btn-outline-secondary">
+                                <i class="ti ti-eye me-1"></i>查看详情
                             </a>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="8" class="text-center py-4 text-muted">
-                            <i class="ti ti-injection fs-1 d-block mb-2"></i>
-                            暂无注塑任务
+                        <td colspan="8" class="text-center py-5">
+                            <div class="empty">
+                                <div class="empty-icon"><i class="ti ti-injection fs-1 opacity-25"></i></div>
+                                <p class="empty-title">暂无注塑任务</p>
+                                <p class="empty-subtitle text-muted">当前没有需要注塑的任务</p>
+                            </div>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
-
-        {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
     </div>
-</div>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    initRemoteTomSelectAll(document, {
-        apiUrl: "{% url 'trial_api_search' %}",
-        valueField: 'id',
-        responseKey: 'results',
-    });
-});
-</script>
+    <br>
+    {% include 'apps/list_modules/paginator.html' %}
 {% endblock %}

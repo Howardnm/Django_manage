@@ -63,6 +63,15 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
         )
         self.filter = InjectionTaskFilter(self.request.GET, queryset=qs)
         qs = self.filter.qs
+
+        # 状态 tab 筛选（卡片头部 tab，非 django_filters 字段）
+        status_param = self.request.GET.get('status', '')
+        valid_statuses = {s.value for s in InjectionTask.Status}
+        if status_param == 'ALL':
+            pass  # 显示全部状态
+        elif status_param in valid_statuses:
+            qs = qs.filter(status=status_param)
+
         if not self.request.GET.get('sort'):
             qs = qs.order_by('-created_at')
         return qs
@@ -71,6 +80,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['filter'] = getattr(self, 'filter', None)
         context['current_sort'] = self.request.GET.get('sort', '')
+        context['current_status'] = self.request.GET.get('status', 'ALL')
         return context
 
 
