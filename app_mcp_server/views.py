@@ -25,6 +25,7 @@ def check_auth(request):
         return True
     return request.headers.get("X-MCP-API-KEY") == expected_key
 
+@csrf_exempt
 async def sse_endpoint(request):
     """建立 SSE 连接: GET /mcp/sse/"""
     if not check_auth(request):

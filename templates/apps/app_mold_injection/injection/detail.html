@@ -47,8 +47,8 @@
 <div class="row row-cards mt-3">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title">基本信息</h3>
+            <div class="card-header bg-blue-lt">
+                <h3 class="card-title text-blue"><i class="ti ti-info-circle me-2"></i>基本信息</h3>
             </div>
             <div class="card-body">
                 <div class="datagrid">
@@ -68,6 +68,18 @@
                             {% endif %}
                         </div>
                     </div>
+                    <div class="datagrid-item">
+                        <div class="datagrid-title">关联项目</div>
+                        <div class="datagrid-content">
+                            {% if injection_task.production_order and injection_task.production_order.project %}
+                            <a href="{% url 'project_detail' injection_task.production_order.project.pk %}">{{ injection_task.production_order.project.name }}</a>
+                            {% elif injection_task.source_project %}
+                            {{ injection_task.source_project.name }}
+                            {% else %}
+                            <span class="text-muted">-</span>
+                            {% endif %}
+                        </div>
+                    </div>
                     {% if injection_task.sample_inventory %}
                     <div class="datagrid-item">
                         <div class="datagrid-title">物料来源(样品库)</div>
@@ -76,12 +88,6 @@
                                 {{ injection_task.sample_inventory.trial_code }} - {{ injection_task.sample_inventory.quantity }}kg
                             </a>
                         </div>
-                    </div>
-                    {% endif %}
-                    {% if injection_task.source_project %}
-                    <div class="datagrid-item">
-                        <div class="datagrid-title">关联项目(渠道B)</div>
-                        <div class="datagrid-content">{{ injection_task.source_project.name }}</div>
                     </div>
                     {% endif %}
                     <div class="datagrid-item">
@@ -117,8 +123,8 @@
 
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h3 class="card-title"><i class="ti ti-mold me-2"></i>模具需求（模具 x 配方矩阵）</h3>
+            <div class="card-header bg-purple-lt">
+                <h3 class="card-title text-purple"><i class="ti ti-mold me-2"></i>模具需求（模具 x 配方矩阵）</h3>
             </div>
             <div class="table-responsive">
                 <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix">
@@ -162,8 +168,8 @@
 
         {% if has_output_specimens %}
         <div class="card mt-3">
-            <div class="card-header">
-                <h3 class="card-title"><i class="ti ti-clipboard me-2"></i>样条产出（实际产出矩阵）</h3>
+            <div class="card-header bg-green-lt">
+                <h3 class="card-title text-green"><i class="ti ti-clipboard me-2"></i>样条产出（实际产出矩阵）</h3>
             </div>
             <div class="table-responsive">
                 <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix">

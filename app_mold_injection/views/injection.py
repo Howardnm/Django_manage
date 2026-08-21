@@ -55,7 +55,8 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
         if qs is None:
             qs = self.model.objects.all()
         qs = qs.select_related(
-            'production_order', 'operator', 'sample_inventory',
+            'production_order', 'production_order__project', 'source_project',
+            'sample_inventory',
         ).prefetch_related(
             'mold_requirements__mold',
         ).annotate(
@@ -95,7 +96,8 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
         if qs is None:
             return self.model.objects.all()
         return qs.select_related(
-            'production_order', 'sample_inventory', 'source_project', 'operator',
+            'production_order', 'production_order__project',
+            'sample_inventory', 'source_project', 'operator',
         ).prefetch_related(
             'mold_requirements__mold', 'mold_requirements__formula_details__formula',
             'output_specimens__mold',
