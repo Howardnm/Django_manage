@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 class TestingTaskListView(TestingAccessMixin, ListView):
     """测试任务列表"""
-    permission_required = []
+    permission_required = 'app_material_testing.view_testingtask'
     model = TestingTask
     template_name = 'apps/app_material_testing/list.html'
     context_object_name = 'testing_tasks'
@@ -45,7 +45,7 @@ class TestingTaskListView(TestingAccessMixin, ListView):
 
 class TestingTaskDetailView(TestingAccessMixin, DetailView):
     """测试任务详情"""
-    permission_required = []
+    permission_required = 'app_material_testing.view_testingtask'
     model = TestingTask
     template_name = 'apps/app_material_testing/detail.html'
     context_object_name = 'testing_task'
@@ -131,13 +131,15 @@ class TestingTaskDetailView(TestingAccessMixin, DetailView):
 
 class FillResultsView(TestingAccessMixin, View):
     """填写测试结果矩阵"""
-    permission_required = []
+    permission_required = 'app_material_testing.change_testingtask'
     template_name = 'apps/app_material_testing/fill_results.html'
 
     def _get_task(self):
-        return get_object_or_404(
+        task = get_object_or_404(
             TestingTask.objects.select_related('production_order'),
             pk=self.kwargs['pk'])
+        self.check_object_permission(task)
+        return task
 
     def _get_formulas(self, task):
         from app_formula.models import LabFormula
@@ -208,10 +210,11 @@ class FillResultsView(TestingAccessMixin, View):
 
 class WriteBackView(TestingAccessMixin, View):
     """测试结果回写"""
-    permission_required = []
+    permission_required = 'app_material_testing.change_testingtask'
 
     def post(self, request, pk):
         task = get_object_or_404(TestingTask, pk=pk)
+        self.check_object_permission(task)
         if task.status == TestingTask.Status.RESULTS_WRITTEN_BACK:
             messages.warning(request, '测试结果已回写，无需重复操作')
             return redirect('material_testing:detail', pk=pk)
@@ -243,6 +246,7 @@ class TestingSampleListView(TestingAccessMixin, View):
 
     template_name = 'apps/app_material_testing/specimens.html'
     paginate_by = 20
+    permission_required = 'app_material_testing.view_testingtask'
 
     def _get_filtered_qs(self, request):
         from app_trial_production.models import SampleInventory
