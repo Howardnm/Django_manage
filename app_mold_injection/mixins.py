@@ -17,6 +17,8 @@ class MoldManageAccessMixin(UnifiedAccessMixin):
     """模具台账管理权限管控。
 
     L1/L2/L4/L5 通过 module_code 从 ModuleAccessConfig (DB) 动态读取。
+    模具台账不做 L4/L5 数据隔离：MoldType 无所有者字段，对象级/数据隔离不适用，
+    纯靠模块准入（L1 角色 + L2 等级 + 视图层 L3 权限码）把关。
     """
 
     module_code = 'mold_injection.mold'

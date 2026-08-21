@@ -22,6 +22,7 @@ class MoldSampleListView(InjectionTaskAccessMixin, View):
 
     template_name = 'apps/app_mold_injection/sample/list.html'
     paginate_by = 20
+    permission_required = 'app_mold_injection.view_injectiontask'
 
     def _get_filtered_qs(self, request):
         qs = SampleInventory.objects.select_related(

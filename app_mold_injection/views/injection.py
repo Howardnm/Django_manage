@@ -48,6 +48,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
     template_name = 'apps/app_mold_injection/injection/list.html'
     context_object_name = 'injection_tasks'
     paginate_by = 20
+    permission_required = 'app_mold_injection.view_injectiontask'
 
     def get_queryset(self):
         from app_mold_injection.filters import InjectionTaskFilter
@@ -90,6 +91,7 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
     model = InjectionTask
     template_name = 'apps/app_mold_injection/injection/detail.html'
     context_object_name = 'injection_task'
+    permission_required = 'app_mold_injection.view_injectiontask'
 
     def get_queryset(self):
         qs = super().get_queryset()
@@ -189,6 +191,7 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
 
 class InjectionStartView(InjectionTaskAccessMixin, View):
     """开始注塑任务"""
+    permission_required = 'app_mold_injection.change_injectiontask'
 
     def post(self, request, pk):
         task = get_object_or_404(InjectionTask, pk=pk)
@@ -208,6 +211,7 @@ class InjectionStartView(InjectionTaskAccessMixin, View):
 class InjectionCompleteView(InjectionTaskAccessMixin, View):
     """完成注塑任务 — 含样条产出"""
     template_name = 'apps/app_mold_injection/injection/complete.html'
+    permission_required = 'app_mold_injection.change_injectiontask'
 
     @staticmethod
     def _build_matrix_context(task):
