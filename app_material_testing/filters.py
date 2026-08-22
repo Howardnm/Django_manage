@@ -7,18 +7,9 @@ from app_material_testing.models import TestingTask
 
 
 class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    """测试任务筛选器"""
+    """测试任务筛选器 — 状态筛选由列表卡片头部 tab 承载，不在此处作为下拉。"""
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
-
-    status = django_filters.ChoiceFilter(
-        choices=TestingTask.Status.choices,
-        widget=forms.Select(attrs={
-            'class': 'form-select form-select-search',
-            'placeholder': '任务状态',
-            'style': 'width: 150px;',
-        }),
-    )
 
     sort = django_filters.OrderingFilter(
         fields=(
@@ -31,7 +22,7 @@ class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
 
     class Meta:
         model = TestingTask
-        fields = ['q', 'status', 'start_date', 'end_date']
+        fields = ['q', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

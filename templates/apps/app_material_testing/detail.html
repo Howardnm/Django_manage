@@ -41,7 +41,16 @@
                 <form method="post" action="{% url 'material_testing:writeback' pk=testing_task.pk %}" class="d-inline">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-outline-success">
-                        <i class="ti ti-arrow-back-up me-1"></i>回写配方
+                        <i class="ti ti-send me-1"></i>回写配方
+                    </button>
+                </form>
+                {% endif %}
+                {% if testing_task.status != 'RESULTS_WRITTEN_BACK' %}
+                <form method="post" action="{% url 'material_testing:force_complete' pk=testing_task.pk %}" class="d-inline"
+                      onsubmit="return confirm('数据可能未填写完整，确定手动完成并回写已填结果吗？此操作会结束该测试任务。');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-outline-danger">
+                        <i class="ti ti-flag me-1"></i>手动完成并回写
                     </button>
                 </form>
                 {% endif %}

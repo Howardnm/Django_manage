@@ -17,7 +17,7 @@ class AppMaterialTestingConfig(AppConfig):
         StateMachine.register(TestingTask, {
             'PENDING': ['IN_PROGRESS'],
             'IN_PROGRESS': ['COMPLETED'],
-            'COMPLETED': ['RESULTS_WRITTEN_BACK'],
+            'COMPLETED': ['IN_PROGRESS', 'RESULTS_WRITTEN_BACK'],
             'RESULTS_WRITTEN_BACK': [],
         })
 

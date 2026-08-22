@@ -3,7 +3,8 @@ import logging
 from django.views.generic import ListView, DetailView, View
 from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
-from django.db.models import Count
+from django.db import models
+from django.db.models import Count, OuterRef, Subquery
 from app_material_testing.mixins import TestingAccessMixin
 from app_material_testing.models import TestingTask, TrialTestResult
 from app_material_testing.services import TestingTaskService
@@ -25,13 +26,28 @@ class TestingTaskListView(TestingAccessMixin, ListView):
         qs = super().get_queryset()
         if qs is None:
             return self.model.objects.all()
+        from app_trial_production.models import ProductionOrderFormulaDetail
+        formula_count_sub = ProductionOrderFormulaDetail.objects.filter(
+            production_order_id=OuterRef('production_order_id'),
+        ).values('production_order_id').annotate(
+            _count=Count('id')).values('_count')
         qs = qs.select_related(
-            'production_order', 'assigned_to',
+            'production_order', 'production_order__project', 'assigned_to',
         ).prefetch_related('test_items').annotate(
             test_item_count=Count('test_items'),
+            formula_count=Subquery(formula_count_sub, output_field=models.IntegerField()),
         )
         self.filter = TestingTaskFilter(self.request.GET, queryset=qs)
         qs = self.filter.qs
+
+        # 状态 tab 筛选（卡片头部 tab，非 django_filters 字段）
+        status_param = self.request.GET.get('status', '')
+        valid_statuses = {s.value for s in TestingTask.Status}
+        if status_param == 'ALL':
+            pass  # 显示全部状态
+        elif status_param in valid_statuses:
+            qs = qs.filter(status=status_param)
+
         if not self.request.GET.get('sort'):
             qs = qs.order_by('-created_at')
         return qs
@@ -40,6 +56,7 @@ class TestingTaskListView(TestingAccessMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['filter'] = getattr(self, 'filter', None)
         context['current_sort'] = self.request.GET.get('sort', '')
+        context['current_status'] = self.request.GET.get('status', 'ALL')
         return context
 
 
@@ -228,6 +245,26 @@ class WriteBackView(TestingAccessMixin, View):
         except InvalidStateTransition as e:
             logger.exception(f"Write-back failed for task {task.pk}")
             messages.error(request, f'回写测试结果失败：{e}')
+        return redirect('material_testing:detail', pk=pk)
+
+
+class ForceCompleteWriteBackView(TestingAccessMixin, View):
+    """手动完成并回写 — 数据缺失时强制结束任务，回写已填结果。"""
+    permission_required = 'app_material_testing.change_testingtask'
+
+    def post(self, request, pk):
+        task = get_object_or_404(TestingTask, pk=pk)
+        self.check_object_permission(task)
+        if task.status == TestingTask.Status.RESULTS_WRITTEN_BACK:
+            messages.warning(request, '测试任务已回写，无需重复操作')
+            return redirect('material_testing:detail', pk=pk)
+
+        try:
+            written = TestingTaskService.force_complete_and_writeback(task)
+            messages.success(request, f'测试任务已手动完成，回写 {written} 条测试结果')
+        except InvalidStateTransition as e:
+            logger.exception(f"Force complete failed for task {task.pk}")
+            messages.error(request, f'手动完成失败：{e}')
         return redirect('material_testing:detail', pk=pk)
 
 
