@@ -331,6 +331,19 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         self.check_object_permission(obj)
         return obj
 
+    def _resolve_owner(self, obj):
+        """解析对象的数据所有者（默认：遍历 user_link_fields 里的单字段名）。
+
+        子类可重写以支持跨关系所有者（如 测试任务 → 工单 → 项目 → 负责人）。
+        Returns: User 实例或 None。
+        """
+        for attr in self.user_link_fields:
+            if hasattr(obj, attr):
+                owner = getattr(obj, attr)
+                if owner:
+                    return owner
+        return None
+
     def check_object_permission(self, obj):
         """对象级权限校验：所有者 → L4 部门 → L5 工作组（任一命中即放行）。
 
@@ -345,12 +358,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
             return True
 
         # 1. 探测数据所有者
-        owner = None
-        for attr in self.user_link_fields:
-            if hasattr(obj, attr):
-                owner = getattr(obj, attr)
-                if owner:
-                    break
+        owner = self._resolve_owner(obj)
         if not owner:
             # 修复 #8: 无法确定所有者时的处理
             cfg = self._resolve_config()
