@@ -31,6 +31,12 @@ class ColorCenterAccessMixin(UnifiedAccessMixin):
             return getattr(order, 'manager', None)
         return getattr(obj, 'manager', None)
 
+    def apply_isolation(self, qs):
+        # 配色中心人员：跳过 L4/L5（列表页可见全部）
+        if ColorCenterTeamAccessMixin.user_has_access(self.request.user):
+            return qs
+        return super().apply_isolation(qs)
+
     def check_object_permission(self, obj):
         # 配色中心人员：跳过 L4/L5（可见全部）
         if ColorCenterTeamAccessMixin.user_has_access(self.request.user):

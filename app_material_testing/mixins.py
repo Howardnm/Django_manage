@@ -27,8 +27,14 @@ class TestingAccessMixin(UnifiedAccessMixin):
             return 'production_order__project__manager'
         return super()._isolation_field_name(model)
 
+    def apply_isolation(self, qs):
+        # 测试中心人员：跳过 L4/L5（列表页可见全部任务）
+        if TestingTeamAccessMixin.user_has_access(self.request.user):
+            return qs
+        return super().apply_isolation(qs)
+
     def check_object_permission(self, obj):
-        # 测试中心人员：跳过 L4/L5（可见全部任务）
+        # 测试中心人员：跳过 L4/L5（详情/写操作可见全部）
         if TestingTeamAccessMixin.user_has_access(self.request.user):
             return True
         return super().check_object_permission(obj)
