@@ -5,7 +5,7 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.contrib import messages
 from django.db import models
 from django.db.models import Count, OuterRef, Subquery
-from app_material_testing.mixins import TestingAccessMixin, TestingDetailAccessMixin
+from app_material_testing.mixins import TestingAccessMixin, TestingTaskAccessMixin
 from app_material_testing.models import TestingTask, TrialTestResult
 from app_material_testing.services import TestingTaskService
 from common_utils.state_machine import InvalidStateTransition
@@ -13,7 +13,7 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
-class TestingTaskListView(TestingAccessMixin, ListView):
+class TestingTaskListView(TestingTaskAccessMixin, ListView):
     """测试任务列表"""
     permission_required = 'app_material_testing.view_testingtask'
     model = TestingTask
@@ -60,7 +60,7 @@ class TestingTaskListView(TestingAccessMixin, ListView):
         return context
 
 
-class TestingTaskDetailView(TestingDetailAccessMixin, DetailView):
+class TestingTaskDetailView(TestingTaskAccessMixin, DetailView):
     """测试任务详情"""
     permission_required = 'app_material_testing.view_testingtask'
     model = TestingTask

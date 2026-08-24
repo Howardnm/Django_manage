@@ -1,9 +1,9 @@
-"""测试任务详情页独立权限 Mixin 回归测试。
+"""测试任务列表/详情页独立权限 Mixin 回归测试。
 
-验证 TestingDetailAccessMixin：
+验证 TestingTaskAccessMixin：
 1. 数据所有者 = 测试任务关联项目的负责人（production_order.project.manager），
    而非 assigned_to（测试员）。
-2. 研发角色组（material_testing 授权、非 team）：按项目负责人做 L4 部门隔离。
+2. 研发角色组（material_testing.task 授权、非 team）：按项目负责人做 L4 部门隔离。
 3. 测试中心人员（命中 material_testing.team）：跳过 L4/L5，可见全部任务。
 4. 无 view_testingtask 权限码 → 拒绝。
 """
@@ -21,7 +21,7 @@ from app_project.models import Project, ProjectNode
 from app_trial_production.models import ProductionOrder, ProductionOrderFormulaDetail
 from app_material_testing.models import TestingTask
 from app_material_testing.mixins import (
-    TestingAccessMixin, TestingTeamAccessMixin, TestingDetailAccessMixin,
+    TestingAccessMixin, TestingTeamAccessMixin, TestingTaskAccessMixin,
 )
 
 User = get_user_model()
@@ -48,12 +48,19 @@ class TestingDetailAccessTests(TestCase):
             code='Testing_Center_Team', name='测试中心团队')
         self.testing_group.roles.add(self.testing_role)
 
-        # material_testing — 同时配研发 + 测试中心角色组，L4 隔离开
+        # material_testing — 写操作/主模块，配研发 + 测试中心角色组，L4 隔离开
         main_cfg = ModuleAccessConfig.objects.create(
             module_code='material_testing', module_name='材料测试中心',
             enforce_dept_isolation=True, enforce_group_isolation=False,
         )
         main_cfg.role_groups.add(self.rnd_group, self.testing_group)
+
+        # material_testing.task — 列表/详情页（项目负责人隔离），配研发 + 测试中心
+        task_cfg = ModuleAccessConfig.objects.create(
+            module_code='material_testing.task', module_name='材料测试中心-测试任务',
+            enforce_dept_isolation=True, enforce_group_isolation=False,
+        )
+        task_cfg.role_groups.add(self.rnd_group, self.testing_group)
 
         # material_testing.team — 仅测试中心角色组（身份标识）
         team_cfg = ModuleAccessConfig.objects.create(
@@ -176,6 +183,10 @@ class TestingDetailMixinUnitTests(TestCase):
             module_code='material_testing', module_name='材料测试中心',
             enforce_dept_isolation=True, enforce_group_isolation=False)
         main_cfg.role_groups.add(self.rnd_group, self.testing_group)
+        task_cfg = ModuleAccessConfig.objects.create(
+            module_code='material_testing.task', module_name='材料测试中心-测试任务',
+            enforce_dept_isolation=True, enforce_group_isolation=False)
+        task_cfg.role_groups.add(self.rnd_group, self.testing_group)
         team_cfg = ModuleAccessConfig.objects.create(
             module_code='material_testing.team', module_name='材料测试中心-团队成员',
             enforce_dept_isolation=True, enforce_group_isolation=False)
@@ -201,7 +212,7 @@ class TestingDetailMixinUnitTests(TestCase):
             production_order=order, assigned_to=self.testing,
             status=TestingTask.Status.IN_PROGRESS)
 
-        self.mixin = TestingDetailAccessMixin()
+        self.mixin = TestingTaskAccessMixin()
         self.mixin.user_link_fields = ['assigned_to']
 
     def _make_user(self, username, role, dept):
@@ -227,4 +238,4 @@ class TestingDetailMixinUnitTests(TestCase):
         """模块码归属正确。"""
         self.assertEqual(TestingAccessMixin.module_code, 'material_testing')
         self.assertEqual(TestingTeamAccessMixin.module_code, 'material_testing.team')
-        self.assertEqual(TestingDetailAccessMixin.module_code, 'material_testing')
+        self.assertEqual(TestingTaskAccessMixin.module_code, 'material_testing.task')
