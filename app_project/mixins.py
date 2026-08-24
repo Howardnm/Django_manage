@@ -11,6 +11,7 @@ class ProjectAccessMixin(UnifiedAccessMixin):
 
     module_code = 'project'
     module_name = '项目管理中心'
+    module_description = '项目管理中心。按负责人隔离，叠加协同成员/销售成员穿透查看。'
     user_link_fields = ['manager']
 
     def get_queryset(self):
@@ -58,6 +59,7 @@ class PerformanceManagementMixin(ProjectAccessMixin):
 
     module_code = 'project.performance_management'
     module_name = '绩效管理'
+    module_description = '绩效管理写操作。高职级人员操作评分规则。'
 
 
 class PerformanceRuleReadMixin(ProjectAccessMixin):
@@ -65,6 +67,7 @@ class PerformanceRuleReadMixin(ProjectAccessMixin):
 
     module_code = 'project.performance_read'
     module_name = '绩效规则查看'
+    module_description = '绩效规则查看。研发工程师 + 业务经理查看。'
 
 
 class SharedConfigMixin(ProjectAccessMixin):
@@ -72,3 +75,4 @@ class SharedConfigMixin(ProjectAccessMixin):
 
     module_code = 'project.shared_config'
     module_name = '全局配置表'
+    module_description = '全局配置表。组织级共享资源。'

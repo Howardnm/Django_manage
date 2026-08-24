@@ -10,6 +10,7 @@ class TestingAccessMixin(UnifiedAccessMixin):
 
     module_code = 'material_testing'
     module_name = '材料测试中心'
+    module_description = '材料测试中心。角色组配「测试中心人员 + 研发」；研发按项目负责人隔离，需 view/change_testingtask。'
     user_link_fields = ['assigned_to']
 
 
@@ -22,6 +23,7 @@ class TestingTeamAccessMixin(TestingAccessMixin):
 
     module_code = 'material_testing.team'
     module_name = '材料测试中心-团队成员'
+    module_description = '测试中心人员身份标识（仅识别跳过 L4/L5，不被视图继承）。仅配「测试中心人员」角色组。'
 
 
 class TestingDetailAccessMixin(TestingAccessMixin):

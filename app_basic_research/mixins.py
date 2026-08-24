@@ -8,4 +8,5 @@ class BasicResearchAccessMixin(UnifiedAccessMixin):
 
     module_code = 'basic_research'
     module_name = '基础预研中心'
+    module_description = '基础预研中心。按负责人(manager)隔离。'
     user_link_fields = ['manager']

@@ -11,6 +11,7 @@ class RepositoryAccessMixin(UnifiedAccessMixin):
 
     module_code = 'repository'
     module_name = '客户档案中心'
+    module_description = '客户档案中心。双重负责制：业务部(salesperson) OR 研发部(project.manager)。'
     user_link_fields = ['salesperson', 'project__manager']
 
     def get_queryset(self):

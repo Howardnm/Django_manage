@@ -11,6 +11,7 @@ class ColorCenterAccessMixin(UnifiedAccessMixin):
 
     module_code = 'color_center'
     module_name = '材料配色中心'
+    module_description = '配色中心读侧。角色组配「配色中心人员 + 研发」；研发按项目负责人做 L4/L5 隔离，需 view_colormatchingtask。'
     user_link_fields = ['operator']  # 实际被 _resolve_owner / _isolation_field_name 覆盖
 
     def _isolation_field_name(self, model):
@@ -42,6 +43,7 @@ class ColorCenterTeamAccessMixin(ColorCenterAccessMixin):
 
     module_code = 'color_center.team'
     module_name = '材料配色中心-团队成员'
+    module_description = '配色中心人员身份标识（仅识别跳过 L4/L5，不被视图继承）。仅配「配色中心人员」角色组。'
 
 
 class ColorCenterReadMixin(ColorCenterAccessMixin):
@@ -53,3 +55,4 @@ class ColorCenterWriteMixin(ColorCenterReadMixin):
 
     module_code = 'color_center.write'
     module_name = '材料配色中心-填写'
+    module_description = '配色中心写侧。角色组配「配色中心人员 + 研发」；保存 BOM 需 change_colormatchingtask，隔离同读侧。'

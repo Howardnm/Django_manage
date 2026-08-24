@@ -6,6 +6,7 @@ class PanelAccessMixin(UnifiedAccessMixin):
 
     module_code = 'panel'
     module_name = '看板工作台'
+    module_description = '看板工作台。'
 
 
 class HomeAccessMixin(UnifiedAccessMixin):
@@ -21,6 +22,7 @@ class HomeAccessMixin(UnifiedAccessMixin):
 
     module_code = 'home'
     module_name = '系统首页'
+    module_description = '系统首页。纯静态页零数据查询，无 L3 权限码；未配置时 fail-closed（仅超管可访问）。'
     permission_required = []  # 纯静态页面，零数据查询
 
 

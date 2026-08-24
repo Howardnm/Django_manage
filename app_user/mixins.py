@@ -46,6 +46,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
     # —— 模块标识（声明后 L1/L2/L4/L5 从 ModuleAccessConfig 动态读取）——
     module_code = None
     module_name = None  # 模块中文名，与 module_code 配套声明，供 sync_rbac_modules 注册使用
+    module_description = None  # 模块权限配置说明，供 sync_rbac_modules 回填 + Admin 展示
 
     # —— 准入控制（module_code 模式下从 DB 读取，否则从以下 class attribute 读取）——
     identity_required = []

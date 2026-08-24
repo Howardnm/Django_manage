@@ -9,3 +9,4 @@ class WorkflowAccessMixin(UnifiedAccessMixin):
 
     module_code = 'workflow'
     module_name = '流程审批中心'
+    module_description = '流程审批中心。'

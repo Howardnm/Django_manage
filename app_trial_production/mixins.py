@@ -10,6 +10,7 @@ class TrialProductionAccessMixin(UnifiedAccessMixin):
 
     module_code = 'trial_production'
     module_name = '试验排产中心'
+    module_description = '试验排产中心基础（子模块继承的默认隔离，creator/操作员等所有者维度）。'
     user_link_fields = ['creator', 'extruder_operator', 'operator',
                         'assigned_to', 'recorded_by']
 
@@ -19,6 +20,7 @@ class ExtrusionTaskAccessMixin(TrialProductionAccessMixin):
 
     module_code = 'trial_production.extrusion_task'
     module_name = '挤出任务'
+    module_description = '挤出任务。仅挤出工程师；按工单所有者隔离。'
 
 
 class DashboardAccessMixin(TrialProductionAccessMixin):
@@ -26,6 +28,7 @@ class DashboardAccessMixin(TrialProductionAccessMixin):
 
     module_code = 'trial_production.dashboard'
     module_name = '排产总览'
+    module_description = '排产总览。仅研发工程师。'
 
 
 class OrderManageAccessMixin(TrialProductionAccessMixin):
@@ -38,6 +41,7 @@ class OrderManageAccessMixin(TrialProductionAccessMixin):
 
     module_code = 'trial_production.order_manage'
     module_name = '工单管理'
+    module_description = '工单管理详情/打印。研发按 L4/L5 隔离；挤出工程师（extrusion_task 角色组）跳过隔离看全部。'
 
     def has_permission(self):
         """准入：order_manage 角色组放行；挤出工程师通过 extrusion_task 角色组放行。"""
@@ -58,6 +62,7 @@ class RndAccessMixin(TrialProductionAccessMixin):
 
     module_code = 'trial_production.rnd'
     module_name = '排产发起/审批'
+    module_description = '排产发起/审批。仅研发工程师，按项目负责人/成员隔离。'
     user_link_fields = ['manager']
 
     @staticmethod
@@ -78,3 +83,4 @@ class SampleInventoryAccessMixin(TrialProductionAccessMixin):
 
     module_code = 'trial_production.sample_inventory'
     module_name = '样品库存'
+    module_description = '样品库存。研发工程师 + 操作员可访问。'

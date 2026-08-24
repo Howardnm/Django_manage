@@ -385,6 +385,8 @@ class ModuleAccessConfig(models.Model):
                                    help_text="如 'formula'、'trial_production.extrusion_task'。")
     module_name = models.CharField("模块名称", max_length=50,
                                    help_text="如 '实验配方库'。")
+    module_description = models.TextField("配置说明", blank=True, default='',
+                                          help_text="该模块权限的配置说明。由 sync_rbac_modules 从 mixin 声明的 module_description 回填。")
     role_groups = models.ManyToManyField(RoleGroup, verbose_name="允许访问的角色组",
                                          blank=True,
                                          help_text="用户所属角色在任一勾选组中即可访问本模块。"

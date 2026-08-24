@@ -24,6 +24,7 @@ class InternalUserRequiredMixin(UnifiedAccessMixin):
 
     module_code = 'common.user_tree'
     module_name = '用户树'
+    module_description = '用户树 API。通用内部 API，不涉及 L4/L5；未配置时回退 is_internal 检查。'
 
     # 通用 API 视图不涉及 L4/L5 数据隔离
     enforce_dept_isolation = False

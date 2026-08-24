@@ -459,8 +459,8 @@ class RoleGroupAdmin(admin.ModelAdmin):
 
 @admin.register(ModuleAccessConfig)
 class ModuleAccessConfigAdmin(admin.ModelAdmin):
-    list_display = ('module_code', 'module_name', 'min_level',
-                    'enforce_dept_isolation', 'enforce_group_isolation',
+    list_display = ('module_code', 'module_name', 'module_description',
+                    'min_level', 'enforce_dept_isolation', 'enforce_group_isolation',
                     'l4_bypass_min_level', 'l5_bypass_min_level', 'is_active')
     list_editable = ('l4_bypass_min_level', 'l5_bypass_min_level')
     list_filter = ('is_active', 'enforce_dept_isolation', 'enforce_group_isolation')

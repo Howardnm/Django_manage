@@ -10,6 +10,7 @@ class InjectionTaskAccessMixin(UnifiedAccessMixin):
 
     module_code = 'mold_injection.task'
     module_name = '注塑任务'
+    module_description = '注塑任务。角色组配注塑操作员；需 view/change_injectiontask。'
     user_link_fields = ['operator']
 
 
@@ -23,3 +24,4 @@ class MoldManageAccessMixin(UnifiedAccessMixin):
 
     module_code = 'mold_injection.mold'
     module_name = '模具台账'
+    module_description = '模具台账。不做 L4/L5 隔离，纯模块准入；需 view/add/change_moldtype。'

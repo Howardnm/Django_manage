@@ -8,6 +8,7 @@ class RawMaterialAccessMixin(UnifiedAccessMixin):
 
     module_code = 'raw_material'
     module_name = '原材料/供应商'
+    module_description = '原材料/供应商库（SAP 同步共享数据，无创建人归属；编辑由 L1 角色组 + change_* 码控制，无对象级校验）。'
 
     def check_edit_permission(self, obj):
         """原材料/供应商/类型为 SAP 同步的共享参考数据，无创建人归属概念。
@@ -25,4 +26,5 @@ class RawMaterialPickerAccessMixin(UnifiedAccessMixin):
 
     module_code = 'raw_material_picker'
     module_name = '原材料搜索选择器'
+    module_description = '原材料搜索选择器。独立于原材料模块，可单独授权搜索能力。'
     user_link_fields = []  # RawMaterial 无所有者字段，避免 access_filter 回退默认 'manager' 触发 FieldError
