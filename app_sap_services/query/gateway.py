@@ -17,10 +17,14 @@ SAPGateway — SAP 服务模块顶层入口。
 """
 
 import threading
-from typing import Dict, List, Optional, Type, Any
+from typing import Dict, List, Optional, Type, Any, TYPE_CHECKING
 
 from ..config import SAPConfig
 from ..connection import ConnectionManager
+
+if TYPE_CHECKING:
+    from ..schemas.base import RfcSchema
+    from .builder import RfcQuery
 
 
 class SAPGateway:

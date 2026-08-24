@@ -203,6 +203,7 @@ class _ColorProjectContextMixin:
     def _build_base_context(self):
         """构建 GET/POST 共享的基础上下文"""
         project = self._resolve_project()
+        self.check_object_permission(project)
         material = project.material if project else None
         all_formulas = self._fetch_formulas(project, material)
         stage_round_items, all_stage_formulas = self._build_stage_groups(all_formulas)
@@ -319,7 +320,8 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
         from app_color_center.filters import ColorProjectFilter
         self.filter = ColorProjectFilter(self.request.GET, queryset=qs)
         qs = self.filter.qs.order_by('-created_at')
-        return qs
+        # 研发按项目负责人隔离、配色中心人员跳过（复用基类 L4/L5 配置）
+        return self.apply_isolation(qs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -449,6 +451,7 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
         selected_formula = get_object_or_404(LabFormula, pk=formula_id)
 
         project = self._resolve_project()
+        self.check_object_permission(project)
         if selected_formula.project_id != project.pk:
             raise PermissionDenied("配方不属于当前项目")
 

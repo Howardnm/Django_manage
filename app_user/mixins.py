@@ -225,23 +225,30 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
 
         Returns: 经 L4/L5 过滤的 QuerySet；若视图无 model/queryset 则为 None。
         """
-        user = self.request.user
-
         if hasattr(self, 'queryset') and self.queryset is not None:
             qs = self.queryset.all()
         elif hasattr(self, 'model') and self.model is not None:
             qs = self.model.objects.all()
         else:
             return None
+        return self.apply_isolation(qs)
+
+    def apply_isolation(self, qs):
+        """对任意 QuerySet 应用 L4/L5 隔离（复用 _resolve_config 读 DB 开关/等级跳过）。
+
+        供自定义 get_queryset（未调 super().get_queryset 的视图）手动复用。
+        Returns: 经隔离过滤的 QuerySet。
+        """
+        user = self.request.user
 
         if user.is_superuser:
             return qs
 
         cfg = self._resolve_config()
+        user_field = self._isolation_field_name(qs.model)
 
         # L4: 部门级数据隔离
         if cfg['enforce_dept_isolation'] and not self._bypass_level(cfg, 'l4', user):
-            user_field = self._detect_user_link_field(qs.model)
             if user_field:
                 if user.department:
                     qs = qs.filter(**{f"{user_field}__department": user.department})
@@ -250,7 +257,7 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
             else:
                 # 修复 C1: 无 user_link_field 时记录警告，避免静默跳过数据隔离
                 logger.warning(
-                    "get_queryset: model %s has no matching user_link_field (%s). "
+                    "apply_isolation: model %s has no matching user_link_field (%s). "
                     "L4 department isolation skipped. "
                     "Add a matching field or set user_link_fields on the mixin.",
                     qs.model.__name__, self.user_link_fields,
@@ -258,8 +265,6 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
 
         # L5: 工作组级数据隔离
         if cfg['enforce_group_isolation'] and not self._bypass_level(cfg, 'l5', user):
-            user_field = (self._detect_user_link_field(qs.model)
-                          if hasattr(qs, 'model') and qs.model else None)
             if user_field:
                 user_wg_ids = list(
                     user.work_groups.filter(is_active=True).values_list('id', flat=True)
@@ -282,6 +287,15 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
                     ).distinct()
 
         return qs
+
+    def _isolation_field_name(self, model):
+        """L4/L5 列表过滤的 owner 关联字段名。
+
+        默认走单字段探测；子类可覆写为跨关系路径（如 'project__manager'）。
+        Args: model: 要扫描字段的 Django 模型类。
+        Returns: 关联字段名字符串或 None。
+        """
+        return self._detect_user_link_field(model)
 
     def _detect_user_link_field(self, model):
         """探测模型实际存在的关联字段。
