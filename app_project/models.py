@@ -382,7 +382,7 @@ class ProjectMember(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='members', verbose_name="关联项目")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="成员用户")
     role = models.CharField("成员角色", max_length=20, choices=ROLE_CHOICES, default='RND')
-    workload_share = models.DecimalField("工作量占比 (0-1.0)", max_digits=3, decimal_places=2, default=1.00)
+    workload_share = models.DecimalField("工作量占比", max_digits=5, decimal_places=2, default=100.00, help_text="工作量占比百分比 (0-100)")
 
     class Meta:
         verbose_name = "项目成员"
@@ -393,7 +393,7 @@ class ProjectMember(models.Model):
 class ProjectSalesMember(models.Model):
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='sales_members', verbose_name="关联项目")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, verbose_name="销售成员")
-    workload_share = models.DecimalField("销售工作量占比 (0-1.0)", max_digits=3, decimal_places=2, default=0.00)
+    workload_share = models.DecimalField("销售工作量占比", max_digits=5, decimal_places=2, default=0.00, help_text="销售工作量占比百分比 (0-100)")
 
     class Meta:
         verbose_name = "项目销售成员"
@@ -402,6 +402,41 @@ class ProjectSalesMember(models.Model):
 
     def __str__(self):
         return f"{self.project.name} - {self.user.username} (销售)"
+
+
+# 6.2 成员成绩快照模型
+class MemberScoreSnapshot(models.Model):
+    """成员成绩快照 — 绩效看板的唯一数据源。
+
+    每次成员得分变更（节点终态变化 / 评分规则变更 / 成员占比或增减 / 等级因子变更）
+    都落一条快照，记录该成员在某个项目上、某条轨（研发/销售）的即时成绩，
+    以及当时的底层因子（质量分/占比/等级因子）用于审计回溯。
+    """
+    TRACK_CHOICES = [('RD', '研发'), ('SALES', '销售')]
+
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='score_snapshots', verbose_name="关联项目")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='+', verbose_name="成员用户")
+    track = models.CharField("成绩轨", max_length=10, choices=TRACK_CHOICES)
+
+    snapshot_at = models.DateTimeField("快照时间", db_index=True, help_text="本次成绩自何时起生效")
+
+    effective_score = models.DecimalField("有效贡献分", max_digits=9, decimal_places=2, default=0.00, help_text="含等级因子加权")
+    workload_score = models.DecimalField("基础工作量分", max_digits=9, decimal_places=2, default=0.00, help_text="不含等级因子")
+
+    # 审计冗余 — 回溯本次成绩所用的底层因子
+    quality_score = models.DecimalField("项目质量分", max_digits=5, decimal_places=2, default=0.00)
+    workload_share = models.DecimalField("工作量占比", max_digits=5, decimal_places=2, default=0.00, help_text="百分比 0-100")
+    grade_factor = models.DecimalField("等级因子", max_digits=5, decimal_places=2, default=1.00)
+
+    class Meta:
+        verbose_name = "成员成绩快照"
+        indexes = [
+            models.Index(fields=['user', 'track', '-snapshot_at'], name='app_project_user_track_idx'),
+            models.Index(fields=['project', 'track', '-snapshot_at'], name='app_project_proj_track_idx'),
+        ]
+
+    def __str__(self):
+        return f"{self.project.name} - {self.user.username} ({self.get_track_display()}) @ {self.snapshot_at}"
 
 
 # 7. 项目全局配置（单例）

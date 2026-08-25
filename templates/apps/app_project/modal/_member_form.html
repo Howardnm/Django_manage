@@ -56,10 +56,10 @@
             </div>
             <div class="col-lg-6">
                 <div class="mb-3">
-                    <label class="form-label required">工作量权重 (0-1.0)</label>
-                    <!-- 【修改】默认值改为 0.00 -->
-                    <input type="number" name="workload_share" id="input-workload" step="0.01" min="0" max="1" class="form-control"
-                           value="{{ form.workload_share.value|default:'0.00' }}" required>
+                    <label class="form-label required">工作量权重 (%)</label>
+                    <!-- 【修改】默认值改为 0 -->
+                    <input type="number" name="workload_share" id="input-workload" step="1" min="0" max="100" class="form-control"
+                           value="{{ form.workload_share.value|default:'0' }}" required>
                 </div>
             </div>
         </div>

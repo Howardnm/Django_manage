@@ -81,7 +81,7 @@ def run(ctx: FakeContext) -> None:
         repo.save()
 
         # --- ProjectMember ---
-        role_pool = [('PROCESS', 0.2), ('RND', 0.5), ('SALES', 0.3), ('ASSIST', 0.1)]
+        role_pool = [('PROCESS', 20), ('RND', 50), ('SALES', 30), ('ASSIST', 10)]
         for role, share in pick(role_pool, random.randint(1, 3)):
             pool_map = {
                 'RND': ctx.rnd_users,
@@ -96,7 +96,7 @@ def run(ctx: FakeContext) -> None:
         if random.random() < 0.3:
             ProjectSalesMember.objects.get_or_create(
                 project=p, user=pick_one(ctx.sales_users),
-                defaults={'workload_share': rand_decimal(0.2, 0.8, 2)},
+                defaults={'workload_share': rand_decimal(20, 80, 2)},
             )
 
         projects.append(p)

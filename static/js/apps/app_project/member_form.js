@@ -18,16 +18,27 @@ document.addEventListener("htmx:afterSettle", function (evt) {
     if (!inputWorkload) return;
 
     function validate() {
-        const newValue = parseFloat(inputWorkload.value) || 0;
-        const total = existingSum + newValue;
+        const raw = inputWorkload.value.trim();
+        const newValue = Number(raw);
 
-        if (currentTotalText) {
-            currentTotalText.textContent = (total * 100).toFixed(0) + '%';
+        // 只允许填写 0~100 的整数
+        if (raw !== '' && (!Number.isInteger(newValue) || newValue < 0 || newValue > 100)) {
+            if (warningBox) warningBox.classList.remove('d-none');
+            if (warningText) warningText.innerHTML = '<strong>占比只允许填写整数！</strong> 请输入 0 ~ 100 之间的整数。';
+            if (btnSave) btnSave.disabled = true;
+            inputWorkload.classList.add('is-invalid');
+            return;
         }
 
-        if (total > 1.0001) {
+        const total = existingSum + (raw === '' ? 0 : newValue);
+
+        if (currentTotalText) {
+            currentTotalText.textContent = total.toFixed(0) + '%';
+        }
+
+        if (total > 100) {
             if (warningBox) warningBox.classList.remove('d-none');
-            if (warningText) warningText.innerHTML = '<strong>权重超标！</strong> 总工作量将达到 <b>' + (total * 100).toFixed(0) + '%</b>，请调减。';
+            if (warningText) warningText.innerHTML = '<strong>权重超标！</strong> 总工作量将达到 <b>' + total.toFixed(0) + '%</b>，请调减。';
             if (btnSave) btnSave.disabled = true;
             inputWorkload.classList.add('is-invalid');
         } else {

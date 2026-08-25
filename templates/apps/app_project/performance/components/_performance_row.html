@@ -5,7 +5,7 @@
             <span class="avatar avatar-sm rounded me-2">{{ item.user.username|slice:":1"|upper }}</span>
             <div class="flex-fill">
                 <div class="font-weight-medium">{{ item.user.username }}</div>
-                <div class="text-muted small">{{ item.user.profile.department|default:"研发部" }}</div>
+                <div class="text-muted small">{{ item.user.department|default:"研发部" }}</div>
             </div>
         </div>
     </td>

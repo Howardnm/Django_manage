@@ -20,6 +20,23 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ['name', 'description']
     inlines = [ProjectMemberInline, ProjectNodeInline]
 
+    def save_formset(self, request, form, formset, change):
+        """inline 成员/节点保存后，兜底重算本项目成绩并写成员快照。
+
+        绕过「父对象表单保存 vs inline 信号回写」的旧值覆盖竞态。
+        """
+        super().save_formset(request, form, formset, change)
+        project = form.instance
+        if project and project.pk:
+            from .utils.signals import recalculate_project_scores
+            try:
+                recalculate_project_scores(project)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception(
+                    "admin save_formset 重算失败 project=%s", project.pk
+                )
+
 @admin.register(NodeScoreRule)
 class NodeScoreRuleAdmin(admin.ModelAdmin):
     list_display = ['name', 'score_value', 'trigger_stage', 'trigger_status', 'is_multiple_rounds']
