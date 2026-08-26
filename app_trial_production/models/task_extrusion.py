@@ -46,6 +46,14 @@ class ExtrusionTask(AbstractExtrusionParams):
     def status_css_class(self):
         return {
             self.Status.PENDING: 'bg-secondary-lt',
-            self.Status.IN_PROGRESS: 'bg-azure-lt',
-            self.Status.COMPLETED: 'bg-green-lt',
+            self.Status.IN_PROGRESS: 'bg-azure text-white',
+            self.Status.COMPLETED: 'bg-green text-white',
         }.get(self.status, 'bg-secondary-lt')
+
+    @property
+    def pellet_split_label(self):
+        return '已分拨' if self.pellet_split_completed else '未分拨'
+
+    @property
+    def pellet_split_css_class(self):
+        return 'bg-green text-white' if self.pellet_split_completed else 'bg-secondary-lt'

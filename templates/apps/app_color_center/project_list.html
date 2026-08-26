@@ -39,9 +39,9 @@
                         </td>
                         <td>
                             {% if p.material %}
-                            <span class="text-reset">{{ p.material.grade_name }}</span>
+                            <span class="text-black fw-bold">{{ p.material.grade_name }}</span>
                             {% if p.material.sap_material_code %}
-                            <div class="text-muted small">{{ p.material.sap_material_code }}</div>
+                            <div class="text-black">{{ p.material.sap_material_code }}</div>
                             {% endif %}
                             {% else %}<span class="text-muted">-</span>{% endif %}
                         </td>
