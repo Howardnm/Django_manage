@@ -225,6 +225,22 @@
                 <span>结构</span>
                 <button type="button" class="btn-close" data-cad-action="tree-close" aria-label="关闭"></button>
             </div>
+            <div class="cad-preview-tree-meta text-muted small" data-cad-tree-stats></div>
+            <input type="search" class="form-control form-control-sm cad-preview-tree-search"
+                   data-cad-tree-search placeholder="搜索零件…" autocomplete="off">
+            <div class="btn-group w-100 cad-preview-tree-filters" role="group" data-cad-tree-filter="all">
+                <button type="button" class="btn btn-sm btn-outline-secondary active"
+                        data-cad-action="tree-filter" data-cad-tree-filter="all">全部</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-cad-action="tree-filter" data-cad-tree-filter="visible">可见</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary"
+                        data-cad-action="tree-filter" data-cad-tree-filter="hidden">已隐藏</button>
+            </div>
+            <div class="cad-preview-tree-actions cad-preview-tree-fold">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="tree-expand-all">全部展开</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="tree-collapse-all">全部折叠</button>
+            </div>
+            <div class="cad-preview-tree-empty text-muted small px-1 is-hidden" data-cad-tree-empty>无匹配</div>
             <div class="cad-preview-tree" data-cad-tree>
                 <div class="text-muted small px-1">解析完成后显示装配树</div>
             </div>

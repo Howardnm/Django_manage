@@ -19,6 +19,7 @@
     var DEFAULT_LIGHT_INTENSITY = 0.75;
     var DEFAULT_LIGHT_COLOR = '#ffffff';
     var DEFAULT_EXPLODE_BIN_PCT = 2;
+    var TREE_AUTO_COLLAPSE_MIN = 12;
 
     var libsPromise = null;
     var renderer = null;
@@ -47,6 +48,8 @@
     var nodeMap = {};
     var selectedNodeId = null;
     var isolateBackup = null;
+    var treeQuery = '';
+    var treeVisFilter = 'all';
     var orthoOn = false;
     var gridOn = false;
     var axesOn = false;
@@ -175,6 +178,15 @@
         } else if (action === 'tree-close') {
             ev.preventDefault();
             hideTreePanel();
+        } else if (action === 'tree-filter') {
+            ev.preventDefault();
+            setTreeVisFilter(btn.getAttribute('data-cad-tree-filter') || 'all');
+        } else if (action === 'tree-expand-all') {
+            ev.preventDefault();
+            expandAllTreeNodes();
+        } else if (action === 'tree-collapse-all') {
+            ev.preventDefault();
+            collapseAllTreeNodes();
         } else if (action === 'view') {
             ev.preventDefault();
             setPresetView(btn.getAttribute('data-cad-view') || 'iso');
@@ -673,6 +685,8 @@
         nodeIdSeq = 0;
         selectedNodeId = null;
         isolateBackup = null;
+        treeQuery = '';
+        treeVisFilter = 'all';
         pointerDownPos = null;
         clipHelper = null;
         explodeUnits = [];
@@ -741,6 +755,7 @@
     }
 
     function resetTreeDom() {
+        resetTreeFilterState();
         var tree = pageRoot && pageRoot.querySelector('[data-cad-tree]');
         if (tree) {
             tree.innerHTML = '<div class="text-muted small px-1">解析完成后显示装配树</div>';
@@ -1512,6 +1527,7 @@
         explodeBinPct = DEFAULT_EXPLODE_BIN_PCT;
         alignedView = null;
         showViewRoll(false);
+        resetTreeFilterState();
         while (modelGroup.children.length) {
             modelGroup.remove(modelGroup.children[0]);
         }
@@ -1524,6 +1540,7 @@
             };
         }
         modelGroup.add(buildSceneNode(root, result, null, fallbackName || '模型'));
+        cacheLeafCounts();
         return result.meshes.length;
     }
 
@@ -1840,9 +1857,13 @@
     }
 
     function onPivotKeydown(ev) {
-        if (ev.key === 'Escape' && placingPivot) {
-            setPlacingPivot(false);
+        if (ev.key !== 'Escape' || !placingPivot) {
+            return;
         }
+        if (ev.target && ev.target.closest && ev.target.closest('[data-cad-tree-search]')) {
+            return;
+        }
+        setPlacingPivot(false);
     }
 
     function pivotToSelected() {
@@ -2095,6 +2116,262 @@
         return out;
     }
 
+    function resetTreeFilterState() {
+        treeQuery = '';
+        treeVisFilter = 'all';
+        if (!pageRoot) {
+            return;
+        }
+        var search = pageRoot.querySelector('[data-cad-tree-search]');
+        if (search) {
+            search.value = '';
+        }
+        var group = pageRoot.querySelector('.cad-preview-tree-filters');
+        if (group) {
+            group.setAttribute('data-cad-tree-filter', 'all');
+            var chips = group.querySelectorAll('[data-cad-action="tree-filter"]');
+            for (var i = 0; i < chips.length; i++) {
+                chips[i].classList.toggle('active', chips[i].getAttribute('data-cad-tree-filter') === 'all');
+            }
+        }
+        var empty = pageRoot.querySelector('[data-cad-tree-empty]');
+        if (empty) {
+            empty.classList.add('is-hidden');
+        }
+        var tree = pageRoot.querySelector('[data-cad-tree]');
+        if (tree) {
+            tree.classList.remove('is-hidden');
+        }
+        var stats = pageRoot.querySelector('[data-cad-tree-stats]');
+        if (stats) {
+            stats.textContent = '';
+        }
+    }
+
+    function cacheLeafCounts() {
+        Object.keys(nodeMap).forEach(function (id) {
+            nodeMap[id].leafCount = 0;
+        });
+        Object.keys(nodeMap).forEach(function (id) {
+            var rec = nodeMap[id];
+            if (!rec || getTreeChildren(rec.object).length) {
+                return;
+            }
+            rec.leafCount = 1;
+            var cur = rec.parentId;
+            while (cur && nodeMap[cur]) {
+                nodeMap[cur].leafCount += 1;
+                cur = nodeMap[cur].parentId;
+            }
+        });
+    }
+
+    function treeLeafTotal() {
+        if (!modelGroup) {
+            return 0;
+        }
+        var total = 0;
+        getTreeChildren(modelGroup).forEach(function (root) {
+            var rec = nodeMap[root.userData && root.userData.cadNodeId];
+            total += rec && rec.leafCount ? rec.leafCount : 0;
+        });
+        return total;
+    }
+
+    function objectIsShown(object) {
+        var cur = object;
+        while (cur) {
+            if (cur.visible === false) {
+                return false;
+            }
+            cur = cur.parent;
+        }
+        return true;
+    }
+
+    function hiddenLeafCount() {
+        var hidden = 0;
+        Object.keys(nodeMap).forEach(function (id) {
+            var rec = nodeMap[id];
+            if (!rec || getTreeChildren(rec.object).length) {
+                return;
+            }
+            if (!objectIsShown(rec.object)) {
+                hidden += 1;
+            }
+        });
+        return hidden;
+    }
+
+    function treeFilterOn() {
+        return !!(treeQuery && treeQuery.trim()) || treeVisFilter !== 'all';
+    }
+
+    function nodeMatchesFilter(rec) {
+        if (!rec) {
+            return false;
+        }
+        var query = (treeQuery || '').trim().toLowerCase();
+        if (query && String(rec.name || '').toLowerCase().indexOf(query) === -1) {
+            return false;
+        }
+        if (treeVisFilter === 'visible') {
+            return !!rec.object.visible;
+        }
+        if (treeVisFilter === 'hidden') {
+            return !rec.object.visible;
+        }
+        return true;
+    }
+
+    function expandTreeAncestors(id) {
+        var li = pageRoot && pageRoot.querySelector('[data-cad-tree-node="' + id + '"]');
+        var p = li && li.parentElement;
+        while (p) {
+            if (p.classList && p.classList.contains('cad-preview-tree-node')) {
+                p.classList.remove('is-collapsed');
+            }
+            p = p.parentElement;
+        }
+    }
+
+    function updateTreeStats(hitCount) {
+        var stats = pageRoot && pageRoot.querySelector('[data-cad-tree-stats]');
+        if (!stats) {
+            return;
+        }
+        var text = treeLeafTotal() + ' 件 · 隐藏 ' + hiddenLeafCount();
+        if (treeFilterOn() && hitCount != null) {
+            text += ' · 匹配 ' + hitCount;
+        }
+        stats.textContent = text;
+    }
+
+    function applyTreeFilter() {
+        if (!pageRoot) {
+            return;
+        }
+        var filterOn = treeFilterOn();
+        var hits = {};
+        var hitCount = 0;
+        Object.keys(nodeMap).forEach(function (id) {
+            if (nodeMatchesFilter(nodeMap[id])) {
+                hits[id] = true;
+                hitCount += 1;
+            }
+        });
+        var keep = {};
+        if (filterOn) {
+            Object.keys(hits).forEach(function (id) {
+                var cur = id;
+                while (cur) {
+                    keep[cur] = true;
+                    cur = nodeMap[cur] ? nodeMap[cur].parentId : null;
+                }
+            });
+        }
+        var nodes = pageRoot.querySelectorAll('[data-cad-tree-node]');
+        for (var i = 0; i < nodes.length; i++) {
+            var li = nodes[i];
+            var id = li.getAttribute('data-cad-tree-node');
+            li.classList.toggle('is-filtered-out', filterOn && !keep[id]);
+        }
+        if (filterOn) {
+            Object.keys(hits).forEach(expandTreeAncestors);
+        }
+        var noMatch = filterOn && hitCount === 0;
+        var empty = pageRoot.querySelector('[data-cad-tree-empty]');
+        if (empty) {
+            empty.classList.toggle('is-hidden', !noMatch);
+        }
+        var tree = pageRoot.querySelector('[data-cad-tree]');
+        if (tree) {
+            tree.classList.toggle('is-hidden', noMatch);
+        }
+        updateTreeStats(hitCount);
+    }
+
+    function autoCollapseLargeGroups() {
+        Object.keys(nodeMap).forEach(function (id) {
+            var rec = nodeMap[id];
+            if (!rec || rec.parentId == null) {
+                return;
+            }
+            if (getTreeChildren(rec.object).length < TREE_AUTO_COLLAPSE_MIN) {
+                return;
+            }
+            var li = pageRoot && pageRoot.querySelector('[data-cad-tree-node="' + id + '"]');
+            if (li) {
+                li.classList.add('is-collapsed');
+            }
+        });
+    }
+
+    function setTreeVisFilter(kind) {
+        treeVisFilter = kind === 'visible' || kind === 'hidden' ? kind : 'all';
+        var group = pageRoot && pageRoot.querySelector('.cad-preview-tree-filters');
+        if (group) {
+            group.setAttribute('data-cad-tree-filter', treeVisFilter);
+            var chips = group.querySelectorAll('[data-cad-action="tree-filter"]');
+            for (var i = 0; i < chips.length; i++) {
+                chips[i].classList.toggle(
+                    'active',
+                    chips[i].getAttribute('data-cad-tree-filter') === treeVisFilter
+                );
+            }
+        }
+        applyTreeFilter();
+    }
+
+    function expandAllTreeNodes() {
+        if (!pageRoot) {
+            return;
+        }
+        var nodes = pageRoot.querySelectorAll('[data-cad-tree-node]');
+        for (var i = 0; i < nodes.length; i++) {
+            nodes[i].classList.remove('is-collapsed');
+        }
+    }
+
+    function collapseAllTreeNodes() {
+        Object.keys(nodeMap).forEach(function (id) {
+            var rec = nodeMap[id];
+            if (!rec || rec.parentId == null) {
+                return;
+            }
+            if (!getTreeChildren(rec.object).length) {
+                return;
+            }
+            var li = pageRoot && pageRoot.querySelector('[data-cad-tree-node="' + id + '"]');
+            if (li) {
+                li.classList.add('is-collapsed');
+            }
+        });
+    }
+
+    function onTreeSearchInput(ev) {
+        var input = ev.target && ev.target.closest && ev.target.closest('[data-cad-tree-search]');
+        if (!input) {
+            return;
+        }
+        treeQuery = input.value || '';
+        applyTreeFilter();
+    }
+
+    function onTreeSearchKeydown(ev) {
+        if (ev.key !== 'Escape') {
+            return;
+        }
+        var input = ev.target && ev.target.closest && ev.target.closest('[data-cad-tree-search]');
+        if (!input || !input.value) {
+            return;
+        }
+        ev.preventDefault();
+        input.value = '';
+        treeQuery = '';
+        applyTreeFilter();
+    }
+
     function renderTree() {
         var tree = pageRoot && pageRoot.querySelector('[data-cad-tree]');
         if (!tree) {
@@ -2102,10 +2379,18 @@
         }
         var roots = modelGroup ? getTreeChildren(modelGroup) : [];
         if (!roots.length) {
+            tree.classList.remove('is-hidden');
             tree.innerHTML = '<div class="text-muted small px-1">无可显示的结构</div>';
+            var empty = pageRoot.querySelector('[data-cad-tree-empty]');
+            if (empty) {
+                empty.classList.add('is-hidden');
+            }
+            updateTreeStats(0);
             return;
         }
         tree.innerHTML = '<ul class="cad-preview-tree-list">' + roots.map(renderTreeNode).join('') + '</ul>';
+        autoCollapseLargeGroups();
+        applyTreeFilter();
     }
 
     function renderTreeNode(object) {
@@ -2125,6 +2410,10 @@
         var toggleCls = 'cad-preview-tree-toggle' + (isLeaf ? ' is-leaf' : '');
         var eyeIcon = hidden ? 'ti ti-eye-off' : 'ti ti-eye';
         var name = rec ? rec.name : id;
+        var countHtml = '';
+        if (!isLeaf && rec && rec.leafCount) {
+            countHtml = '<span class="cad-preview-tree-count" data-cad-tree-count>(' + rec.leafCount + ')</span>';
+        }
         var childrenHtml = kids.length ? '<ul>' + kids.map(renderTreeNode).join('') + '</ul>' : '';
         return '<li class="' + cls + '" data-cad-tree-node="' + id + '">' +
             '<div class="cad-preview-tree-row">' +
@@ -2133,7 +2422,7 @@
             '<button type="button" class="cad-preview-tree-vis" data-cad-tree-vis="' + id + '" aria-label="显隐">' +
             '<i class="' + eyeIcon + '"></i></button>' +
             '<span class="cad-preview-tree-label" data-cad-tree-select="' + id + '" title="' + escapeHtml(name) + '">' +
-            escapeHtml(name) + '</span></div>' + childrenHtml + '</li>';
+            escapeHtml(name) + '</span>' + countHtml + '</div>' + childrenHtml + '</li>';
     }
 
     function onTreeClick(ev) {
@@ -2168,6 +2457,7 @@
         }
         rec.object.visible = !rec.object.visible;
         syncTreeNodeUi(id);
+        applyTreeFilter();
     }
 
     function syncTreeNodeUi(id) {
@@ -2295,6 +2585,7 @@
             nodeMap[id].object.visible = isOnSelectedPath(id);
         });
         refreshTreeVisibility();
+        applyTreeFilter();
     }
 
     function showAllNodes() {
@@ -2303,6 +2594,7 @@
             nodeMap[id].object.visible = true;
         });
         refreshTreeVisibility();
+        applyTreeFilter();
     }
 
     function findCadNode(obj) {
@@ -2557,6 +2849,9 @@
             pageRoot.addEventListener('change', onSectionInput);
             pageRoot.addEventListener('input', onExplodeInput);
             pageRoot.addEventListener('change', onExplodeInput);
+            pageRoot.addEventListener('input', onTreeSearchInput);
+            pageRoot.addEventListener('change', onTreeSearchInput);
+            pageRoot.addEventListener('keydown', onTreeSearchKeydown);
             document.addEventListener('keydown', onPivotKeydown);
             pageRoot.__cadToolbarBound = true;
         }
