@@ -11,6 +11,7 @@
 - **UUID 下载令牌** — 每个附件独立 UUID 下载链接，防 ID 枚举
 - **HTMX 开箱即用** — 上传弹窗、列表刷新全部基于 HTMX，一行模板标签即可嵌入
 - **通用分组** — `group_key` 字段支持按节点/阶段/类型等任意维度分组展示
+- **CAD 在线预览** — STP/STEP/IGES 在新窗口旋转查看（浏览器端 OpenCascade WASM）
 
 ---
 
@@ -21,7 +22,7 @@ app_attachment/
 ├── models.py             # Attachment 统一模型（GFK）
 ├── configs.py            # AttachmentConfig 声明式配置数据类
 ├── registry.py           # 全局注册中心（model_class → config）
-├── views.py              # CRUD 视图（列表/上传/下载/删除）
+├── views.py              # CRUD 视图（列表/上传/下载/预览分发/删除）
 ├── forms.py              # AttachmentUploadForm 通用上传表单
 ├── urls.py               # URL 路由（app_name='attachment'）
 ├── utils.py              # PermissionAdapter 权限适配器
@@ -37,9 +38,19 @@ app_attachment/
 
 模板文件：`templates/apps/app_attachment/`
 ```
-_attachment_panel.html    # 完整附件面板（卡片 + 列表 + 弹窗）
-_file_list.html           # 文件列表表格（HTMX 局部刷新）
-_upload_modal.html        # 上传弹窗表单
+_attachment_panel.html      # 完整附件面板（卡片 + 列表 + 弹窗）
+_file_list.html             # 文件列表表格（HTMX 局部刷新）
+_upload_modal.html          # 上传弹窗表单
+_cad_preview_button.html    # 3D 预览按钮
+cad_preview.html            # CAD 全屏预览页（由 viewer 路由分发）
+```
+
+静态资源：
+```
+static/js/common/cad_preview.js
+static/css/common/cad_preview.css
+static/three/core-0.149.0/            # Three.js + OrbitControls（MIT）
+static/occt-import-js/core-0.0.23/    # OpenCascade WASM（LGPL-2.1，勿合并进业务 JS）
 ```
 
 ---
@@ -150,6 +161,7 @@ class AppYourModuleConfig(AppConfig):
 | GET | `/attachment/<ct_id>/<obj_id>/upload/` | 上传表单（弹窗内容） |
 | POST | `/attachment/<ct_id>/<obj_id>/upload/` | 处理文件上传 |
 | GET | `/attachment/download/<token>/` | 安全下载（UUID token 校验 + 权限检查） |
+| GET | `/attachment/viewer/<token>/` | 通用在线预览分发（按 `preview_kind` 选模板，当前仅 cad3d） |
 | POST | `/attachment/delete/<pk>/` | 软删除附件 |
 
 **URL 名称**: `app_name = 'attachment'`
@@ -158,6 +170,7 @@ class AppYourModuleConfig(AppConfig):
 {% url 'attachment:list' ct_id obj_id %}
 {% url 'attachment:upload' ct_id obj_id %}
 {% url 'attachment:download' token=att.download_token %}
+{% url 'attachment:viewer' token=att.download_token %}
 {% url 'attachment:delete' att.pk %}
 ```
 
@@ -293,7 +306,26 @@ attachments = Attachment.objects.filter(
 
 ---
 
-## 12. 已注册模块清单
+## 12. CAD 在线预览（STP / STEP / IGES）
+
+附件列表对 `.stp` / `.step` / `.igs` / `.iges` 显示「3D 预览」按钮，新窗口打开 viewer 页，可旋转 / 缩放 / 平移，并支持装配结构树显隐、六面视图与视轴旋转、正交投影、网格/轴线、线框、X 射线透视、旋转中心、XYZ 剖切、爆炸图（径向 / X / Y / Z + 等距拉开，可选零件中心）、光照和 PNG 截图。解析在浏览器 Web Worker 中完成（occt-import-js WASM），不占用 Django worker。列表页不加载 Three.js / WASM。
+
+| 项 | 说明 |
+|----|------|
+| 入口 | 附件列表 / 项目资料库的预览按钮 → `target="_blank"` 打开 viewer |
+| 全屏 | `GET /attachment/viewer/<token>/`（`attachment:viewer`），按 `Attachment.preview_kind` 分发模板；独立页面，不套 `base.html`（无侧栏/顶栏） |
+| 权限 | 与下载相同（UUID token + 父对象 view 权限）；无权限 403 |
+| 不支持的类型 | viewer 返回 **404**（例如对 PDF 打开该 URL） |
+| 上限 | 上传仍为 50MB；大于 20MB 会提示解析可能较慢，复杂模型可能因 WASM 内存失败 |
+| 许可证 | Three.js MIT；occt-import-js **LGPL-2.1**（独立 js/wasm 动态加载，勿合并进业务脚本） |
+
+`preview_kind` 当前仅 `'cad3d'`。以后加 PDF / 图片预览：在模型中返回新 kind，并往 `VIEWER_TEMPLATES` 登记模板，URL 不用改。
+
+不在范围内：DWG/DXF、量测、切口补面、服务端 tessellation。
+
+---
+
+## 13. 已注册模块清单
 
 | 模块 | 父模型 | 文件夹解析 |
 |------|--------|-----------|

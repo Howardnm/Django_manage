@@ -4,11 +4,14 @@
 提供统一的附件上传、列表、下载、删除功能。
 所有视图通过 PermissionAdapter 自动适配各业务模块的权限策略。
 """
+import uuid as _uuid
+
 from django.contrib import messages
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
 from django.http import Http404, HttpResponse, FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 
 from .forms import AttachmentUploadForm
@@ -209,22 +212,19 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
 
 
 # ==========================================
-# 附件下载视图
+# Token 解析（下载 / 预览共用）
 # ==========================================
-class AttachmentDownloadView(AttachmentBaseMixin, View):
+class AttachmentTokenMixin(AttachmentBaseMixin):
     """
-    安全文件下载。
+    通过 download_token 解析附件并完成查看权限校验。
 
-    GET /attachment/download/<token>/
-    UUID token 防枚举：无效 token 统一返回 403。
+    无效 token / 无权限 / 文件缺失 一律 403，不区分「不存在」。
     """
 
-    def get(self, request, token):
-        # 校验 token 格式，无效格式直接 403
-        import uuid as _uuid
+    def resolve_by_token(self, token):
         try:
-            _uuid.UUID(token)
-        except (ValueError, AttributeError):
+            _uuid.UUID(str(token))
+        except (ValueError, AttributeError, TypeError):
             raise PermissionDenied
 
         attachment = (
@@ -242,7 +242,6 @@ class AttachmentDownloadView(AttachmentBaseMixin, View):
         except ValueError:
             raise PermissionDenied
 
-        # 解析父对象用于权限检查
         model_class = ct.model_class()
         if model_class is None:
             raise PermissionDenied
@@ -253,7 +252,22 @@ class AttachmentDownloadView(AttachmentBaseMixin, View):
 
         if not attachment.file:
             raise PermissionDenied
+        return attachment, parent, config
 
+
+# ==========================================
+# 附件下载视图
+# ==========================================
+class AttachmentDownloadView(AttachmentTokenMixin, View):
+    """
+    安全文件下载。
+
+    GET /attachment/download/<token>/
+    UUID token 防枚举：无效 token 统一返回 403。
+    """
+
+    def get(self, request, token):
+        attachment, _parent, _config = self.resolve_by_token(token)
         try:
             filename = attachment.display_name or attachment.filename
             return FileResponse(
@@ -263,6 +277,41 @@ class AttachmentDownloadView(AttachmentBaseMixin, View):
             )
         except FileNotFoundError:
             raise PermissionDenied
+
+
+# ==========================================
+# 通用在线预览分发
+# ==========================================
+VIEWER_TEMPLATES = {
+    'cad3d': 'apps/app_attachment/cad_preview.html',
+}
+
+
+class AttachmentViewerView(AttachmentTokenMixin, View):
+    """
+    通用在线预览页。
+
+    GET /attachment/viewer/<token>/
+    按 attachment.preview_kind 选择模板，当前仅 cad3d。
+    不支持预览的类型返回 404（与无权限 403 区分，避免对 PDF 打开空画布）。
+    """
+
+    def get(self, request, token):
+        attachment, parent, config = self.resolve_by_token(token)
+        kind = attachment.preview_kind
+        template_name = VIEWER_TEMPLATES.get(kind)
+        if not template_name:
+            raise Http404('该文件不支持在线预览')
+
+        return render(request, template_name, {
+            'attachment': attachment,
+            'parent': parent,
+            'config': config,
+            'download_url': reverse(
+                'attachment:download',
+                kwargs={'token': attachment.download_token},
+            ),
+        })
 
 
 # ==========================================

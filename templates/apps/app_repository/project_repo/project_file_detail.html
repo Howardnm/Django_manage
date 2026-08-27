@@ -56,14 +56,15 @@
                         <tr>
                             <td>
                                 <a href="{% url 'attachment:download' token=att.download_token %}" target="_blank" class="text-reset fw-bold">
-                                    <i class="ti ti-file me-1"></i>{{ att.display_name }}
+                                    <i class="{{ att.file_icon_class }} me-1"></i>{{ att.display_name }}
                                 </a>
                             </td>
                             <td><span class="badge bg-azure-lt">{{ att.category|default:"-" }}</span></td>
                             <td class="text-muted">v{{ att.version }}</td>
                             <td class="text-muted">{{ att.file_size|filesizeformat }}</td>
                             <td class="text-muted">{{ att.uploaded_at|date:"Y-m-d H:i" }}</td>
-                            <td>
+                            <td class="text-end text-nowrap">
+                                {% include 'apps/app_attachment/_cad_preview_button.html' %}
                                 <button class="btn btn-sm btn-icon btn-ghost-danger"
                                         hx-post="{% url 'attachment:delete' att.pk %}"
                                         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
@@ -114,14 +115,15 @@
                         <tr>
                             <td>
                                 <a href="{% url 'attachment:download' token=att.download_token %}" target="_blank" class="text-reset fw-bold">
-                                    <i class="ti ti-file me-1"></i>{{ att.display_name }}
+                                    <i class="{{ att.file_icon_class }} me-1"></i>{{ att.display_name }}
                                 </a>
                             </td>
                             <td><span class="badge bg-azure-lt">{{ att.category|default:"-" }}</span></td>
                             <td class="text-muted">v{{ att.version }}</td>
                             <td class="text-muted">{{ att.file_size|filesizeformat }}</td>
                             <td class="text-muted">{{ att.uploaded_at|date:"Y-m-d H:i" }}</td>
-                            <td>
+                            <td class="text-end text-nowrap">
+                                {% include 'apps/app_attachment/_cad_preview_button.html' %}
                                 <button class="btn btn-sm btn-icon btn-ghost-danger"
                                         hx-post="{% url 'attachment:delete' att.pk %}"
                                         hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'

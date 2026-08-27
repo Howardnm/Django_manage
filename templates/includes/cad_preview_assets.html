@@ -1,0 +1,10 @@
+{% load static %}
+{# 仅 viewer 页加载。three / OrbitControls 由 cad_preview.js 挂载时再插入。 #}
+<script>
+window.CAD_PREVIEW_ASSETS = window.CAD_PREVIEW_ASSETS || {
+    three: "{% static 'three/core-0.149.0/three.min.js' %}",
+    orbit: "{% static 'three/core-0.149.0/OrbitControls.js' %}",
+    worker: "{% static 'occt-import-js/core-0.0.23/occt-import-js-worker.js' %}"
+};
+</script>
+<script src="{% static 'js/common/cad_preview.js' %}"></script>

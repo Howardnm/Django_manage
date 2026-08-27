@@ -1,0 +1,9 @@
+{% if att.can_preview_3d %}
+<a href="{% url 'attachment:viewer' token=att.download_token %}"
+   class="btn btn-sm btn-icon btn-ghost-azure"
+   target="_blank"
+   rel="noopener"
+   title="3D 预览">
+    <i class="ti ti-eye"></i>
+</a>
+{% endif %}

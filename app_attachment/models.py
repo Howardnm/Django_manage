@@ -117,6 +117,11 @@ class Attachment(models.Model):
                 pass
         super().save(*args, **kwargs)
 
+    IMAGE_EXTENSIONS = frozenset({
+        'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
+    })
+    CAD_3D_EXTENSIONS = frozenset({'stp', 'step', 'igs', 'iges'})
+
     @property
     def filename(self):
         """从路径中提取原始文件名"""
@@ -130,6 +135,28 @@ class Attachment(models.Model):
     @property
     def is_image(self):
         """是否为常见图片格式"""
-        return self.extension in (
-            'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',
-        )
+        return self.extension in self.IMAGE_EXTENSIONS
+
+    @property
+    def preview_kind(self):
+        """
+        在线预览器类型，供 attachment:viewer 路由分发。
+
+        当前仅 'cad3d'；未来可扩展 'pdf' / 'image' 等，无需改 URL。
+        空字符串表示不支持在线预览。
+        """
+        if self.extension in self.CAD_3D_EXTENSIONS:
+            return 'cad3d'
+        return ''
+
+    @property
+    def can_preview_3d(self):
+        return self.preview_kind == 'cad3d'
+
+    @property
+    def file_icon_class(self):
+        if self.can_preview_3d:
+            return 'ti ti-box'
+        if self.is_image:
+            return 'ti ti-photo'
+        return 'ti ti-file'

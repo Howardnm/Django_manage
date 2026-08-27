@@ -9,6 +9,7 @@ from .views import (
     AttachmentListView,
     AttachmentUploadView,
     AttachmentDownloadView,
+    AttachmentViewerView,
     AttachmentDeleteView,
 )
 
@@ -37,6 +38,14 @@ urlpatterns = [
         'download/<str:token>/',
         AttachmentDownloadView.as_view(),
         name='download',
+    ),
+
+    # GET /attachment/viewer/<token>/
+    # 通用在线预览分发（按 preview_kind 选模板，当前仅 cad3d）
+    path(
+        'viewer/<str:token>/',
+        AttachmentViewerView.as_view(),
+        name='viewer',
     ),
 
     # POST /attachment/delete/<pk>/

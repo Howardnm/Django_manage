@@ -1,0 +1,243 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>3D 预览 - {{ attachment.display_name }}</title>
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="stylesheet" href="{% static 'tabler/core-1.4.0/dist/css/tabler.min.css' %}">
+    <link rel="stylesheet" href="{% static 'tabler/icons-webfont-3.36.1/dist/tabler-icons.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/common/cad_preview.css' %}">
+</head>
+<body class="cad-preview-body">
+<div class="cad-preview-page">
+    <header class="cad-preview-toolbar">
+        <div class="cad-preview-toolbar-title">
+            <div class="page-pretitle">附件预览</div>
+            <h1 class="page-title text-truncate">{{ attachment.display_name }}</h1>
+        </div>
+        <div class="btn-list">
+            <button type="button" class="btn btn-outline-secondary" data-cad-action="tree">
+                <i class="ti ti-list-tree me-1"></i>结构
+            </button>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                        data-cad-group="display">
+                    <i class="ti ti-eye me-1"></i>显示
+                </button>
+                <div class="dropdown-menu">
+                    <button type="button" class="dropdown-item" data-cad-action="solid">
+                        <i class="ti ti-box me-2"></i>实体
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="wireframe">
+                        <i class="ti ti-vector-triangle me-2"></i>线框
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="xray" title="半透明透视内部">
+                        <i class="ti ti-circle-dotted me-2"></i>X射线
+                    </button>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                        data-cad-group="view">
+                    <i class="ti ti-viewfinder me-1"></i>视图
+                </button>
+                <div class="dropdown-menu">
+                    <button type="button" class="dropdown-item" data-cad-action="fit">
+                        <i class="ti ti-focus-2 me-2"></i>自适应
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="front">正视</button>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="back">后视</button>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="left">左视</button>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="right">右视</button>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="top">俯视</button>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="bottom">仰视</button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="view" data-cad-view="iso">轴测</button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="ortho">
+                        <i class="ti ti-box me-2"></i>正交投影
+                    </button>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                        data-cad-group="assist">
+                    <i class="ti ti-adjustments me-1"></i>辅助
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
+                    <button type="button" class="dropdown-item" data-cad-action="grid">
+                        <i class="ti ti-grid-dots me-2"></i>网格
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="axes">
+                        <i class="ti ti-axis-x me-2"></i>坐标轴
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="place-pivot" title="单击模型表面放置旋转中心">
+                        <i class="ti ti-crosshair me-2"></i>放置旋转中心
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="section">
+                        <i class="ti ti-cut me-2"></i>剖切
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="explode">
+                        <i class="ti ti-arrows-maximize me-2"></i>爆炸
+                    </button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="light">
+                        <i class="ti ti-sun me-2"></i>光照
+                    </button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-outline-secondary" data-cad-action="screenshot">
+                <i class="ti ti-camera me-1"></i>截图
+            </button>
+            <a href="{% url 'attachment:download' token=attachment.download_token %}"
+               class="btn btn-outline-secondary" target="_blank" rel="noopener">
+                <i class="ti ti-download me-1"></i>下载
+            </a>
+        </div>
+        <div class="cad-preview-toolbar-hint text-muted">拖动旋转 · 滚轮缩放 · 右键平移 · 双击零件设为旋转中心</div>
+    </header>
+
+    <div class="cad-preview-stage"
+         id="cad-preview-page-stage"
+         data-cad-url="{% url 'attachment:download' token=attachment.download_token %}"
+         data-cad-name="{{ attachment.display_name }}"
+         data-cad-ext="{{ attachment.extension }}"
+         data-cad-size="{{ attachment.file_size|default:0 }}">
+        <canvas class="cad-preview-canvas"></canvas>
+        <div class="cad-preview-view-roll is-hidden" data-cad-view-roll>
+            <button type="button" class="btn btn-outline-secondary" data-cad-action="view-roll" data-cad-roll="-90" title="逆时针 90°">
+                <i class="ti ti-rotate"></i>
+            </button>
+            <button type="button" class="btn btn-outline-secondary" data-cad-action="view-roll" data-cad-roll="90" title="顺时针 90°">
+                <i class="ti ti-rotate-clockwise"></i>
+            </button>
+        </div>
+        <div class="cad-preview-overlay" data-cad-status>
+            <span class="spinner-border text-secondary"></span>
+            <div class="text-muted" data-cad-status-text>正在加载 3D 引擎…</div>
+        </div>
+        <div class="cad-preview-overlay is-hidden" data-cad-error>
+            <div class="alert alert-warning mb-2" data-cad-error-text></div>
+            <a class="btn btn-primary"
+               href="{% url 'attachment:download' token=attachment.download_token %}"
+               target="_blank" rel="noopener">
+                <i class="ti ti-download me-1"></i>下载原文件
+            </a>
+        </div>
+        <div class="cad-preview-light-panel is-hidden" data-cad-light-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>光照</span>
+                <button type="button" class="btn-close" data-cad-action="light-close" aria-label="关闭"></button>
+            </div>
+            <label class="cad-preview-light-row" data-cad-light-lock>
+                <span>方位 <em data-cad-light-az-val>50°</em></span>
+                <input type="range" min="0" max="360" step="1" value="50" data-cad-light="azimuth">
+            </label>
+            <label class="cad-preview-light-row" data-cad-light-lock>
+                <span>高度 <em data-cad-light-el-val>46°</em></span>
+                <input type="range" min="5" max="85" step="1" value="46" data-cad-light="elevation">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>亮度 <em data-cad-light-in-val>0.75</em></span>
+                <input type="range" min="0.20" max="1.50" step="0.05" value="0.75" data-cad-light="intensity">
+            </label>
+            <label class="cad-preview-light-row cad-preview-light-row--color">
+                <span>颜色 <em data-cad-light-color-val>#ffffff</em></span>
+                <input type="color" value="#ffffff" data-cad-light="color">
+            </label>
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" data-cad-light="follow">
+                <span class="form-check-label">跟随视角</span>
+            </label>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="light-reset">重置</button>
+        </div>
+        <div class="cad-preview-light-panel is-hidden" data-cad-section-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>剖切</span>
+                <button type="button" class="btn-close" data-cad-action="section-close" aria-label="关闭"></button>
+            </div>
+            <div class="cad-preview-light-row">
+                <span>轴向</span>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="section-axis" data-cad-axis="x">X</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="section-axis" data-cad-axis="y">Y</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="section-axis" data-cad-axis="z">Z</button>
+                </div>
+            </div>
+            <label class="cad-preview-light-row">
+                <span>偏移 <em data-cad-section-off-val>50%</em></span>
+                <input type="range" min="0" max="100" step="1" value="50" data-cad-section="offset">
+            </label>
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" data-cad-section="flip">
+                <span class="form-check-label">翻转方向</span>
+            </label>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="section-reset">重置</button>
+        </div>
+        <div class="cad-preview-light-panel is-hidden" data-cad-explode-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>爆炸</span>
+                <button type="button" class="btn-close" data-cad-action="explode-close" aria-label="关闭"></button>
+            </div>
+            <div class="text-muted small mb-2" data-cad-explode-level>当前：默认层</div>
+            <div class="text-muted small mb-2 is-hidden" data-cad-explode-hint>单实体无法爆炸</div>
+            <div class="cad-preview-light-row">
+                <span>方向</span>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="explode-style" data-cad-explode-style="radial" title="从中心向外推开">径向</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-style" data-cad-explode-style="x">X</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-style" data-cad-explode-style="y">Y</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-style" data-cad-explode-style="z">Z</button>
+                </div>
+            </div>
+            <div class="text-muted small mb-2" data-cad-explode-center>中心：包围盒</div>
+            <div class="cad-preview-tree-actions mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-center" title="用结构树当前选中零件的中心作为爆炸原点">选为中心</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-center-reset">包围盒</button>
+            </div>
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" checked data-cad-explode="even">
+                <span class="form-check-label">等距拉开</span>
+            </label>
+            <label class="cad-preview-light-row" data-cad-explode-bin-lock>
+                <span>分档 <em data-cad-explode-bin-val>2%</em></span>
+                <input type="range" min="0.5" max="10" step="0.5" value="2" data-cad-explode="bin" title="同一距离区间内的零件同序号">
+            </label>
+            <label class="cad-preview-light-row" data-cad-explode-lock>
+                <span>程度 <em data-cad-explode-val>0%</em></span>
+                <input type="range" min="0" max="100" step="1" value="0" data-cad-explode="amount">
+            </label>
+            <div class="cad-preview-tree-actions mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-selected" title="把结构树当前选中节点的子级作为爆炸单元">按所选</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-default">默认层</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="explode-reset">重置程度</button>
+        </div>
+        <div class="cad-preview-tree-panel is-hidden" data-cad-tree-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>结构</span>
+                <button type="button" class="btn-close" data-cad-action="tree-close" aria-label="关闭"></button>
+            </div>
+            <div class="cad-preview-tree" data-cad-tree>
+                <div class="text-muted small px-1">解析完成后显示装配树</div>
+            </div>
+            <div class="cad-preview-tree-actions">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="isolate">独立所选</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="show-all">显示全部</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="pivot-selected">设为中心</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="explode-selected" title="把该节点的子级作为爆炸单元">按所选爆炸</button>
+            </div>
+        </div>
+    </div>
+</div>
+<script src="{% static 'tabler/core-1.4.0/dist/js/tabler.min.js' %}"></script>
+{% include 'includes/cad_preview_assets.html' %}
+</body>
+</html>

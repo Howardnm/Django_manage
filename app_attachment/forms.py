@@ -61,5 +61,5 @@ class AttachmentUploadForm(TablerFormMixin, forms.ModelForm):
         return (
             '.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,'
             '.jpg,.jpeg,.png,.gif,.bmp,.webp,.svg,'
-            '.txt,.csv,.zip,.rar,.7z,.stp,.step,.igs,.dwg,.dxf'
+            '.txt,.csv,.zip,.rar,.7z,.stp,.step,.igs,.iges,.dwg,.dxf'
         )
