@@ -18,8 +18,14 @@
     var DEFAULT_LIGHT_ELEVATION = 46;
     var DEFAULT_LIGHT_INTENSITY = 0.75;
     var DEFAULT_LIGHT_COLOR = '#ffffff';
+    var DEFAULT_LIGHT_KIND = 'area';
+    var DEFAULT_LIGHT_DISTANCE = 1.5;
+    var DEFAULT_LIGHT_GLOSS = 0.35;
     var DEFAULT_EXPLODE_BIN_PCT = 2;
     var TREE_AUTO_COLLAPSE_MIN = 12;
+    var DEFAULT_HINT = '拖动旋转 · 滚轮缩放 · 右键平移 · 双击零件设为旋转中心';
+    var MEASURE_HINT = '单击两点测距 · 可连续标注 · 靠近端点吸附 · Esc 退出';
+    var MEASURE_COLOR = 0x206bc4;
 
     var libsPromise = null;
     var renderer = null;
@@ -30,6 +36,7 @@
     var ambientLight = null;
     var keyLight = null;
     var fillLight = null;
+    var pointLight = null;
     var rafId = 0;
     var resizeObserver = null;
     var worker = null;
@@ -44,6 +51,9 @@
     var lightIntensity = DEFAULT_LIGHT_INTENSITY;
     var lightColor = DEFAULT_LIGHT_COLOR;
     var lightFollow = false;
+    var lightKind = DEFAULT_LIGHT_KIND;
+    var lightDistance = DEFAULT_LIGHT_DISTANCE;
+    var lightGloss = DEFAULT_LIGHT_GLOSS;
     var nodeIdSeq = 0;
     var nodeMap = {};
     var selectedNodeId = null;
@@ -61,6 +71,21 @@
     var orthoHalf = 50;
     var pivotHelper = null;
     var placingPivot = false;
+    var measuring = false;
+    var measureSegments = [];
+    var measurePending = null;
+    var measureGroup = null;
+    var measurePreview = null;
+    var darkCanvas = false;
+    var shotIncludeMeasure = true;
+    var shotIncludeHelpers = true;
+    var shotIncludeHighlight = true;
+    var shotAlpha = false;
+    var shotScale = 2;
+    var shotSize = 0;
+    var capturingShot = false;
+    var CLEAR_COLOR_LIGHT = 0xf4f6f8;
+    var CLEAR_COLOR_DARK = 0x1c2330;
     var pivotInteracting = false;
     var pivotHideAt = 0;
     var PIVOT_HOLD_MS = 1000;
@@ -156,6 +181,31 @@
         } else if (action === 'xray') {
             ev.preventDefault();
             setDisplayMode(displayMode === 'xray' ? 'solid' : 'xray');
+        } else if (action === 'dark') {
+            ev.preventDefault();
+            setDarkCanvas(!darkCanvas);
+        } else if (action === 'display-panel') {
+            ev.preventDefault();
+            toggleDisplayPanel();
+            closeParentDropdown(btn);
+        } else if (action === 'display-close') {
+            ev.preventDefault();
+            hideDisplayPanel();
+        } else if (action === 'part-color') {
+            ev.preventDefault();
+            applySelectedPartColor();
+        } else if (action === 'part-color-reset') {
+            ev.preventDefault();
+            restorePartColor(selectedNodeId);
+        } else if (action === 'part-color-reset-all') {
+            ev.preventDefault();
+            restorePartColor(null);
+        } else if (action === 'shot-scale') {
+            ev.preventDefault();
+            setShotScale(Number(btn.getAttribute('data-cad-shot-scale')));
+        } else if (action === 'shot-size') {
+            ev.preventDefault();
+            setShotSize(Number(btn.getAttribute('data-cad-shot-size')));
         } else if (action === 'fit') {
             ev.preventDefault();
             fitToView();
@@ -171,6 +221,9 @@
         } else if (action === 'light-reset') {
             ev.preventDefault();
             resetLights();
+        } else if (action === 'light-kind') {
+            ev.preventDefault();
+            setLightKind(btn.getAttribute('data-cad-light-kind') || 'area');
         } else if (action === 'tree') {
             ev.preventDefault();
             hideLightPanel();
@@ -205,6 +258,12 @@
             setAxes(!axesOn);
         } else if (action === 'screenshot') {
             ev.preventDefault();
+            toggleShotPanel();
+        } else if (action === 'shot-close') {
+            ev.preventDefault();
+            hideShotPanel();
+        } else if (action === 'shot-export') {
+            ev.preventDefault();
             captureScreenshot();
         } else if (action === 'place-pivot') {
             ev.preventDefault();
@@ -227,6 +286,19 @@
             ev.preventDefault();
             toggleExplodePanel();
             closeParentDropdown(btn);
+        } else if (action === 'measure') {
+            ev.preventDefault();
+            toggleMeasurePanel();
+            closeParentDropdown(btn);
+        } else if (action === 'measure-close') {
+            ev.preventDefault();
+            hideMeasurePanel();
+        } else if (action === 'measure-clear') {
+            ev.preventDefault();
+            clearMeasure();
+        } else if (action === 'measure-remove') {
+            ev.preventDefault();
+            removeMeasureSegment(Number(btn.getAttribute('data-cad-measure-index')));
         } else if (action === 'explode-close') {
             ev.preventDefault();
             hideExplodePanel();
@@ -323,6 +395,9 @@
     function showLightPanel() {
         hideSectionPanel();
         hideExplodePanel();
+        hideMeasurePanel();
+        hideDisplayPanel();
+        hideShotPanel();
         var panel = lightPanel();
         if (panel) {
             panel.classList.remove('is-hidden');
@@ -409,6 +484,9 @@
     function showSectionPanel() {
         hideLightPanel();
         hideExplodePanel();
+        hideMeasurePanel();
+        hideDisplayPanel();
+        hideShotPanel();
         var panel = sectionPanel();
         if (panel) {
             panel.classList.remove('is-hidden');
@@ -443,6 +521,9 @@
     function showExplodePanel() {
         hideLightPanel();
         hideSectionPanel();
+        hideMeasurePanel();
+        hideDisplayPanel();
+        hideShotPanel();
         var panel = explodePanel();
         if (panel) {
             panel.classList.remove('is-hidden');
@@ -460,6 +541,759 @@
             panel.classList.add('is-hidden');
         }
         setToggleActive('explode', explodeAmount > 0);
+    }
+
+    function measurePanel() {
+        return pageRoot && pageRoot.querySelector('[data-cad-measure-panel]');
+    }
+
+    function toggleMeasurePanel() {
+        var panel = measurePanel();
+        if (!panel) {
+            return;
+        }
+        if (panel.classList.contains('is-hidden')) {
+            showMeasurePanel();
+        } else {
+            hideMeasurePanel();
+        }
+    }
+
+    function showMeasurePanel() {
+        hideLightPanel();
+        hideSectionPanel();
+        hideExplodePanel();
+        hideDisplayPanel();
+        hideShotPanel();
+        var panel = measurePanel();
+        if (panel) {
+            panel.classList.remove('is-hidden');
+        }
+        enterMeasuring();
+        syncMeasureUi();
+    }
+
+    function hideMeasurePanel() {
+        var panel = measurePanel();
+        if (panel) {
+            panel.classList.add('is-hidden');
+        }
+        exitMeasuring();
+    }
+
+    function displayPanel() {
+        return pageRoot && pageRoot.querySelector('[data-cad-display-panel]');
+    }
+
+    function toggleDisplayPanel() {
+        var panel = displayPanel();
+        if (!panel) {
+            return;
+        }
+        if (panel.classList.contains('is-hidden')) {
+            showDisplayPanel();
+        } else {
+            hideDisplayPanel();
+        }
+    }
+
+    function showDisplayPanel() {
+        hideLightPanel();
+        hideSectionPanel();
+        hideExplodePanel();
+        hideMeasurePanel();
+        hideShotPanel();
+        var panel = displayPanel();
+        if (panel) {
+            panel.classList.remove('is-hidden');
+        }
+        syncDisplayUi();
+        setToggleActive('display-panel', true);
+    }
+
+    function hideDisplayPanel() {
+        var panel = displayPanel();
+        if (panel) {
+            panel.classList.add('is-hidden');
+        }
+        setToggleActive('display-panel', false);
+    }
+
+    function shotPanel() {
+        return pageRoot && pageRoot.querySelector('[data-cad-shot-panel]');
+    }
+
+    function toggleShotPanel() {
+        var panel = shotPanel();
+        if (!panel) {
+            return;
+        }
+        if (panel.classList.contains('is-hidden')) {
+            showShotPanel();
+        } else {
+            hideShotPanel();
+        }
+    }
+
+    function showShotPanel() {
+        hideLightPanel();
+        hideSectionPanel();
+        hideExplodePanel();
+        hideMeasurePanel();
+        hideDisplayPanel();
+        var panel = shotPanel();
+        if (panel) {
+            panel.classList.remove('is-hidden');
+        }
+        syncShotUi();
+        setToggleActive('screenshot', true);
+    }
+
+    function hideShotPanel() {
+        var panel = shotPanel();
+        if (panel) {
+            panel.classList.add('is-hidden');
+        }
+        setToggleActive('screenshot', false);
+    }
+
+    function canvasClearColor() {
+        return darkCanvas ? CLEAR_COLOR_DARK : CLEAR_COLOR_LIGHT;
+    }
+
+    function applyCanvasClear(alpha) {
+        if (!renderer) {
+            return;
+        }
+        if (alpha) {
+            renderer.setClearColor(0x000000, 0);
+        } else {
+            renderer.setClearColor(canvasClearColor(), 1);
+        }
+    }
+
+    function setDarkCanvas(on) {
+        darkCanvas = !!on;
+        if (stageEl) {
+            stageEl.classList.toggle('is-dark', darkCanvas);
+        }
+        applyCanvasClear(false);
+        if (gridOn) {
+            syncHelpers();
+        }
+        setToggleActive('dark', darkCanvas);
+        syncDisplayUi();
+    }
+
+    function hexToCss(hex) {
+        var n = hex & 0xffffff;
+        var s = n.toString(16);
+        while (s.length < 6) {
+            s = '0' + s;
+        }
+        return '#' + s;
+    }
+
+    function parseCssColor(value) {
+        var s = String(value || '').replace('#', '');
+        var n = parseInt(s, 16);
+        return isNaN(n) ? DEFAULT_COLOR : n;
+    }
+
+    function applyPartColor(nodeId, hex) {
+        if (!nodeId || !nodeMap[nodeId]) {
+            return;
+        }
+        eachSolidMaterial(nodeId, function (m) {
+            if (!m.color) {
+                return;
+            }
+            if (!m.userData) {
+                m.userData = {};
+            }
+            if (m.userData._cadColorOrig == null) {
+                m.userData._cadColorOrig = m.color.getHex();
+            }
+            m.color.setHex(hex);
+            m.needsUpdate = true;
+        });
+    }
+
+    function restorePartColor(nodeId) {
+        var ids = nodeId ? [nodeId] : Object.keys(nodeMap);
+        ids.forEach(function (id) {
+            eachSolidMaterial(id, function (m) {
+                if (m.color && m.userData && m.userData._cadColorOrig != null) {
+                    m.color.setHex(m.userData._cadColorOrig);
+                    m.needsUpdate = true;
+                }
+            });
+        });
+        syncDisplayUi();
+    }
+
+    function applySelectedPartColor() {
+        if (!selectedNodeId) {
+            return;
+        }
+        var input = pageRoot && pageRoot.querySelector('[data-cad-part-color]');
+        applyPartColor(selectedNodeId, parseCssColor(input && input.value));
+        syncDisplayUi();
+    }
+
+    function selectedPartColorHex() {
+        var hex = null;
+        if (!selectedNodeId) {
+            return DEFAULT_COLOR;
+        }
+        eachSolidMaterial(selectedNodeId, function (m) {
+            if (hex == null && m.color) {
+                hex = m.color.getHex();
+            }
+        });
+        return hex == null ? DEFAULT_COLOR : hex;
+    }
+
+    function setShotScale(n) {
+        n = Math.round(Number(n));
+        if (!(n >= 1 && n <= 8)) {
+            n = 2;
+        }
+        shotScale = n;
+        syncShotUi();
+    }
+
+    function setShotSize(n) {
+        n = Number(n) || 0;
+        if (n !== 1920 && n !== 2560 && n !== 3840) {
+            n = 0;
+        }
+        shotSize = n;
+        syncShotUi();
+    }
+
+    function onDisplayInput(ev) {
+        if (ev.target && ev.target.hasAttribute('data-cad-dark')) {
+            setDarkCanvas(!!ev.target.checked);
+            return;
+        }
+        var input = ev.target.closest('[data-cad-shot]');
+        if (!input) {
+            return;
+        }
+        var kind = input.getAttribute('data-cad-shot');
+        if (kind === 'measure') {
+            shotIncludeMeasure = !!input.checked;
+        } else if (kind === 'helpers') {
+            shotIncludeHelpers = !!input.checked;
+        } else if (kind === 'highlight') {
+            shotIncludeHighlight = !!input.checked;
+        } else if (kind === 'alpha') {
+            shotAlpha = !!input.checked;
+        }
+    }
+
+    function syncDisplayUi() {
+        var panel = displayPanel();
+        if (!panel) {
+            return;
+        }
+        var darkEl = panel.querySelector('[data-cad-dark]');
+        if (darkEl) {
+            darkEl.checked = darkCanvas;
+        }
+        var nameEl = panel.querySelector('[data-cad-part-name]');
+        var rec = selectedNodeId && nodeMap[selectedNodeId];
+        if (nameEl) {
+            nameEl.textContent = rec ? (rec.name || selectedNodeId) : '（无选中）';
+        }
+        var colorEl = panel.querySelector('[data-cad-part-color]');
+        if (colorEl && rec) {
+            colorEl.value = hexToCss(selectedPartColorHex());
+        }
+        var applyBtn = panel.querySelector('[data-cad-action="part-color"]');
+        var resetBtn = panel.querySelector('[data-cad-action="part-color-reset"]');
+        if (applyBtn) {
+            applyBtn.disabled = !rec;
+        }
+        if (resetBtn) {
+            resetBtn.disabled = !rec;
+        }
+    }
+
+    function syncShotUi() {
+        var panel = shotPanel();
+        if (!panel) {
+            return;
+        }
+        var shotMap = {
+            measure: shotIncludeMeasure,
+            helpers: shotIncludeHelpers,
+            highlight: shotIncludeHighlight,
+            alpha: shotAlpha,
+        };
+        Object.keys(shotMap).forEach(function (key) {
+            var el = panel.querySelector('[data-cad-shot="' + key + '"]');
+            if (el) {
+                el.checked = shotMap[key];
+            }
+        });
+        var scaleBtns = panel.querySelectorAll('[data-cad-action="shot-scale"]');
+        var i;
+        for (i = 0; i < scaleBtns.length; i++) {
+            scaleBtns[i].classList.toggle(
+                'active',
+                Number(scaleBtns[i].getAttribute('data-cad-shot-scale')) === shotScale
+            );
+        }
+        var sizeBtns = panel.querySelectorAll('[data-cad-action="shot-size"]');
+        var j;
+        for (j = 0; j < sizeBtns.length; j++) {
+            sizeBtns[j].classList.toggle(
+                'active',
+                Number(sizeBtns[j].getAttribute('data-cad-shot-size')) === shotSize
+            );
+        }
+    }
+
+    function setHint(text) {
+        var hint = pageRoot && pageRoot.querySelector('[data-cad-hint]');
+        if (hint) {
+            hint.textContent = text || DEFAULT_HINT;
+        }
+    }
+
+    function formatMeasure(n) {
+        var abs = Math.abs(n);
+        var text;
+        if (abs >= 1e5 || (n !== 0 && abs < 1e-2)) {
+            text = n.toExponential(2);
+        } else {
+            text = n.toFixed(2);
+        }
+        return text + ' mm';
+    }
+
+    function enterMeasuring() {
+        if (placingPivot) {
+            setPlacingPivot(false);
+        }
+        measuring = true;
+        if (stageEl) {
+            stageEl.classList.toggle('is-measuring', true);
+        }
+        setHint(MEASURE_HINT);
+        setToggleActive('measure', true);
+    }
+
+    function exitMeasuring() {
+        measuring = false;
+        hideMeasurePreview();
+        if (stageEl) {
+            stageEl.classList.remove('is-measuring');
+        }
+        setHint(DEFAULT_HINT);
+        setToggleActive('measure', isPanelOpen(measurePanel()) || hasMeasureGeom());
+    }
+
+    function ensureMeasureGroup() {
+        if (!scene || !window.THREE) {
+            return null;
+        }
+        if (!measureGroup) {
+            measureGroup = new window.THREE.Group();
+            measureGroup.name = '__cad_measure';
+            scene.add(measureGroup);
+        }
+        return measureGroup;
+    }
+
+    function measureMarkerSize() {
+        var info = getModelBox(false);
+        var maxDim = info ? info.maxDim : 50;
+        return Math.max(maxDim * 0.012, 0.25);
+    }
+
+    function measureSnapRadius() {
+        var info = getModelBox(false);
+        var maxDim = info ? info.maxDim : 50;
+        var dist = 80;
+        if (camera && controls) {
+            dist = camera.position.distanceTo(controls.target);
+        }
+        return Math.max(maxDim * 0.01, dist * 0.012, 0.2);
+    }
+
+    function measureLineMaterial(color) {
+        return new window.THREE.LineBasicMaterial({
+            color: color == null ? MEASURE_COLOR : color,
+            depthTest: false,
+            depthWrite: false,
+        });
+    }
+
+    function addMeasureLine(group, a, b, mat) {
+        var line = new window.THREE.Line(
+            new window.THREE.BufferGeometry().setFromPoints([a, b]),
+            mat
+        );
+        line.renderOrder = 10;
+        group.add(line);
+        return line;
+    }
+
+    function setMeasureMarkColor(root, color) {
+        if (!root) {
+            return;
+        }
+        root.traverse(function (obj) {
+            if (obj.material && obj.material.color) {
+                obj.material.color.setHex(color);
+            }
+        });
+    }
+
+    function makeMeasureMark(color) {
+        var THREE = window.THREE;
+        var group = new THREE.Group();
+        var mat = measureLineMaterial(color);
+        addMeasureLine(group, new THREE.Vector3(-1, 0, 0), new THREE.Vector3(1, 0, 0), mat);
+        addMeasureLine(group, new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 1, 0), mat);
+        addMeasureLine(group, new THREE.Vector3(0, 0, -1), new THREE.Vector3(0, 0, 1), mat);
+        return group;
+    }
+
+    function addMeasureArrow(group, from, to, size, mat) {
+        var THREE = window.THREE;
+        var dir = to.clone().sub(from);
+        if (dir.lengthSq() < 1e-12) {
+            return;
+        }
+        dir.normalize();
+        var back = to.clone().addScaledVector(dir, -size);
+        var up = Math.abs(dir.z) < 0.92 ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(0, 1, 0);
+        var side = new THREE.Vector3().crossVectors(dir, up);
+        if (side.lengthSq() < 1e-12) {
+            side.set(1, 0, 0);
+        }
+        side.normalize().multiplyScalar(size * 0.42);
+        addMeasureLine(group, to, back.clone().add(side), mat);
+        addMeasureLine(group, to, back.clone().sub(side), mat);
+    }
+
+    function clearMeasureChildren(group) {
+        if (!group) {
+            return;
+        }
+        var seen = [];
+        while (group.children.length) {
+            var child = group.children[0];
+            group.remove(child);
+            child.traverse(function (obj) {
+                if (obj.geometry && obj.geometry.dispose) {
+                    obj.geometry.dispose();
+                }
+                var mats = obj.material
+                    ? (Array.isArray(obj.material) ? obj.material : [obj.material])
+                    : [];
+                mats.forEach(function (m) {
+                    if (m && m.dispose && seen.indexOf(m) === -1) {
+                        seen.push(m);
+                        m.dispose();
+                    }
+                });
+            });
+        }
+    }
+
+    function worldVertex(obj, attr, index) {
+        return new window.THREE.Vector3().fromBufferAttribute(attr, index).applyMatrix4(obj.matrixWorld);
+    }
+
+    function hitCandidateVertices(hit) {
+        var obj = hit && hit.object;
+        var geom = obj && obj.geometry;
+        var attr = geom && geom.attributes && geom.attributes.position;
+        if (!attr || !window.THREE) {
+            return [];
+        }
+        obj.updateWorldMatrix(true, false);
+        var out = [];
+        if (hit.face) {
+            out.push(worldVertex(obj, attr, hit.face.a));
+            out.push(worldVertex(obj, attr, hit.face.b));
+            out.push(worldVertex(obj, attr, hit.face.c));
+            return out;
+        }
+        if (hit.index == null) {
+            return out;
+        }
+        var idx = geom.index;
+        var i0;
+        var i1;
+        if (idx) {
+            i0 = idx.getX(hit.index);
+            i1 = idx.getX(Math.min(hit.index + 1, idx.count - 1));
+        } else {
+            i0 = hit.index;
+            i1 = Math.min(hit.index + 1, attr.count - 1);
+        }
+        out.push(worldVertex(obj, attr, i0));
+        if (i1 !== i0) {
+            out.push(worldVertex(obj, attr, i1));
+        }
+        return out;
+    }
+
+    function snapMeasureHit(hit) {
+        var point = hit && hit.point ? hit.point.clone() : null;
+        if (!point) {
+            return { point: null, snapped: false };
+        }
+        var best = point;
+        var bestDist = measureSnapRadius();
+        var snapped = false;
+        hitCandidateVertices(hit).forEach(function (v) {
+            var d = v.distanceTo(point);
+            if (d < bestDist) {
+                bestDist = d;
+                best = v;
+                snapped = true;
+            }
+        });
+        return { point: best, snapped: snapped };
+    }
+
+    function hideMeasurePreview() {
+        if (measurePreview) {
+            measurePreview.visible = false;
+        }
+    }
+
+    function showMeasurePreview(point, snapped) {
+        var THREE = window.THREE;
+        if (!point || !THREE || !scene) {
+            hideMeasurePreview();
+            return;
+        }
+        if (!measurePreview) {
+            measurePreview = makeMeasureMark(MEASURE_COLOR);
+            measurePreview.name = '__cad_measure_preview';
+            scene.add(measurePreview);
+        }
+        measurePreview.position.copy(point);
+        measurePreview.scale.setScalar(measureMarkerSize() * (snapped ? 1 : 0.7));
+        setMeasureMarkColor(measurePreview, snapped ? 0xe67e22 : MEASURE_COLOR);
+        measurePreview.visible = true;
+    }
+
+    function rebuildMeasureGeom() {
+        var THREE = window.THREE;
+        var group = ensureMeasureGroup();
+        if (!group || !THREE) {
+            return;
+        }
+        clearMeasureChildren(group);
+        var size = measureMarkerSize();
+        var mat = measureLineMaterial();
+        function addMark(p) {
+            var mark = makeMeasureMark(MEASURE_COLOR);
+            mark.position.copy(p);
+            mark.scale.setScalar(size);
+            group.add(mark);
+        }
+        function addSegment(a, b) {
+            addMark(a);
+            addMark(b);
+            addMeasureLine(group, a, b, mat);
+            var arrow = Math.min(size * 1.35, a.distanceTo(b) * 0.22);
+            if (arrow > 1e-4) {
+                addMeasureArrow(group, a, b, arrow, mat);
+                addMeasureArrow(group, b, a, arrow, mat);
+            }
+        }
+        measureSegments.forEach(function (seg) {
+            addSegment(seg.a, seg.b);
+        });
+        if (measurePending) {
+            addMark(measurePending);
+        }
+        updateMeasureLabel();
+    }
+
+    function hasMeasureGeom() {
+        return measureSegments.length > 0 || !!measurePending;
+    }
+
+    function clearMeasure() {
+        measureSegments = [];
+        measurePending = null;
+        hideMeasurePreview();
+        rebuildMeasureGeom();
+        syncMeasureUi();
+        if (!measuring) {
+            setToggleActive('measure', isPanelOpen(measurePanel()));
+        }
+    }
+
+    function removeMeasureSegment(index) {
+        if (!Number.isInteger(index) || index < 0 || index >= measureSegments.length) {
+            return;
+        }
+        measureSegments.splice(index, 1);
+        rebuildMeasureGeom();
+        syncMeasureUi();
+        if (!measuring && !hasMeasureGeom()) {
+            setToggleActive('measure', isPanelOpen(measurePanel()));
+        }
+    }
+
+    function addMeasurePoint(point) {
+        if (!point || !window.THREE) {
+            return;
+        }
+        var p = point.clone();
+        if (!measurePending) {
+            measurePending = p;
+        } else {
+            measureSegments.push({ a: measurePending, b: p });
+            measurePending = null;
+        }
+        rebuildMeasureGeom();
+        syncMeasureUi();
+        setToggleActive('measure', true);
+    }
+
+    function selectedNodeBox() {
+        if (!selectedNodeId || !nodeMap[selectedNodeId] || !window.THREE) {
+            return null;
+        }
+        var rec = nodeMap[selectedNodeId];
+        rec.object.updateWorldMatrix(true, true);
+        var THREE = window.THREE;
+        var box = new THREE.Box3();
+        var has = false;
+        rec.object.traverse(function (obj) {
+            if (!obj.isMesh || !obj.userData || obj.userData.cadRole !== 'solid') {
+                return;
+            }
+            if (!cadGroupIsShown(obj)) {
+                return;
+            }
+            var b = new THREE.Box3().setFromObject(obj);
+            if (b.isEmpty()) {
+                return;
+            }
+            if (!has) {
+                box.copy(b);
+                has = true;
+            } else {
+                box.union(b);
+            }
+        });
+        if (!has) {
+            return null;
+        }
+        var size = box.getSize(new THREE.Vector3());
+        return {
+            name: rec.name || selectedNodeId,
+            size: size,
+            diagonal: size.length(),
+        };
+    }
+
+    function syncMeasureUi() {
+        if (!pageRoot) {
+            return;
+        }
+        var distEl = pageRoot.querySelector('[data-cad-measure="distance"]');
+        var n = measureSegments.length;
+        if (distEl) {
+            if (measurePending) {
+                distEl.textContent = n ? ('点第二点（已 ' + n + ' 条）') : '点第二点';
+            } else if (!n) {
+                distEl.textContent = measuring ? '点第一点' : '—';
+            } else if (n === 1) {
+                distEl.textContent = formatMeasure(measureSegments[0].a.distanceTo(measureSegments[0].b));
+            } else {
+                var last = measureSegments[n - 1];
+                distEl.textContent = formatMeasure(last.a.distanceTo(last.b)) + '（共 ' + n + ' 条）';
+            }
+        }
+        var listEl = pageRoot.querySelector('[data-cad-measure="list"]');
+        if (listEl) {
+            if (!n) {
+                listEl.innerHTML = '';
+                listEl.classList.add('is-hidden');
+            } else {
+                listEl.innerHTML = measureSegments.map(function (seg, i) {
+                    return '<div class="cad-preview-measure-item">' +
+                        '<span>' + (i + 1) + '. ' + escapeHtml(formatMeasure(seg.a.distanceTo(seg.b))) + '</span>' +
+                        '<button type="button" class="btn btn-sm btn-ghost-secondary cad-preview-measure-remove"' +
+                        ' data-cad-action="measure-remove" data-cad-measure-index="' + i + '" title="删除此标注">×</button>' +
+                        '</div>';
+                }).join('');
+                listEl.classList.remove('is-hidden');
+            }
+        }
+        var box = selectedNodeBox();
+        var nameEl = pageRoot.querySelector('[data-cad-measure="name"]');
+        var sizeEl = pageRoot.querySelector('[data-cad-measure="size"]');
+        if (nameEl) {
+            nameEl.textContent = box ? box.name : '（无）';
+        }
+        if (sizeEl) {
+            if (box) {
+                sizeEl.textContent = 'X ' + formatMeasure(box.size.x) +
+                    '  Y ' + formatMeasure(box.size.y) +
+                    '  Z ' + formatMeasure(box.size.z) +
+                    '\n对角 ' + formatMeasure(box.diagonal);
+            } else {
+                sizeEl.textContent = measuring
+                    ? '在结构树或退出量测后点选零件'
+                    : '点选零件查看包围盒';
+            }
+        }
+        updateMeasureLabel();
+    }
+
+    function updateMeasureLabel() {
+        if (!pageRoot || !camera || !canvasEl || !window.THREE) {
+            return;
+        }
+        var labels = pageRoot.querySelectorAll('[data-cad-measure-label]');
+        if (!labels.length) {
+            return;
+        }
+        var parent = labels[0].parentNode;
+        var n = measureSegments.length;
+        while (labels.length < n) {
+            parent.appendChild(labels[0].cloneNode(true));
+            labels = pageRoot.querySelectorAll('[data-cad-measure-label]');
+        }
+        var rect = canvasEl.getBoundingClientRect();
+        var i;
+        for (i = 0; i < labels.length; i++) {
+            var el = labels[i];
+            if (i >= n) {
+                el.classList.add('is-hidden');
+                continue;
+            }
+            var a = measureSegments[i].a;
+            var b = measureSegments[i].b;
+            var mid = a.clone().add(b).multiplyScalar(0.5);
+            var ndc = mid.project(camera);
+            var x = (ndc.x * 0.5 + 0.5) * rect.width;
+            var y = (-ndc.y * 0.5 + 0.5) * rect.height;
+            if (ndc.z > 1 || ndc.z < -1 || x < 0 || y < 0 || x > rect.width || y > rect.height) {
+                el.classList.add('is-hidden');
+                continue;
+            }
+            el.textContent = formatMeasure(a.distanceTo(b));
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            el.classList.remove('is-hidden');
+        }
     }
 
     function setToggleActive(action, on) {
@@ -482,14 +1316,20 @@
     }
 
     function syncGroupToggles() {
-        setGroupActive('display', displayMode !== 'solid');
-        setGroupActive('view', orthoOn);
         setGroupActive(
-            'assist',
-            gridOn || axesOn || placingPivot || sectionOn || explodeAmount > 0
+            'display',
+            displayMode !== 'solid' || darkCanvas
+                || isPanelOpen(displayPanel())
                 || isPanelOpen(lightPanel())
+        );
+        setGroupActive('view', orthoOn);
+        setGroupActive('assist', gridOn || axesOn || placingPivot);
+        setGroupActive(
+            'tools',
+            measuring || sectionOn || explodeAmount > 0
                 || isPanelOpen(sectionPanel())
                 || isPanelOpen(explodePanel())
+                || isPanelOpen(measurePanel())
         );
     }
 
@@ -531,7 +1371,27 @@
             lightColor = input.value || DEFAULT_LIGHT_COLOR;
         } else if (kind === 'follow') {
             lightFollow = !!input.checked;
+        } else if (kind === 'distance') {
+            lightDistance = Number(input.value);
+            if (!(lightDistance > 0)) {
+                lightDistance = DEFAULT_LIGHT_DISTANCE;
+            }
+        } else if (kind === 'gloss') {
+            lightGloss = Number(input.value);
+            if (!(lightGloss >= 0)) {
+                lightGloss = 0;
+            }
+            if (lightGloss > 1) {
+                lightGloss = 1;
+            }
+            applyMaterialGloss();
         }
+        applyLights();
+        syncLightUi();
+    }
+
+    function setLightKind(kind) {
+        lightKind = kind === 'point' ? 'point' : 'area';
         applyLights();
         syncLightUi();
     }
@@ -542,8 +1402,60 @@
         lightIntensity = DEFAULT_LIGHT_INTENSITY;
         lightColor = DEFAULT_LIGHT_COLOR;
         lightFollow = false;
+        lightKind = DEFAULT_LIGHT_KIND;
+        lightDistance = DEFAULT_LIGHT_DISTANCE;
+        lightGloss = DEFAULT_LIGHT_GLOSS;
         applyLights();
+        applyMaterialGloss();
         syncLightUi();
+    }
+
+    function glossParams(g) {
+        g = Math.max(0, Math.min(1, Number(g) || 0));
+        var spec = Math.round(g * 210);
+        return {
+            hex: (spec << 16) | (spec << 8) | spec,
+            shininess: 1 + g * 30 + g * g * 70,
+        };
+    }
+
+    function applyMaterialGloss() {
+        if (!modelGroup) {
+            return;
+        }
+        var p = glossParams(lightGloss);
+        var seen = [];
+        modelGroup.traverse(function (obj) {
+            if (!obj.userData || obj.userData.cadRole !== 'solid') {
+                return;
+            }
+            var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+            mats.forEach(function (m) {
+                if (!m || !m.specular || seen.indexOf(m) !== -1) {
+                    return;
+                }
+                seen.push(m);
+                m.specular.setHex(p.hex);
+                m.shininess = p.shininess;
+                m.needsUpdate = true;
+            });
+        });
+    }
+
+    function lightDirection() {
+        var THREE = window.THREE;
+        var dir = new THREE.Vector3();
+        if (lightFollow && camera && controls) {
+            dir.copy(camera.position).sub(controls.target);
+            if (dir.lengthSq() < 1e-8) {
+                dir.set(1, 1, 1);
+            }
+            return dir.normalize();
+        }
+        var az = lightAzimuth * Math.PI / 180;
+        var el = lightElevation * Math.PI / 180;
+        var cosEl = Math.cos(el);
+        return dir.set(cosEl * Math.cos(az), cosEl * Math.sin(az), Math.sin(el));
     }
 
     function syncLightUi() {
@@ -556,10 +1468,15 @@
         var ins = panel.querySelector('[data-cad-light="intensity"]');
         var color = panel.querySelector('[data-cad-light="color"]');
         var follow = panel.querySelector('[data-cad-light="follow"]');
+        var dist = panel.querySelector('[data-cad-light="distance"]');
+        var gloss = panel.querySelector('[data-cad-light="gloss"]');
         var azVal = panel.querySelector('[data-cad-light-az-val]');
         var elVal = panel.querySelector('[data-cad-light-el-val]');
         var inVal = panel.querySelector('[data-cad-light-in-val]');
         var colorVal = panel.querySelector('[data-cad-light-color-val]');
+        var distVal = panel.querySelector('[data-cad-light-dist-val]');
+        var glossVal = panel.querySelector('[data-cad-light-gloss-val]');
+        var isPoint = lightKind === 'point';
         if (az) {
             az.value = String(Math.round(lightAzimuth));
             az.disabled = lightFollow;
@@ -577,6 +1494,13 @@
         if (follow) {
             follow.checked = lightFollow;
         }
+        if (dist) {
+            dist.value = String(lightDistance);
+            dist.disabled = !isPoint;
+        }
+        if (gloss) {
+            gloss.value = String(lightGloss);
+        }
         if (azVal) {
             azVal.textContent = lightFollow ? '跟随' : Math.round(lightAzimuth) + '°';
         }
@@ -589,38 +1513,53 @@
         if (colorVal) {
             colorVal.textContent = lightColor;
         }
+        if (distVal) {
+            distVal.textContent = Number(lightDistance).toFixed(1) + '×';
+        }
+        if (glossVal) {
+            glossVal.textContent = Math.round(lightGloss * 100) + '%';
+        }
+        panel.querySelectorAll('[data-cad-light-kind]').forEach(function (btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-cad-light-kind') === lightKind);
+        });
         panel.classList.toggle('is-follow', lightFollow);
+        panel.classList.toggle('is-point', isPoint);
     }
 
     function applyLights() {
         if (!keyLight || !fillLight || !ambientLight) {
             return;
         }
-        var dir;
-        if (lightFollow && camera && controls) {
-            dir = camera.position.clone().sub(controls.target);
-            if (dir.lengthSq() < 1e-8) {
-                dir.set(1, 1, 1);
-            }
-            dir.normalize();
-        } else {
-            var az = lightAzimuth * Math.PI / 180;
-            var el = lightElevation * Math.PI / 180;
-            var cosEl = Math.cos(el);
-            dir = {
-                x: cosEl * Math.cos(az),
-                y: cosEl * Math.sin(az),
-                z: Math.sin(el),
-            };
+        var dir = lightDirection();
+        var isPoint = lightKind === 'point';
+        keyLight.visible = !isPoint;
+        fillLight.visible = !isPoint;
+        if (pointLight) {
+            pointLight.visible = isPoint;
         }
-        keyLight.position.set(dir.x, dir.y, dir.z);
-        keyLight.intensity = lightIntensity;
-        fillLight.position.set(-dir.x * 0.55, -dir.y * 0.55, Math.max(dir.z * 0.3, 0.15));
-        fillLight.intensity = Math.max(lightIntensity * 0.32, 0.12);
-        ambientLight.intensity = 0.38 + lightIntensity * 0.22;
         keyLight.color.set(lightColor);
         fillLight.color.copy(keyLight.color).multiplyScalar(0.55);
         ambientLight.color.copy(keyLight.color).multiplyScalar(0.7);
+        ambientLight.intensity = 0.38 + lightIntensity * 0.22;
+        if (isPoint && pointLight) {
+            var info = getModelBox(false);
+            var maxDim = info ? info.maxDim : 80;
+            var dist = Math.max(maxDim * lightDistance, 1);
+            if (info) {
+                pointLight.position.copy(info.center).addScaledVector(dir, dist);
+            } else {
+                pointLight.position.copy(dir).multiplyScalar(dist);
+            }
+            pointLight.color.set(lightColor);
+            pointLight.intensity = lightIntensity * 2.8;
+            pointLight.distance = dist + maxDim * 1.8;
+            pointLight.decay = 2;
+            return;
+        }
+        keyLight.position.copy(dir);
+        keyLight.intensity = lightIntensity;
+        fillLight.position.set(-dir.x * 0.55, -dir.y * 0.55, Math.max(dir.z * 0.3, 0.15));
+        fillLight.intensity = Math.max(lightIntensity * 0.32, 0.12);
     }
 
     function cadFormat(ext) {
@@ -678,9 +1617,15 @@
         ambientLight = null;
         keyLight = null;
         fillLight = null;
+        pointLight = null;
         gridHelper = null;
         axesHelper = null;
         pivotHelper = null;
+        measureGroup = null;
+        measurePreview = null;
+        measureSegments = [];
+        measurePending = null;
+        measuring = false;
         nodeMap = {};
         nodeIdSeq = 0;
         selectedNodeId = null;
@@ -688,6 +1633,7 @@
         treeQuery = '';
         treeVisFilter = 'all';
         pointerDownPos = null;
+        capturingShot = false;
         clipHelper = null;
         explodeUnits = [];
         explodeAmount = 0;
@@ -723,8 +1669,13 @@
         hideLightPanel();
         hideSectionPanel();
         hideExplodePanel();
+        hideMeasurePanel();
+        hideDisplayPanel();
+        hideShotPanel();
         hideTreePanel();
         resetTreeDom();
+        clearMeasure();
+        setHint(DEFAULT_HINT);
         sectionOn = false;
         sectionAxis = 'z';
         sectionOffset = 50;
@@ -739,7 +1690,9 @@
         CLIP_PLANES.length = 0;
         if (stageEl) {
             stageEl.classList.remove('is-placing-pivot');
+            stageEl.classList.remove('is-measuring');
         }
+        setToggleActive('measure', false);
         setToggleActive('ortho', false);
         setToggleActive('grid', false);
         setToggleActive('axes', false);
@@ -763,7 +1716,7 @@
     }
 
     function resizeRenderer() {
-        if (!renderer || !camera || !stageEl) {
+        if (!renderer || !camera || !stageEl || capturingShot) {
             return;
         }
         var w = stageEl.clientWidth || 800;
@@ -786,7 +1739,8 @@
             applyLights();
         }
         syncPivotHelper();
-        if (renderer && scene && camera) {
+        updateMeasureLabel();
+        if (renderer && scene && camera && !capturingShot) {
             renderer.render(scene, camera);
         }
     }
@@ -796,10 +1750,15 @@
         var w = container.clientWidth || 800;
         var h = container.clientHeight || 480;
 
-        renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, preserveDrawingBuffer: true });
+        renderer = new THREE.WebGLRenderer({
+            canvas: canvas,
+            antialias: true,
+            alpha: true,
+            preserveDrawingBuffer: true,
+        });
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
         renderer.setSize(w, h, false);
-        renderer.setClearColor(0xf4f6f8);
+        applyCanvasClear(false);
         renderer.localClippingEnabled = true;
         ensureClipPlane();
 
@@ -814,6 +1773,9 @@
         scene.add(keyLight);
         fillLight = new THREE.DirectionalLight(0xffffff, 0.25);
         scene.add(fillLight);
+        pointLight = new THREE.PointLight(0xffffff, 0.75, 0, 2);
+        pointLight.visible = false;
+        scene.add(pointLight);
         applyLights();
 
         bindControls(camera, canvas);
@@ -830,10 +1792,11 @@
 
     function makeSolidMaterial(color) {
         var THREE = window.THREE;
+        var p = glossParams(lightGloss);
         return new THREE.MeshPhongMaterial({
             color: color,
-            specular: 0x111111,
-            shininess: 8,
+            specular: p.hex,
+            shininess: p.shininess,
             side: THREE.DoubleSide,
             clippingPlanes: CLIP_PLANES,
         });
@@ -1234,6 +2197,7 @@
         if (sectionOn) {
             applySectionPlane();
         }
+        syncMeasureUi();
     }
 
     function resetExplode() {
@@ -1528,6 +2492,8 @@
         alignedView = null;
         showViewRoll(false);
         resetTreeFilterState();
+        hideMeasurePanel();
+        clearMeasure();
         while (modelGroup.children.length) {
             modelGroup.remove(modelGroup.children[0]);
         }
@@ -1852,18 +2818,27 @@
         }
         setToggleActive('place-pivot', placingPivot);
         if (placingPivot) {
+            if (measuring) {
+                hideMeasurePanel();
+            }
             showPivotHelper(true);
         }
     }
 
     function onPivotKeydown(ev) {
-        if (ev.key !== 'Escape' || !placingPivot) {
+        if (ev.key !== 'Escape') {
             return;
         }
         if (ev.target && ev.target.closest && ev.target.closest('[data-cad-tree-search]')) {
             return;
         }
-        setPlacingPivot(false);
+        if (placingPivot) {
+            setPlacingPivot(false);
+            return;
+        }
+        if (measuring) {
+            hideMeasurePanel();
+        }
     }
 
     function pivotToSelected() {
@@ -2016,7 +2991,12 @@
         disposeHelper(gridHelper);
         var size = Math.max(info.maxDim * 2.2, 1);
         var divisions = 20;
-        gridHelper = new THREE.GridHelper(size, divisions, 0xb0b8c4, 0xd8dde5);
+        gridHelper = new THREE.GridHelper(
+            size,
+            divisions,
+            darkCanvas ? 0x5b6778 : 0xb0b8c4,
+            darkCanvas ? 0x2f3948 : 0xd8dde5
+        );
         gridHelper.rotation.x = Math.PI / 2;
         gridHelper.position.set(info.center.x, info.center.y, info.box.min.z);
         scene.add(gridHelper);
@@ -2053,12 +3033,14 @@
     }
 
     function captureScreenshot() {
-        if (!renderer || !scene || !camera || !canvasEl) {
+        if (!renderer || !scene || !camera || !canvasEl || capturingShot) {
             return;
         }
+        capturingShot = true;
+        hideMeasurePreview();
         var hidden = [];
         var els = stageEl ? stageEl.querySelectorAll(
-            '[data-cad-status], [data-cad-error], [data-cad-light-panel], [data-cad-tree-panel], [data-cad-section-panel], [data-cad-explode-panel], [data-cad-view-roll]'
+            '[data-cad-status], [data-cad-error], [data-cad-light-panel], [data-cad-tree-panel], [data-cad-section-panel], [data-cad-explode-panel], [data-cad-measure-panel], [data-cad-display-panel], [data-cad-shot-panel], [data-cad-measure-label], [data-cad-view-roll]'
         ) : [];
         for (var i = 0; i < els.length; i++) {
             if (!els[i].classList.contains('is-hidden')) {
@@ -2066,15 +3048,66 @@
                 hidden.push(els[i]);
             }
         }
-        var pivotWasVisible = pivotHelper && pivotHelper.visible;
-        if (pivotHelper) {
-            pivotHelper.visible = false;
+        var hidden3d = [];
+        function hide3d(obj) {
+            if (obj && obj.visible) {
+                hidden3d.push(obj);
+                obj.visible = false;
+            }
         }
-        var clipWasVisible = clipHelper && clipHelper.visible;
-        if (clipHelper) {
-            clipHelper.visible = false;
+        hide3d(pivotHelper);
+        hide3d(clipHelper);
+        if (!shotIncludeMeasure) {
+            hide3d(measureGroup);
+            hide3d(measurePreview);
         }
+        if (!shotIncludeHelpers) {
+            hide3d(gridHelper);
+            hide3d(axesHelper);
+        }
+        var highlightHidden = false;
+        if (!shotIncludeHighlight && selectedNodeId) {
+            restoreEmissive(selectedNodeId);
+            highlightHidden = true;
+        }
+
+        var liveW = (stageEl && stageEl.clientWidth) || 800;
+        var liveH = (stageEl && stageEl.clientHeight) || 480;
+        var liveRatio = Math.min(window.devicePixelRatio || 1, 2);
+        var w = liveW;
+        var h = liveH;
+        if (shotSize > 0) {
+            var longSide = Math.max(liveW, liveH) || 1;
+            var k = shotSize / longSide;
+            w = Math.max(1, Math.round(liveW * k));
+            h = Math.max(1, Math.round(liveH * k));
+        }
+        var scale = shotScale;
+        var maxDim = 8192;
+        try {
+            var gl = renderer.getContext();
+            if (gl) {
+                var cap = gl.getParameter(gl.MAX_RENDERBUFFER_SIZE);
+                if (cap) {
+                    maxDim = Math.min(maxDim, cap);
+                }
+            }
+        } catch (e) { /* ignore */ }
+        if (Math.max(w, h) * scale > maxDim) {
+            scale = maxDim / Math.max(w, h);
+        }
+
+        if (camera.isOrthographicCamera) {
+            applyOrthoFrustum(w, h);
+        } else {
+            camera.aspect = w / Math.max(h, 1);
+            camera.updateProjectionMatrix();
+        }
+        renderer.setPixelRatio(scale);
+        renderer.setSize(w, h, false);
+        applyCanvasClear(shotAlpha);
         renderer.render(scene, camera);
+
         var base = String(currentFileName || 'cad')
             .replace(/\.[^.]+$/, '')
             .replace(/[\\/:*?"<>|]+/g, '_')
@@ -2083,12 +3116,26 @@
             hidden.forEach(function (el) {
                 el.classList.remove('is-hidden');
             });
-            if (pivotHelper) {
-                pivotHelper.visible = !!pivotWasVisible;
+            hidden3d.forEach(function (obj) {
+                obj.visible = true;
+            });
+            if (highlightHidden && selectedNodeId) {
+                applyEmissive(selectedNodeId);
             }
-            if (clipHelper) {
-                clipHelper.visible = !!clipWasVisible;
+            if (camera) {
+                if (camera.isOrthographicCamera) {
+                    applyOrthoFrustum(liveW, liveH);
+                } else {
+                    camera.aspect = liveW / Math.max(liveH, 1);
+                    camera.updateProjectionMatrix();
+                }
             }
+            if (renderer) {
+                renderer.setPixelRatio(liveRatio);
+                renderer.setSize(liveW, liveH, false);
+                applyCanvasClear(false);
+            }
+            capturingShot = false;
             if (!blob) {
                 return;
             }
@@ -2458,6 +3505,7 @@
         rec.object.visible = !rec.object.visible;
         syncTreeNodeUi(id);
         applyTreeFilter();
+        syncMeasureUi();
     }
 
     function syncTreeNodeUi(id) {
@@ -2527,24 +3575,27 @@
         selectedNodeId = id || null;
         if (!selectedNodeId || !nodeMap[selectedNodeId]) {
             selectedNodeId = null;
+            syncDisplayUi();
+            syncMeasureUi();
             return;
         }
         applyEmissive(selectedNodeId);
+        syncDisplayUi();
         var li = pageRoot && pageRoot.querySelector('[data-cad-tree-node="' + selectedNodeId + '"]');
-        if (!li) {
-            return;
-        }
-        li.classList.add('is-selected');
-        var p = li.parentElement;
-        while (p) {
-            if (p.classList && p.classList.contains('cad-preview-tree-node')) {
-                p.classList.remove('is-collapsed');
+        if (li) {
+            li.classList.add('is-selected');
+            var p = li.parentElement;
+            while (p) {
+                if (p.classList && p.classList.contains('cad-preview-tree-node')) {
+                    p.classList.remove('is-collapsed');
+                }
+                p = p.parentElement;
             }
-            p = p.parentElement;
+            if (typeof li.scrollIntoView === 'function') {
+                li.scrollIntoView({ block: 'nearest' });
+            }
         }
-        if (typeof li.scrollIntoView === 'function') {
-            li.scrollIntoView({ block: 'nearest' });
-        }
+        syncMeasureUi();
     }
 
     function isOnSelectedPath(id) {
@@ -2586,6 +3637,7 @@
         });
         refreshTreeVisibility();
         applyTreeFilter();
+        syncMeasureUi();
     }
 
     function showAllNodes() {
@@ -2595,6 +3647,7 @@
         });
         refreshTreeVisibility();
         applyTreeFilter();
+        syncMeasureUi();
     }
 
     function findCadNode(obj) {
@@ -2607,6 +3660,20 @@
             cur = cur.parent;
         }
         return null;
+    }
+
+    function onCanvasPointerMove(ev) {
+        if (!measuring || placingPivot) {
+            hideMeasurePreview();
+            return;
+        }
+        var hit = raycastModel(ev);
+        if (!hit) {
+            hideMeasurePreview();
+            return;
+        }
+        var snap = snapMeasureHit(hit);
+        showMeasurePreview(snap.point, snap.snapped);
     }
 
     function onCanvasPointerDown(ev) {
@@ -2699,6 +3766,17 @@
                 if (id) {
                     selectNode(id);
                 }
+            }
+            return;
+        }
+        if (measuring) {
+            if (hit) {
+                addMeasurePoint(snapMeasureHit(hit).point);
+                hideMeasurePreview();
+            } else if (measurePending) {
+                measurePending = null;
+                rebuildMeasureGeom();
+                syncMeasureUi();
             }
             return;
         }
@@ -2823,6 +3901,8 @@
         addMeshes(result, currentFileName);
         renderTree();
         setDisplayMode('solid');
+        setDarkCanvas(darkCanvas);
+        applyLights();
         syncExplodeUi();
         if (sectionOn) {
             applySectionPlane();
@@ -2849,6 +3929,8 @@
             pageRoot.addEventListener('change', onSectionInput);
             pageRoot.addEventListener('input', onExplodeInput);
             pageRoot.addEventListener('change', onExplodeInput);
+            pageRoot.addEventListener('input', onDisplayInput);
+            pageRoot.addEventListener('change', onDisplayInput);
             pageRoot.addEventListener('input', onTreeSearchInput);
             pageRoot.addEventListener('change', onTreeSearchInput);
             pageRoot.addEventListener('keydown', onTreeSearchKeydown);
@@ -2858,6 +3940,8 @@
         if (canvasEl && !canvasEl.__cadPickBound) {
             canvasEl.addEventListener('pointerdown', onCanvasPointerDown);
             canvasEl.addEventListener('pointerup', onCanvasPointerUp);
+            canvasEl.addEventListener('pointermove', onCanvasPointerMove);
+            canvasEl.addEventListener('pointerleave', hideMeasurePreview);
             canvasEl.addEventListener('dblclick', onCanvasDblClick);
             canvasEl.__cadPickBound = true;
         }

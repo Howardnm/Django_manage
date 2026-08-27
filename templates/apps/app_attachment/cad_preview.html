@@ -37,6 +37,16 @@
                     <button type="button" class="dropdown-item" data-cad-action="xray" title="半透明透视内部">
                         <i class="ti ti-circle-dotted me-2"></i>X射线
                     </button>
+                    <div class="dropdown-divider"></div>
+                    <button type="button" class="dropdown-item" data-cad-action="dark">
+                        <i class="ti ti-moon me-2"></i>深色画布
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="display-panel">
+                        <i class="ti ti-palette me-2"></i>外观
+                    </button>
+                    <button type="button" class="dropdown-item" data-cad-action="light">
+                        <i class="ti ti-sun me-2"></i>光照
+                    </button>
                 </div>
             </div>
             <div class="dropdown">
@@ -70,7 +80,7 @@
                         data-cad-group="assist">
                     <i class="ti ti-adjustments me-1"></i>辅助
                 </button>
-                <div class="dropdown-menu dropdown-menu-end">
+                <div class="dropdown-menu">
                     <button type="button" class="dropdown-item" data-cad-action="grid">
                         <i class="ti ti-grid-dots me-2"></i>网格
                     </button>
@@ -80,16 +90,23 @@
                     <button type="button" class="dropdown-item" data-cad-action="place-pivot" title="单击模型表面放置旋转中心">
                         <i class="ti ti-crosshair me-2"></i>放置旋转中心
                     </button>
-                    <div class="dropdown-divider"></div>
+                </div>
+            </div>
+            <div class="dropdown">
+                <button type="button" class="btn btn-outline-secondary dropdown-toggle"
+                        data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false"
+                        data-cad-group="tools">
+                    <i class="ti ti-tools me-1"></i>工具
+                </button>
+                <div class="dropdown-menu dropdown-menu-end">
                     <button type="button" class="dropdown-item" data-cad-action="section">
                         <i class="ti ti-cut me-2"></i>剖切
                     </button>
                     <button type="button" class="dropdown-item" data-cad-action="explode">
                         <i class="ti ti-arrows-maximize me-2"></i>爆炸
                     </button>
-                    <div class="dropdown-divider"></div>
-                    <button type="button" class="dropdown-item" data-cad-action="light">
-                        <i class="ti ti-sun me-2"></i>光照
+                    <button type="button" class="dropdown-item" data-cad-action="measure">
+                        <i class="ti ti-ruler-measure me-2"></i>量测
                     </button>
                 </div>
             </div>
@@ -101,7 +118,7 @@
                 <i class="ti ti-download me-1"></i>下载
             </a>
         </div>
-        <div class="cad-preview-toolbar-hint text-muted">拖动旋转 · 滚轮缩放 · 右键平移 · 双击零件设为旋转中心</div>
+        <div class="cad-preview-toolbar-hint text-muted" data-cad-hint>拖动旋转 · 滚轮缩放 · 右键平移 · 双击零件设为旋转中心</div>
     </header>
 
     <div class="cad-preview-stage"
@@ -136,6 +153,13 @@
                 <span>光照</span>
                 <button type="button" class="btn-close" data-cad-action="light-close" aria-label="关闭"></button>
             </div>
+            <div class="cad-preview-light-row">
+                <span>类型</span>
+                <div class="btn-group w-100" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="light-kind" data-cad-light-kind="area" title="平行光，覆盖整模">区域</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="light-kind" data-cad-light-kind="point" title="点光源，近处更亮">点光源</button>
+                </div>
+            </div>
             <label class="cad-preview-light-row" data-cad-light-lock>
                 <span>方位 <em data-cad-light-az-val>50°</em></span>
                 <input type="range" min="0" max="360" step="1" value="50" data-cad-light="azimuth">
@@ -148,9 +172,17 @@
                 <span>亮度 <em data-cad-light-in-val>0.75</em></span>
                 <input type="range" min="0.20" max="1.50" step="0.05" value="0.75" data-cad-light="intensity">
             </label>
+            <label class="cad-preview-light-row">
+                <span>光泽 <em data-cad-light-gloss-val>35%</em></span>
+                <input type="range" min="0" max="1" step="0.05" value="0.35" data-cad-light="gloss" title="材质高光，0 为哑光">
+            </label>
             <label class="cad-preview-light-row cad-preview-light-row--color">
                 <span>颜色 <em data-cad-light-color-val>#ffffff</em></span>
                 <input type="color" value="#ffffff" data-cad-light="color">
+            </label>
+            <label class="cad-preview-light-row" data-cad-light-point-lock>
+                <span>距离 <em data-cad-light-dist-val>1.5×</em></span>
+                <input type="range" min="0.4" max="4" step="0.1" value="1.5" data-cad-light="distance" title="相对模型尺寸">
             </label>
             <label class="form-check mb-2">
                 <input class="form-check-input" type="checkbox" data-cad-light="follow">
@@ -220,6 +252,93 @@
             </div>
             <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="explode-reset">重置程度</button>
         </div>
+        <div class="cad-preview-light-panel cad-preview-display-panel is-hidden" data-cad-display-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>外观</span>
+                <button type="button" class="btn-close" data-cad-action="display-close" aria-label="关闭"></button>
+            </div>
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" data-cad-dark>
+                <span class="form-check-label">深色画布</span>
+            </label>
+            <div class="cad-preview-light-row">
+                <span>零件颜色 <em data-cad-part-name>（无选中）</em></span>
+            </div>
+            <label class="cad-preview-light-row cad-preview-light-row--color">
+                <span>颜色</span>
+                <input type="color" value="#8a9ba8" data-cad-part-color>
+            </label>
+            <div class="cad-preview-tree-actions mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="part-color" disabled>应用到所选</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="part-color-reset" disabled>恢复所选</button>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-2" data-cad-action="part-color-reset-all">恢复全部</button>
+        </div>
+        <div class="cad-preview-light-panel cad-preview-shot-panel is-hidden" data-cad-shot-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>截图</span>
+                <button type="button" class="btn-close" data-cad-action="shot-close" aria-label="关闭"></button>
+            </div>
+            <label class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" checked data-cad-shot="measure">
+                <span class="form-check-label">包含量测标注</span>
+            </label>
+            <label class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" checked data-cad-shot="helpers">
+                <span class="form-check-label">包含网格与坐标轴</span>
+            </label>
+            <label class="form-check mb-1">
+                <input class="form-check-input" type="checkbox" checked data-cad-shot="highlight">
+                <span class="form-check-label">包含选中高亮</span>
+            </label>
+            <label class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" data-cad-shot="alpha">
+                <span class="form-check-label">透明背景</span>
+            </label>
+            <div class="cad-preview-light-row">
+                <span>精度</span>
+                <div class="btn-group w-100 cad-preview-shot-scale" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="1">1x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="shot-scale" data-cad-shot-scale="2">2x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="3">3x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="4">4x</button>
+                </div>
+                <div class="btn-group w-100 cad-preview-shot-scale mt-1" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="5">5x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="6">6x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="7">7x</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-scale" data-cad-shot-scale="8">8x</button>
+                </div>
+            </div>
+            <div class="cad-preview-light-row">
+                <span>边长</span>
+                <div class="btn-group w-100 cad-preview-shot-size" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="shot-size" data-cad-shot-size="0">视口</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-size" data-cad-shot-size="1920">1920</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-size" data-cad-shot-size="2560">2560</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="shot-size" data-cad-shot-size="3840">3840</button>
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-primary w-100" data-cad-action="shot-export">
+                <i class="ti ti-download me-1"></i>导出 PNG
+            </button>
+        </div>
+        <div class="cad-preview-light-panel cad-preview-measure-panel is-hidden" data-cad-measure-panel>
+            <div class="cad-preview-light-panel-head">
+                <span>量测</span>
+                <button type="button" class="btn-close" data-cad-action="measure-close" aria-label="关闭"></button>
+            </div>
+            <div class="cad-preview-light-row">
+                <span>距离 <em data-cad-measure="distance">—</em></span>
+                <div class="cad-preview-measure-list text-muted small is-hidden" data-cad-measure="list"></div>
+            </div>
+            <div class="cad-preview-light-row">
+                <span>选中 <em data-cad-measure="name">（无）</em></span>
+                <div class="cad-preview-measure-size text-muted small" data-cad-measure="size">在结构树或退出量测后点选零件</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="measure-clear">清除距离</button>
+        </div>
+        <div class="cad-preview-measure-label is-hidden" data-cad-measure-label></div>
         <div class="cad-preview-tree-panel is-hidden" data-cad-tree-panel>
             <div class="cad-preview-light-panel-head">
                 <span>结构</span>

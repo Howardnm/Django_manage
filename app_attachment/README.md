@@ -308,7 +308,7 @@ attachments = Attachment.objects.filter(
 
 ## 12. CAD 在线预览（STP / STEP / IGES）
 
-附件列表对 `.stp` / `.step` / `.igs` / `.iges` 显示「3D 预览」按钮，新窗口打开 viewer 页，可旋转 / 缩放 / 平移，并支持装配结构树（搜索、显隐过滤、件数统计）、六面视图与视轴旋转、正交投影、网格/轴线、线框、X 射线透视、旋转中心、XYZ 剖切、爆炸图（径向 / X / Y / Z + 等距拉开，可选零件中心）、光照和 PNG 截图。解析在浏览器 Web Worker 中完成（occt-import-js WASM），不占用 Django worker。列表页不加载 Three.js / WASM。
+附件列表对 `.stp` / `.step` / `.igs` / `.iges` 显示「3D 预览」按钮，新窗口打开 viewer 页，可旋转 / 缩放 / 平移，并支持装配结构树（搜索、显隐过滤、件数统计）、六面视图与视轴旋转、正交投影、网格/轴线、线框、X 射线透视、旋转中心、XYZ 剖切、爆炸图（径向 / X / Y / Z + 等距拉开，可选零件中心）、量测（点到点距离、可连续多条、端点吸附、选中件包围盒，读数按毫米）、深色画布、零件换色、截图面板（量测/网格/高亮/透明底、精度与边长，面板内导出 PNG）、光照（区域平行光 / 点光源，方位与距离可调、材质光泽可调）。解析在浏览器 Web Worker 中完成（occt-import-js WASM），不占用 Django worker。列表页不加载 Three.js / WASM。
 
 | 项 | 说明 |
 |----|------|
@@ -321,7 +321,7 @@ attachments = Attachment.objects.filter(
 
 `preview_kind` 当前仅 `'cad3d'`。以后加 PDF / 图片预览：在模型中返回新 kind，并往 `VIEWER_TEMPLATES` 登记模板，URL 不用改。
 
-不在范围内：DWG/DXF、量测、切口补面、服务端 tessellation。
+不在范围内：DWG/DXF、切口补面、服务端 tessellation。
 
 ---
 

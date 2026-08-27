@@ -70,6 +70,10 @@ body.cad-preview-body {
     overflow: hidden;
 }
 
+.cad-preview-stage.is-dark {
+    background: #1c2330;
+}
+
 .cad-preview-canvas {
     display: block;
     width: 100%;
@@ -77,8 +81,71 @@ body.cad-preview-body {
     touch-action: none;
 }
 
-.cad-preview-stage.is-placing-pivot .cad-preview-canvas {
+.cad-preview-stage.is-placing-pivot .cad-preview-canvas,
+.cad-preview-stage.is-measuring .cad-preview-canvas {
     cursor: crosshair;
+}
+
+.cad-preview-measure-label {
+    position: absolute;
+    z-index: 3;
+    transform: translate(-50%, -120%);
+    pointer-events: none;
+    padding: 0.12rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(32, 107, 196, 0.92);
+    color: #fff;
+    font-size: 0.75rem;
+    line-height: 1.3;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(24, 36, 51, 0.16);
+}
+
+.cad-preview-measure-panel,
+.cad-preview-display-panel,
+.cad-preview-shot-panel {
+    width: 240px;
+}
+
+.cad-preview-shot-size .btn,
+.cad-preview-shot-scale .btn {
+    padding-left: 0.25rem;
+    padding-right: 0.25rem;
+}
+
+.cad-preview-measure-size,
+.cad-preview-measure-list {
+    margin-top: 0.15rem;
+    line-height: 1.45;
+    white-space: pre-line;
+}
+
+.cad-preview-measure-list {
+    max-height: 8rem;
+    overflow: auto;
+}
+
+.cad-preview-measure-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem;
+    white-space: nowrap;
+}
+
+.cad-preview-measure-item span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cad-preview-measure-remove {
+    flex: 0 0 auto;
+    width: 1.4rem;
+    height: 1.4rem;
+    padding: 0;
+    line-height: 1;
+    color: var(--tblr-muted, #6c7a91);
 }
 
 .cad-preview-view-roll {
@@ -122,6 +189,10 @@ body.cad-preview-body {
     z-index: 2;
     padding: 1.5rem;
     text-align: center;
+}
+
+.cad-preview-stage.is-dark .cad-preview-overlay {
+    background: rgba(28, 35, 48, 0.88);
 }
 
 .cad-preview-overlay.is-hidden,
@@ -201,6 +272,7 @@ body.cad-preview-body {
 }
 
 .cad-preview-light-panel.is-follow [data-cad-light-lock],
+.cad-preview-light-panel:not(.is-point) [data-cad-light-point-lock],
 .cad-preview-light-panel.is-explode-locked [data-cad-explode-lock],
 .cad-preview-light-panel.is-explode-locked [data-cad-explode-bin-lock],
 .cad-preview-light-panel.is-even-off [data-cad-explode-bin-lock] {
