@@ -1075,7 +1075,7 @@
     }
 
     function assignExplodeRanks(origin, maxDim) {
-        var binPct = Math.max(0.5, Math.min(10, explodeBinPct));
+        var binPct = Math.max(0.2, Math.min(20, explodeBinPct));
         var delta = Math.max(maxDim * (binPct / 100), 1e-10);
         var coincideEps = Math.max(maxDim * 1e-6, 1e-10);
         explodeUnits.forEach(function (u, i) {
@@ -1212,7 +1212,7 @@
     }
 
     function applyExplode() {
-        var t = Math.max(0, Math.min(100, explodeAmount)) / 100;
+        var t = Math.max(0, Math.min(300, explodeAmount)) / 100;
         explodeUnits.forEach(function (u) {
             u.object.position.copy(u.home).addScaledVector(u.dir, t * explodeSpan);
         });
@@ -1288,7 +1288,9 @@
         }
         var binVal = panel.querySelector('[data-cad-explode-bin-val]');
         if (binVal) {
-            binVal.textContent = Number(explodeBinPct).toFixed(explodeBinPct % 1 ? 1 : 0) + '%';
+            binVal.textContent = Number(explodeBinPct).toFixed(
+                Math.abs(explodeBinPct % 1) < 1e-6 ? 0 : 1
+            ) + '%';
         }
         var input = panel.querySelector('[data-cad-explode="amount"]');
         if (input) {
@@ -1327,7 +1329,7 @@
             return;
         }
         if (kind === 'bin') {
-            explodeBinPct = Math.max(0.5, Math.min(10, Number(input.value) || DEFAULT_EXPLODE_BIN_PCT));
+            explodeBinPct = Math.max(0.2, Math.min(20, Number(input.value) || DEFAULT_EXPLODE_BIN_PCT));
             if (!explodeUnits.length) {
                 prepareExplodeUnits();
             } else {
