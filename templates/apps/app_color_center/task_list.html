@@ -79,7 +79,7 @@
                         </td>
                         <td>
                             {% if stats %}
-                            <span class="badge {% if stats.done == stats.total %}bg-green{% else %}bg-yellow{% endif %} text-white">
+                            <span class="badge {% if stats.done == stats.total %}bg-green-lt{% else %}bg-yellow-lt{% endif %}">
                                 {{ stats.done }}/{{ stats.total }}
                             </span>
                             {% else %}<span class="text-muted">-</span>{% endif %}

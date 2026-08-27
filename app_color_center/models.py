@@ -71,8 +71,8 @@ class ColorMatchingTask(models.Model):
     @property
     def status_css_class(self):
         return {
-            self.Status.PENDING: 'bg-orange text-white',
-            self.Status.IN_PROGRESS: 'bg-azure text-white',
-            self.Status.COMPLETED: 'bg-green text-white',
+            self.Status.PENDING: 'bg-orange-lt',
+            self.Status.IN_PROGRESS: 'bg-azure-lt',
+            self.Status.COMPLETED: 'bg-green-lt',
             self.Status.NOT_REQUIRED: 'bg-secondary-lt',
         }.get(self.status, 'bg-secondary-lt')
