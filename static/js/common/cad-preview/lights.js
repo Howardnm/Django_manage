@@ -1,7 +1,7 @@
 /**
  * CAD 预览 — 光照
  */
-import { THREE, S, hooks, DEFAULT_LIGHT_AZIMUTH, DEFAULT_LIGHT_COLOR, DEFAULT_LIGHT_DISTANCE, DEFAULT_LIGHT_ELEVATION, DEFAULT_LIGHT_GLOSS, DEFAULT_LIGHT_INTENSITY, DEFAULT_LIGHT_KIND, getModelBox, glossParams } from './core.js';
+import { THREE, S, hooks, DEFAULT_LIGHT_AZIMUTH, DEFAULT_LIGHT_COLOR, DEFAULT_LIGHT_DISTANCE, DEFAULT_LIGHT_ELEVATION, DEFAULT_LIGHT_GLOSS, DEFAULT_LIGHT_INTENSITY, DEFAULT_LIGHT_KIND, DEFAULT_MAT_CLEARCOAT, DEFAULT_MAT_CLEARCOAT_ROUGHNESS, DEFAULT_MAT_METALNESS, DEFAULT_MAT_ROUGHNESS, applyGlossPreset, clamp01, currentMatParams, getModelBox } from './core.js';
 
 function lightPanel() {
     return S.pageRoot && S.pageRoot.querySelector('[data-cad-light-panel]');
@@ -75,13 +75,19 @@ function onLightInput(ev) {
             S.lightDistance = DEFAULT_LIGHT_DISTANCE;
         }
     } else if (kind === 'gloss') {
-        S.lightGloss = Number(input.value);
-        if (!(S.lightGloss >= 0)) {
-            S.lightGloss = 0;
-        }
-        if (S.lightGloss > 1) {
-            S.lightGloss = 1;
-        }
+        applyGlossPreset(input.value);
+        applyMaterialGloss();
+    } else if (kind === 'roughness') {
+        S.matRoughness = clamp01(input.value);
+        applyMaterialGloss();
+    } else if (kind === 'metalness') {
+        S.matMetalness = clamp01(input.value);
+        applyMaterialGloss();
+    } else if (kind === 'clearcoat') {
+        S.matClearcoat = clamp01(input.value);
+        applyMaterialGloss();
+    } else if (kind === 'clearcoat-roughness') {
+        S.matClearcoatRoughness = clamp01(input.value);
         applyMaterialGloss();
     }
     applyLights();
@@ -102,7 +108,11 @@ function resetLights() {
     S.lightFollow = false;
     S.lightKind = DEFAULT_LIGHT_KIND;
     S.lightDistance = DEFAULT_LIGHT_DISTANCE;
-    S.lightGloss = DEFAULT_LIGHT_GLOSS;
+    applyGlossPreset(DEFAULT_LIGHT_GLOSS);
+    S.matRoughness = DEFAULT_MAT_ROUGHNESS;
+    S.matMetalness = DEFAULT_MAT_METALNESS;
+    S.matClearcoat = DEFAULT_MAT_CLEARCOAT;
+    S.matClearcoatRoughness = DEFAULT_MAT_CLEARCOAT_ROUGHNESS;
     applyLights();
     applyMaterialGloss();
     syncLightUi();
@@ -112,7 +122,7 @@ function applyMaterialGloss() {
     if (!S.modelGroup) {
         return;
     }
-    var p = glossParams(S.lightGloss);
+    var p = currentMatParams();
     var seen = [];
     S.modelGroup.traverse(function (obj) {
         if (!obj.userData || obj.userData.cadRole !== 'solid') {
@@ -120,12 +130,25 @@ function applyMaterialGloss() {
         }
         var mats = Array.isArray(obj.material) ? obj.material : [obj.material];
         mats.forEach(function (m) {
-            if (!m || !m.specular || seen.indexOf(m) !== -1) {
+            if (!m || seen.indexOf(m) !== -1) {
+                return;
+            }
+            if (m.roughness == null && m.metalness == null) {
                 return;
             }
             seen.push(m);
-            m.specular.setHex(p.hex);
-            m.shininess = p.shininess;
+            if (m.roughness != null) {
+                m.roughness = p.roughness;
+            }
+            if (m.metalness != null) {
+                m.metalness = p.metalness;
+            }
+            if (m.clearcoat != null) {
+                m.clearcoat = p.clearcoat;
+            }
+            if (m.clearcoatRoughness != null) {
+                m.clearcoatRoughness = p.clearcoatRoughness;
+            }
             m.needsUpdate = true;
         });
     });
@@ -158,12 +181,20 @@ function syncLightUi() {
     var follow = panel.querySelector('[data-cad-light="follow"]');
     var dist = panel.querySelector('[data-cad-light="distance"]');
     var gloss = panel.querySelector('[data-cad-light="gloss"]');
+    var roughness = panel.querySelector('[data-cad-light="roughness"]');
+    var metalness = panel.querySelector('[data-cad-light="metalness"]');
+    var clearcoat = panel.querySelector('[data-cad-light="clearcoat"]');
+    var coatRough = panel.querySelector('[data-cad-light="clearcoat-roughness"]');
     var azVal = panel.querySelector('[data-cad-light-az-val]');
     var elVal = panel.querySelector('[data-cad-light-el-val]');
     var inVal = panel.querySelector('[data-cad-light-in-val]');
     var colorVal = panel.querySelector('[data-cad-light-color-val]');
     var distVal = panel.querySelector('[data-cad-light-dist-val]');
     var glossVal = panel.querySelector('[data-cad-light-gloss-val]');
+    var roughnessVal = panel.querySelector('[data-cad-light-roughness-val]');
+    var metalnessVal = panel.querySelector('[data-cad-light-metalness-val]');
+    var clearcoatVal = panel.querySelector('[data-cad-light-clearcoat-val]');
+    var coatRoughVal = panel.querySelector('[data-cad-light-clearcoat-roughness-val]');
     var isPoint = S.lightKind === 'point';
     if (az) {
         az.value = String(Math.round(S.lightAzimuth));
@@ -189,6 +220,18 @@ function syncLightUi() {
     if (gloss) {
         gloss.value = String(S.lightGloss);
     }
+    if (roughness) {
+        roughness.value = String(S.matRoughness);
+    }
+    if (metalness) {
+        metalness.value = String(S.matMetalness);
+    }
+    if (clearcoat) {
+        clearcoat.value = String(S.matClearcoat);
+    }
+    if (coatRough) {
+        coatRough.value = String(S.matClearcoatRoughness);
+    }
     if (azVal) {
         azVal.textContent = S.lightFollow ? '跟随' : Math.round(S.lightAzimuth) + '°';
     }
@@ -206,6 +249,18 @@ function syncLightUi() {
     }
     if (glossVal) {
         glossVal.textContent = Math.round(S.lightGloss * 100) + '%';
+    }
+    if (roughnessVal) {
+        roughnessVal.textContent = Math.round(S.matRoughness * 100) + '%';
+    }
+    if (metalnessVal) {
+        metalnessVal.textContent = Math.round(S.matMetalness * 100) + '%';
+    }
+    if (clearcoatVal) {
+        clearcoatVal.textContent = Math.round(S.matClearcoat * 100) + '%';
+    }
+    if (coatRoughVal) {
+        coatRoughVal.textContent = Math.round(S.matClearcoatRoughness * 100) + '%';
     }
     panel.querySelectorAll('[data-cad-light-kind]').forEach(function (btn) {
         btn.classList.toggle('active', btn.getAttribute('data-cad-light-kind') === S.lightKind);
@@ -226,9 +281,15 @@ function applyLights() {
         S.pointLight.visible = isPoint;
     }
     S.keyLight.color.set(S.lightColor);
-    S.fillLight.color.copy(S.keyLight.color).multiplyScalar(0.55);
-    S.ambientLight.color.copy(S.keyLight.color).multiplyScalar(0.7);
-    S.ambientLight.intensity = 0.28 + S.lightIntensity * 0.22;
+    S.fillLight.color.copy(S.keyLight.color).multiplyScalar(0.72);
+    if (S.ambientLight.isHemisphereLight) {
+        S.ambientLight.color.copy(S.keyLight.color);
+        S.ambientLight.groundColor.copy(S.keyLight.color).multiplyScalar(0.38);
+        S.ambientLight.intensity = 0.55 + S.lightIntensity * 0.42;
+    } else {
+        S.ambientLight.color.copy(S.keyLight.color).multiplyScalar(0.7);
+        S.ambientLight.intensity = 0.28 + S.lightIntensity * 0.22;
+    }
     if (isPoint && S.pointLight) {
         var info = getModelBox(false);
         var maxDim = info ? info.maxDim : 80;
@@ -239,15 +300,16 @@ function applyLights() {
             S.pointLight.position.copy(dir).multiplyScalar(dist);
         }
         S.pointLight.color.set(S.lightColor);
-        S.pointLight.intensity = S.lightIntensity * 2.5;
-        S.pointLight.distance = dist + maxDim * 1.8;
+        // r185 物理点光按距离平方衰减。强度乘 dist²，模型中心亮度跟区域主光同级。
+        S.pointLight.intensity = S.lightIntensity * 2.8 * dist * dist;
+        S.pointLight.distance = 0;
         S.pointLight.decay = 2;
         return;
     }
     S.keyLight.position.copy(dir);
-    S.keyLight.intensity = S.lightIntensity;
+    S.keyLight.intensity = S.lightIntensity * 2.8;
     S.fillLight.position.set(-dir.x * 0.55, -dir.y * 0.55, Math.max(dir.z * 0.3, 0.15));
-    S.fillLight.intensity = Math.max(S.lightIntensity * 0.32, 0.12);
+    S.fillLight.intensity = Math.max(S.lightIntensity * 0.95, 0.28);
 }
 
 

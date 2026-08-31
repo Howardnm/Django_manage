@@ -323,6 +323,9 @@ async function loadModel(opts) {
     hooks.renderTree();
     hooks.setDisplayMode('solid');
     hooks.setDarkCanvas(S.darkCanvas);
+    if (hooks.applyMaterialGloss) {
+        hooks.applyMaterialGloss();
+    }
     hooks.applyLights();
     hooks.syncExplodeUi();
     if (hooks.isSectionOn()) {

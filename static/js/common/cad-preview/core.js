@@ -16,6 +16,10 @@ export var DEFAULT_LIGHT_COLOR = '#ffffff';
 export var DEFAULT_LIGHT_KIND = 'area';
 export var DEFAULT_LIGHT_DISTANCE = 1.5;
 export var DEFAULT_LIGHT_GLOSS = 0.35;
+export var DEFAULT_MAT_ROUGHNESS = 0.452;
+export var DEFAULT_MAT_METALNESS = 0.106;
+export var DEFAULT_MAT_CLEARCOAT = 0.295;
+export var DEFAULT_MAT_CLEARCOAT_ROUGHNESS = 0.178;
 export var MAX_SECTION_CUTS = 8;
 export var DEFAULT_EXPLODE_BIN_PCT = 2;
 export var TREE_AUTO_COLLAPSE_MIN = 12;
@@ -65,6 +69,10 @@ export var S = {
     lightKind: DEFAULT_LIGHT_KIND,
     lightDistance: DEFAULT_LIGHT_DISTANCE,
     lightGloss: DEFAULT_LIGHT_GLOSS,
+    matRoughness: DEFAULT_MAT_ROUGHNESS,
+    matMetalness: DEFAULT_MAT_METALNESS,
+    matClearcoat: DEFAULT_MAT_CLEARCOAT,
+    matClearcoatRoughness: DEFAULT_MAT_CLEARCOAT_ROUGHNESS,
     nodeIdSeq: 0,
     nodeMap: {},
     selectedNodeId: null,
@@ -226,12 +234,43 @@ function escapeHtml(text) {
         .replace(/"/g, '&quot;');
 }
 
+function clamp01(v) {
+    v = Number(v);
+    if (!(v >= 0)) {
+        return 0;
+    }
+    if (v > 1) {
+        return 1;
+    }
+    return v;
+}
+
 function glossParams(g) {
-    g = Math.max(0, Math.min(1, Number(g) || 0));
-    var spec = Math.round(g * 210);
+    g = clamp01(g);
     return {
-        hex: (spec << 16) | (spec << 8) | spec,
-        shininess: 1 + g * 30 + g * g * 70,
+        roughness: 0.62 - g * 0.48,
+        metalness: 0.05 + g * 0.16,
+        clearcoat: 0.12 + g * 0.5,
+        clearcoatRoughness: 0.22 - g * 0.12,
+    };
+}
+
+function applyGlossPreset(g) {
+    var p = glossParams(g);
+    S.lightGloss = clamp01(g);
+    S.matRoughness = p.roughness;
+    S.matMetalness = p.metalness;
+    S.matClearcoat = p.clearcoat;
+    S.matClearcoatRoughness = p.clearcoatRoughness;
+    return p;
+}
+
+function currentMatParams() {
+    return {
+        roughness: clamp01(S.matRoughness),
+        metalness: clamp01(S.matMetalness),
+        clearcoat: clamp01(S.matClearcoat),
+        clearcoatRoughness: clamp01(S.matClearcoatRoughness),
     };
 }
 
@@ -357,7 +396,8 @@ function initScene(canvas, container) {
     });
     S.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     S.renderer.setSize(w, h, false);
-    S.renderer.toneMapping = THREE.NoToneMapping;
+    S.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    S.renderer.toneMappingExposure = 1.12;
     applyCanvasClear(false);
     S.renderer.localClippingEnabled = true;
 
@@ -366,13 +406,13 @@ function initScene(canvas, container) {
     S.camera.up.set(0, 0, 1);
     S.camera.position.set(120, 90, 80);
 
-    S.ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    S.ambientLight = new THREE.HemisphereLight(0xffffff, 0x6e7a86, 0.95);
     S.scene.add(S.ambientLight);
-    S.keyLight = new THREE.DirectionalLight(0xffffff, 1.0);
+    S.keyLight = new THREE.DirectionalLight(0xffffff, 2.8);
     S.scene.add(S.keyLight);
-    S.fillLight = new THREE.DirectionalLight(0xffffff, 0.32);
+    S.fillLight = new THREE.DirectionalLight(0xffffff, 0.9);
     S.scene.add(S.fillLight);
-    S.pointLight = new THREE.PointLight(0xffffff, 2.5, 0, 2);
+    S.pointLight = new THREE.PointLight(0xffffff, 2.8, 0, 2);
     S.pointLight.visible = false;
     S.scene.add(S.pointLight);
     if (hooks.applyLights) {
@@ -392,12 +432,14 @@ function initScene(canvas, container) {
 }
 
 function makeSolidMaterial(color) {
-    var p = glossParams(S.lightGloss);
+    var p = currentMatParams();
     var planes = [];
-    var mat = new THREE.MeshPhongMaterial({
+    var mat = new THREE.MeshPhysicalMaterial({
         color: color,
-        specular: p.hex,
-        shininess: p.shininess,
+        roughness: p.roughness,
+        metalness: p.metalness,
+        clearcoat: p.clearcoat,
+        clearcoatRoughness: p.clearcoatRoughness,
         side: THREE.DoubleSide,
         clippingPlanes: planes,
     });
@@ -633,4 +675,4 @@ function findCadNode(obj) {
 }
 
 
-export { assets, setStatus, setError, canvasClearColor, applyCanvasClear, setHint, setToggleActive, setGroupActive, closeParentDropdown, escapeHtml, glossParams, disposeScene, resizeRenderer, animate, initScene, makeSolidMaterial, meshMaterials, disposeHelperObject, eachSolid, eachMaterial, objectIsShown, cadGroupIsShown, getModelBox, getFitDistance, applyCameraClip, applyOrthoFrustum, bindControls, onOrbitStart, onOrbitEnd, nodeCenter, disposeHelper, getTreeChildren, findCadNode };
+export { assets, setStatus, setError, canvasClearColor, applyCanvasClear, setHint, setToggleActive, setGroupActive, closeParentDropdown, escapeHtml, clamp01, glossParams, applyGlossPreset, currentMatParams, disposeScene, resizeRenderer, animate, initScene, makeSolidMaterial, meshMaterials, disposeHelperObject, eachSolid, eachMaterial, objectIsShown, cadGroupIsShown, getModelBox, getFitDistance, applyCameraClip, applyOrthoFrustum, bindControls, onOrbitStart, onOrbitEnd, nodeCenter, disposeHelper, getTreeChildren, findCadNode };

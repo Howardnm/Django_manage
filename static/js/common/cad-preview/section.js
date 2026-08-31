@@ -867,7 +867,7 @@ function groupsToBrepFaces(geom) {
     var i;
     for (i = 0; i < groups.length; i++) {
         var g = groups[i];
-        if (!g || g.cadCap || g.count < 3 || (g.start % 3) !== 0 || (g.count % 3) !== 0) {
+        if (!g || g.count < 3 || (g.start % 3) !== 0 || (g.count % 3) !== 0) {
             continue;
         }
         var first = g.start / 3;

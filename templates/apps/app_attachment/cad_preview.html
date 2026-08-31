@@ -170,11 +170,27 @@
             </label>
             <label class="cad-preview-light-row">
                 <span>亮度 <em data-cad-light-in-val>1.00</em></span>
-                <input type="range" min="0.20" max="1.50" step="0.05" value="1.00" data-cad-light="intensity">
+                <input type="range" min="0.20" max="2.50" step="0.05" value="1.00" data-cad-light="intensity">
             </label>
             <label class="cad-preview-light-row">
                 <span>光泽 <em data-cad-light-gloss-val>35%</em></span>
-                <input type="range" min="0" max="1" step="0.05" value="0.35" data-cad-light="gloss" title="材质高光，0 为哑光">
+                <input type="range" min="0" max="1" step="0.05" value="0.35" data-cad-light="gloss" title="一键预设：同时改粗糙度、金属度、清漆">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>粗糙度 <em data-cad-light-roughness-val>45%</em></span>
+                <input type="range" min="0" max="1" step="0.01" value="0.45" data-cad-light="roughness" title="表面微观起伏，越高越哑">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>金属度 <em data-cad-light-metalness-val>11%</em></span>
+                <input type="range" min="0" max="1" step="0.01" value="0.11" data-cad-light="metalness" title="金属反射，塑料件宜低">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>清漆 <em data-cad-light-clearcoat-val>30%</em></span>
+                <input type="range" min="0" max="1" step="0.01" value="0.30" data-cad-light="clearcoat" title="表层清漆强度">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>清漆粗糙 <em data-cad-light-clearcoat-roughness-val>18%</em></span>
+                <input type="range" min="0" max="1" step="0.01" value="0.18" data-cad-light="clearcoat-roughness" title="清漆层本身的粗糙度">
             </label>
             <label class="cad-preview-light-row cad-preview-light-row--color">
                 <span>颜色 <em data-cad-light-color-val>#ffffff</em></span>
