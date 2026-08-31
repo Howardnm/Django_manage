@@ -1,10 +1,35 @@
 {% load static %}
-{# 仅 viewer 页加载。three / OrbitControls 由 cad_preview.js 挂载时再插入。 #}
+{# 仅 viewer 页加载。列表页不引用本模板，故不会拉取 Three / WASM / CSG。 #}
 <script>
 window.CAD_PREVIEW_ASSETS = window.CAD_PREVIEW_ASSETS || {
-    three: "{% static 'three/core-0.149.0/three.min.js' %}",
-    orbit: "{% static 'three/core-0.149.0/OrbitControls.js' %}",
     worker: "{% static 'occt-import-js/core-0.0.23/occt-import-js-worker.js' %}"
 };
 </script>
-<script src="{% static 'js/common/cad_preview.js' %}"></script>
+<script type="importmap">
+{
+  "imports": {
+    "three": "{% static 'three/core-0.185.1/build/three.module.min.js' %}",
+    "three/addons/": "{% static 'three/core-0.185.1/examples/jsm/' %}",
+    "three-mesh-bvh": "{% static 'three-mesh-bvh/core-0.9.14/index.module.js' %}",
+    "three-bvh-csg": "{% static 'three-bvh-csg/core-0.0.18/index.module.js' %}"
+  }
+}
+</script>
+<script type="module">
+import("{% static 'js/common/cad-preview/index.js' %}").catch(function (err) {
+    var stage = document.getElementById('cad-preview-page-stage');
+    var overlay = stage && stage.querySelector('[data-cad-status]');
+    var error = stage && stage.querySelector('[data-cad-error]');
+    var text = stage && stage.querySelector('[data-cad-error-text]');
+    if (overlay) {
+        overlay.classList.add('is-hidden');
+    }
+    if (error) {
+        error.classList.remove('is-hidden');
+    }
+    if (text) {
+        text.textContent = '3D 引擎加载失败。请刷新页面重试';
+    }
+    console.error(err);
+});
+</script>

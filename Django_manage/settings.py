@@ -196,7 +196,7 @@ USE_TZ = True
 # 静态文件 & 媒体文件
 # ==============================================================================
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # STATIC_ROOT是在部署的时候才发挥作用,执行 python managy.py collectstatic ，会在工程文件下生成staticfiles文件夹，把各个app下的静态文件收集到这个目录下。
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')

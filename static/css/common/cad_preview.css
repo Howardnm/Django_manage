@@ -103,8 +103,14 @@ body.cad-preview-body {
 
 .cad-preview-measure-panel,
 .cad-preview-display-panel,
-.cad-preview-shot-panel {
+.cad-preview-shot-panel,
+.cad-preview-section-panel {
     width: 240px;
+}
+
+.cad-preview-section-panel {
+    max-height: calc(100% - 24px);
+    overflow: auto;
 }
 
 .cad-preview-shot-size .btn,
@@ -137,6 +143,15 @@ body.cad-preview-body {
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.cad-preview-measure-item.is-selected {
+    background: rgba(32, 107, 196, 0.12);
+    border-radius: 4px;
+}
+
+.cad-preview-measure-item[data-cad-action] {
+    cursor: pointer;
 }
 
 .cad-preview-measure-remove {
@@ -269,6 +284,15 @@ body.cad-preview-body {
     border-radius: 3px;
     background: transparent;
     cursor: pointer;
+}
+
+.cad-preview-section-actions {
+    display: flex;
+    gap: 0.35rem;
+}
+
+.cad-preview-section-actions .btn {
+    flex: 1 1 0;
 }
 
 .cad-preview-light-panel.is-follow [data-cad-light-lock],

@@ -47,9 +47,11 @@ cad_preview.html            # CAD 全屏预览页（由 viewer 路由分发）
 
 静态资源：
 ```
-static/js/common/cad_preview.js
+static/js/common/cad-preview/         # 预览业务 JS（按功能拆文件，入口 index.js）
 static/css/common/cad_preview.css
-static/three/core-0.149.0/            # Three.js + OrbitControls（MIT）
+static/three/core-0.185.1/            # Three.js r185 ESM（module + core.min 同目录）+ OrbitControls（MIT）
+static/three-mesh-bvh/core-0.9.14/    # CSG 依赖（MIT）
+static/three-bvh-csg/core-0.0.18/     # 提交剖切时真切网格（MIT）
 static/occt-import-js/core-0.0.23/    # OpenCascade WASM（LGPL-2.1，勿合并进业务 JS）
 ```
 
@@ -308,7 +310,9 @@ attachments = Attachment.objects.filter(
 
 ## 12. CAD 在线预览（STP / STEP / IGES）
 
-附件列表对 `.stp` / `.step` / `.igs` / `.iges` 显示「3D 预览」按钮，新窗口打开 viewer 页，可旋转 / 缩放 / 平移，并支持装配结构树（搜索、显隐过滤、件数统计）、六面视图与视轴旋转、正交投影、网格/轴线、线框、X 射线透视、旋转中心、XYZ 剖切、爆炸图（径向 / X / Y / Z + 等距拉开，可选零件中心）、量测（点到点距离、可连续多条、端点吸附、选中件包围盒，读数按毫米）、深色画布、零件换色、截图面板（量测/网格/高亮/透明底、精度与边长，面板内导出 PNG）、光照（区域平行光 / 点光源，方位与距离可调、材质光泽可调）。解析在浏览器 Web Worker 中完成（occt-import-js WASM），不占用 Django worker。列表页不加载 Three.js / WASM。
+附件列表对 `.stp` / `.step` / `.igs` / `.iges` 显示「3D 预览」按钮，新窗口打开 viewer 页，可旋转 / 缩放 / 平移，并支持装配结构树（搜索、显隐过滤、件数统计）、六面视图与视轴旋转、正交投影、网格/轴线、线框、X 射线透视、旋转中心、剖切（打开面板不自动切；须先选零件，Ctrl 可多选；「添加剖切」只开 GPU 预览和切刀，拖滑条不改三角网；「提交切削」才用 three-bvh-csg 封口差运算真切网格并隐藏切刀，失败件回退 GPU；可叠多条，列表点选可再改再提交；只切所选，不切整模；XYZ 预设 / 任意角 / 翻转；新建过旋转中心；切面 bake 在零件上，爆炸后残缺跟着走）、爆炸图（径向 / X / Y / Z + 等距拉开，可选零件中心）、量测（点到点距离、可连续多条、三角顶点吸附且吸附范围随缩放变细，尺寸线跟零件走、选中件包围盒，读数按毫米）、深色画布、零件换色、截图面板（量测/网格/高亮/透明底、精度与边长，面板内导出 PNG）、光照（区域平行光 / 点光源，方位与距离可调、材质光泽可调）。解析在浏览器 Web Worker 中完成（occt-import-js WASM），不占用 Django worker。列表页不加载 Three.js / WASM / CSG。
+
+渲染走 Three.js r185（`static/three/core-0.185.1/`，ESM import map；`three.module.min.js` 与同目录 `three.core.min.js` 必须同时存在）。业务脚本在 `static/js/common/cad-preview/`，入口 `index.js`。引擎加载失败时动态 import 的 catch 会显示错误遮罩，不再停在「正在加载 3D 引擎…」。色彩管理跟 r185 默认（sRGB，物理灯光，不再 ×π）。
 
 | 项 | 说明 |
 |----|------|
@@ -317,11 +321,13 @@ attachments = Attachment.objects.filter(
 | 权限 | 与下载相同（UUID token + 父对象 view 权限）；无权限 403 |
 | 不支持的类型 | viewer 返回 **404**（例如对 PDF 打开该 URL） |
 | 上限 | 上传仍为 50MB；大于 20MB 会提示解析可能较慢，复杂模型可能因 WASM 内存失败 |
-| 许可证 | Three.js MIT；occt-import-js **LGPL-2.1**（独立 js/wasm 动态加载，勿合并进业务脚本） |
+| 许可证 | Three.js / three-mesh-bvh / three-bvh-csg MIT；occt-import-js **LGPL-2.1**（独立 js/wasm 动态加载，勿合并进业务脚本） |
 
 `preview_kind` 当前仅 `'cad3d'`。以后加 PDF / 图片预览：在模型中返回新 kind，并往 `VIEWER_TEMPLATES` 登记模板，URL 不用改。
 
-不在范围内：DWG/DXF、切口补面、服务端 tessellation。
+预览剖切只走 GPU `clippingPlanes`。提交后用 three-bvh-csg `SUBTRACTION` 改三角网（封口差，实体自带切口面）。开壳或非流形 STEP 可能失败，该件保留 GPU 切开，整页不崩。无薄片、无切口补面开关。只切所选零件（Ctrl 多选），不切整模。提交后线框按 CSG 保留的 B-rep 面分组重建（每面 `EdgesGeometry` 180°），未切面保持 CAD 轮廓，切口只出新边界，不把整网三角边画出来。
+
+不在范围内：DWG/DXF、服务端 tessellation。
 
 ---
 

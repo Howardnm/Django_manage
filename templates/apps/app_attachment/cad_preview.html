@@ -169,8 +169,8 @@
                 <input type="range" min="5" max="85" step="1" value="46" data-cad-light="elevation">
             </label>
             <label class="cad-preview-light-row">
-                <span>亮度 <em data-cad-light-in-val>0.75</em></span>
-                <input type="range" min="0.20" max="1.50" step="0.05" value="0.75" data-cad-light="intensity">
+                <span>亮度 <em data-cad-light-in-val>1.00</em></span>
+                <input type="range" min="0.20" max="1.50" step="0.05" value="1.00" data-cad-light="intensity">
             </label>
             <label class="cad-preview-light-row">
                 <span>光泽 <em data-cad-light-gloss-val>35%</em></span>
@@ -190,11 +190,21 @@
             </label>
             <button type="button" class="btn btn-sm btn-outline-secondary w-100" data-cad-action="light-reset">重置</button>
         </div>
-        <div class="cad-preview-light-panel is-hidden" data-cad-section-panel>
+        <div class="cad-preview-light-panel cad-preview-section-panel is-hidden" data-cad-section-panel>
             <div class="cad-preview-light-panel-head">
                 <span>剖切</span>
                 <button type="button" class="btn-close" data-cad-action="section-close" aria-label="关闭"></button>
             </div>
+            <div class="cad-preview-light-row">
+                <span>列表</span>
+                <div class="cad-preview-measure-list text-muted small is-hidden" data-cad-section="list"></div>
+            </div>
+            <div class="cad-preview-section-actions mb-2">
+                <button type="button" class="btn btn-sm btn-outline-secondary" data-cad-action="section-add">添加剖切</button>
+                <button type="button" class="btn btn-sm btn-primary" data-cad-action="section-commit" disabled>提交切削</button>
+            </div>
+            <div class="text-muted small mb-2" data-cad-section="targets">请选择要剖切的零件（Ctrl 多选）</div>
+            <button type="button" class="btn btn-sm btn-outline-secondary w-100 mb-2" data-cad-action="section-pivot">对准中心</button>
             <div class="cad-preview-light-row">
                 <span>轴向</span>
                 <div class="btn-group w-100" role="group">
@@ -203,6 +213,14 @@
                     <button type="button" class="btn btn-sm btn-outline-secondary active" data-cad-action="section-axis" data-cad-axis="z">Z</button>
                 </div>
             </div>
+            <label class="cad-preview-light-row">
+                <span>方位 <em data-cad-section-az-val>0°</em></span>
+                <input type="range" min="0" max="360" step="1" value="0" data-cad-section="azimuth">
+            </label>
+            <label class="cad-preview-light-row">
+                <span>高度 <em data-cad-section-el-val>90°</em></span>
+                <input type="range" min="-90" max="90" step="1" value="90" data-cad-section="elevation">
+            </label>
             <label class="cad-preview-light-row">
                 <span>偏移 <em data-cad-section-off-val>50%</em></span>
                 <input type="range" min="0" max="100" step="1" value="50" data-cad-section="offset">
