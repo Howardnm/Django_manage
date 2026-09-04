@@ -1,90 +1,62 @@
-# app_mcp_server 架构设计与接入指南 (重构版)
+# app_mcp_server 架构
 
-## 1. 核心目标
-本模块是一个高度模块化、零配置自动加载的 **MCP (Model Context Protocol) 框架层**。它将 `Django_manage` 的复杂业务逻辑转化为 AI Agent (如 Dify, Claude Desktop) 可调用的标准工具，支持 **HTTP/SSE** 和 **Stdio** 双模式传输。
+## 目标
 
----
+把 `Django_manage` 的业务查询变成 AI Agent 可调用的 MCP 工具。协议层用官方 `mcp` 2.x 的 `MCPServer`；远程走 Streamable HTTP，本地走 Stdio。
 
-## 2. 目录结构 (Tree)
+## 目录
 
 ```text
 app_mcp_server/
-├── core/                       # 【核心基础设施】
-│   ├── registry.py             # 工具注册中心 (@mcp_site.register)
-│   ├── server.py               # MCP Server 单例及 JSON-RPC 适配
-│   └── sessions.py             # AnyIO 异步会话与生命周期管理
-├── transports/                 # 【传输适配层】
-│   ├── sse.py                  # SSE (Server-Sent Events) 事件流生成器
-│   └── http.py                 # HTTP POST 消息解包与路由逻辑
-├── serializers/                # 【序列化层】数据对象转 AI 友好格式
-│   ├── base.py                 # 基础格式化工具 (日期等)
-│   ├── material.py             # 成品材料序列化
-│   ├── formula.py              # 实验配方序列化 (BOM/物性)
-│   └── project.py              # 项目档案与进度序列化
-├── tools/                      # 【业务工具库】
-│   ├── materials.py            # 材料查询工具
-│   ├── formulas.py             # 配方查询工具
-│   └── projects.py             # 项目全景查询工具
-├── management/                 # 【命令行接口】
-│   └── commands/
-│       └── run_mcp_server.py   # Stdio 模式入口 (本地调试/Claude Desktop)
-├── views.py                    # 【接入端点】Django HTTP 视图
-├── urls.py                     # 路由配置 (/sse/, /messages/)
-├── apps.py                     # 自动发现逻辑 (pkgutil 动态加载 tools)
-└── ARCHITECTURE.md             # 本架构说明文档
+├── core/
+│   └── server.py               # MCPServer 单例（mcp）
+├── serializers/                # DRF 只读 ModelSerializer → AI 扁平 JSON
+├── tools/                      # @mcp.tool() 业务工具
+├── management/commands/
+│   └── run_mcp_server.py       # Stdio 入口
+├── apps.py                     # 扫描 tools/ + autodiscover mcp_tools
+└── ARCHITECTURE.md
 ```
 
----
+Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette ASGI 应用，由 [Django_manage/asgi.py](../Django_manage/asgi.py) 挂到 `/mcp`。
 
-## 3. 分层逻辑详解
+## 分层
 
-### 3.1 核心层 (Core Layer)
-- **`mcp_site` (Registry)**: 业务逻辑与协议层的防火墙。业务代码只需关注 Django ORM，通过装饰器描述工具，无需引用 MCP SDK。
-- **`mcp_server` (Server)**: 统一处理协议握手、工具列表上报、异常捕获以及 Decimal 等特殊类型的 JSON 序列化。
-- **`SessionManager`**: 解决 HTTP 无状态协议与 MCP 长连接之间的矛盾。支持 Session 活动追踪和过时自动清理。
+### 协议层
 
-### 3.2 传输层 (Transport Layer)
-- **SSE (Remote)**: 专为 Dify 等云端 AI Agent 设计。保持长连接，下发 `endpoint` 和 `message` 事件。
-- **Stdio (Local)**: 专为 Claude Desktop, Cursor 设计。通过 `python manage.py run_mcp_server` 直接运行，协议走标准输入输出。
+- `mcp = MCPServer("Django_manage")`
+- 工具用 `@mcp.tool()`，函数名即工具名，docstring 即 description，类型注解即参数 schema
 
-### 3.3 业务适配层 (Business Adapter)
-- **Tools**: 纯异步实现 (`async def`)，通过 `sync_to_async` 安全调用 Django ORM。
-- **Serializers**: 负责将复杂的数据库关联关系（如 `Project` -> `Repository` -> `BOM`）扁平化，提供“循序渐进”的数据深度。
+### 传输
 
----
+- **Streamable HTTP**（远程）：ASGI `POST/GET/DELETE /mcp`，`StreamableHTTPSessionManager`
+- **Stdio**（本地）：`mcp.run()`，`python manage.py run_mcp_server`
 
-## 4. 开发者指南：如何新增一个 AI 工具？
+旧版 `GET /mcp/sse/` + `POST /mcp/messages/` 已下线。
 
-本模块支持 **“全自动扫描注册”**，无需修改 `apps.py` 或 `views.py`。
+### 业务
 
-1. **创建文件**: 在 `tools/` 目录下新建一个 Python 文件（如 `custom_tool.py`）。
-2. **编写逻辑**:
-   ```python
-   from app_mcp_server.core.registry import mcp_site
-   from app_mcp_server.serializers import serialize_xxx
-   
-   @mcp_site.register(
-       name="my_new_tool",
-       description="向 AI 描述这个工具的作用",
-       parameters={ "type": "object", "properties": { ... } }
-   )
-   async def my_new_tool(param1):
-       # 你的业务逻辑
-       return result
-   ```
-3. **重启服务**: 重启后，AI Agent 将自动感知并拉取到新工具。
+- Tools：同步 `def`（SDK 丢进线程跑 ORM），`raise ToolError`，`read_only_hint=True`，返回 TypedDict
+- Serializers：DRF 只读 `ModelSerializer`（`Serializer(obj).data`），输出仍是扁平字符串 / float / `YYYY-MM-DD`，不是目录 HTTP 那套嵌套 REST 形状
 
----
+## 新增工具
 
-## 5. 接入配置
+1. 在 `tools/` 新建 `.py`
+2. `from app_mcp_server.core.server import mcp, READ_ONLY`，`@mcp.tool(annotations=READ_ONLY)` + 同步 `def` + 返回类型 + docstring。查不到数据时 `raise ToolError`，不要 `return "Error: ..."`
+3. 重启服务
 
-### 5.1 Dify (云端接入)
-- **URL**: `http://<your-ip>:<port>/mcp/sse/`
-- **Transport**: `SSE`
-- **Auth**: Header `X-MCP-API-KEY` (根据 settings.py 配置)
+## 接入
 
-### 5.2 Claude Desktop (本地接入)
-在 `claude_desktop_config.json` 中添加：
+### 远程
+
+- URL: `http://<host>/mcp`
+- Transport: `http` / `streamable-http`
+- Header: `X-MCP-API-KEY`（若配置了 `MCP_API_KEY`）
+
+必须用 ASGI。Nginx 用 `location /mcp`（无尾斜杠也能命中），`proxy_buffering off`。
+
+### Claude Desktop
+
 ```json
 "mcpServers": {
   "django-manage": {
@@ -93,6 +65,3 @@ app_mcp_server/
   }
 }
 ```
-
----
-*Created and maintained by MCP Framework for Django_manage*

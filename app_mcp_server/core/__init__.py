@@ -1,1 +1,1 @@
-# MCP Core Infrastructure Layer
+# MCP Core — MCPServer singleton in server.py

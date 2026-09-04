@@ -46,9 +46,6 @@ urlpatterns = [
     # 模具注塑中心
     path('mold-injection/', include('app_mold_injection.urls')),
 
-    # MCP Server 接口
-    path('mcp/', include('app_mcp_server.urls')),
-
     # 附件管理模块（统一上传/下载/删除）
     path('attachment/', include('app_attachment.urls')),
 

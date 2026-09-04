@@ -102,7 +102,7 @@ docker compose up -d
 |---|---|---|
 | `db` | `pgvector/pgvector:pg16` | PostgreSQL 16 + pgvector 向量扩展 |
 | `web` | `${DOCKERHUB_USERNAME}/django-manage:latest` | Django ASGI（预构建镜像） |
-| `nginx` | `nginx:1.27-alpine` | 反向代理 + 静态文件 + MCP SSE |
+| `nginx` | `nginx:1.27-alpine` | 反向代理 + 静态文件 + MCP Streamable HTTP |
 
 > 未配置 `DOCKERHUB_USERNAME` 时 docker-compose 会回退到本地构建。
 
@@ -229,8 +229,8 @@ server {
         expires 30d;
     }
 
-    # MCP SSE 长连接（关闭缓冲 + 长超时）
-    location /mcp/ {
+    # MCP Streamable HTTP（关闭缓冲 + 长超时；匹配 /mcp 与 /mcp/）
+    location /mcp {
         proxy_pass http://django_asgi;
         proxy_http_version 1.1;
         proxy_set_header Connection "";
@@ -238,6 +238,7 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept $http_accept;
         proxy_buffering off;
         proxy_read_timeout 3600s;
     }
@@ -269,10 +270,10 @@ proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
 云厂商（ALB/SLB/CLB）默认已透传；Cloudflare 默认提供 `X-Forwarded-For` 和 `CF-Connecting-IP`，如用后者改为 `real_ip_header CF-Connecting-IP;`。
 
-**② 关闭 SSE 缓冲**——自建 Nginx：
+**② 关闭 MCP 流缓冲**——自建 Nginx：
 
 ```nginx
-location /mcp/ {
+location /mcp {
     proxy_buffering off;
     proxy_read_timeout 3600s;
     proxy_http_version 1.1;
@@ -329,23 +330,26 @@ AWS ALB / 阿里云 SLB 默认不缓冲，无需额外配置。
 
 ## MCP Server
 
-基于 [Model Context Protocol](https://modelcontextprotocol.io/)，通过 SSE 长连接向 AI Agent 暴露 Django 业务数据。
+基于 [Model Context Protocol](https://modelcontextprotocol.io/)（`mcp==2.1.1` 的 `MCPServer`），通过 **Streamable HTTP** 向 AI Agent 暴露 Django 业务数据。端点挂在 ASGI `/mcp`，必须用 uvicorn / gunicorn+`UvicornWorker`。
 
 ```
-Client (AI Agent)                        Django
+Client (AI Agent)                        Django ASGI
      │
-     ├─ GET /mcp/sse/ ────────────────→ 建立 SSE 流，返回 sessionId
-     │   ← event: endpoint               POST 地址：/mcp/messages/?sessionId=xxx
-     │
-     ├─ POST /mcp/messages/ ──────────→ JSON-RPC 工具调用
-     │   ← SSE event: message ──────── 流式返回结果
+     ├─ POST /mcp  ──────────────────→ JSON-RPC（initialize / tools/list / tools/call）
+     │   ← application/json 或 SSE
+     ├─ GET  /mcp  ──────────────────→ 可选的服务端通知流
+     ├─ DELETE /mcp ─────────────────→ 结束会话
 ```
+
+客户端填 `http(s)://<host>/mcp`，传输类型 `http`（不要再用 SSE 的 `/mcp/sse/`）。
+
+本地 Claude Desktop 仍可用 Stdio：`python manage.py run_mcp_server`。
 
 ### 鉴权
 
 ```python
-# settings.py — 不设置则跳过鉴权（开发环境）
-MCP_API_KEY = os.environ.get('MCP_API_KEY')
+# settings.py — 不设置或空字符串则跳过鉴权（开发环境）
+MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
 ```
 
 客户端请求头：`X-MCP-API-KEY: <key>`
@@ -361,7 +365,7 @@ MCP_API_KEY = os.environ.get('MCP_API_KEY')
 | `search_formulas` | 搜索配方（编码/名称） | `keyword` |
 | `get_formula_detail` | 配方详情（BOM、成本、测试结果） | `code` |
 
-新增工具只需在 `app_mcp_server/tools/` 下添加 `.py` 文件，Django 启动时自动注册。
+新增工具：在 `app_mcp_server/tools/` 添加 `.py`，使用 `@mcp.tool()` + docstring，Django 启动时自动注册。
 
 ---
 

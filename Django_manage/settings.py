@@ -279,6 +279,9 @@ REST_FRAMEWORK = {
 #   手册系统侧 —— CatalogGateway 出站请求携带该头
 INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
 
+# MCP Streamable HTTP 鉴权。未设置或空字符串则跳过鉴权（开发环境）。
+MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
+
 # ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────
 # 主系统对外接口基础地址：手册系统连接主系统的入口（结尾需带斜杠）
 EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:8000/api/external/')

@@ -41,8 +41,7 @@ FROM python:3.13-slim-bookworm
 # 1. 设置环境变量
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/opt/venv/bin:$PATH" \
-    UVICORN_LIFESPAN=off
+    PATH="/opt/venv/bin:$PATH"
 
 # 2. 设置工作目录
 WORKDIR /app
@@ -82,7 +81,7 @@ RUN python manage.py collectstatic --noinput
 
 # 暴露端口
 # 8000: 业务应用 (gunicorn 3 worker)
-# 8001: MCP 单 worker 服务 (nginx 反向代理 /mcp/ 到此)
+# 8001: MCP 单 worker 服务 (nginx 反向代理 /mcp 到此)
 EXPOSE 8000 8001
 
 # 启动命令 (ASGI 模式：gunicorn + uvicorn worker)

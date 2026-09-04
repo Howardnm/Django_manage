@@ -1,46 +1,70 @@
-import logging
-from typing import Any, Dict
-from .base import format_date
+from rest_framework import serializers
 
-logger = logging.getLogger(__name__)
+from app_formula.models import FormulaBOM, FormulaTestResult, LabFormula
 
-def serialize_formula(formula) -> Dict[str, Any]:
+from .base import FloatDecimalField, NADateField, as_plain
+
+
+class FormulaBOMSerializer(serializers.ModelSerializer):
+    raw_material = serializers.CharField(source="raw_material.name", default="Unknown", read_only=True)
+    model = serializers.CharField(source="raw_material.model_name", default="N/A", read_only=True)
+    category = serializers.CharField(source="raw_material.category.name", default="N/A", read_only=True)
+    percentage = FloatDecimalField()
+    feeding_port = serializers.CharField(source="get_feeding_port_display", default="Main", read_only=True)
+    weighing_scale = serializers.CharField(source="get_weighing_scale_display", default="A", read_only=True)
+
+    class Meta:
+        model = FormulaBOM
+        fields = (
+            "raw_material", "model", "category", "percentage",
+            "feeding_port", "weighing_scale", "is_pre_mix",
+        )
+
+
+class FormulaTestResultSerializer(serializers.ModelSerializer):
+    item = serializers.CharField(source="test_config.name", read_only=True)
+    unit = serializers.CharField(source="test_config.unit", read_only=True)
+    standard = serializers.CharField(source="test_config.standard", read_only=True)
+    value = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FormulaTestResult
+        fields = ("item", "value", "unit", "standard")
+
+    def get_value(self, obj):
+        if obj.value is not None:
+            return float(obj.value)
+        return obj.value_text or "N/A"
+
+
+class FormulaSerializer(serializers.ModelSerializer):
+    material_type = serializers.CharField(source="material_type.name", default="N/A", read_only=True)
+    cost_predicted = FloatDecimalField()
+    bom = FormulaBOMSerializer(source="bom_lines", many=True, read_only=True)
+    test_results = serializers.SerializerMethodField()
+    description = serializers.CharField(default="", allow_blank=True, read_only=True)
+    created_at = NADateField()
+
+    class Meta:
+        model = LabFormula
+        fields = (
+            "code", "version", "name", "material_type", "cost_predicted",
+            "bom", "test_results", "description", "created_at",
+        )
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        data["description"] = data.get("description") or ""
+        return data
+
+    def get_test_results(self, obj):
+        results = [
+            res for res in obj.test_results.all()
+            if res.production_order_id is None
+        ]
+        return FormulaTestResultSerializer(results, many=True).data
+
+
+def serialize_formula(formula):
     """Full Formula Serialization including BOM and detailed Test Results."""
-    try:
-        bom_lines = []
-        for line in formula.bom_lines.all():
-            rm = line.raw_material
-            bom_lines.append({
-                "raw_material": rm.name if rm else "Unknown",
-                "model": rm.model_name if rm else "N/A",
-                "category": rm.category.name if rm and rm.category else "N/A",
-                "percentage": float(line.percentage or 0),
-                "feeding_port": line.get_feeding_port_display() if hasattr(line, 'get_feeding_port_display') else "Main",
-                "weighing_scale": line.get_weighing_scale_display() if hasattr(line, 'get_weighing_scale_display') else "A",
-                "is_pre_mix": line.is_pre_mix
-            })
-
-        test_results = []
-        for res in formula.test_results.all():
-            if res.production_order_id is not None:
-                continue
-            test_results.append({
-                "item": res.test_config.name,
-                "value": float(res.value) if res.value is not None else (res.value_text or "N/A"),
-                "unit": res.test_config.unit,
-                "standard": res.test_config.standard
-            })
-
-        return {
-            "code": formula.code,
-            "name": formula.name,
-            "material_type": formula.material_type.name if formula.material_type else "N/A",
-            "cost_predicted": float(formula.cost_predicted or 0),
-            "bom": bom_lines,
-            "test_results": test_results,
-            "description": formula.description or "",
-            "created_at": format_date(formula.created_at)
-        }
-    except Exception as e:
-        logger.error(f"Error serializing formula: {e}")
-        return {"error": "Formula serialization failed"}
+    return as_plain(FormulaSerializer(formula).data)

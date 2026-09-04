@@ -96,10 +96,8 @@ services:
       --max-requests-jitter 300
 
   # ── MCP 服务（单 worker，独占 8001 端口）──
-  # MCP 会话（SSE 流 + POST 消息）依赖进程内 SessionManager，
-  # 必须保证同一会话的所有请求落在同一 worker。多 worker 轮询会导致
-  # POST 消息找不到 SSE 流（400 Invalid Session）。故独立单 worker 运行，
-  # nginx 将 /mcp/ 反向代理到此服务，与业务流量（3 worker）隔离。
+  # Streamable HTTP 有状态会话在进程内存，需同一 worker。
+  # nginx 将 /mcp 反向代理到此服务，与业务流量（3 worker）隔离。
   mcp:
     image: ${DOCKERHUB_USERNAME:-django-manage}/django-manage:latest
     container_name: django-mcp
@@ -117,7 +115,7 @@ services:
       --bind 0.0.0.0:8001
       --workers 1
       --worker-class uvicorn.workers.UvicornWorker
-      --timeout 120
+      --timeout 3600
 
   # ── Nginx 反向代理 ──
   nginx:

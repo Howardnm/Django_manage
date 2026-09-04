@@ -1,48 +1,38 @@
-from asgiref.sync import sync_to_async
 from django.db.models import Q
+from mcp.server.mcpserver.exceptions import ToolError
+
 from app_formula.models import LabFormula
-from app_mcp_server.core.registry import mcp_site
+from app_mcp_server.core.server import READ_ONLY, mcp
 from app_mcp_server.serializers import serialize_formula
+from app_mcp_server.serializers.types import FormulaOut
 
-@mcp_site.register(
-    name="search_formulas",
-    description="Search for lab formulas by code or name. Returns a list of matching formulas with basic info.",
-    parameters={
-        "type": "object",
-        "properties": {
-            "keyword": {"type": "string", "description": "Keyword to search in formula code or name"}
-        }
-    }
-)
-async def search_formulas(keyword: str = ""):
-    @sync_to_async(thread_sensitive=False)
-    def query():
-        qs = LabFormula.objects.select_related('material_type').all()
-        if keyword:
-            qs = qs.filter(Q(code__icontains=keyword) | Q(name__icontains=keyword))
-        
-        return [serialize_formula(f) for f in qs[:10]]
-    
-    return await query()
 
-@mcp_site.register(
-    name="get_formula_detail",
-    description="Get detailed information about a specific formula including BOM composition and cost.",
-    parameters={
-        "type": "object",
-        "properties": {
-            "code": {"type": "string", "description": "The exact experiment code of the formula (e.g., 'L20231001-01')"}
-        },
-        "required": ["code"]
-    }
-)
-async def get_formula_detail(code: str):
-    @sync_to_async(thread_sensitive=False)
-    def query():
-        try:
-            formula = LabFormula.objects.select_related('material_type', 'creator').get(code=code)
-            return serialize_formula(formula)
-        except LabFormula.DoesNotExist:
-            return f"Error: Formula with code '{code}' not found."
-            
-    return await query()
+def _formula_qs():
+    return LabFormula.objects.select_related("material_type", "creator").prefetch_related(
+        "bom_lines__raw_material__category",
+        "test_results__test_config",
+    )
+
+
+@mcp.tool(annotations=READ_ONLY)
+def search_formulas(keyword: str = "") -> list[FormulaOut]:
+    """Search for lab formulas by code or name. Returns matching formulas including BOM and test results."""
+    qs = _formula_qs()
+    if keyword:
+        qs = qs.filter(Q(code__icontains=keyword) | Q(name__icontains=keyword))
+    return [serialize_formula(f) for f in qs[:10]]
+
+
+@mcp.tool(annotations=READ_ONLY)
+def get_formula_detail(code: str, version: int | None = None) -> FormulaOut:
+    """Get a lab formula by experiment code. Same code may have multiple versions; omit version to get the latest."""
+    qs = _formula_qs().filter(code=code)
+    if version is not None:
+        formula = qs.filter(version=version).first()
+        if not formula:
+            raise ToolError(f"Formula {code!r} version {version} not found.")
+    else:
+        formula = qs.order_by("-version").first()
+        if not formula:
+            raise ToolError(f"Formula with code {code!r} not found.")
+    return serialize_formula(formula)
