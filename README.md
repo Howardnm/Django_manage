@@ -352,7 +352,7 @@ Client (AI Agent)                        Django ASGI
 MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
 ```
 
-客户端请求头：`X-MCP-API-KEY: <key>`
+客户端请求头：`Authorization: Bearer <MCP_API_KEY>`
 
 ### 工具清单
 

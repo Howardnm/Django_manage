@@ -39,7 +39,7 @@ python manage.py run_mcp_server
       "type": "http",
       "url": "http://127.0.0.1:8000/mcp",
       "headers": {
-        "X-MCP-API-KEY": "<optional>"
+        "Authorization": "Bearer <MCP_API_KEY>"
       }
     }
   }
@@ -67,7 +67,13 @@ python manage.py run_mcp_server
 
 `settings.MCP_API_KEY` 来自环境变量 `MCP_API_KEY`。未设置或为空则跳过鉴权。
 
-客户端请求头：`X-MCP-API-KEY: <key>`
+客户端请求头（RFC 6750）：
+
+```http
+Authorization: Bearer <MCP_API_KEY>
+```
+
+缺少或错误的 token 返回 `401`，并带 `WWW-Authenticate: Bearer`。
 
 ## 新增工具
 

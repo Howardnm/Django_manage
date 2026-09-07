@@ -8,6 +8,7 @@
 
 ```text
 app_mcp_server/
+├── asgi.py                     # MCPASGIApp + CORS/鉴权 + mcp_lifespan
 ├── core/
 │   └── server.py               # MCPServer 单例（mcp）
 ├── serializers/                # DRF 只读 ModelSerializer → AI 扁平 JSON
@@ -18,7 +19,7 @@ app_mcp_server/
 └── ARCHITECTURE.md
 ```
 
-Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette ASGI 应用，由 [Django_manage/asgi.py](../Django_manage/asgi.py) 挂到 `/mcp`。
+Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette ASGI 应用；`MCPASGIApp` 在本模块 [asgi.py](./asgi.py)，由 [Django_manage/asgi.py](../Django_manage/asgi.py) 在 Django setup 之后挂到 `/mcp`。
 
 ## 分层
 
@@ -29,7 +30,7 @@ Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette 
 
 ### 传输
 
-- **Streamable HTTP**（远程）：ASGI `POST/GET/DELETE /mcp`，`StreamableHTTPSessionManager`
+- **Streamable HTTP**（远程）：`MCPASGIApp`（CORS + `Authorization: Bearer` 鉴权）→ `session_manager.handle_request`；host lifespan `session_manager.run()`
 - **Stdio**（本地）：`mcp.run()`，`python manage.py run_mcp_server`
 
 旧版 `GET /mcp/sse/` + `POST /mcp/messages/` 已下线。
@@ -51,7 +52,7 @@ Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette 
 
 - URL: `http://<host>/mcp`
 - Transport: `http` / `streamable-http`
-- Header: `X-MCP-API-KEY`（若配置了 `MCP_API_KEY`）
+- Header: `Authorization: Bearer <MCP_API_KEY>`（若配置了 `MCP_API_KEY`）
 
 必须用 ASGI。Nginx 用 `location /mcp`（无尾斜杠也能命中），`proxy_buffering off`。
 

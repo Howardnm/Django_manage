@@ -279,7 +279,8 @@ REST_FRAMEWORK = {
 #   手册系统侧 —— CatalogGateway 出站请求携带该头
 INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
 
-# MCP Streamable HTTP 鉴权。未设置或空字符串则跳过鉴权（开发环境）。
+# MCP Streamable HTTP Bearer token。未设置或空字符串则跳过鉴权（开发环境）。
+# 客户端：Authorization: Bearer <MCP_API_KEY>
 MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
 
 # ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────
