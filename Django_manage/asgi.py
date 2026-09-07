@@ -59,7 +59,7 @@ class MCPASGIApp:
             return
 
         expected_key = getattr(django_settings, "MCP_API_KEY", None) or None
-        if expected_key and request.headers.get("x-mcp-api-key") != expected_key:
+        if expected_key and request.headers.get("Authorization") != expected_key:
             response = JSONResponse(
                 {"error": "Authentication Required"},
                 status_code=403,
