@@ -17,6 +17,14 @@ from app_trial_production.services import SampleInventoryService
 logger = logging.getLogger(__name__)
 
 
+# 注塑模块样品库存状态筛选 Tab
+SAMPLE_STATUS_TABS = [
+    {'value': 'IN_LAB', 'label': '在实验房', 'icon': 'ti ti-package'},
+    {'value': 'CONSUMED', 'label': '已消耗', 'icon': 'ti ti-check'},
+    {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
+]
+
+
 class MoldSampleListView(InjectionTaskAccessMixin, View):
     """注塑模块样品库存列表 — 待打样颗粒 + 待测试样条，按工单分组表格呈现。"""
 
@@ -66,6 +74,7 @@ class MoldSampleListView(InjectionTaskAccessMixin, View):
             'paginator': paginator,
             'filter': self.filter,
             'current_status': request.GET.get('status', 'IN_LAB'),
+            'status_tabs': SAMPLE_STATUS_TABS,
         }
         return render(request, self.template_name, context)
 

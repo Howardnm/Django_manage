@@ -11,6 +11,7 @@ from app_raw_material.models import PriceAvgConfig, RawMaterial, RawMaterialPric
 from app_raw_material.forms import RawMaterialForm, RawMaterialPropertyFormSet
 from app_raw_material.utils.filters import RawMaterialFilter
 from app_raw_material.mixins import RawMaterialAccessMixin
+from common_utils.constants import STD_TABS
 
 class RawMaterialListView(RawMaterialAccessMixin, ListView):
     """原材料列表：仅限定的研发中心角色组可见，L4/L5 关闭"""
@@ -88,7 +89,8 @@ class RawMaterialListView(RawMaterialAccessMixin, ListView):
             'cart_raw_material_ids': self.request.session.get('cart_raw_materials_v2', []),
             'filter': self.filterset,
             'current_sort': self.request.GET.get('sort', ''),
-            'current_std': current_std
+            'current_std': current_std,
+            'std_tabs': STD_TABS,
         })
         return context
 

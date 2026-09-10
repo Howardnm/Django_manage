@@ -14,6 +14,15 @@ from app_trial_production.services import SampleInventoryService
 logger = logging.getLogger(__name__)
 
 
+# 成品颗粒库存状态筛选 Tab
+SAMPLE_STATUS_TABS = [
+    {'value': 'IN_LAB', 'label': '在实验房', 'icon': 'ti ti-package'},
+    {'value': 'SAP_STORED', 'label': '已入SAP仓库', 'icon': 'ti ti-building-warehouse'},
+    {'value': 'CONSUMED', 'label': '已消耗', 'icon': 'ti ti-check'},
+    {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
+]
+
+
 class SampleInventoryListView(SampleInventoryAccessMixin, View):
     """成品颗粒库存列表页 — 排产模块管辖（PELLET + FINISHED），按工单分组表格呈现。"""
 
@@ -62,6 +71,7 @@ class SampleInventoryListView(SampleInventoryAccessMixin, View):
             'paginator': paginator,
             'filter': self.filter,
             'current_status': request.GET.get('status', 'IN_LAB'),
+            'status_tabs': SAMPLE_STATUS_TABS,
         }
         return render(request, self.template_name, context)
 

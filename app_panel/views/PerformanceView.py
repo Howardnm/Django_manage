@@ -15,6 +15,13 @@ from app_project.models import (
 User = get_user_model()
 
 
+# 绩效看板榜单 Tab
+PERFORMANCE_TABS = [
+    {'value': 'rd', 'label': '研发绩效榜', 'icon': 'ti ti-flask'},
+    {'value': 'sales', 'label': '销售绩效榜', 'icon': 'ti ti-briefcase'},
+]
+
+
 def _latest_snapshot_ids(track, project_ids=None, date_before=None):
     """返回「每个 (project, user) 在该轨的最新一条快照」的 id 列表。
 
@@ -162,6 +169,7 @@ class UserPerformanceListView(PanelAccessMixin, View):
             'rd_data': rd_data,
             'sales_data': sales_data,
             'current_tab': tab,
+            'performance_tabs': PERFORMANCE_TABS,
             'page_title': '成员协同绩效看板',
             'current_sort': sort,
             'start_date': start_date, 'end_date': end_date,

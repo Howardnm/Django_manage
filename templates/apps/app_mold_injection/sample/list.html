@@ -12,26 +12,7 @@
 
     <div class="card mt-3">
         <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item">
-                    <a class="nav-link {% if current_status == 'IN_LAB' %}active{% endif %}"
-                       href="?{% url_replace status='IN_LAB' page=1 %}">
-                        <i class="ti ti-package me-1"></i>在实验房
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if current_status == 'CONSUMED' %}active{% endif %}"
-                       href="?{% url_replace status='CONSUMED' page=1 %}">
-                        <i class="ti ti-check me-1"></i>已消耗
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
-                       href="?{% url_replace status='ALL' page=1 %}">
-                        <i class="ti ti-filter me-1"></i>全部状态
-                    </a>
-                </li>
-            </ul>
+            {% url_tabs tabs=status_tabs param='status' %}
         </div>
 
         {% include 'apps/list_modules/tools_search_filter.html' %}

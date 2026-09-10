@@ -13,6 +13,15 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
+# 注塑任务状态筛选 Tab
+INJECTION_STATUS_TABS = [
+    {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
+    {'value': 'PENDING', 'label': '待生产', 'icon': 'ti ti-clock'},
+    {'value': 'IN_PROGRESS', 'label': '注塑中', 'icon': 'ti ti-injection'},
+    {'value': 'COMPLETED', 'label': '已完成', 'icon': 'ti ti-check'},
+]
+
+
 def _build_mold_formula_matrix(mold_requirements):
     """从 mold_requirements QuerySet 构建 (formulas, matrix_rows) 元组。
 
@@ -83,6 +92,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
         context['filter'] = getattr(self, 'filter', None)
         context['current_sort'] = self.request.GET.get('sort', '')
         context['current_status'] = self.request.GET.get('status', 'ALL')
+        context['status_tabs'] = INJECTION_STATUS_TABS
         return context
 
 

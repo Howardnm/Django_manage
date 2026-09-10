@@ -1,3 +1,4 @@
+{% load project_extras %}
 <!-- 关联配方卡片 -->
 <div class="card mb-3">
     <!-- 包裹整个表格的 Form，用于提交对比请求 -->
@@ -26,10 +27,7 @@
                 </a>
 
                 <!-- ISO/ASTM 切换按钮 -->
-                <div class="btn-group btn-group-sm">
-                    <a href="?std=ISO" class="btn {% if current_std != 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ISO</a>
-                    <a href="?std=ASTM" class="btn {% if current_std == 'ASTM' %}btn-primary{% else %}btn-outline-primary{% endif %}">ASTM</a>
-                </div>
+                {% url_tabs tabs=std_tabs param='std' style='buttons' %}
             </div>
         </div>
 

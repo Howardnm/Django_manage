@@ -1,0 +1,17 @@
+{% if style == 'buttons' %}
+<div class="btn-group btn-group-sm">
+    {% for tab in tabs %}
+        <a href="{{ tab.url }}" class="btn {% if tab.active %}btn-primary{% else %}btn-outline-primary{% endif %}">{{ tab.short }}</a>
+    {% endfor %}
+</div>
+{% else %}
+<ul class="nav nav-tabs card-header-tabs"{% if bs_tabs %} data-bs-toggle="tabs"{% endif %}>
+    {% for tab in tabs %}
+        <li class="nav-item">
+            <a href="{{ tab.url }}" class="nav-link {% if tab.active %}active{% endif %}">
+                {% if tab.icon %}<i class="{{ tab.icon }} me-1"></i>{% endif %}{{ tab.label }}
+            </a>
+        </li>
+    {% endfor %}
+</ul>
+{% endif %}

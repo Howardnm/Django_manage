@@ -11,6 +11,7 @@ from app_basic_research.forms import ResearchProjectForm, ResearchProjectNodeUpd
 from app_basic_research.models import ResearchProject, ResearchStage, ResearchProjectNode
 from app_basic_research.utils.filters import ResearchProjectFilter
 from app_basic_research.mixins import BasicResearchAccessMixin
+from common_utils.constants import STD_TABS
 
 logger = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
             'nodes': project.cached_nodes,
             'related_formulas': related_formulas,
             'current_std': current_std,
+            'std_tabs': STD_TABS,
             'cart_formula_ids': self.request.session.get('compare_cart', {}).get('formula', []),
             'avg_months': PriceAvgConfig.get().months,
         })

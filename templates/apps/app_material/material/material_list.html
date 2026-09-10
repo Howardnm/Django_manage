@@ -36,7 +36,7 @@
 
     <div class="card mt-3">
         <div class="card-header">
-            {% include 'apps/list_modules/std_tabs.html' %}
+            {% url_tabs tabs=std_tabs param='std' %}
         </div>
 
         <!-- 筛选区域（复用通用筛选器组件，保留 std 参数 + 性能折叠面板） -->

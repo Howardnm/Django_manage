@@ -12,26 +12,7 @@
 
     <div class="card mt-3">
         <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs">
-                <li class="nav-item">
-                    <a class="nav-link {% if not current_sub_type %}active{% endif %}"
-                       href="?{% url_replace sub_type='' page=1 %}">
-                        <i class="ti ti-filter me-1"></i>全部样条
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if current_sub_type == 'FOR_TESTING' %}active{% endif %}"
-                       href="?{% url_replace sub_type='FOR_TESTING' page=1 %}">
-                        <i class="ti ti-microscope me-1"></i>待测试样条
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if current_sub_type == 'CONSUMED' %}active{% endif %}"
-                       href="?{% url_replace sub_type='CONSUMED' page=1 %}">
-                        <i class="ti ti-check me-1"></i>已消耗
-                    </a>
-                </li>
-            </ul>
+            {% url_tabs tabs=sub_type_tabs param='sub_type' %}
         </div>
 
         {% include 'apps/list_modules/tools_search_filter.html' %}

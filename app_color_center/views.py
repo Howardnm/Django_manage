@@ -23,6 +23,16 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
+# 配色任务状态筛选 Tab
+COLOR_TASK_STATUS_TABS = [
+    {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
+    {'value': 'PENDING', 'label': '待配色', 'icon': 'ti ti-clock'},
+    {'value': 'IN_PROGRESS', 'label': '配色中', 'icon': 'ti ti-palette'},
+    {'value': 'COMPLETED', 'label': '已完成', 'icon': 'ti ti-check'},
+    {'value': 'NOT_REQUIRED', 'label': '无需配色', 'icon': 'ti ti-x'},
+]
+
+
 def _first_unfilled_formula(formula_details_qs):
     """首个『未填写色粉BOM』且带 project_node 的配方（用于跳转定位）；无则 None。"""
     for fd in formula_details_qs.filter(needs_color_matching=True):
@@ -268,6 +278,7 @@ class TaskListView(ColorCenterAccessMixin, ListView):
         context['filter'] = self.filter
         context['current_sort'] = self.request.GET.get('sort', '')
         context['current_status'] = self.request.GET.get('status', 'ALL')
+        context['status_tabs'] = COLOR_TASK_STATUS_TABS
         # 预计算当前页工单的配色完成进度 + 跳转参数
         context['order_stats'], context['order_redirect_params'], context['order_detail_params'] = \
             self._compute_order_stats(context['page_obj'])

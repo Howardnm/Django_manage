@@ -17,6 +17,7 @@ from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
 from app_formula.utils.search_picker_config import for_formula_import
 from django.utils.safestring import mark_safe
+from common_utils.constants import STD_TABS
 
 logger = logging.getLogger(__name__)
 
@@ -229,6 +230,7 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),
             'filter': self.filterset,
             'current_std': current_std,
+            'std_tabs': STD_TABS,
             'current_sort': self.request.GET.get('sort', ''),
             'avg_months': PriceAvgConfig.get().months,
         })

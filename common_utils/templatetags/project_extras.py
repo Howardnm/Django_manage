@@ -132,3 +132,35 @@ def sort_url_multi(context, field):
         
     query.setlist('sort', new_sorts)
     return query.urlencode()
+
+
+@register.inclusion_tag('apps/list_modules/url_tabs.html', takes_context=True)
+def url_tabs(context, tabs, param='status', active=None, style='tabs', reset_page=True, bs_tabs=False):
+    """通用 URL 参数 Tab / 按钮组组件。
+
+    用法：
+        {% url_tabs tabs=status_tabs param='status' %}
+        {% url_tabs tabs=std_tabs param='std' style='buttons' %}
+
+    tabs 形如 [{'value':..., 'label':..., 'icon':...?, 'short':...?}]，tabs[0] 为默认值。
+    切换时保留当前 GET 参数（q/sort 等），默认重置 page=1。
+    active 默认由 request.GET.get(param, tabs[0]['value']) 推导（须与 View 默认值一致）。
+    """
+    request = context['request']
+    if not tabs:
+        return {'tabs': [], 'style': style, 'bs_tabs': bs_tabs}
+    current = active if active is not None else request.GET.get(param, tabs[0]['value'])
+    rendered = []
+    for tab in tabs:
+        query = request.GET.copy()
+        query[param] = tab['value']
+        if reset_page:
+            query['page'] = 1
+        rendered.append({
+            'label': tab['label'],
+            'short': tab.get('short', tab['label']),
+            'icon': tab.get('icon', ''),
+            'url': f"?{query.urlencode()}",
+            'active': str(tab['value']) == str(current),
+        })
+    return {'tabs': rendered, 'style': style, 'bs_tabs': bs_tabs}

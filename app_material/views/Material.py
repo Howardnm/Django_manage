@@ -14,6 +14,7 @@ from app_material.utils.filters import MaterialFilter
 from app_formula.models import FormulaTestResult, LabFormula
 from app_material.mixins import MaterialAccessMixin
 from app_material.services.material_cache import MaterialCache
+from common_utils.constants import STD_TABS
 
 
 class MaterialListView(MaterialAccessMixin, ListView):
@@ -87,7 +88,8 @@ class MaterialListView(MaterialAccessMixin, ListView):
             'cart_material_ids': self.request.session.get('cart_materials_v2', []),
             'filter': self.filterset,
             'current_sort': self.request.GET.get('sort', ''),
-            'current_std': current_std
+            'current_std': current_std,
+            'std_tabs': STD_TABS,
         })
         return context
 
@@ -257,6 +259,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
         context.update({
             'related_formulas': formulas,
             'current_std': current_std,
+            'std_tabs': STD_TABS,
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),
             'avg_months': PriceAvgConfig.get().months,
         })

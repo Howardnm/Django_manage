@@ -24,7 +24,7 @@
     <div class="card mt-3">
         <!-- 1. 标准切换 Tabs -->
         <div class="card-header">
-            {% include 'apps/list_modules/std_tabs.html' %}
+            {% url_tabs tabs=std_tabs param='std' %}
         </div>
 
         <!-- 2. 筛选区域（复用通用筛选器组件，保留 std 参数 + 性能折叠面板） -->

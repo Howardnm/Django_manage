@@ -13,6 +13,23 @@ from common_utils.state_machine import InvalidStateTransition
 logger = logging.getLogger(__name__)
 
 
+# 测试工单状态筛选 Tab
+TEST_ORDER_STATUS_TABS = [
+    {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
+    {'value': 'PENDING', 'label': '待测试', 'icon': 'ti ti-clock'},
+    {'value': 'IN_PROGRESS', 'label': '测试中', 'icon': 'ti ti-microscope'},
+    {'value': 'COMPLETED', 'label': '已完成', 'icon': 'ti ti-check'},
+    {'value': 'RESULTS_WRITTEN_BACK', 'label': '已回写', 'icon': 'ti ti-file-check'},
+]
+
+# 样条库存子类型筛选 Tab
+SPECIMEN_SUB_TYPE_TABS = [
+    {'value': '', 'label': '全部样条', 'icon': 'ti ti-filter'},
+    {'value': 'FOR_TESTING', 'label': '待测试样条', 'icon': 'ti ti-microscope'},
+    {'value': 'CONSUMED', 'label': '已消耗', 'icon': 'ti ti-check'},
+]
+
+
 class TestingTaskListView(TestingTaskAccessMixin, ListView):
     """测试任务列表"""
     permission_required = 'app_material_testing.view_testingtask'
@@ -57,6 +74,7 @@ class TestingTaskListView(TestingTaskAccessMixin, ListView):
         context['filter'] = getattr(self, 'filter', None)
         context['current_sort'] = self.request.GET.get('sort', '')
         context['current_status'] = self.request.GET.get('status', 'ALL')
+        context['status_tabs'] = TEST_ORDER_STATUS_TABS
         return context
 
 
@@ -329,5 +347,6 @@ class TestingSampleListView(TestingAccessMixin, View):
             'paginator': paginator,
             'filter': self.filter,
             'current_sub_type': request.GET.get('sub_type', ''),
+            'sub_type_tabs': SPECIMEN_SUB_TYPE_TABS,
         }
         return render(request, self.template_name, context)

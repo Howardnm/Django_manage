@@ -66,18 +66,7 @@
             <div class="col-12">
                 <div class="card">
                     <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
-                            <li class="nav-item">
-                                <a href="?{% url_replace tab='rd' %}" class="nav-link {% if current_tab == 'rd' %}active{% endif %}">
-                                    <i class="ti ti-flask me-1"></i>研发绩效榜
-                                </a>
-                            </li>
-                            <li class="nav-item">
-                                <a href="?{% url_replace tab='sales' %}" class="nav-link {% if current_tab == 'sales' %}active{% endif %}">
-                                    <i class="ti ti-briefcase me-1"></i>销售绩效榜
-                                </a>
-                            </li>
-                        </ul>
+                        {% url_tabs tabs=performance_tabs param='tab' reset_page=False bs_tabs=True %}
                     </div>
                     <div class="table-responsive">
                         <table class="table table-vcenter table-mobile-md card-table table-hover">
