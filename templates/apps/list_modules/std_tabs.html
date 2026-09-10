@@ -1,0 +1,13 @@
+{% load project_extras %}
+<ul class="nav nav-tabs card-header-tabs">
+    <li class="nav-item">
+        <a href="?{% url_replace std='ISO' page=1 %}" class="nav-link {% if current_std != 'ASTM' %}active{% endif %}">
+            ISO / 国标
+        </a>
+    </li>
+    <li class="nav-item">
+        <a href="?{% url_replace std='ASTM' page=1 %}" class="nav-link {% if current_std == 'ASTM' %}active{% endif %}">
+            ASTM (美标)
+        </a>
+    </li>
+</ul>
