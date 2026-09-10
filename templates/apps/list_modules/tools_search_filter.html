@@ -1,7 +1,13 @@
+{% load project_extras %}
 <div class="card-body border-bottom py-3">
     <form method="GET"
           {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
           class="d-flex flex-wrap align-items-center gap-2">
+
+        {# 保留 ISO/ASTM 标准参数（opt-in：preserve_std=True 时启用） #}
+        {% if preserve_std %}
+            <input type="hidden" name="std" value="{{ current_std }}">
+        {% endif %}
 
         {% for field in filter.form %}
             {# ── 1. 隐藏字段：直接渲染（如 sort、page）──── #}
@@ -10,7 +16,7 @@
 
             {# ── 2. 搜索框：input-icon + search 图标 ──── #}
             {% elif field.name == 'q' %}
-                <div class="d-inline-block" style="min-width: 260px;">
+                <div class="d-inline-block" style="min-width: 200px;">
                     <div class="input-icon">
                         <span class="input-icon-addon">
                             <i class="ti ti-search"></i>
@@ -31,21 +37,33 @@
                 </div>
 
             {# ── 4. 数值范围（_min / _max）：紧凑 input-group ──── #}
+            {# advanced_panel=True 时不内联渲染，收进折叠面板 #}
             {% elif '_min' in field.name or '_max' in field.name %}
+                {% if not advanced_panel %}
                 <div class="d-inline-block" style="max-width: 120px;">
                     <div class="input-group input-group-sm">
                         {{ field }}
                     </div>
                 </div>
+                {% endif %}
 
             {# ── 5. 其他字段（下拉筛选框）── #}
-            {# d-inline-block 防 flex 拉伸；宽度由 widget 自身 style 控制 #}
+            {# d-inline-block 防 flex 拉伸；固定宽度使 TomSelect 始终填满容器（同原生 form-select width:100%），聚焦/失焦不随内容变宽 #}
             {% else %}
-                <div class="d-inline-block">
+                <div class="d-inline-block" style="width: 180px;">
                     {{ field }}
                 </div>
             {% endif %}
         {% endfor %}
+
+        {# ── 高级筛选折叠触发按钮（opt-in：advanced_panel=True）── #}
+        {% if advanced_panel %}
+            <div class="d-inline-block">
+                <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
+                    <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
+                </button>
+            </div>
+        {% endif %}
 
         {# ── 操作按钮（靠右）── #}
         <div class="ms-auto">
@@ -53,12 +71,36 @@
                 <i class="ti ti-search"></i>
             </button>
             {% if request.GET %}
-                <a href="{% if hx_url %}{{ hx_url }}{% else %}{{ request.path }}{% endif %}"
+                <a href="{% if preserve_std %}?std={{ current_std }}{% elif hx_url %}{{ hx_url }}{% else %}{{ request.path }}{% endif %}"
                    {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
                    class="btn btn-ghost-danger ms-2" title="清除所有筛选与排序" data-bs-toggle="tooltip">
                     重置
                 </a>
             {% endif %}
         </div>
+
+        {# ── 高级筛选折叠面板（opt-in：advanced_panel=True，泛型按 X_min/X_max 分组）── #}
+        {% if advanced_panel %}
+        <div class="collapse w-100 mt-2" id="advanced-filter">
+            <div class="card card-body bg-blue-lt">
+                <div class="row g-3">
+                    {% for field in filter.form %}
+                        {% if field.name|slice:'-4:' == '_min' %}
+                            {% with max_name=field.name|slice:':-4'|add:'_max' %}
+                            <div class="col-md-3">
+                                <label class="form-label small">{{ field.label }}</label>
+                                <div class="input-group input-group-sm">
+                                    {{ field }}
+                                    <span class="input-group-text">-</span>
+                                    {{ filter.form|get_item:max_name }}
+                                </div>
+                            </div>
+                            {% endwith %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </form>
 </div>

@@ -60,7 +60,7 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
     # ... (以下部分保持不变) ...
     melt_min = django_filters.NumberFilter(
         method='filter_property_range', 
-        label='熔融指数 Min',
+        label='熔融指数',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Min'})
     )
     melt_max = django_filters.NumberFilter(
@@ -72,7 +72,7 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
     # 2. 拉伸强度 (Tensile Strength)
     tensile_min = django_filters.NumberFilter(
         method='filter_property_range', 
-        label='拉伸强度 Min',
+        label='拉伸强度',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Min'})
     )
     tensile_max = django_filters.NumberFilter(
@@ -84,7 +84,7 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
     # 3. 弯曲模量 (Flexural Modulus)
     flex_modulus_min = django_filters.NumberFilter(
         method='filter_property_range', 
-        label='弯曲模量 Min',
+        label='弯曲模量',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Min'})
     )
     flex_modulus_max = django_filters.NumberFilter(
@@ -96,7 +96,7 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
     # 4. 冲击强度 (Impact Strength)
     impact_min = django_filters.NumberFilter(
         method='filter_property_range', 
-        label='冲击强度 Min',
+        label='冲击强度',
         widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Min'})
     )
     impact_max = django_filters.NumberFilter(

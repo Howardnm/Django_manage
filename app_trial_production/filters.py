@@ -161,11 +161,11 @@ class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
     project = django_filters.ModelChoiceFilter(
         field_name='production_order__project',
         queryset=Project.objects.all(),
+        empty_label='检索项目名称',
         widget=forms.Select(attrs={
             'class': 'form-select remote-search',
             'data-model': 'project',
             'placeholder': '检索项目名称',
-            'style': 'width: 220px;',
         }),
     )
 
@@ -174,7 +174,6 @@ class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         widget=forms.TextInput(attrs={
             'class': 'form-control',
             'placeholder': '存放位置',
-            'style': 'width: 140px;',
         }),
     )
 
@@ -197,7 +196,7 @@ class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         super().__init__(*args, **kwargs)
         if 'q' in self.filters:
             self.filters['q'].field.widget.attrs['placeholder'] = (
-                '检索实验单号 / 批次号 / 配方名称 / 工单号'
+                '检索工单号 / 实验单号 / 批次号'
             )
 
     def filter_search(self, queryset, name, value):

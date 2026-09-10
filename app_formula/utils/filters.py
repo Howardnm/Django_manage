@@ -18,19 +18,19 @@ class LabFormulaFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.F
 
     # --- 性能指标范围筛选 ---
     # 熔指
-    melt_min = django_filters.NumberFilter(method='filter_metric', label='熔指 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
+    melt_min = django_filters.NumberFilter(method='filter_metric', label='熔融指数', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     melt_max = django_filters.NumberFilter(method='filter_metric', label='熔指 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
     # 拉伸强度
-    tensile_min = django_filters.NumberFilter(method='filter_metric', label='拉伸 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
+    tensile_min = django_filters.NumberFilter(method='filter_metric', label='拉伸强度', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     tensile_max = django_filters.NumberFilter(method='filter_metric', label='拉伸 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
     # 弯曲模量
-    flex_modulus_min = django_filters.NumberFilter(method='filter_metric', label='弯模 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
+    flex_modulus_min = django_filters.NumberFilter(method='filter_metric', label='弯曲模量', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     flex_modulus_max = django_filters.NumberFilter(method='filter_metric', label='弯模 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
     
     # 冲击
-    impact_min = django_filters.NumberFilter(method='filter_metric', label='冲击 Min', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
+    impact_min = django_filters.NumberFilter(method='filter_metric', label='冲击强度', widget=forms.NumberInput(attrs={'placeholder': 'Min', 'class': 'form-control form-control-sm'}))
     impact_max = django_filters.NumberFilter(method='filter_metric', label='冲击 Max', widget=forms.NumberInput(attrs={'placeholder': 'Max', 'class': 'form-control form-control-sm'}))
 
     # 排序字段

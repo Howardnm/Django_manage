@@ -1,96 +1,44 @@
 {% extends "base.html" %}
-{% load static %}
 {% load project_extras %}
 
 {% block title %}样条库存{% endblock %}
 
 {% block content %}
-{# ── Page Header ─────────────────────────────────────────── #}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <div class="page-pretitle">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'material_testing:list' %}">材料测试中心</a></li>
-                        <li class="breadcrumb-item active">样条库存</li>
-                    </ol>
-                </nav>
-            </div>
-            <h2 class="page-title mb-0">样条库存</h2>
-        </div>
-        <div class="col-auto ms-auto">
-            <span class="text-muted small">
-                <i class="ti ti-info-circle me-1"></i>样条由注塑产出，送往测试中心执行测试
-            </span>
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col"><h2 class="page-title">样条库存</h2></div>
         </div>
     </div>
-</div>
 
-<div class="card mt-3">
-    {# ── 子类型筛选 Tab（card-header-tabs） ── #}
-    <div class="card-header">
-        <ul class="nav nav-tabs card-header-tabs">
-            <li class="nav-item">
-                <a class="nav-link {% if not current_sub_type %}active{% endif %}"
-                   href="?{% url_replace sub_type='' page=1 %}">
-                    <i class="ti ti-filter me-1"></i>全部样条
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if current_sub_type == 'FOR_TESTING' %}active{% endif %}"
-                   href="?{% url_replace sub_type='FOR_TESTING' page=1 %}">
-                    <i class="ti ti-microscope me-1"></i>待测试样条
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if current_sub_type == 'CONSUMED' %}active{% endif %}"
-                   href="?{% url_replace sub_type='CONSUMED' page=1 %}">
-                    <i class="ti ti-check me-1"></i>已消耗
-                </a>
-            </li>
-        </ul>
-    </div>
+    <div class="card mt-3">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a class="nav-link {% if not current_sub_type %}active{% endif %}"
+                       href="?{% url_replace sub_type='' page=1 %}">
+                        <i class="ti ti-filter me-1"></i>全部样条
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_sub_type == 'FOR_TESTING' %}active{% endif %}"
+                       href="?{% url_replace sub_type='FOR_TESTING' page=1 %}">
+                        <i class="ti ti-microscope me-1"></i>待测试样条
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_sub_type == 'CONSUMED' %}active{% endif %}"
+                       href="?{% url_replace sub_type='CONSUMED' page=1 %}">
+                        <i class="ti ti-check me-1"></i>已消耗
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-    {# ── 筛选栏 ─────────────────────────────────────────── #}
-    <div class="card-body border-bottom py-3">
-        <form method="GET" class="row g-2 align-items-center">
-            {% for field in filter.form %}
-                {% if field.is_hidden %}
-                    {{ field }}
-                {% elif field.name == 'q' %}
-                    <div class="col-auto">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            {{ field }}
-                        </div>
-                    </div>
-                {% elif field.name == 'start_date' or field.name == 'end_date' %}
-                    <div class="col-auto">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-calendar"></i></span>
-                            {{ field }}
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="col-auto">{{ field }}</div>
-                {% endif %}
-            {% endfor %}
-            <div class="col-auto ms-auto">
-                <button type="submit" class="btn btn-primary btn-icon" aria-label="查询">
-                    <i class="ti ti-search"></i>
-                </button>
-                {% if request.GET %}
-                <a href="{% url 'material_testing:specimens' %}" class="btn btn-ghost-danger ms-2">重置</a>
-                {% endif %}
-            </div>
-        </form>
-    </div>
+        {% include 'apps/list_modules/tools_search_filter.html' %}
 
-    {# ── 工单分组表格 ───────────────────────────────────── #}
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
-            <thead>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+                <thead>
                 <tr>
                     <th>工单号 / 实验单号</th>
                     <th>样品状态</th>
@@ -100,62 +48,61 @@
                     <th>创建时间</th>
                     <th style="width: 60px;"></th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% for group in page_obj %}
-                {% with order=group.order summary=group.summary %}
-                <tr>
-                    <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=material_testing" class="fw-bold text-reset">
-                            {{ order.code }}
-                        </a>
-                        <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
-                    </td>
-                    <td>
-                        <span class="badge {{ summary.active_status_css }}">{{ summary.active_status_label }}</span>
-                    </td>
-                    <td class="text-center fw-bold">{{ summary.total_samples }}</td>
-                    <td class="text-center">
-                        {% if summary.specimen_for_testing_count %}
-                        <span class="text-azure fw-bold">{{ summary.specimen_for_testing_count }} 条</span>
-                        {% else %}<span class="text-muted">-</span>{% endif %}
-                    </td>
-                    <td class="text-center">
-                        {% if summary.specimen_consumed_count %}
-                        <span class="text-purple fw-bold">{{ summary.specimen_consumed_count }} 条</span>
-                        {% else %}<span class="text-muted">-</span>{% endif %}
-                    </td>
-                    <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
-                    <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=material_testing"
-                           class="btn btn-sm btn-icon btn-ghost-primary" title="查看样品">
-                            <i class="ti ti-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endwith %}
+                    {% with order=group.order summary=group.summary %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'trial_sample_order_detail' order.pk %}?from=material_testing" class="fw-bold text-reset">
+                                {{ order.code }}
+                            </a>
+                            <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
+                        </td>
+                        <td>
+                            <span class="badge {{ summary.active_status_css }}">{{ summary.active_status_label }}</span>
+                        </td>
+                        <td class="text-center fw-bold">{{ summary.total_samples }}</td>
+                        <td class="text-center">
+                            {% if summary.specimen_for_testing_count %}
+                            <span class="text-azure fw-bold">{{ summary.specimen_for_testing_count }} 条</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if summary.specimen_consumed_count %}
+                            <span class="text-purple fw-bold">{{ summary.specimen_consumed_count }} 条</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{% url 'trial_sample_order_detail' order.pk %}?from=material_testing"
+                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看样品">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
                 {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
-                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样条记录
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样条记录
+                        </td>
+                    </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
 
-{% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
-
-<script src="{% static 'js/common/tomselect_remote.js' %}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    initRemoteTomSelectAll(document, {
-        apiUrl: "{% url 'trial_api_search' %}",
-        valueField: 'id',
-        responseKey: 'results',
-    });
-});
-</script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            initRemoteTomSelectAll(document, {
+                apiUrl: "{% url 'trial_api_search' %}",
+                valueField: 'id',
+                responseKey: 'results',
+            });
+        });
+    </script>
 {% endblock %}

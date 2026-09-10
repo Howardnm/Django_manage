@@ -1,95 +1,44 @@
 {% extends "base.html" %}
-{% load static %}
 {% load project_extras %}
 
 {% block title %}样品库存 — 注塑{% endblock %}
 
 {% block content %}
-{# ── Page Header ─────────────────────────────────────────── #}
-<div class="page-header">
-    <div class="row align-items-center">
-        <div class="col">
-            <div class="page-pretitle">
-                <nav aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'mold_injection:task_list' %}">模具注塑中心</a></li>
-                        <li class="breadcrumb-item active">样品库存</li>
-                    </ol>
-                </nav>
-            </div>
-            <h2 class="page-title mb-0">待打样颗粒 / 待测试样条</h2>
-        </div>
-        <div class="col-auto ms-auto">
-            <div class="btn-list">
-            </div>
+    <div class="page-header">
+        <div class="row align-items-center">
+            <div class="col"><h2 class="page-title">待打样颗粒 / 待测试样条</h2></div>
         </div>
     </div>
-</div>
 
-<div class="card mt-3">
-    {# ── 状态筛选 Tab（card-header-tabs） ── #}
-    <div class="card-header">
-        <ul class="nav nav-tabs card-header-tabs">
-            <li class="nav-item">
-                <a class="nav-link {% if current_status == 'IN_LAB' %}active{% endif %}"
-                   href="?{% url_replace status='IN_LAB' page=1 %}">
-                    <i class="ti ti-package me-1"></i>在实验房
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if current_status == 'CONSUMED' %}active{% endif %}"
-                   href="?{% url_replace status='CONSUMED' page=1 %}">
-                    <i class="ti ti-check me-1"></i>已消耗
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
-                   href="?{% url_replace status='ALL' page=1 %}">
-                    <i class="ti ti-filter me-1"></i>全部状态
-                </a>
-            </li>
-        </ul>
-    </div>
+    <div class="card mt-3">
+        <div class="card-header">
+            <ul class="nav nav-tabs card-header-tabs">
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'IN_LAB' %}active{% endif %}"
+                       href="?{% url_replace status='IN_LAB' page=1 %}">
+                        <i class="ti ti-package me-1"></i>在实验房
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'CONSUMED' %}active{% endif %}"
+                       href="?{% url_replace status='CONSUMED' page=1 %}">
+                        <i class="ti ti-check me-1"></i>已消耗
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if current_status == 'ALL' %}active{% endif %}"
+                       href="?{% url_replace status='ALL' page=1 %}">
+                        <i class="ti ti-filter me-1"></i>全部状态
+                    </a>
+                </li>
+            </ul>
+        </div>
 
-    {# ── 筛选栏 ─────────────────────────────────────────── #}
-    <div class="card-body border-bottom py-3">
-        <form method="GET" class="row g-2 align-items-center">
-            {% for field in filter.form %}
-                {% if field.is_hidden %}
-                    {{ field }}
-                {% elif field.name == 'q' %}
-                    <div class="col-auto">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-search"></i></span>
-                            {{ field }}
-                        </div>
-                    </div>
-                {% elif field.name == 'start_date' or field.name == 'end_date' %}
-                    <div class="col-auto">
-                        <div class="input-icon">
-                            <span class="input-icon-addon"><i class="ti ti-calendar"></i></span>
-                            {{ field }}
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="col-auto">{{ field }}</div>
-                {% endif %}
-            {% endfor %}
-            <div class="col-auto ms-auto">
-                <button type="submit" class="btn btn-primary btn-icon" aria-label="查询">
-                    <i class="ti ti-search"></i>
-                </button>
-                {% if request.GET %}
-                <a href="{% url 'mold_injection:sample_list' %}" class="btn btn-ghost-danger ms-2">重置</a>
-                {% endif %}
-            </div>
-        </form>
-    </div>
+        {% include 'apps/list_modules/tools_search_filter.html' %}
 
-    {# ── 工单分组表格 ───────────────────────────────────── #}
-    <div class="table-responsive">
-        <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
-            <thead>
+        <div class="table-responsive">
+            <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
+                <thead>
                 <tr>
                     <th>工单号 / 实验单号</th>
                     <th>样品状态</th>
@@ -99,62 +48,61 @@
                     <th>创建时间</th>
                     <th style="width: 60px;"></th>
                 </tr>
-            </thead>
-            <tbody>
+                </thead>
+                <tbody>
                 {% for group in page_obj %}
-                {% with order=group.order summary=group.summary %}
-                <tr>
-                    <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection" class="fw-bold text-reset">
-                            {{ order.code }}
-                        </a>
-                        <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
-                    </td>
-                    <td>
-                        <span class="badge {{ summary.active_status_css }}">{{ summary.active_status_label }}</span>
-                    </td>
-                    <td class="text-center fw-bold">{{ summary.total_samples }}</td>
-                    <td class="text-end">
-                        {% if summary.pellet_for_injection_kg %}
-                        <span class="text-orange fw-bold">{{ summary.pellet_for_injection_kg|floatformat:1 }} kg</span>
-                        {% else %}<span class="text-muted">-</span>{% endif %}
-                    </td>
-                    <td class="text-center">
-                        {% if summary.specimen_for_testing_count %}
-                        <span class="text-azure fw-bold">{{ summary.specimen_for_testing_count }} 条</span>
-                        {% else %}<span class="text-muted">-</span>{% endif %}
-                    </td>
-                    <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
-                    <td>
-                        <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection"
-                           class="btn btn-sm btn-icon btn-ghost-primary" title="查看样品">
-                            <i class="ti ti-eye"></i>
-                        </a>
-                    </td>
-                </tr>
-                {% endwith %}
+                    {% with order=group.order summary=group.summary %}
+                    <tr>
+                        <td>
+                            <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection" class="fw-bold text-reset">
+                                {{ order.code }}
+                            </a>
+                            <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
+                        </td>
+                        <td>
+                            <span class="badge {{ summary.active_status_css }}">{{ summary.active_status_label }}</span>
+                        </td>
+                        <td class="text-center fw-bold">{{ summary.total_samples }}</td>
+                        <td class="text-end">
+                            {% if summary.pellet_for_injection_kg %}
+                            <span class="text-orange fw-bold">{{ summary.pellet_for_injection_kg|floatformat:1 }} kg</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-center">
+                            {% if summary.specimen_for_testing_count %}
+                            <span class="text-azure fw-bold">{{ summary.specimen_for_testing_count }} 条</span>
+                            {% else %}<span class="text-muted">-</span>{% endif %}
+                        </td>
+                        <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <a href="{% url 'trial_sample_order_detail' order.pk %}?from=mold_injection"
+                               class="btn btn-sm btn-icon btn-ghost-primary" title="查看样品">
+                                <i class="ti ti-eye"></i>
+                            </a>
+                        </td>
+                    </tr>
+                    {% endwith %}
                 {% empty %}
-                <tr>
-                    <td colspan="7" class="text-center py-5 text-muted">
-                        <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
-                    </td>
-                </tr>
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="ti ti-package-off fs-1 d-block mb-2"></i>暂无样品记录
+                        </td>
+                    </tr>
                 {% endfor %}
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
+    <br>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
 
-{% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
-
-<script src="{% static 'js/common/tomselect_remote.js' %}"></script>
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    initRemoteTomSelectAll(document, {
-        apiUrl: "{% url 'trial_api_search' %}",
-        valueField: 'id',
-        responseKey: 'results',
-    });
-});
-</script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            initRemoteTomSelectAll(document, {
+                apiUrl: "{% url 'trial_api_search' %}",
+                valueField: 'id',
+                responseKey: 'results',
+            });
+        });
+    </script>
 {% endblock %}
