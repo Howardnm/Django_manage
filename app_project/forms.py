@@ -1,6 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectSalesMember, FailureReason, FeedbackType
+from .models import Project, ProjectNode, ProjectStage, ProjectMember, NodeScoreRule, ProjectSalesMember, FailureReason, FeedbackType
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -62,7 +62,16 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # 【优化】使用模型类方法获取用户可选的状态选项
-        self.fields['status'].choices = ProjectNode.get_user_selectable_choices()
+        choices = ProjectNode.get_user_selectable_choices()
+        if self.instance and self.instance.stage == ProjectStage.MASS_TRACK:
+            choices = [(v, l) for v, l in choices if v != 'DONE']
+        self.fields['status'].choices = choices
+
+    def clean_status(self):
+        status = self.cleaned_data.get('status')
+        if self.instance and self.instance.stage == ProjectStage.MASS_TRACK and status == 'DONE':
+            raise ValidationError('量产过程跟踪不能标记为已完成')
+        return status
 
 
 # 【新增】项目成员管理表单

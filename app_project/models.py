@@ -9,15 +9,21 @@ from django.utils.functional import cached_property  # 引入缓存装饰器
 # 1. 定义标准流程阶段 (枚举) - 这相当于"类型库"
 class ProjectStage(models.TextChoices):
     INIT = 'INIT', '① 项目立项'
-    COLLECT = 'COLLECT', '② 收集资料'
-    FEASIBILITY = 'FEASIBILITY', '③ 可行性评估'
-    PRICING = 'PRICING', '④ 客户定价'
-    RND = 'RND', '⑤ 研发阶段'  # 可能多次
-    PILOT = 'PILOT', '⑥ 客户小试'  # 可能多次
-    MID_TEST = 'MID_TEST', '⑦ 客户中试'  # 可能多次
-    MASS_PROD = 'MASS_PROD', '⑧ 客户量产下单'
-    ORDER = 'ORDER', '⑨ 开发周期完成'
-    FEEDBACK = 'FEEDBACK', '🎗️客户意见'
+    RND = 'RND', '② 研发阶段'  # 可能多次
+    PILOT = 'PILOT', '③ 客户小试'  # 可能多次
+    MID_TEST = 'MID_TEST', '④ 客户中试'  # 可能多次
+    MASS_PROD = 'MASS_PROD', '⑤ 客户量产下单'
+    ORDER = 'ORDER', '⑥ 开发周期完成'
+    MASS_TRACK = 'MASS_TRACK', '📌 量产过程跟踪'  # 默认创建、不计进度、禁止 DONE
+    FEEDBACK = 'FEEDBACK', '🎗️客户意见'  # 按需插入、不计进度
+
+    @classmethod
+    def non_progress_codes(cls):
+        return {cls.FEEDBACK, cls.MASS_TRACK}
+
+    @classmethod
+    def progress_codes(cls):
+        return [c for c, _ in cls.choices if c not in cls.non_progress_codes()]
 
 
 # 2. 项目基本信息共享字段 — 抽象基类
@@ -278,7 +284,7 @@ class ProjectNode(models.Model):
     def can_report_failure(self):
         project_current_node = self.project.current_active_node
         is_current_node = (project_current_node and project_current_node.pk == self.pk)
-        allowed_stages = [ProjectStage.RND, ProjectStage.PILOT, ProjectStage.MID_TEST]
+        allowed_stages = [ProjectStage.RND, ProjectStage.PILOT, ProjectStage.MID_TEST, ProjectStage.MASS_TRACK]
         return is_current_node and self.is_active and (self.stage in allowed_stages) and self.status != 'AWAITING_APPROVAL'
 
     @property
@@ -332,11 +338,12 @@ class ProjectNode(models.Model):
     def has_been_updated(self):
         return self.status != 'PENDING'
 
-    FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+    FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
+    MATURE_FORMULA_STAGES = [ProjectStage.MASS_PROD, ProjectStage.MASS_TRACK]
 
     @property
     def can_be_mature(self):
-        return self.stage == ProjectStage.MASS_PROD
+        return self.stage in self.MATURE_FORMULA_STAGES
 
     @property
     def can_add_formula(self):
@@ -344,13 +351,13 @@ class ProjectNode(models.Model):
 
     @property
     def formula_button_label(self):
-        if self.stage == 'MASS_PROD':
+        if self.stage in self.MATURE_FORMULA_STAGES:
             return '新增成熟配方'
         return '新增配方'
 
     @property
     def formula_name(self):
-        if self.stage == 'MASS_PROD':
+        if self.stage in self.MATURE_FORMULA_STAGES:
             return f'{self.project.name} — 量产成熟配方'
         return f'{self.project.name} — {self.get_stage_display()} 第{self.round}轮'
 
@@ -362,7 +369,9 @@ class ProjectNode(models.Model):
                 self.failure_reason = failure_reason
             self.save()
         project = self.project
-        if self.stage in ['RND', 'PILOT', 'MID_TEST']:
+        if self.stage == ProjectStage.MASS_TRACK:
+            project.add_iteration_node(ProjectStage.MASS_TRACK, self.order)
+        elif self.stage in ['RND', 'PILOT', 'MID_TEST']:
             project.add_iteration_node(ProjectStage.RND, self.order)
             if self.stage == 'MID_TEST':
                 project.add_iteration_node(ProjectStage.MID_TEST, self.order + 1)

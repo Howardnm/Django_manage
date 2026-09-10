@@ -15,8 +15,6 @@ class Command(BaseCommand):
 
             # --- 1. 正常流程完成（首轮 DONE）--- 逐阶段递进，分值逐步升高 ---
             ('项目立项完成',               10,  'RD', ProjectStage.INIT,        'DONE',       False),
-            ('资料收集完成',               20,  'RD', ProjectStage.COLLECT,     'DONE',       False),
-            ('可行性评估通过',             40,  'RD', ProjectStage.FEASIBILITY, 'DONE',       False),
             ('研发阶段成功',               60,  'RD', ProjectStage.RND,         'DONE',       False),
             ('客户小试合格',               80,  'RD', ProjectStage.PILOT,       'DONE',       False),
             ('客户中试合格',               90,  'RD', ProjectStage.MID_TEST,    'DONE',       False),
@@ -40,8 +38,6 @@ class Command(BaseCommand):
 
             # --- 5. 按阶段终止（首轮 TERMINATED）--- 根据终止时的进度给予阶梯分值 ---
             ('立项阶段项目终止',           0,   'RD', ProjectStage.INIT,        'TERMINATED', False),
-            ('资料收集阶段终止',           5,   'RD', ProjectStage.COLLECT,     'TERMINATED', False),
-            ('可行性评估阶段终止',         10,  'RD', ProjectStage.FEASIBILITY, 'TERMINATED', False),
             ('研发阶段终止',               15,  'RD', ProjectStage.RND,         'TERMINATED', False),
             ('小试阶段终止',               25,  'RD', ProjectStage.PILOT,       'TERMINATED', False),
             ('中试阶段终止',               35,  'RD', ProjectStage.MID_TEST,    'TERMINATED', False),
@@ -64,9 +60,6 @@ class Command(BaseCommand):
 
             # --- 1. 前期跟进（首轮 DONE）--- 销售侧重商务推进，前期分值偏保守 ---
             ('项目立项（销售）',           5,   'SALES', ProjectStage.INIT,        'DONE',       False),
-            ('收集资料（销售）',           10,  'SALES', ProjectStage.COLLECT,     'DONE',       False),
-            ('可行性评估（销售）',         30,  'SALES', ProjectStage.FEASIBILITY, 'DONE',       False),
-            ('客户定价完成',               50,  'SALES', ProjectStage.PRICING,     'DONE',       False),
 
             # --- 2. 研发阶段同步跟进（首轮 DONE）--- 研发推进期间销售的协同价值 ---
             ('研发阶段完成（销售）',       15,  'SALES', ProjectStage.RND,         'DONE',       False),
@@ -79,9 +72,6 @@ class Command(BaseCommand):
 
             # --- 4. 按阶段终止（首轮 TERMINATED）--- 根据商务推进程度给予阶梯分值 ---
             ('立项阶段终止（销售）',       0,   'SALES', ProjectStage.INIT,        'TERMINATED', False),
-            ('资料收集阶段终止（销售）',   2,   'SALES', ProjectStage.COLLECT,     'TERMINATED', False),
-            ('可行性评估阶段终止（销售）', 10,  'SALES', ProjectStage.FEASIBILITY, 'TERMINATED', False),
-            ('客户定价阶段终止（销售）',   20,  'SALES', ProjectStage.PRICING,     'TERMINATED', False),
             ('研发阶段终止（销售）',       5,   'SALES', ProjectStage.RND,         'TERMINATED', False),
             ('小试阶段终止（销售）',       10,  'SALES', ProjectStage.PILOT,       'TERMINATED', False),
             ('中试阶段终止（销售）',       20,  'SALES', ProjectStage.MID_TEST,    'TERMINATED', False),

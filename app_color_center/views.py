@@ -61,7 +61,7 @@ class _ColorProjectContextMixin:
     与权限无关，故不以（外部）权限 Mixin 形式存在；下划线前缀表示模块内部私有。
     """
 
-    STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+    STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
 
     def _resolve_project(self):
         if not hasattr(self, '_project'):

@@ -2,7 +2,7 @@
 app_project 伪数据生成器
 
 业务逻辑：
-  - Project 创建时 signal 自动生成 9 个 PENDING ProjectNode（9 个阶段）
+  - Project 创建时 signal 自动生成标准流程 PENDING ProjectNode（排除 FEEDBACK；含不计进度的 MASS_TRACK）
   - 按业务推进节点状态：DONE → DOING/PAUSED → PENDING
   - ProjectRepository 关联 Customer/OEM/Salesperson
   - ProjectMember + ProjectSalesMember 分配项目人员和工作量
@@ -26,11 +26,7 @@ def run(ctx: FakeContext) -> None:
     from app_repository.models import ProjectRepository
     from app_project.utils.signals import _update_project_current_stage
 
-    ordered_stages = [
-        ProjectStage.INIT, ProjectStage.COLLECT, ProjectStage.FEASIBILITY,
-        ProjectStage.PRICING, ProjectStage.RND, ProjectStage.PILOT,
-        ProjectStage.MID_TEST, ProjectStage.MASS_PROD, ProjectStage.ORDER,
-    ]
+    ordered_stages = ProjectStage.progress_codes()
     oem_nicks = ["吉利", "长城", "比亚迪", "蔚来", "小鹏"]
     project_templates = [
         ("汽车内饰件", "PP-TD20"), ("前端模块", "PA66-GF30"),
@@ -58,7 +54,7 @@ def run(ctx: FakeContext) -> None:
             grade=pick_one(ctx.grades),
             approval_workflow=pick_one(ctx.workflow_defs) if random.random() < 0.5 else None,
         )
-        # signal auto-creates 9 PENDING nodes — 现在推进状态
+        # signal auto-creates standard-stage PENDING nodes — 现在推进状态
         target_idx = random.randint(0, len(ordered_stages))
         all_nodes = list(p.nodes.all().order_by('order'))
         for idx, node in enumerate(all_nodes):

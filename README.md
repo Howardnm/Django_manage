@@ -8,7 +8,7 @@
 |---|---|---|
 | `app_panel` | `/` | 仪表盘、首页面板 |
 | `app_user` | `/user/` | 用户管理、RBAC 权限控制、分子公司/基地 |
-| `app_project` | `/project/` | 项目管理（9 阶段生命周期）、绩效考核 |
+| `app_project` | `/project/` | 项目管理（6 阶段 + 量产过程跟踪）、绩效考核 |
 | `app_repository` | `/repository/` | 项目物料仓库、OEM/客户管理 |
 | `app_material` | `/material/` | 物料主数据、性能指标、测试标准 |
 | `app_external_api` | `/api/external/` | 对外数据接口（只读资源 · 鉴权 · 下载） |

@@ -240,7 +240,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         all_formulas = self._fetch_formulas(project, material)
 
         # 按阶段 + 轮次分组，用于顶部 tab
-        STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD']
+        STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
         stage_grouped = OrderedDict()
         all_stage_formulas = []  # 所有有节点的配方(用于全局对比)
         for f in all_formulas:

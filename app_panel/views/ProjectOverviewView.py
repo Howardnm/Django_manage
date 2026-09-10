@@ -47,7 +47,11 @@ class ProjectOverviewView(ProjectAccessMixin, View):
         # 阶段分布
         stage_data = active_qs.values('current_stage').annotate(count=Count('id'))
         stage_map = {item['current_stage']: item['count'] for item in stage_data}
-        stage_counts = {label: stage_map.get(code, 0) for code, label in ProjectStage.choices if code != 'FEEDBACK'}
+        stage_counts = {
+            label: stage_map.get(code, 0)
+            for code, label in ProjectStage.choices
+            if code not in ProjectStage.non_progress_codes()
+        }
 
         # --- 风险预警逻辑 ---
         active_node_statuses = ['PENDING', 'DOING']

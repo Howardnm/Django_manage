@@ -112,13 +112,13 @@ class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
 
             if node and not node.can_be_mature:
                 self.fields['is_mature'].disabled = True
-                self.fields['is_mature'].help_text = '仅量产下单阶段可标记为成熟配方'
+                self.fields['is_mature'].help_text = '仅量产下单 / 量产过程跟踪阶段可标记为成熟配方'
 
     def clean_is_mature(self):
         is_mature = self.cleaned_data.get('is_mature')
         project_node = self.cleaned_data.get('project_node')
         if is_mature and project_node and not project_node.can_be_mature:
-            raise forms.ValidationError('仅量产下单阶段可标记为成熟配方，请修改项目阶段节点后再勾选。')
+            raise forms.ValidationError('仅量产下单 / 量产过程跟踪阶段可标记为成熟配方，请修改项目阶段节点后再勾选。')
         return is_mature
 
 

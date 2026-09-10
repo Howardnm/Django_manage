@@ -163,9 +163,11 @@ def _update_project_current_stage(project):
             new_remark = last_node.remark or ""
 
     # --- B. 计算进度百分比 ---
-    valid_nodes = [n for n in all_nodes if n.stage != 'FEEDBACK' and n.status != 'FAILED']
-    total = len(valid_nodes)
-    if total < 9: total = 9
+    # 分母与 create_project_nodes 同一口径：标准流程阶段数（排除 FEEDBACK / MASS_TRACK）
+    non_progress = ProjectStage.non_progress_codes()
+    standard_stage_count = len(ProjectStage.progress_codes())
+    valid_nodes = [n for n in all_nodes if n.stage not in non_progress and n.status != 'FAILED']
+    total = max(len(valid_nodes), standard_stage_count)
     done_count = sum(1 for n in valid_nodes if n.status == 'DONE')
     new_percent = int((done_count / total) * 100) if total > 0 else 0
 
@@ -176,7 +178,7 @@ def _update_project_current_stage(project):
     # 取"最近一个已有结果且非反馈阶段的节点"的得分
     last_terminal_node = all_nodes.filter(
         status__in=['DONE', 'FAILED', 'TERMINATED']
-    ).exclude(stage=ProjectStage.FEEDBACK).last()
+    ).exclude(stage__in=non_progress).last()
 
     current_quality_score = last_terminal_node.final_score if last_terminal_node else 0
     current_sales_quality_score = last_terminal_node.sales_final_score if last_terminal_node else 0
@@ -206,6 +208,14 @@ def _update_project_current_stage(project):
 
     if update_fields:
         project.save(update_fields=update_fields)
+
+    # 开发周期完成后，把尚未开始的量产跟踪节点切到进行中
+    if new_percent == 100 and not new_is_terminated:
+        ProjectNode.objects.filter(
+            project=project,
+            stage=ProjectStage.MASS_TRACK,
+            status='PENDING',
+        ).update(status='DOING')
 
 
 # --- 全局配置变更 → 项目同步 ---
