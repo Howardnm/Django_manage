@@ -34,8 +34,6 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
     def _fetch_formulas(self, project, material):
         project_formulas = LabFormula.objects.filter(
             project=project
-        ).exclude(
-            name__startswith='竞品-'
         ).select_related(
             'project_node', 'material_type', 'creator', 'process', 'project',
         ).prefetch_related(
@@ -66,9 +64,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         )
 
     def _build_comparison_matrices(self, formulas, material=None):
-        """参考 FormulaCompareView 构建对比矩阵：材料基准列 + 配方列(按创建时间降序)"""
-        if not formulas:
-            return [], [], []
+        """构建对比矩阵：材料基准列 + 配方列(按创建时间正序)，委托共享矩阵构建器。"""
+        from common_utils.comparison_matrix import build_compare_matrices
 
         # 按创建时间正序排列 (越早越靠左)
         formulas = sorted(formulas, key=lambda f: f.created_at)
@@ -79,110 +76,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         for f in formulas:
             columns.append({'type': 'formula', 'obj': f})
 
-        # BOM 对比矩阵 — 先建内存索引，避免 .filter() 绕过 prefetch 缓存
-        all_raw_materials = set()
-        bom_map = {}  # {formula_id: {raw_material_id: percentage}}
-        for f in formulas:
-            bom_map[f.id] = {}
-            for line in f.bom_lines.all():
-                all_raw_materials.add(line.raw_material)
-                bom_map[f.id][line.raw_material_id] = line.percentage
-        sorted_raw_materials = sorted(all_raw_materials, key=lambda x: (x.category.order, x.name))
-
-        bom_matrix = []
-        for rm in sorted_raw_materials:
-            row = {'item': rm, 'values': []}
-            for col in columns:
-                if col['type'] == 'material':
-                    row['values'].append({'val': '-', 'is_empty': True})
-                else:
-                    pct = bom_map.get(col['obj'].id, {}).get(rm.id)
-                    row['values'].append({
-                        'val': pct if pct is not None else '-',
-                        'is_empty': pct is None,
-                    })
-            bom_matrix.append(row)
-
-        # 色粉BOM 对比矩阵
-        all_cp_materials = set()
-        cpbom_map = {}
-        for f in formulas:
-            cpbom_map[f.id] = {}
-            bom = getattr(f, 'color_powder_bom', None)
-            if bom:
-                for entry in bom.entries.select_related('raw_material__category'):
-                    all_cp_materials.add(entry.raw_material)
-                    cpbom_map[f.id][entry.raw_material_id] = entry.percentage
-        sorted_cp_materials = sorted(all_cp_materials, key=lambda x: (x.category.order, x.name))
-
-        cpbom_matrix = []
-        for rm in sorted_cp_materials:
-            row = {'item': rm, 'values': []}
-            for col in columns:
-                if col['type'] == 'material':
-                    row['values'].append({'val': '-', 'is_empty': True})
-                else:
-                    pct = cpbom_map.get(col['obj'].id, {}).get(rm.id)
-                    row['values'].append({
-                        'val': pct if pct is not None else '-',
-                        'is_empty': pct is None,
-                    })
-            cpbom_matrix.append(row)
-
-        # 性能对比矩阵
-        all_test_configs = set()
-        mat_props = {}
-        if material:
-            mat_properties = list(material.properties.select_related('test_config').all())
-            for p in mat_properties:
-                all_test_configs.add(p.test_config)
-            mat_props = {
-                p.test_config_id: p.value_text if p.test_config.data_type != 'NUMBER' else p.value
-                for p in mat_properties
-            }
-
-        formula_props = {}
-        for f in formulas:
-            formula_props[f.id] = {}
-            for r in f.test_results.all():
-                if r.production_order_id is not None:
-                    continue  # 跳过工单回写结果，对比矩阵仅展示手动录入
-                all_test_configs.add(r.test_config)
-                formula_props[f.id][r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
-        sorted_configs = sorted(all_test_configs, key=lambda x: (x.category.order, x.order))
-
-        test_matrix = []
-        for tc in sorted_configs:
-            row = {'item': tc, 'values': []}
-            base_val = mat_props.get(tc.id) if material else None
-
-            for i, col in enumerate(columns):
-                if col['type'] == 'material':
-                    val = mat_props.get(tc.id)
-                    row['values'].append({
-                        'val': val if val is not None else '-',
-                        'compare_class': '',
-                        'is_base': True,
-                    })
-                else:
-                    val = formula_props.get(col['obj'].id, {}).get(tc.id)
-                    compare_class = ''
-                    if val is not None and base_val is not None and tc.data_type == 'NUMBER':
-                        try:
-                            if val > base_val:
-                                compare_class = 'text-green'
-                            elif val < base_val:
-                                compare_class = 'text-red'
-                        except Exception:
-                            pass
-
-                    row['values'].append({
-                        'val': val if val is not None else '-',
-                        'compare_class': compare_class,
-                        'is_base': False,
-                    })
-            test_matrix.append(row)
-
+        bom_matrix, cpbom_matrix, test_matrix = build_compare_matrices(columns)
         return columns, bom_matrix, test_matrix, cpbom_matrix
 
     @staticmethod
@@ -242,9 +136,13 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         # 按阶段 + 轮次分组，用于顶部 tab
         STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
         stage_grouped = OrderedDict()
-        all_stage_formulas = []  # 所有有节点的配方(用于全局对比)
+        all_stage_formulas = []  # 所有配方(用于全局对比，含竞品)
+        competitor_formulas = []  # 无 project_node 的竞品配方 → 伪阶段「客户竞品」
         for f in all_formulas:
             if not f.project_node:
+                # 竞品配方：纳入全局对比池，统一归入「客户竞品」伪阶段
+                all_stage_formulas.append(f)
+                competitor_formulas.append(f)
                 continue
             all_stage_formulas.append(f)
             s = f.project_node.stage
@@ -267,6 +165,15 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     'round': r,
                     'formulas': stage_grouped[stage][r],
                 })
+
+        # 客户竞品伪阶段：竞品配方无 project_node，统一追加到 Tab 栏末尾
+        if competitor_formulas:
+            stage_round_items.append({
+                'stage': 'COMPETITOR',
+                'stage_display': '客户竞品',
+                'round': None,
+                'formulas': competitor_formulas,
+            })
 
         # 当前激活的阶段和轮次
         active_stage = self.request.GET.get('stage', STAGE_ORDER[0])
@@ -365,72 +272,25 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         if compare_mode and compare_formulas:
             columns, bom_matrix, test_matrix, cpbom_matrix = self._build_comparison_matrices(compare_formulas, material=material)
 
-        # 客户竞品 Tab
-        competitor_tab_active = self.request.GET.get('tab') == 'competitor'
-        competitor_formulas = []
-        competitor_formula_items = []
-        selected_competitor_formula = None
-        competitor_test_result_tabs = []
-        competitor_has_test_results = False
-        competitor_order_items = []
-        if competitor_tab_active:
-            from app_trial_production.models import ProductionOrder
-
-            # ── 竞品配方列表 ──
-            competitor_formulas = LabFormula.objects.filter(
-                project=project,
-                name__startswith='竞品-',
-            ).select_related('material_type', 'creator').order_by('-created_at')
-
-            for f in competitor_formulas:
-                competitor_formula_items.append({
-                    'pk': f.pk,
-                    'code': f.code,
-                    'version': f.version,
-                    'material_type_name': f.material_type.name,
-                    'creator': f.creator.username,
-                    'created_at': f.created_at,
-                })
-
-            # 选中的配方实验单
-            formula_id_str = self.request.GET.get('formula_id', '')
-            if formula_id_str:
-                try:
-                    selected_competitor_formula = LabFormula.objects.filter(
-                        pk=int(formula_id_str), project=project,
-                        name__startswith='竞品-',
-                    ).select_related('material_type', 'creator').prefetch_related(
-                        'productionorderformuladetail_set__production_order',
-                        'test_results__test_config__category',
-                        'test_results__production_order',
-                    ).first()
-                except (ValueError, TypeError):
-                    pass
-
-            # ── 竞品配方实验单的测试结果 Tab ──
-            competitor_test_result_tabs, competitor_has_test_results = [], False
-            if selected_competitor_formula:
-                competitor_test_result_tabs, competitor_has_test_results = \
-                    self._build_test_result_tabs(selected_competitor_formula, 'competitor-tab')
-
-            # ── 竞品工单列表 ──
-            competitor_orders = ProductionOrder.objects.filter(
-                project=project,
-                skip_extrusion=True,
-            ).select_related('creator').order_by('-created_at')
-
-            for o in competitor_orders:
-                competitor_order_items.append({
-                    'pk': o.pk,
-                    'code': o.code,
-                    'trial_code': o.trial_code or '',
-                    'status': o.get_status_display(),
-                    'status_css': o.STATUS_CSS_MAP.get(o.status, 'bg-secondary-lt'),
-                    'status_dot': o.STATUS_DOT_MAP.get(o.status, 'bg-secondary'),
-                    'creator': o.creator.username,
-                    'created_at': o.created_at,
-                    'quantity_planned': o.quantity_planned,
-                })
+        # 客户竞品详细卡片 — 选中竞品配方时展示其关联工单的竞品信息
+        selected_competitor_info = None
+        if selected_formula and selected_formula.name.startswith('竞品-'):
+            detail = selected_formula.productionorderformuladetail_set.select_related(
+                'production_order__customer',
+            ).order_by('-production_order__created_at').first()
+            if detail:
+                o = detail.production_order
+                selected_competitor_info = {
+                    'company': o.competitor_company,
+                    'brand': o.competitor_brand,
+                    'model': o.competitor_model,
+                    'customer': o.customer,
+                    'order_pk': o.pk,
+                    'order_code': o.code,
+                    'order_status': o.get_status_display(),
+                    'injection_temperature': o.injection_temperature,
+                    'injection_pretreatment': o.injection_pretreatment,
+                }
 
         context.update({
             'material': material,
@@ -450,14 +310,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'bom_matrix': bom_matrix,
             'test_matrix': test_matrix,
             'cpbom_matrix': cpbom_matrix,
-            # 客户竞品 Tab
-            'competitor_tab_active': competitor_tab_active,
-            'competitor_formulas': competitor_formulas,
-            'competitor_formula_items': competitor_formula_items,
-            'selected_competitor_formula': selected_competitor_formula,
-            'competitor_test_result_tabs': competitor_test_result_tabs,
-            'competitor_has_test_results': competitor_has_test_results,
-            'competitor_order_items': competitor_order_items,
+            'selected_competitor_info': selected_competitor_info,
             'avg_months': PriceAvgConfig.get().months,
         })
         return context
@@ -512,11 +365,11 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
         # ── 校验 ──
         if quantity_planned <= 0:
             messages.error(request, '计划数量必须大于 0')
-            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?tab=competitor')
+            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?stage=COMPETITOR')
 
         if not material_type_id:
             messages.error(request, '请选择基材类型')
-            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?tab=competitor')
+            return redirect(reverse('project_formula_process', kwargs={'pk': pk}) + '?stage=COMPETITOR')
 
         # ── 构建配方名称 ──
         formula_name_parts = ['竞品']
@@ -582,7 +435,7 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
         )
         return redirect(
             reverse('project_formula_process', kwargs={'pk': pk})
-            + f'?tab=competitor&order_id={order.pk}'
+            + f'?stage=COMPETITOR&formula_id={formula.pk}'
         )
 
     @staticmethod
@@ -720,5 +573,5 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
         """根据配方类型决定重定向目标。"""
         base = reverse('project_formula_process', kwargs={'pk': project_pk})
         if formula.name.startswith('竞品-'):
-            return f'{base}?tab=competitor&formula_id={formula.pk}'
+            return f'{base}?stage=COMPETITOR&formula_id={formula.pk}'
         return f'{base}?formula_id={formula.pk}'

@@ -5,7 +5,8 @@ from django.http import HttpResponse, JsonResponse
 from app_material.models import MaterialLibrary
 from app_formula.models import LabFormula
 from app_formula.mixins import FormulaAccessMixin
-from app_raw_material.models import RawMaterial
+from app_raw_material.models import RawMaterial, PriceAvgConfig
+from common_utils.comparison_matrix import build_compare_matrices
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
@@ -197,8 +198,10 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
 
         # 2. 获取对象 — 配方走 get_queryset() 确保 L4 部门隔离
         formulas = list(self.get_queryset().filter(pk__in=formula_ids)
+            .select_related('creator', 'material_type', 'project', 'process')
             .prefetch_related('bom_lines__raw_material__category',
-                              'test_results__test_config__category')
+                              'test_results__test_config__category',
+                              'color_powder_bom__entries__raw_material')
             .order_by('created_at'))
         materials = list(MaterialLibrary.objects.filter(pk__in=material_ids)
             .prefetch_related('properties__test_config__category')
@@ -229,123 +232,14 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         for f in formulas:
             columns.append({'type': 'formula', 'obj': f})
 
-        # ==========================================
-        # 4. 构建 BOM 对比矩阵 (仅配方有 BOM)
-        # ==========================================
-        bom_matrix = []
-        all_raw_materials = set()
-        bom_lookup = {}  # {formula_id: {raw_material_id: line}} 避免 .filter() N+1
-        for f in formulas:
-            f_bom = {}
-            for line in f.bom_lines.all():
-                all_raw_materials.add(line.raw_material)
-                f_bom[line.raw_material_id] = line
-            bom_lookup[f.id] = f_bom
-
-        sorted_raw_materials = sorted(list(all_raw_materials), key=lambda x: (x.category.order, x.name))
-
-        for rm in sorted_raw_materials:
-            row = {
-                'item': rm,
-                'values': []
-            }
-            
-            for col in columns:
-                if col['type'] == 'formula':
-                    f = col['obj']
-                    line = bom_lookup.get(f.id, {}).get(rm.id)
-                    if line:
-                        row['values'].append({'val': line.percentage, 'is_highlight': True})
-                    else:
-                        row['values'].append({'val': '-', 'is_highlight': False})
-                else:
-                    # 材料和原材料没有 BOM
-                    row['values'].append({'val': '-', 'is_highlight': False})
-            bom_matrix.append(row)
-
-        # 5. 构建 性能对比矩阵 (单次迭代，利用 prefetch)
-        test_matrix = []
-        all_test_configs = set()
-
-        mat_props = {}
-        for m in materials:
-            props = {}
-            for p in m.properties.all():
-                all_test_configs.add(p.test_config)
-                props[p.test_config_id] = p.value_text if p.test_config.data_type != 'NUMBER' else p.value
-            mat_props[m.id] = props
-
-        raw_mat_props = {}
-        for rm in raw_materials:
-            props = {}
-            for p in rm.properties.all():
-                all_test_configs.add(p.test_config)
-                props[p.test_config_id] = p.value_text if p.test_config.data_type != 'NUMBER' else p.value
-            raw_mat_props[rm.id] = props
-
-        formula_props = {}
-        for f in formulas:
-            props = {}
-            for r in f.test_results.all():
-                if r.production_order_id is not None:
-                    continue
-                all_test_configs.add(r.test_config)
-                props[r.test_config_id] = r.value_text if r.test_config.data_type != 'NUMBER' else r.value
-            formula_props[f.id] = props
-
-        sorted_configs = sorted(list(all_test_configs), key=lambda x: (x.category.order, x.order))
-
-        # 确定基准值 (取第一列的值作为基准)
-        first_col = columns[0] if columns else None
-        
-        for tc in sorted_configs:
-            row = {
-                'item': tc,
-                'values': []
-            }
-            
-            # 获取基准值
-            base_val = None
-            if first_col:
-                if first_col['type'] == 'material':
-                    base_val = mat_props.get(first_col['obj'].id, {}).get(tc.id)
-                elif first_col['type'] == 'raw_material':
-                    base_val = raw_mat_props.get(first_col['obj'].id, {}).get(tc.id)
-                else:
-                    base_val = formula_props.get(first_col['obj'].id, {}).get(tc.id)
-            
-            # 填充数据
-            for i, col in enumerate(columns):
-                val = None
-                if col['type'] == 'material':
-                    val = mat_props.get(col['obj'].id, {}).get(tc.id)
-                elif col['type'] == 'raw_material':
-                    val = raw_mat_props.get(col['obj'].id, {}).get(tc.id)
-                else:
-                    val = formula_props.get(col['obj'].id, {}).get(tc.id)
-                
-                # 对比逻辑 (从第二列开始对比)
-                compare_class = ""
-                # 只有数值类型才进行大小比较
-                if i > 0 and val is not None and base_val is not None and tc.data_type == 'NUMBER':
-                    try:
-                        if val > base_val:
-                            compare_class = "text-green"
-                        elif val < base_val:
-                            compare_class = "text-red"
-                    except: pass
-                
-                row['values'].append({
-                    'val': val if val is not None else '-',
-                    'compare_class': compare_class,
-                    'is_base': (i == 0)
-                })
-                
-            test_matrix.append(row)
+        # 4. 构建 BOM / 色粉BOM / 性能 对比矩阵（共享矩阵构建器）
+        bom_matrix, cpbom_matrix, test_matrix = build_compare_matrices(columns)
 
         context['columns'] = columns
         context['bom_matrix'] = bom_matrix
+        context['cpbom_matrix'] = cpbom_matrix
         context['test_matrix'] = test_matrix
+        context['avg_months'] = PriceAvgConfig.get().months
         context['page_title'] = "综合对比分析"
         # 传递 material 对象以便模板兼容旧逻辑 (如果有且仅有一个材料且在第一位)
         if materials and len(materials) == 1 and columns[0]['type'] == 'material':

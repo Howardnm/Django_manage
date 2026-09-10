@@ -15,7 +15,7 @@
             <nav aria-label="breadcrumb">
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a></li>
-                    <li class="breadcrumb-item"><a href="{% url 'project_formula_process' project.pk %}?tab=competitor">客户竞品</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'project_formula_process' project.pk %}?stage=COMPETITOR">客户竞品</a></li>
                     <li class="breadcrumb-item active">新增客户竞品</li>
                 </ol>
             </nav>
@@ -197,7 +197,7 @@
         </div>
 
         <div class="d-flex justify-content-end gap-2 mt-3">
-            <a href="{% url 'project_formula_process' project.pk %}?tab=competitor" class="btn btn-link link-secondary">取消</a>
+            <a href="{% url 'project_formula_process' project.pk %}?stage=COMPETITOR" class="btn btn-link link-secondary">取消</a>
             <button type="submit" class="btn btn-primary">
                 <i class="ti ti-check me-1"></i>创建竞品工单
             </button>

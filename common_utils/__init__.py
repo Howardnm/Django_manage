@@ -13,9 +13,11 @@ Public API:
 内部模块：
     autocomplete_registry  — 自动补全注册表（各 app 在 apps.py 中注册模型）
     state_machine          — 状态转换守卫引擎
+    comparison_matrix      — 配方对比矩阵构建（BOM/色粉BOM/性能）
 """
 
 from common_utils.filters import TablerFilterMixin, TablerFormMixin, DateRangeFilterMixin  # noqa: F401
 from common_utils.forms import UserPickerWidget  # noqa: F401
 from common_utils.search_picker_config import SearchPickerConfig  # noqa: F401
+from common_utils.comparison_matrix import build_compare_matrices  # noqa: F401
 

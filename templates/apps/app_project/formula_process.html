@@ -58,23 +58,9 @@
                     </span>
                 </li>
             {% endif %}
-            {# 客户竞品 Tab #}
-            <li class="nav-item" role="presentation">
-                <a class="nav-link {% if competitor_tab_active %}active{% endif %}"
-                   href="?tab=competitor">
-                    <i class="ti ti-target me-1"></i>客户竞品
-                    {% if competitor_orders %}
-                    <span class="badge {% if competitor_tab_active %}bg-white text-primary{% else %}bg-primary-lt{% endif %} ms-1">{{ competitor_orders|length }}</span>
-                    {% endif %}
-                </a>
-            </li>
         </ul>
     </div>
 </div>
-
-{% if competitor_tab_active %}
-    {% include 'apps/app_project/_competitor_tab.html' %}
-{% else %}
 
 <div class="row row-cards">
     {% if not compare_mode %}
@@ -102,7 +88,7 @@
                            class="list-group-item list-group-item-action py-2 px-3 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
-                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}</span>
+                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}竞品{% endif %} - {{ f.material_type.name }}</span>
                                 {% if f.cost_predicted %}
                                     <span class="badge bg-green-lt text-green flex-shrink-0" style="font-size: 10px;">{{ f.cost_predicted }}</span>
                                 {% endif %}
@@ -139,7 +125,7 @@
                                            class="list-group-item list-group-item-action py-2 px-3 ps-5 {% if not compare_mode and selected_formula.pk == f.pk %}active{% endif %}">
                                             <div class="d-flex align-items-center gap-2">
                                                 <span class="badge bg-azure-lt text-azure flex-shrink-0" style="font-size: 11px; min-width: 28px;">v{{ f.version }}</span>
-                                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}-{% endif %} - {{ f.material_type.name }}</span>
+                                                <span class="text-truncate flex-fill fw-medium" style="font-size: 13px;">{% if f.project_node %}{{ f.project_node.get_stage_display }} 第{{ f.project_node.round }}轮{% else %}竞品{% endif %} - {{ f.material_type.name }}</span>
                                                 {% if f.cost_predicted %}
                                                     <span class="badge bg-green-lt text-green flex-shrink-0" style="font-size: 10px;">{{ f.cost_predicted }}</span>
                                                 {% endif %}
@@ -166,13 +152,16 @@
             </div>
         </div>
 
-        {% if related_orders %}
         <!-- 关联排产工单列表 -->
         <div class="card mt-3">
             <div class="card-header bg-green-lt d-flex align-items-center py-2 px-3">
                 <i class="ti ti-factory text-green me-2"></i>
                 <span class="fw-semibold text-green" style="font-size: 14px;">关联排产工单</span>
                 <span class="badge bg-green text-white ms-auto" style="font-size: 10px;">{{ related_orders|length }}</span>
+                <a href="{% url 'project_competitor_order_create' project.pk %}"
+                   class="btn btn-sm btn-primary py-0 ms-2" style="font-size: 12px;">
+                    <i class="ti ti-plus me-1"></i>新增客样
+                </a>
             </div>
             <div class="list-group list-group-flush" style="max-height: 30vh; overflow-y: auto;">
                 {% for order in related_orders %}
@@ -198,10 +187,14 @@
                     </div>
                     {% endif %}
                 </a>
+                {% empty %}
+                <div class="list-group-item text-center text-muted py-5">
+                    <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                    暂无关联排产工单
+                </div>
                 {% endfor %}
             </div>
         </div>
-        {% endif %}
     </div>
     {% endif %}
 
@@ -268,6 +261,55 @@
                     </div>
                 </div>
             </div>
+
+            {% if selected_competitor_info %}
+            <!-- 客户竞品详细卡片 -->
+            <div class="card mb-3">
+                <div class="card-header bg-purple-lt d-flex align-items-center py-2 px-3">
+                    <i class="ti ti-target text-purple me-2"></i>
+                    <span class="fw-semibold text-purple" style="font-size: 14px;">客户竞品信息</span>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3 small">
+                        <div class="col-md-4">
+                            <span class="text-muted">竞品公司：</span>
+                            <strong>{{ selected_competitor_info.company|default:"-" }}</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="text-muted">竞品品牌：</span>
+                            <strong>{{ selected_competitor_info.brand|default:"-" }}</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="text-muted">竞品型号/牌号：</span>
+                            <strong>{{ selected_competitor_info.model|default:"-" }}</strong>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="text-muted">关联客户：</span>
+                            <strong>
+                                {% if selected_competitor_info.customer %}
+                                <a href="{% url 'repo_customer_detail' selected_competitor_info.customer.pk %}" target="_blank" class="text-reset">{{ selected_competitor_info.customer.company_name }}</a>
+                                {% else %}-{% endif %}
+                            </strong>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="text-muted">关联工单：</span>
+                            <strong>
+                                <a href="{% url 'trial_order_detail' selected_competitor_info.order_pk %}" target="_blank" class="text-reset">{{ selected_competitor_info.order_code }}</a>
+                                <span class="badge ms-1" style="font-size: 10px;">{{ selected_competitor_info.order_status }}</span>
+                            </strong>
+                        </div>
+                        <div class="col-md-4">
+                            <span class="text-muted">注塑温度：</span>
+                            <strong>{% if selected_competitor_info.injection_temperature %}{{ selected_competitor_info.injection_temperature }}℃{% else %}-{% endif %}</strong>
+                        </div>
+                        <div class="col-12">
+                            <span class="text-muted">注塑前处理：</span>
+                            <span>{{ selected_competitor_info.injection_pretreatment|default:"-" }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
 
             <!-- BOM 表 -->
             <div class="card mb-3">
@@ -420,7 +462,6 @@
         {% endif %}
     </div>
 </div>
-{% endif %}
 
 {% endblock %}
 

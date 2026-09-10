@@ -1,0 +1,238 @@
+{% load project_extras %}
+<table class="table table-vcenter table-bordered card-table text-center table-sm compare-table" style="font-size: 13px; table-layout: auto;">
+    <thead>
+    <tr class="bg-light">
+        <th class="text-start align-middle" style="min-width: 60px; white-space: nowrap;">分类 / 项目</th>
+        <th class="text-start align-middle" style="min-width: 100px; white-space: nowrap;">详情 / 标准</th>
+        <th class="align-middle" style="min-width: 40px; white-space: nowrap;">单位</th>
+        {% for col in columns %}
+            <th class="align-middle" style="min-width: 100px;">
+                {% if col.type == 'material' %}
+                    <div class="badge bg-blue-lt mb-2">基准材料</div>
+                    <div class="fw-bold fs-4 text-wrap">
+                        <a href="{% url 'material_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.grade_name }}</a>
+                    </div>
+                    <div class="small text-muted text-truncate" title="{{ col.obj.manufacturer }}">{{ col.obj.manufacturer }}</div>
+                {% elif col.type == 'raw_material' %}
+                    <div class="badge bg-orange-lt mb-2">原材料</div>
+                    <div class="fw-bold fs-4 text-wrap">
+                        <a href="{% url 'raw_material_detail' col.obj.pk %}" target="_blank" class="text-reset">{{ col.obj.name }}</a>
+                    </div>
+                    <div class="small text-muted text-truncate" title="{{ col.obj.model_name }}">{{ col.obj.model_name|default:"-" }}</div>
+                {% else %}
+                    <div class="fw-bold text-primary text-wrap">{% if col.obj.project_node %}{{ col.obj.project_node.get_stage_display }} 第{{ col.obj.project_node.round }}轮{% elif '竞品-' in col.obj.name %}客户竞品{% endif %}</div>
+                    <div class="small text-muted">{{ col.obj.code }}</div>
+                    <div class="mt-1">
+                        {% if col.obj.is_mature %}
+                            <span class="badge bg-green-lt" title="成熟配方">★成熟</span>
+                        {% endif %}
+                        {% if project and col.obj.project_id != project.pk %}
+                            <span class="badge bg-yellow-lt" title="来源: {{ col.obj.project.name }}">史</span>
+                        {% else %}
+                            <span class="badge bg-blue-lt">{{ col.obj.material_type.name }}</span>
+                        {% endif %}
+                    </div>
+                {% endif %}
+            </th>
+        {% endfor %}
+    </tr>
+    </thead>
+    <tbody>
+    <!-- 0. 描述 -->
+    <tr>
+        <td class="text-start bg-light fw-bold text-blue align-middle"><i class="ti ti-notes me-1"></i>描述/备注</td>
+        <td class="align-middle">-</td>
+        <td class="align-middle">-</td>
+        {% for col in columns %}
+            <td class="text-wrap text-start align-middle">
+                <div class="small text-muted" style="white-space: normal; max-height: 80px; overflow-y: auto;">
+                    {% if col.type == 'raw_material' %}{{ col.obj.usage_method|default:"-" }}{% else %}{{ col.obj.description|default:"-" }}{% endif %}
+                </div>
+            </td>
+        {% endfor %}
+    </tr>
+
+    <!-- 1. 预测成本 -->
+    <tr>
+        <td class="text-start bg-light fw-bold text-green align-middle"><i class="ti ti-currency-yen me-1"></i>预测成本</td>
+        <td class="align-middle">-</td>
+        <td class="text-muted align-middle">元/kg</td>
+        {% for col in columns %}
+            <td class="fw-bold text-green align-middle">
+                {% if col.type == 'material' %}-{% elif col.type == 'raw_material' %}{{ col.obj.latest_price|default:"-" }}{% else %}{{ col.obj.cost_predicted|default:"-" }}{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+
+    <!-- 2. 近N月均价 -->
+    <tr>
+        <td class="text-start bg-light fw-bold text-orange align-middle"><i class="ti ti-currency-yen me-1"></i>近{{ avg_months }}月均价</td>
+        <td class="align-middle">-</td>
+        <td class="text-muted align-middle">元/kg</td>
+        {% for col in columns %}
+            <td class="fw-bold text-orange align-middle">
+                {% if col.type == 'formula' and col.obj.unit_cost %}{{ col.obj.unit_cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+
+    <!-- 3. 色粉预测成本 -->
+    <tr>
+        <td class="text-start bg-light fw-bold text-pink align-middle"><i class="ti ti-palette me-1"></i>色粉预测成本</td>
+        <td class="align-middle">-</td>
+        <td class="text-muted align-middle">元/kg</td>
+        {% for col in columns %}
+            <td class="fw-bold text-pink align-middle">
+                {% if col.type == 'formula' and col.obj.color_powder_bom and col.obj.color_powder_bom.cost %}{{ col.obj.color_powder_bom.cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+
+    <!-- 4. BOM 区 -->
+    <tr class="bg-orange-lt">
+        <td class="text-start fw-bold text-orange align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #fef0e6;">
+            <i class="ti ti-list me-1"></i>BOM 结构对比
+        </td>
+        {% if columns|length > 1 %}
+        <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #fef0e6;">&nbsp;</td>
+        {% endif %}
+    </tr>
+    {% if bom_matrix %}
+        {% for row in bom_matrix %}
+            <tr>
+                <td class="text-start align-middle text-muted small">{{ row.item.category.name }}</td>
+                <td class="text-start align-middle">
+                    <div class="fw-bold text-truncate" title="{{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}">
+                        {{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}
+                    </div>
+                </td>
+                <td class="text-muted align-middle">%</td>
+                {% for cell in row.values %}
+                    <td class="align-middle">
+                        {% if cell.is_empty %}
+                            <span class="text-muted text-opacity-25">-</span>
+                        {% else %}
+                            <span class="fw-bold text-dark">{{ cell.val|smart_decimal }}</span>
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="{{ columns|length|add:3 }}" class="text-center text-muted py-3">暂无 BOM 数据</td></tr>
+    {% endif %}
+
+    <!-- 5. 色粉BOM区 -->
+    <tr class="bg-pink-lt">
+        <td class="text-start fw-bold text-pink align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #fbe9f0;">
+            <i class="ti ti-palette me-1"></i>色粉BOM结构对比
+        </td>
+        {% if columns|length > 1 %}
+        <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #fbe9f0;">&nbsp;</td>
+        {% endif %}
+    </tr>
+    {% if cpbom_matrix %}
+        {% for row in cpbom_matrix %}
+            <tr>
+                <td class="text-start align-middle text-muted small">{{ row.item.category.name }}</td>
+                <td class="text-start align-middle">
+                    <div class="fw-bold text-truncate" title="{{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}">
+                        {{ row.item.name }} {% if row.item.model_name %}- {{ row.item.model_name }}{% endif %}
+                    </div>
+                </td>
+                <td class="text-muted align-middle">%</td>
+                {% for cell in row.values %}
+                    <td class="align-middle">
+                        {% if cell.is_empty %}
+                            <span class="text-muted text-opacity-25">-</span>
+                        {% else %}
+                            <span class="fw-bold text-dark">{{ cell.val|smart_decimal }}</span>
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="{{ columns|length|add:3 }}" class="text-center text-muted py-3">暂无 色粉BOM 数据</td></tr>
+    {% endif %}
+
+    <!-- 6. 性能区 -->
+    <tr class="bg-purple-lt">
+        <td class="text-start fw-bold text-purple align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #f1ebf8;">
+            <i class="ti ti-flask me-1"></i>性能指标对比
+        </td>
+        {% if columns|length > 1 %}
+        <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #f1ebf8;">&nbsp;</td>
+        {% endif %}
+    </tr>
+    {% if test_matrix %}
+        {% for row in test_matrix %}
+            <tr>
+                <td class="text-start align-middle fw-bold">
+                    <div class="text-truncate" title="{{ row.item.name }}">{{ row.item.name }}</div>
+                </td>
+                <td class="text-start align-middle small text-muted">
+                    <div class="text-truncate" title="{{ row.item.standard }}{% if row.item.condition %} ({{ row.item.condition }}){% endif %}">
+                        {{ row.item.standard }}
+                        {% if row.item.condition %}<span class="ms-1">({{ row.item.condition }})</span>{% endif %}
+                    </div>
+                </td>
+                <td class="text-muted small align-middle">{{ row.item.unit }}</td>
+                {% for cell in row.values %}
+                    <td class="align-middle {{ cell.compare_class }}{% if cell.is_base %} text-blue{% endif %}"{% if cell.is_base %} style="--tblr-table-bg-type: #e6f1fa; background-color: #e6f1fa"{% endif %}>
+                        {% if cell.val != '-' %}
+                            <span class="fw-bold">{{ cell.val }}</span>
+                        {% else %}
+                            <span class="text-muted text-opacity-25">-</span>
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="{{ columns|length|add:3 }}" class="text-center text-muted py-3">暂无测试数据</td></tr>
+    {% endif %}
+
+    <!-- 7. 工艺 & 信息区 -->
+    <tr class="bg-cyan-lt">
+        <td class="text-start fw-bold text-cyan align-middle sticky-col" colspan="4" style="left: 0; z-index: 2; background-color: #e6f4f7;">
+            <i class="ti ti-settings-cog me-1"></i>工艺 & 基础信息
+        </td>
+        {% if columns|length > 1 %}
+        <td class="align-middle" colspan="{{ columns|length|add:-1 }}" style="background-color: #e6f4f7;">&nbsp;</td>
+        {% endif %}
+    </tr>
+    <tr>
+        <td class="text-start text-muted small">工艺方案</td>
+        <td class="text-muted small">-</td>
+        <td class="align-middle">-</td>
+        {% for col in columns %}
+            <td class="text-center">
+                {% if col.type == 'formula' and col.obj.process %}
+                    <a href="{% url 'process_profile_detail' col.obj.process.pk %}" target="_blank" class="small">{{ col.obj.process.name|truncatechars:14 }}</a>
+                {% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+    <tr>
+        <td class="text-start text-muted small">实验员</td>
+        <td class="text-muted small">-</td>
+        <td class="align-middle">-</td>
+        {% for col in columns %}
+            <td class="text-center small">
+                {% if col.type == 'formula' %}{{ col.obj.creator.username }}{% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+    <tr>
+        <td class="text-start text-muted small">创建日期</td>
+        <td class="text-muted small">-</td>
+        <td class="align-middle">-</td>
+        {% for col in columns %}
+            <td class="text-center small">
+                {% if col.type == 'formula' %}{{ col.obj.created_at|date:"Y-m-d" }}{% else %}<span class="text-muted">-</span>{% endif %}
+            </td>
+        {% endfor %}
+    </tr>
+    </tbody>
+</table>
