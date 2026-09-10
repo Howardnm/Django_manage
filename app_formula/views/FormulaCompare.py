@@ -7,6 +7,7 @@ from app_formula.models import LabFormula
 from app_formula.mixins import FormulaAccessMixin
 from app_raw_material.models import RawMaterial, PriceAvgConfig
 from common_utils.comparison_matrix import build_compare_matrices
+from common_utils.serializers.compare import serialize_compare
 import openpyxl
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
@@ -201,7 +202,7 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
             .select_related('creator', 'material_type', 'project', 'process')
             .prefetch_related('bom_lines__raw_material__category',
                               'test_results__test_config__category',
-                              'color_powder_bom__entries__raw_material')
+                              'color_powder_bom__entries__raw_material__category')
             .order_by('created_at'))
         materials = list(MaterialLibrary.objects.filter(pk__in=material_ids)
             .prefetch_related('properties__test_config__category')
@@ -240,6 +241,10 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         context['cpbom_matrix'] = cpbom_matrix
         context['test_matrix'] = test_matrix
         context['avg_months'] = PriceAvgConfig.get().months
+        context['compare_data'] = serialize_compare(
+            columns, (bom_matrix, cpbom_matrix, test_matrix),
+            PriceAvgConfig.get().months, None,
+        )
         context['page_title'] = "综合对比分析"
         # 传递 material 对象以便模板兼容旧逻辑 (如果有且仅有一个材料且在第一位)
         if materials and len(materials) == 1 and columns[0]['type'] == 'material':

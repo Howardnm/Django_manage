@@ -1,0 +1,64 @@
+/* ==========================================
+   通用配方对比表 — static/js/common/compare_table.js 配套样式
+   依赖: Tabler 1.4.0 CSS 变量
+
+   宽度策略：
+   - 前 3 列（分类/项目、详情/标准、单位）按内容自适应，但封顶不过宽，禁止换行
+   - 第 4 列起（数据列）固定宽度 100px，超宽省略
+   ========================================== */
+
+/* table-layout: auto → 标签列随内容伸缩；数据列用 width/max-width 锁死 */
+.compare-table {
+    table-layout: auto;
+    border-collapse: separate;
+    border-spacing: 0;
+}
+
+/* 前 3 列：按内容自适应（min-width 为下限），不超过 max-width，超长省略 */
+.compare-table th:nth-child(1),
+.compare-table td:nth-child(1) {
+    min-width: 60px;
+    max-width: 140px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.compare-table th:nth-child(2),
+.compare-table td:nth-child(2) {
+    min-width: 100px;
+    max-width: 380px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.compare-table th:nth-child(3),
+.compare-table td:nth-child(3) {
+    min-width: 40px;
+    max-width: 70px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 第 4 列起：固定宽度，溢出省略 */
+.compare-table th:nth-child(n+4),
+.compare-table td:nth-child(n+4) {
+    width: 100px;
+    max-width: 100px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.compare-table th,
+.compare-table td {
+    border-right: 1px solid var(--tblr-border-color, #e5e7eb);
+    border-bottom: 1px solid var(--tblr-border-color, #e5e7eb);
+}
+.compare-table th:first-child,
+.compare-table td:first-child {
+    border-left: 1px solid var(--tblr-border-color, #e5e7eb);
+}
+.compare-table thead th {
+    border-top: 1px solid var(--tblr-border-color, #e5e7eb);
+}

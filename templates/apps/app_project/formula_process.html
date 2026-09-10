@@ -2,8 +2,9 @@
 {% load static %}
 {% load project_extras %}
 
-{% block styles %}
+{% block extra_css %}
     <link rel="stylesheet" href="{% static 'css/apps/app_project/formula_process.css' %}">
+    <link rel="stylesheet" href="{% static 'css/common/compare_table.css' %}">
 {% endblock %}
 
 {% block content %}
@@ -200,7 +201,7 @@
 
     <!-- 右侧：配方详情 / 对比视图 -->
     <div class="{% if compare_mode %}col-lg-12{% else %}col-lg-9{% endif %}">
-        {% if compare_mode and columns %}
+        {% if compare_mode and compare_data %}
             <!-- ============ 对比模式 ============ -->
             {% include 'apps/app_project/detail/_formula_compare_panel.html' %}
 
@@ -465,6 +466,6 @@
 
 {% endblock %}
 
-{% block scripts %}
-    <script src="{% static 'js/apps/app_project/formula_compare.js' %}"></script>
+{% block extra_js %}
+    <script src="{% static 'js/common/compare_table.js' %}"></script>
 {% endblock %}

@@ -40,7 +40,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'bom_lines__raw_material__category',
             'test_results__test_config__category',
             'test_results__production_order',
-            'color_powder_bom__entries__raw_material',
+            'color_powder_bom__entries__raw_material__category',
         ).order_by('version')
 
         material_formulas = LabFormula.objects.none()
@@ -55,7 +55,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                 'bom_lines__raw_material__category',
                 'test_results__test_config__category',
                 'test_results__production_order',
-                'color_powder_bom__entries__raw_material',
+                'color_powder_bom__entries__raw_material__category',
             ).order_by('version')
 
         return sorted(
@@ -266,11 +266,16 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         if selected_formula:
             test_result_tabs, has_test_results = self._build_test_result_tabs(selected_formula)
 
-        # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab)
+        # 对比矩阵 (全局对比用全阶段配方，单tab对比用当前tab) → DRF 序列化为 JSON 数据契约
         compare_formulas = all_stage_formulas if global_compare else active_formulas
-        columns, bom_matrix, test_matrix, cpbom_matrix = [], [], [], []
+        compare_data = None
         if compare_mode and compare_formulas:
+            from common_utils.serializers.compare import serialize_compare
             columns, bom_matrix, test_matrix, cpbom_matrix = self._build_comparison_matrices(compare_formulas, material=material)
+            compare_data = serialize_compare(
+                columns, (bom_matrix, cpbom_matrix, test_matrix),
+                PriceAvgConfig.get().months, project,
+            )
 
         # 客户竞品详细卡片 — 选中竞品配方时展示其关联工单的竞品信息
         selected_competitor_info = None
@@ -306,10 +311,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'has_test_results': has_test_results,
             'compare_mode': compare_mode,
             'global_compare': global_compare,
-            'columns': columns,
-            'bom_matrix': bom_matrix,
-            'test_matrix': test_matrix,
-            'cpbom_matrix': cpbom_matrix,
+            'compare_data': compare_data,
             'selected_competitor_info': selected_competitor_info,
             'avg_months': PriceAvgConfig.get().months,
         })
