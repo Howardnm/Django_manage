@@ -39,7 +39,6 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         widget=forms.Select(attrs={
             'class': 'form-select remote-search',
             'data-model': 'supplier',
-            'style': 'width: 250px;',
             'data-placeholder': '输入供应商名称搜索...'
         })
     )

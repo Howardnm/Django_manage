@@ -2,7 +2,7 @@
 <div class="card-body border-bottom py-3">
     <form method="GET"
           {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
-          class="d-flex flex-wrap align-items-center gap-2">
+          class="row g-2 align-items-center">
 
         {# 保留 ISO/ASTM 标准参数（opt-in：preserve_std=True 时启用） #}
         {% if preserve_std %}
@@ -16,8 +16,8 @@
 
             {# ── 2. 搜索框：input-icon + search 图标 ──── #}
             {% elif field.name == 'q' %}
-                <div class="d-inline-block" style="min-width: 200px;">
-                    <div class="input-icon">
+                <div class="col-auto">
+                    <div class="input-icon" style="width: 180px;">
                         <span class="input-icon-addon">
                             <i class="ti ti-search"></i>
                         </span>
@@ -27,7 +27,7 @@
 
             {# ── 3. 日期范围：input-icon + calendar 图标 ──── #}
             {% elif field.name == 'start_date' or field.name == 'end_date' %}
-                <div class="d-inline-block" style="max-width: 160px;">
+                <div class="col-auto">
                     <div class="input-icon">
                         <span class="input-icon-addon">
                             <i class="ti ti-calendar"></i>
@@ -40,25 +40,26 @@
             {# advanced_panel=True 时不内联渲染，收进折叠面板 #}
             {% elif '_min' in field.name or '_max' in field.name %}
                 {% if not advanced_panel %}
-                <div class="d-inline-block" style="max-width: 120px;">
-                    <div class="input-group input-group-sm">
+                <div class="col-auto">
+                    <div class="input-group input-group-sm" style="width: 120px;">
                         {{ field }}
                     </div>
                 </div>
                 {% endif %}
 
-            {# ── 5. 其他字段（下拉筛选框）── #}
-            {# d-inline-block 防 flex 拉伸；固定宽度使 TomSelect 始终填满容器（同原生 form-select width:100%），聚焦/失焦不随内容变宽 #}
+            {# ── 5. 其他字段（下拉 / 文本筛选）── #}
             {% else %}
-                <div class="d-inline-block" style="width: 180px;">
-                    {{ field }}
+                <div class="col-auto">
+                    <div class="filter-select" style="width: 150px;">
+                        {{ field }}
+                    </div>
                 </div>
             {% endif %}
         {% endfor %}
 
         {# ── 高级筛选折叠触发按钮（opt-in：advanced_panel=True）── #}
         {% if advanced_panel %}
-            <div class="d-inline-block">
+            <div class="col-auto">
                 <button type="button" class="btn btn-ghost-secondary" data-bs-toggle="collapse" data-bs-target="#advanced-filter">
                     <i class="ti ti-adjustments-horizontal me-1"></i> 性能筛选
                 </button>
@@ -66,7 +67,7 @@
         {% endif %}
 
         {# ── 操作按钮（靠右）── #}
-        <div class="ms-auto">
+        <div class="col-auto ms-auto">
             <button type="submit" class="btn btn-primary btn-icon" aria-label="查询" title="点击查询" data-bs-toggle="tooltip">
                 <i class="ti ti-search"></i>
             </button>
@@ -81,23 +82,25 @@
 
         {# ── 高级筛选折叠面板（opt-in：advanced_panel=True，泛型按 X_min/X_max 分组）── #}
         {% if advanced_panel %}
-        <div class="collapse w-100 mt-2" id="advanced-filter">
-            <div class="card card-body bg-blue-lt">
-                <div class="row g-3">
-                    {% for field in filter.form %}
-                        {% if field.name|slice:'-4:' == '_min' %}
-                            {% with max_name=field.name|slice:':-4'|add:'_max' %}
-                            <div class="col-md-3">
-                                <label class="form-label small">{{ field.label }}</label>
-                                <div class="input-group input-group-sm">
-                                    {{ field }}
-                                    <span class="input-group-text">-</span>
-                                    {{ filter.form|get_item:max_name }}
+        <div class="col-12">
+            <div class="collapse" id="advanced-filter">
+                <div class="card card-body bg-blue-lt">
+                    <div class="row g-3">
+                        {% for field in filter.form %}
+                            {% if field.name|slice:'-4:' == '_min' %}
+                                {% with max_name=field.name|slice:':-4'|add:'_max' %}
+                                <div class="col-md-3">
+                                    <label class="form-label small">{{ field.label }}</label>
+                                    <div class="input-group input-group-sm">
+                                        {{ field }}
+                                        <span class="input-group-text">-</span>
+                                        {{ filter.form|get_item:max_name }}
+                                    </div>
                                 </div>
-                            </div>
-                            {% endwith %}
-                        {% endif %}
-                    {% endfor %}
+                                {% endwith %}
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>

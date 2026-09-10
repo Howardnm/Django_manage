@@ -16,7 +16,6 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
         widget=forms.Select(attrs={
             'class': 'form-select form-select-search',
             'placeholder': '来源渠道',
-            'style': 'width: 150px;',
         }),
     )
 

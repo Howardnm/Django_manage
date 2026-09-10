@@ -17,7 +17,6 @@ class ProductionOrderFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
         widget=forms.Select(attrs={
             'class': 'form-select form-select-search',
             'placeholder': '工单状态',
-            'style': 'width: 150px;',
         }),
     )
 
@@ -27,7 +26,6 @@ class ProductionOrderFilter(TablerFilterMixin, DateRangeFilterMixin, django_filt
             'class': 'form-select remote-search',
             'data-model': 'project',
             'placeholder': '检索项目名称',
-            'style': 'width: 220px;',
         }),
     )
 
@@ -73,7 +71,6 @@ class PendingOrderFilter(TablerFilterMixin, django_filters.FilterSet):
             'class': 'form-select remote-search',
             'data-model': 'project_pending',
             'placeholder': '检索项目名称',
-            'style': 'width: 220px;',
         }),
     )
 
@@ -106,7 +103,6 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
         widget=forms.Select(attrs={
             'class': 'form-select form-select-search',
             'placeholder': '任务状态',
-            'style': 'width: 150px;',
         }),
     )
 
@@ -117,7 +113,6 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
             'class': 'form-select remote-search',
             'data-model': 'project',
             'placeholder': '检索项目名称',
-            'style': 'width: 220px;',
         }),
     )
 
