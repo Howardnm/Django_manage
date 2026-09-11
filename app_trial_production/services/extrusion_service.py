@@ -74,7 +74,8 @@ def build_extrusion_calendar_events(start_str, end_str):
     from app_trial_production.utils.extrusion import is_all_day_event
 
     qs = ProductionOrder.objects.filter(
-        status__in=['ACCEPTED', 'EXTRUDING', 'INJECTION_MOLDING', 'TESTING'],
+        # COMPLETED 也纳入：全流程已完成但已挤出的工单仍需在日历上可见（与 EXTRUSION_DISPLAY_MAP 一致）
+        status__in=['ACCEPTED', 'EXTRUDING', 'INJECTION_MOLDING', 'TESTING', 'COMPLETED'],
         extrusion_scheduled_date__isnull=False,
     ).select_related(
         'project', 'extrusion_task', 'process_profile',
