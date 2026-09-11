@@ -169,6 +169,7 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
             name=form.cleaned_data.get('name', ''),
             grade=form.cleaned_data.get('grade'),
             material=form.cleaned_data.get('material'),
+            business_segment=form.cleaned_data.get('business_segment'),
             description=form.cleaned_data.get('description', ''),
             submitted_by=self.request.user,
             submission_comment=form.cleaned_data.get('submission_comment', ''),

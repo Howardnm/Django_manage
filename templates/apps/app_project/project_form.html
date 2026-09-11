@@ -97,6 +97,15 @@
                     {% endif %}
                 </div>
 
+                <div class="mb-3">
+                    <label class="form-label">业务板块</label>
+                    {{ form.business_segment }}
+                    <small class="form-hint">选择项目所属业务板块，用于区分项目分类。</small>
+                    {% if form.business_segment.errors %}
+                        <div class="invalid-feedback d-block">{{ form.business_segment.errors.0 }}</div>
+                    {% endif %}
+                </div>
+
                 <!-- 项目描述 -->
                 <div class="mb-3">
                     <label class="form-label">项目描述</label>

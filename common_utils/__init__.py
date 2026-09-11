@@ -18,7 +18,7 @@ Public API:
 """
 
 from common_utils.filters import TablerFilterMixin, TablerFormMixin, DateRangeFilterMixin  # noqa: F401
-from common_utils.forms import UserPickerWidget  # noqa: F401
+from common_utils.forms import UserPickerWidget, RgbColorWidget  # noqa: F401
 from common_utils.search_picker_config import SearchPickerConfig  # noqa: F401
 from common_utils.comparison_matrix import build_compare_matrices  # noqa: F401
 from common_utils.serializers.compare import serialize_compare  # noqa: F401

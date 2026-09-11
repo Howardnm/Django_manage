@@ -3,11 +3,38 @@
 
 当前组件：
 - UserPickerWidget: 人员选择器（组织架构树），支持单选/多选
+- RgbColorWidget: RGB 色值输入（文本框 + 框内原生颜色选择器）
 """
 
+import re
+
 from django import forms
+from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from django.template.loader import render_to_string
+
+
+class RgbColorWidget(forms.TextInput):
+    """RGB 色值：文本框 + 框内左侧原生颜色选择器（由 js/common/rgb_color_input.js 联动）。
+
+    空值时选择器默认灰色 #cccccc；选择器无 name 不参与提交，提交值为文本框内容。
+    结构：<div class="input-group"><input type="color" class="rgb-color-picker">…<input type="text" name="…"></div>
+    """
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = dict(attrs or {})
+        attrs.setdefault('maxlength', 7)
+        text_html = super().render(name, value, attrs, renderer)
+        color_val = str(value) if (value and re.match(r'^#[0-9a-fA-F]{6}$', str(value))) else '#cccccc'
+        picker_html = format_html(
+            '<input type="color" class="form-control form-control-color rgb-color-picker"'
+            ' style="flex:0 0 auto; width:48px; min-width:48px;" value="{}" title="选择颜色">',
+            color_val,
+        )
+        return format_html('<div class="input-group">{}{}</div>', picker_html, text_html)
+
+    class Media:
+        js = ['js/common/rgb_color_input.js']
 
 
 class UserPickerWidget(forms.TextInput):

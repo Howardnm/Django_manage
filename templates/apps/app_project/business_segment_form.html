@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="page-header d-print-none mb-3">
+    <div class="container-xl">
+        <div class="row g-2 align-items-center">
+            <div class="col">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'business_segment_list' %}">业务板块管理</a></li>
+                        <li class="breadcrumb-item active">{% if form.instance.pk %}编辑板块{% else %}新增板块{% endif %}</li>
+                    </ol>
+                </nav>
+                <h2 class="page-title">
+                    {% if form.instance.pk %}编辑业务板块{% else %}新增业务板块{% endif %}
+                </h2>
+                <div class="text-muted small mt-1">定义项目所属业务板块，用于区分项目分类</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="card mb-3">
+                <div class="card-header">
+                    <h3 class="card-title"><i class="ti ti-category me-2 text-primary"></i>基本信息</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label required">板块名称</label>
+                                {{ form.name }}
+                                <div class="form-hint">例如：汽车、电子电器、家电</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">板块编码</label>
+                                {{ form.code }}
+                                <div class="form-hint">如：AUTO, ELECTRONICS</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">排序权重</label>
+                                {{ form.order }}
+                                <div class="form-hint">数字越小越靠前</div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3 mt-4">
+                                <label class="form-check form-switch">
+                                    {{ form.is_active }}
+                                    <span class="form-check-label">
+                                        <strong>是否启用</strong>
+                                        <span class="text-muted d-block small mt-1">禁用后不会在项目业务板块下拉框中出现</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-0">
+                        <label class="form-label">板块说明</label>
+                        {{ form.description }}
+                        <div class="form-hint">可选，用于记录该业务板块的详细说明或适用场景</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex">
+                <a href="{% url 'business_segment_list' %}" class="btn btn-ghost-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>取消返回
+                </a>
+                <button type="submit" class="btn btn-primary ms-auto px-4">
+                    <i class="ti ti-device-floppy me-1"></i>保存板块
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

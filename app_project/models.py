@@ -33,6 +33,7 @@ class AbstractProjectFields(models.Model):
     name = models.CharField("项目名称", max_length=100)
     grade = models.ForeignKey('app_repository.GradeFactor', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="项目等级")
     material = models.ForeignKey('app_material.MaterialLibrary', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="选用成品材料")
+    business_segment = models.ForeignKey('BusinessSegment', on_delete=models.SET_NULL, null=True, blank=True, verbose_name="业务板块")
     description = models.TextField("项目描述", blank=True)
 
     class Meta:
@@ -483,6 +484,24 @@ class FailureReason(models.Model):
     class Meta:
         verbose_name = "不合格原因"
         verbose_name_plural = "不合格原因库"
+        ordering = ['order', 'name']
+
+    def __str__(self):
+        return self.name
+
+
+# 8.0 业务板块库（lookup 模型）
+class BusinessSegment(models.Model):
+    """业务板块 — 用于区分项目所属业务板块"""
+    name = models.CharField("板块名称", max_length=50, unique=True)
+    code = models.CharField("板块编码", max_length=20, blank=True, help_text="如：AUTO, ELECTRONICS")
+    order = models.PositiveIntegerField("排序权重", default=0, help_text="数字越小越靠前")
+    description = models.TextField("板块说明", blank=True, help_text="详细说明该业务板块的范围")
+    is_active = models.BooleanField("是否启用", default=True)
+
+    class Meta:
+        verbose_name = "业务板块"
+        verbose_name_plural = "业务板块库"
         ordering = ['order', 'name']
 
     def __str__(self):

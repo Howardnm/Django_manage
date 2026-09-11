@@ -37,12 +37,17 @@
         <div class="flex-fill overflow-hidden">
             <div class="h3 fw-bold text-primary mb-0 text-truncate">{{ project.name }}</div>
             <div class="text-secondary small d-flex align-items-center">
-                <i class="ti ti-user me-1"></i>
-                负责人：<span class="fw-medium">{{ project.manager.username }}</span>
+                <i class="ti ti-user me-1" title="负责人"></i>
+                <span class="fw-medium">{{ project.manager.username }}</span>
                 {% if project.code %}
                 <span class="text-muted mx-2">|</span>
-                <i class="ti ti-hash me-1"></i>
-                编码：<span class="fw-medium">{{ project.code }}</span>
+                <i class="ti ti-hash me-1" title="编码"></i>
+                <span class="fw-medium">{{ project.code }}</span>
+                {% endif %}
+                {% if project.business_segment %}
+                <span class="text-muted mx-2">|</span>
+                <i class="ti ti-category me-1" title="业务板块"></i>
+                <span class="fw-medium">{{ project.business_segment.name }}</span>
                 {% endif %}
             </div>
         </div>

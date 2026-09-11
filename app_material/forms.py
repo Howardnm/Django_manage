@@ -4,6 +4,7 @@ from django.forms import inlineformset_factory
 from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint,
                                TestConfig, MaterialType, MaterialCharacteristic, MaterialProcessingCondition)
 from common_utils.filters import TablerFormMixin
+from common_utils.forms import RgbColorWidget
 
 
 class MaterialForm(TablerFormMixin, forms.ModelForm):
@@ -31,7 +32,7 @@ class MaterialForm(TablerFormMixin, forms.ModelForm):
             # 颜色字段
             'material_color_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：哑光黑、亮白'}),
             'pantone_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：PANTONE 19-4052'}),
-            'rgb_value': forms.TextInput(attrs={'class': 'form-control d-block', 'data-coloris': '', 'placeholder': '#FF5733', 'maxlength': 7}),
+            'rgb_value': RgbColorWidget(attrs={'class': 'form-control', 'placeholder': '#FF5733'}),
         }
 
     def __init__(self, *args, **kwargs):

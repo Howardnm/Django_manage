@@ -8,6 +8,7 @@ from .views.ProjectSalesMember import *
 from .views.PerformanceRule import *
 from .views.FailureReason import *
 from .views.FeedbackType import *
+from .views.BusinessSegment import *
 from app_panel.views.PerformanceView import UserPerformanceListView, UserPerformanceDetailView
 from app_form_management.views import ProjectFormListView
 
@@ -44,6 +45,12 @@ urlpatterns = [
     # 项目销售成员管理
     path('<int:pk>/sales-member/manage/', ProjectSalesMemberManageView.as_view(), name='project_sales_member_manage'),
     path('sales-member/<int:pk>/delete/', ProjectSalesMemberDeleteView.as_view(), name='project_sales_member_delete'),
+
+    # 业务板块管理
+    path('business-segments/', BusinessSegmentListView.as_view(), name='business_segment_list'),
+    path('business-segments/create/', BusinessSegmentCreateView.as_view(), name='business_segment_create'),
+    path('business-segments/<int:pk>/edit/', BusinessSegmentUpdateView.as_view(), name='business_segment_edit'),
+    path('business-segments/<int:pk>/delete/', BusinessSegmentDeleteView.as_view(), name='business_segment_delete'),
 
     # 不合格原因管理
     path('failure-reasons/', FailureReasonListView.as_view(), name='failure_reason_list'),

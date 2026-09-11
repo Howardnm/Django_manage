@@ -55,6 +55,10 @@
                     <td>{{ change.material.grade_name|default:"—" }}</td>
                 </tr>
                 <tr>
+                    <td class="text-muted small">业务板块</td>
+                    <td>{{ change.business_segment.name|default:"—" }}</td>
+                </tr>
+                <tr>
                     <td class="text-muted small">项目描述</td>
                     <td>{{ change.description|default:"—"|linebreaksbr }}</td>
                 </tr>

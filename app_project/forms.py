@@ -1,6 +1,6 @@
 from django import forms
 from django.core.exceptions import ValidationError
-from .models import Project, ProjectNode, ProjectStage, ProjectMember, NodeScoreRule, ProjectSalesMember, FailureReason, FeedbackType
+from .models import Project, ProjectNode, ProjectStage, ProjectMember, NodeScoreRule, ProjectSalesMember, FailureReason, FeedbackType, BusinessSegment
 from django.contrib.auth import get_user_model
 from django.db.models import Sum
 from common_utils.filters import TablerFormMixin # 从 common_utils 导入通用的 TablerFormMixin
@@ -21,12 +21,13 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
 
     class Meta:
         model = Project
-        fields = ['code', 'name', 'grade', 'material', 'description']
+        fields = ['code', 'name', 'grade', 'material', 'business_segment', 'description']
         widgets = {
             'code': forms.TextInput(attrs={'placeholder': '请输入项目编码，留空则自动生成'}),
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称，格式：【客户 - 材料 - 制件（VAVE/T0/其他）】'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
             'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
+            'business_segment': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),
         }
 
@@ -197,6 +198,18 @@ class NodeScoreRuleForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = NodeScoreRule
         fields = ['name', 'score_value', 'rule_type', 'trigger_stage', 'trigger_status', 'is_multiple_rounds', 'description']
+        widgets = {
+            'description': forms.Textarea(attrs={'rows': 3}),
+        }
+
+
+# ---- 业务板块管理 ----
+
+class BusinessSegmentForm(TablerFormMixin, forms.ModelForm):
+    """业务板块管理表单"""
+    class Meta:
+        model = BusinessSegment
+        fields = ['name', 'code', 'order', 'is_active', 'description']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
         }

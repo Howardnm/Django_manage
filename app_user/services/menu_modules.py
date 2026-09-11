@@ -61,6 +61,8 @@ class MenuModule:
                  "permissions": ["app_project.view_project"]},
                 {"name": "项目评分规则", "url_name": "project_score_rule_list",
                  "permissions": ["app_project.change_project"]},
+                {"name": "业务板块类型", "url_name": "business_segment_list",
+                 "permissions": ["app_project.change_project"]},
                 {"name": "不合格原因类型", "url_name": "failure_reason_list",
                  "permissions": ["app_project.change_project"]},
                 {"name": "客户意见类型", "url_name": "feedback_type_list",

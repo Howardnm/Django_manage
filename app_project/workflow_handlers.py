@@ -81,6 +81,7 @@ def handle_project_change_callback(instance: WorkflowInstance, target_status: st
             project.name = change.name
             project.grade = change.grade
             project.material = change.material
+            project.business_segment = change.business_segment
             project.description = change.description
             project.workflow_instance = None
             project.save()

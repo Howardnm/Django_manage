@@ -3,7 +3,7 @@ from django.db.models import Q
 from django import forms
 from django.contrib.auth import get_user_model
 from app_user.models import WorkGroup
-from app_project.models import Project, ProjectNode, ProjectStage
+from app_project.models import Project, ProjectNode, ProjectStage, BusinessSegment
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from common_utils.forms import UserPickerWidget
 
@@ -65,9 +65,18 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '工作组'})
     )
 
+    # 6. 业务板块筛选
+    business_segment = django_filters.ModelChoiceFilter(
+        queryset=BusinessSegment.objects.all(),
+        field_name='business_segment',
+        label='业务板块',
+        empty_label="所有板块",
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '业务板块'})
+    )
+
     class Meta:
         model = Project
-        fields = ['q', 'manager', 'group', 'stage', 'start_date', 'end_date']
+        fields = ['q', 'manager', 'group', 'stage', 'business_segment', 'start_date', 'end_date']
 
     def filter_manager(self, queryset, name, value):
         if not value:

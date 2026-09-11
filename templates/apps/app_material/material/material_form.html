@@ -183,19 +183,5 @@
         });
     </script>
 
-<script src="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/umd/coloris.min.js' %}"></script>
-<script>
-    Coloris.init();
-    Coloris({
-        el: '[data-coloris]',
-        theme: 'default',
-        themeMode: 'light',
-        format: 'hex',
-        alpha: false,
-        clearButton: true,
-        clearLabel: '清除',
-        closeButton: true,
-        closeLabel: '关闭',
-    });
-</script>
+<script src="{% static 'js/common/rgb_color_input.js' %}"></script>
 {% endblock %}
