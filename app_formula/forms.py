@@ -1,5 +1,8 @@
+import re
+
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
+from django.utils.html import format_html
 from common_utils.filters import TablerFormMixin
 from .models import LabFormula, FormulaBOM, FormulaTestResult
 from app_process.models import ProcessProfile
@@ -7,6 +10,22 @@ from app_material.models import TestConfig
 from app_raw_material.models import RawMaterial
 from app_basic_research.models import ResearchProject
 from app_project.models import Project, ProjectNode
+
+
+class RgbColorWidget(forms.TextInput):
+    """RGB 色值：文本框 + 框内右侧原生颜色选择器（由 common/rgb_color_input.js 联动）。"""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = dict(attrs or {})
+        attrs.setdefault('maxlength', 7)
+        text_html = super().render(name, value, attrs, renderer)
+        color_val = str(value) if (value and re.match(r'^#[0-9a-fA-F]{6}$', str(value))) else '#cccccc'
+        picker_html = format_html(
+            '<input type="color" class="form-control form-control-color rgb-color-picker"'
+            ' style="flex:0 0 auto; width:48px; min-width:48px;" value="{}" title="选择颜色">',
+            color_val,
+        )
+        return format_html('<div class="input-group">{}{}</div>', picker_html, text_html)
 
 
 class _IsInvalidMixin:
@@ -36,7 +55,7 @@ class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
             'is_mature': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'material_color_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：哑光黑、亮白'}),
             'pantone_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '例如：PANTONE 19-4052'}),
-            'rgb_value': forms.TextInput(attrs={'class': 'form-control d-block', 'data-coloris': '', 'placeholder': '#FF5733', 'maxlength': 7}),
+            'rgb_value': RgbColorWidget(attrs={'class': 'form-control', 'placeholder': '#FF5733'}),
         }
 
     def __init__(self, *args, **kwargs):

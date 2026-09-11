@@ -34,6 +34,9 @@ class LabFormula(models.Model):
     # 成熟配方标记
     is_mature = models.BooleanField("成熟配方", default=False, help_text="勾选后该配方将纳入项目关联材料的成熟配方集，供后续项目参考")
 
+    # 客户竞品标记
+    is_competitor = models.BooleanField("客户竞品", default=False, help_text="客户竞品配方（由竞品工单自动创建，跳过挤出直达注塑）")
+
     # 版本号
     version = models.PositiveIntegerField("版本号", default=1, help_text="同一项目+节点的配方版本序号")
 

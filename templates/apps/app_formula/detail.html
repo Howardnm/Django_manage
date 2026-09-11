@@ -177,6 +177,15 @@
 
                         <dt class="col-5 text-muted">录入日期</dt>
                         <dd class="col-7">{{ formula.created_at|date:"Y-m-d" }}</dd>
+
+                        <dt class="col-5 text-muted">客户竞品</dt>
+                        <dd class="col-7">
+                            {% if formula.is_competitor %}
+                                <span class="badge bg-purple-lt"><i class="ti ti-target me-1"></i>是</span>
+                            {% else %}
+                                <span class="text-muted">否</span>
+                            {% endif %}
+                        </dd>
                     </dl>
                 </div>
             </div>

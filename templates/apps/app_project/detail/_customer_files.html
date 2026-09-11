@@ -5,6 +5,11 @@
         <span class="me-2"><i class="ti ti-package"></i></span>
         <h3 class="card-title m-0 text-purple">项目档案</h3>
         <div class="ms-auto d-flex align-items-center">
+            <a href="{% url 'project_formula_process' project.pk %}?stage=COMPETITOR"
+               class="btn btn-outline-purple btn-sm me-2"
+               title="查看客户竞品（配方过程页 - 客户竞品）">
+                <i class="ti ti-target me-1"></i>客户竞品
+            </a>
             {% if repo.workflow_instance and repo.workflow_instance.status == 'RUNNING' %}
                 <a href="{% url 'workflow_instance_detail' pk=repo.workflow_instance.pk %}"
                    class="btn btn-purple btn-sm"

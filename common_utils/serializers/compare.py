@@ -262,10 +262,11 @@ def _serialize_column(c, project=None, latest_map=None, avg_map=None):
         }
     # formula
     name = _get(obj, 'name')
+    is_competitor = bool(getattr(obj, 'is_competitor', False))
     stage_label = ''
     if obj.project_node:
         stage_label = f"{obj.project_node.get_stage_display()} 第{obj.project_node.round}轮"
-    elif name.startswith('竞品-'):
+    elif is_competitor:
         stage_label = '客户竞品'
     cp = getattr(obj, 'color_powder_bom', None)
     uc = _compute_unit_cost(obj, avg_map, latest_map) if (avg_map and latest_map) else getattr(obj, 'unit_cost', None)
@@ -275,7 +276,7 @@ def _serialize_column(c, project=None, latest_map=None, avg_map=None):
         'code': _get(obj, 'code'),
         'name': name,
         'stage_label': stage_label,
-        'is_competitor': name.startswith('竞品-'),
+        'is_competitor': is_competitor,
         'is_mature': bool(getattr(obj, 'is_mature', False)),
         'is_foreign': bool(project and obj.project_id and obj.project_id != project.pk),
         'project_id': obj.project_id,

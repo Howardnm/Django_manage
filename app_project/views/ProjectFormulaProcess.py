@@ -137,10 +137,10 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
         stage_grouped = OrderedDict()
         all_stage_formulas = []  # 所有配方(用于全局对比，含竞品)
-        competitor_formulas = []  # 无 project_node 的竞品配方 → 伪阶段「客户竞品」
+        competitor_formulas = []  # 竞品配方 → 伪阶段「客户竞品」
         for f in all_formulas:
-            if not f.project_node:
-                # 竞品配方：纳入全局对比池，统一归入「客户竞品」伪阶段
+            if f.is_competitor or not f.project_node:
+                # 竞品配方（含无节点的异常配方兜底）：纳入全局对比池，统一归入「客户竞品」伪阶段
                 all_stage_formulas.append(f)
                 competitor_formulas.append(f)
                 continue
@@ -279,7 +279,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         # 客户竞品详细卡片 — 选中竞品配方时展示其关联工单的竞品信息
         selected_competitor_info = None
-        if selected_formula and selected_formula.name.startswith('竞品-'):
+        if selected_formula and selected_formula.is_competitor:
             detail = selected_formula.productionorderformuladetail_set.select_related(
                 'production_order__customer',
             ).order_by('-production_order__created_at').first()
@@ -363,6 +363,9 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
         competitor_model = request.POST.get('competitor_model', '')
         customer_id = request.POST.get('customer_id', '') or None
         material_type_id = request.POST.get('material_type', '') or None
+        material_color_name = request.POST.get('material_color_name', '')
+        pantone_code = request.POST.get('pantone_code', '')
+        rgb_value = request.POST.get('rgb_value', '')
 
         # ── 校验 ──
         if quantity_planned <= 0:
@@ -403,6 +406,9 @@ class CompetitorOrderCreateView(ProjectAccessMixin, View):
                 formula_name=formula_name,
                 material_type_id=int(material_type_id),
                 quantity_planned=quantity_planned,
+                material_color_name=material_color_name,
+                pantone_code=pantone_code,
+                rgb_value=rgb_value,
                 injection_temperature=injection_temperature,
                 injection_pretreatment=injection_pretreatment,
                 packaging_desc=packaging_desc,
@@ -574,6 +580,6 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
     def _redirect_url(project_pk, formula):
         """根据配方类型决定重定向目标。"""
         base = reverse('project_formula_process', kwargs={'pk': project_pk})
-        if formula.name.startswith('竞品-'):
+        if formula.is_competitor:
             return f'{base}?stage=COMPETITOR&formula_id={formula.pk}'
         return f'{base}?formula_id={formula.pk}'

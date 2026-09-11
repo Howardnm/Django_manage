@@ -403,6 +403,7 @@ class ProductionOrderService:
     @transaction.atomic
     def create_competitor_order_with_formula(user, project, formula_name,
                                               material_type_id, quantity_planned,
+                                              material_color_name='', pantone_code='', rgb_value='',
                                               **order_kwargs):
         """
         创建客户竞品工单 + 关联的无BOM配方实验单。
@@ -413,6 +414,7 @@ class ProductionOrderService:
             formula_name: 配方名称（如 "竞品-杜邦-Zytel-70G33L"）
             material_type_id: 基材类型ID (MaterialType pk)
             quantity_planned: 计划产量
+            material_color_name / pantone_code / rgb_value: 配方颜色字段
             **order_kwargs: 传递给 ProductionOrder 的额外字段
                 (competitor_company, competitor_brand, competitor_model,
                  customer_id, injection_temperature, injection_pretreatment,
@@ -434,6 +436,10 @@ class ProductionOrderService:
             project=project,
             project_node=None,
             creator=user,
+            is_competitor=True,
+            material_color_name=material_color_name,
+            pantone_code=pantone_code,
+            rgb_value=rgb_value,
             description='客户竞品注塑测试（系统自动创建）',
         )
         # code 由 LabFormula.save() 自动生成
