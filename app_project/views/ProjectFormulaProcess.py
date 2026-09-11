@@ -235,31 +235,35 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     g['is_collapsed'] = False
                     break
 
-        # 关联工单列表
+        # 关联工单列表 — 当前阶段 tab 内所有配方的工单（按工单去重）
         related_orders = []
-        if selected_formula:
+        if not compare_mode and active_formulas:
+            formula_ids = [f.pk for f in active_formulas]
             order_details = ProductionOrderFormulaDetail.objects.filter(
-                formula=selected_formula
+                formula_id__in=formula_ids
             ).select_related(
                 'production_order__creator',
                 'production_order__project',
-            )
-            related_orders = [
-                {
-                    'code': d.production_order.code,
-                    'status': d.production_order.get_status_display(),
-                    'status_css': d.production_order.STATUS_CSS_MAP.get(d.production_order.status, 'bg-secondary-lt'),
-                    'status_dot': d.production_order.STATUS_DOT_MAP.get(d.production_order.status, 'bg-secondary'),
-                    'planned_quantity': d.planned_quantity,
-                    'quantity_actual': d.production_order.quantity_actual,
-                    'creator': d.production_order.creator.username,
-                    'created_at': d.production_order.created_at,
-                    'scheduled_date': d.production_order.extrusion_scheduled_date,
-                    'scheduled_end': d.production_order.extrusion_scheduled_end,
-                    'pk': d.production_order.pk,
-                }
-                for d in order_details
-            ]
+            ).order_by('-production_order__created_at')
+            seen_order_pks = set()
+            for d in order_details:
+                o = d.production_order
+                if o.pk in seen_order_pks:
+                    continue
+                seen_order_pks.add(o.pk)
+                related_orders.append({
+                    'code': o.code,
+                    'status': o.get_status_display(),
+                    'status_css': o.STATUS_CSS_MAP.get(o.status, 'bg-secondary-lt'),
+                    'status_dot': o.STATUS_DOT_MAP.get(o.status, 'bg-secondary'),
+                    'planned_quantity': o.quantity_planned,
+                    'quantity_actual': o.quantity_actual,
+                    'creator': o.creator.username,
+                    'created_at': o.created_at,
+                    'scheduled_date': o.extrusion_scheduled_date,
+                    'scheduled_end': o.extrusion_scheduled_end,
+                    'pk': o.pk,
+                })
 
         # 测试结果 Tab 数据（手动录入 + 各工单回写）
         test_result_tabs, has_test_results = [], False
