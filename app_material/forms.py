@@ -2,7 +2,8 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from .models.material import (MaterialLibrary, ApplicationScenario, MaterialDataPoint,
-                               TestConfig, MaterialType, MaterialCharacteristic, MaterialProcessingCondition)
+                               TestConfig, MaterialType, MaterialCharacteristic, MaterialProcessingCondition,
+                               MetricCategory)
 from common_utils.filters import TablerFormMixin
 from common_utils.forms import RgbColorWidget
 
@@ -181,6 +182,13 @@ class MaterialTypeForm(TablerFormMixin, forms.ModelForm):
             'classification': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'rows': 3}),
         }
+
+
+class MetricCategoryForm(TablerFormMixin, forms.ModelForm):
+    """测试分类管理表单"""
+    class Meta:
+        model = MetricCategory
+        fields = ['name', 'order']
 
 
 class ApplicationScenarioForm(TablerFormMixin, forms.ModelForm):

@@ -5,6 +5,7 @@ from .views.MaterialType import *
 from .views.Scenario import *
 from .views.TestConfig import *
 from .views.Characteristic import *
+from .views.MetricCategory import *
 from common_utils.views import MaterialAutocompleteView
 
 urlpatterns = [
@@ -41,5 +42,10 @@ urlpatterns = [
     path('test-configs/', TestConfigListView.as_view(), name='test_config_list'),
     path('test-configs/add/', TestConfigCreateView.as_view(), name='test_config_add'),
     path('test-configs/<int:pk>/edit/', TestConfigUpdateView.as_view(), name='test_config_edit'),
+
+    # 6. 测试分类 (MetricCategory)
+    path('metric-categories/', MetricCategoryListView.as_view(), name='metric_category_list'),
+    path('metric-categories/add/', MetricCategoryCreateView.as_view(), name='metric_category_add'),
+    path('metric-categories/<int:pk>/edit/', MetricCategoryUpdateView.as_view(), name='metric_category_edit'),
 
 ]

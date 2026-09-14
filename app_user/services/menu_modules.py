@@ -112,6 +112,7 @@ class MenuModule:
                 {"name": "材料特性分类", "url_name": "characteristic_list"},
                 {"name": "应用场景分类", "url_name": "scenario_list"},
                 {"name": "测试标准配置", "url_name": "test_config_list"},
+                {"name": "测试分类", "url_name": "metric_category_list"},
             ],
         }
 

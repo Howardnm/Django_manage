@@ -2,7 +2,7 @@ import django_filters
 from django import forms
 from django.db.models import Q, Subquery, OuterRef, DecimalField
 
-from ..models import ApplicationScenario, MaterialType, MaterialLibrary, MaterialDataPoint
+from ..models import ApplicationScenario, MaterialType, MaterialLibrary, MaterialDataPoint, MetricCategory
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
 
@@ -153,3 +153,23 @@ class ScenarioFilter(TablerFilterMixin, django_filters.FilterSet):
             Q(name__icontains=value) |
             Q(requirements__icontains=value)
         )
+
+
+class MetricCategoryFilter(TablerFilterMixin, django_filters.FilterSet):
+    q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    sort = django_filters.OrderingFilter(
+        fields=(
+            ('name', 'name'),
+            ('order', 'order'),
+            ('id', 'id'),
+        ),
+        widget=forms.HiddenInput
+    )
+
+    class Meta:
+        model = MetricCategory
+        fields = ['q']
+
+    def filter_search(self, queryset, name, value):
+        return queryset.filter(Q(name__icontains=value))

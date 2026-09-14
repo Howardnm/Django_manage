@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% load project_extras %}
+
+{% block content %}
+<div class="page-header">
+    <div class="row align-items-center">
+        <div class="col">
+            <h2 class="page-title">{{ page_title }}</h2>
+            <div class="text-muted mt-1">定义测试标准的基础分类 (如 物理性能、机械性能、热学性能)</div>
+        </div>
+        <div class="col-auto ms-auto">
+            <a href="{% url 'metric_category_add' %}" class="btn btn-primary">
+                <i class="ti ti-plus"></i> 新增分类
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="card mt-3">
+    <!-- 引入通用搜索栏 -->
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter text-nowrap table-hover">
+            <thead>
+                <tr>
+                    <th class="w-1">
+                        <a href="?{% url_replace sort='order'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            排序
+                            {% if current_sort == 'order' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-order' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th>
+                        <a href="?{% url_replace sort='name'|sort_toggle:current_sort %}" class="table-sort-header text-reset">
+                            分类名称
+                            {% if current_sort == 'name' %}<i class="ti ti-arrow-up icon-sm"></i>
+                            {% elif current_sort == '-name' %}<i class="ti ti-arrow-down icon-sm"></i>
+                            {% endif %}
+                        </a>
+                    </th>
+                    <th class="text-center">关联测试项</th>
+                    <th class="w-1">操作</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for category in categories %}
+                <tr>
+                    <td><span class="text-muted">{{ category.order }}</span></td>
+                    <td>
+                        <span class="badge bg-blue-lt">{{ category.name }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% if category.testconfig_count > 0 %}
+                            <span class="badge bg-purple-lt">{{ category.testconfig_count }}</span>
+                        {% else %}
+                            <span class="text-muted">0</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'metric_category_edit' category.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="编辑">
+                            <i class="ti ti-edit"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center py-5">
+                        <div class="empty">
+                            <div class="empty-icon"><i class="ti ti-database-off fs-1 opacity-50"></i></div>
+                            <p class="text-muted">暂无测试分类数据</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<br>
+{% include 'apps/list_modules/paginator.html' %}
+{% endblock %}
