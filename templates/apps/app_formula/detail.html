@@ -383,8 +383,8 @@ document.addEventListener('DOMContentLoaded', function () {
         series.push({
             name: trendList[i].name,
             data: trendList[i].data,
-            type: 'line',
-            step: 'left',
+            type: 'spline',
+            // step: 'left',
             tooltip: { valueDecimals: 2, pointFormat: '<b>¥{point.y:.2f}/kg</b>' }
         });
     }
@@ -433,8 +433,8 @@ document.addEventListener('DOMContentLoaded', function () {
             },
 
             plotOptions: {
-                line: {
-                    step: 'left',
+                spline: {
+                    // step: 'left',
                     marker: {
                         enabled: true,
                         radius: 4,

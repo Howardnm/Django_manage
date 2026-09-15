@@ -83,8 +83,8 @@ document.addEventListener('DOMContentLoaded', function () {
         series.push({
             name: seriesList[i].name,
             data: seriesList[i].data,
-            type: 'line',
-            step: 'left',
+            type: 'spline',
+            // step: 'left',
             tooltip: { valueDecimals: 2, pointFormat: '<b>¥{point.y:.2f}/kg</b><br/>{point.source}' }
         });
     }
@@ -132,13 +132,13 @@ document.addEventListener('DOMContentLoaded', function () {
         },
 
         plotOptions: {
-            line: {
-                step: 'left',
+            spline: {
+                // step: 'left',
                 marker: {
                     enabled: true,
                     radius: 4,
                     fillColor: '#ffffff',
-                    lineWidth: 2,
+                    lineWidth: 1,
                     lineColor: null
                 },
                 dataLabels: {
