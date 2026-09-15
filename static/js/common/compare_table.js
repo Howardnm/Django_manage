@@ -43,9 +43,9 @@
 
     // ── 列头 ──
     function columnHeaderCell(col) {
+        // 数据列宽度由 compare_table.css 的 :nth-child(n+4) 规则统一给定
         var th = document.createElement('th');
         th.className = 'align-middle';
-        th.style.minWidth = '100px';
 
         if (col.type === 'material') {
             th.appendChild(el('div', 'badge bg-blue-lt mb-2', '基准材料'));
@@ -76,23 +76,19 @@
         return th;
     }
 
-    // 前 3 列：分类/项目、详情/标准、单位（min-width 与原始值一致）
-    var LABEL_HEADERS = [
-        { label: '分类 / 项目', minWidth: '60px' },
-        { label: '详情 / 标准', minWidth: '100px' },
-        { label: '单位', minWidth: '40px' },
-    ];
+    // 前 3 列：分类/项目、详情/标准、单位。
+    // 列宽（含第 1 列的按内容自适应）统一由 compare_table.css 的 :nth-child 规则决定，
+    // 这里不内联 width/min-width —— 内联样式会盖过 CSS，两边口径迟早漂。
+    var LABEL_HEADERS = ['分类 / 项目', '详情 / 标准', '单位'];
 
     function buildThead(columns) {
         var thead = document.createElement('thead');
         var tr = document.createElement('tr');
         tr.className = 'bg-light';
-        LABEL_HEADERS.forEach(function (h) {
+        LABEL_HEADERS.forEach(function (label) {
             var th = document.createElement('th');
             th.className = 'text-start align-middle';
-            th.style.minWidth = h.minWidth;
-            th.style.whiteSpace = 'nowrap';
-            th.textContent = h.label;
+            th.textContent = label;
             tr.appendChild(th);
         });
         columns.forEach(function (col) {

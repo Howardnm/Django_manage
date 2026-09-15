@@ -17,7 +17,9 @@
                 {% if f.project %}
                     <span class="badge bg-blue-lt me-1" title="所属项目">{{ f.project.name }}</span>
                 {% endif %}
-                <span class="badge bg-teal-lt">¥{{ f.cost_predicted }}</span>
+                {% if f.cost is not None %}
+                    <span class="badge bg-teal-lt">¥{{ f.cost }}</span>
+                {% endif %}
                 <i class="ti ti-arrow-right ms-2 text-muted"></i>
             </a>
         {% endfor %}

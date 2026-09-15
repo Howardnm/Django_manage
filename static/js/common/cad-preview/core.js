@@ -7,7 +7,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 export { THREE };
 
 export var LARGE_FILE_BYTES = 20 * 1024 * 1024;
-export var WORKER_TIMEOUT_MS = 90 * 1000;
+export var WORKER_TIMEOUT_MS = 10 * 60 * 1000;
 export var DEFAULT_COLOR = 0x8a9ba8;
 export var DEFAULT_LIGHT_AZIMUTH = 50;
 export var DEFAULT_LIGHT_ELEVATION = 46;

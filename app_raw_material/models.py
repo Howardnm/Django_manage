@@ -1,9 +1,6 @@
-from datetime import date, timedelta
-from decimal import Decimal
 import uuid
 
 from django.db import models
-from django.db.models import Avg
 
 from app_material.models import MaterialType, TestConfig
 
@@ -95,15 +92,11 @@ class RawMaterial(models.Model):
     
     usage_method = models.TextField("使用方法/描述", blank=True, help_text="如：需烘干，建议添加量...")
     
-    _latest_price = models.DecimalField(
-        "最新单价 (元/kg)", max_digits=10, decimal_places=2,
-        null=True, blank=True
-    )
-    _avg_price = models.DecimalField(
-        "均价 (元/kg)", max_digits=10, decimal_places=2,
-        null=True, blank=True
-    )
-    
+    # 价格不落库：最新单价与近N月均价都从 RawMaterialPriceRecord 实时算出，
+    # 口径的唯一实现在 services/price_service.py。
+    # （历史上这里有 _latest_price / _avg_price 两个反规范化缓存列，
+    #   需要靠信号级联维护，与实时值长期不自洽，已删除。）
+
     # 【新增】购入日期
     purchase_date = models.DateField("购入日期", null=True, blank=True)
 
@@ -120,55 +113,73 @@ class RawMaterial(models.Model):
 
     @property
     def latest_price(self):
-        """最新单价 — 全局最新日期均价（方案B），保留2位小数"""
-        if self.pk is None:
-            return self._latest_price
-        from django.db.models import Max
-        max_date = self.price_records.aggregate(max_date=Max('date'))['max_date']
-        if max_date is None:
-            return self._latest_price
-        day_records = self.price_records.filter(date=max_date)
-        avg = day_records.aggregate(avg=Avg('price'))['avg']
-        return avg.quantize(Decimal('0.01')) if avg is not None else self._latest_price
+        """最新单价 — 全库最新日期上、全部工厂报价的均价，保留 2 位小数。
 
-    @latest_price.setter
-    def latest_price(self, value):
-        self._latest_price = value
+        口径的唯一实现在 app_raw_material/services/price_service.py；
+        这里只是薄委托，勿在此重新实现聚合（历史上多份拷贝已经漂移过）。
+        未保存的实例或查不到任何报价 → None。
+        """
+        if self.pk is None:
+            return None
+        from app_raw_material.services import RawMaterialPriceService
+        return RawMaterialPriceService.latest_price(self)
 
     @property
     def avg_price(self):
-        """近N月均价 — 先同日均值，再全窗口均值（方案B变体），保留2位小数"""
+        """近N月均价 — 窗口内先按日均值、再对日均值求平均，保留 2 位小数。"""
         if self.pk is None:
-            return self._avg_price
-        config = PriceAvgConfig.get()
-        cutoff = date.today() - timedelta(days=config.months * 30)
-        records = self.price_records.filter(date__gte=cutoff)
-        if not records.exists():
-            return self.latest_price
-        daily_avg = records.values('date').annotate(daily_avg=Avg('price'))
-        overall = daily_avg.aggregate(overall=Avg('daily_avg'))['overall']
-        return overall.quantize(Decimal('0.01')) if overall is not None else self.latest_price
+            return None
+        from app_raw_material.services import RawMaterialPriceService
+        return RawMaterialPriceService.avg_price(self)
 
-    @avg_price.setter
-    def avg_price(self, value):
-        self._avg_price = value
+    @classmethod
+    def annotate_latest_price(cls, queryset):
+        """给 queryset 附上 `latest_price_sort` 排序表达式。
+
+        **只用于 ORDER BY**：分页列表没法在 Python 侧排序，所以「最新单价」
+        这一条口径不得不用 SQL 再表达一次（取最大日期 → 该日期各工厂报价的均价）。
+
+        这是 services/price_service.py 里 `latest_from_series` 的 SQL 镜像 ——
+        改价格口径时**两处都要改**。展示用的价格一律走 price_service，不要读这个注解。
+        """
+        from django.db.models import Avg, Max, OuterRef, Subquery
+
+        # 内层必须切片：Django 的 exact lookup 要求子查询 has_limit_one()
+        latest_date = (
+            RawMaterialPriceRecord.objects
+            .filter(raw_material=OuterRef('pk'))
+            .values('raw_material')
+            .annotate(d=Max('date'))
+            .values('d')[:1]
+        )
+        latest_day_avg = (
+            RawMaterialPriceRecord.objects
+            .filter(raw_material=OuterRef('pk'), date=Subquery(latest_date))
+            .values('raw_material')
+            .annotate(a=Avg('price'))
+            .values('a')
+        )
+        return queryset.annotate(latest_price_sort=Subquery(latest_day_avg))
 
     # ── 工厂级别方法 ──
 
     def latest_price_for_plant(self, plant):
-        """指定工厂的最新单价，保留2位小数"""
-        latest = self.price_records.filter(plant=plant).order_by('-date').first()
-        return latest.price if latest else None
+        """指定工厂的最新单价（该工厂当日报价的均价），保留 2 位小数。
+
+        口径统一说明：旧实现取 `order_by('-date').first()` 的单条记录，
+        与非工厂版（当日跨工厂均价）不一致；现改为同一算法。
+        """
+        from app_raw_material.services import RawMaterialPriceService
+        return RawMaterialPriceService.latest_price_for_plant(self, plant)
 
     def avg_price_for_plant(self, plant):
-        """指定工厂的近N月均价，保留2位小数"""
-        config = PriceAvgConfig.get()
-        cutoff = date.today() - timedelta(days=config.months * 30)
-        records = self.price_records.filter(plant=plant, date__gte=cutoff)
-        if records.exists():
-            avg = records.aggregate(avg=Avg('price'))['avg']
-            return avg.quantize(Decimal('0.01')) if avg is not None else self.latest_price_for_plant(plant)
-        return self.latest_price_for_plant(plant)
+        """指定工厂的近N月均价（窗口内先日均、再对日均求均值），保留 2 位小数。
+
+        口径统一说明：旧实现在窗口内直接做记录级 Avg，与非工厂版的
+        「日均值的均值」不一致；现改为同一算法。
+        """
+        from app_raw_material.services import RawMaterialPriceService
+        return RawMaterialPriceService.avg_price_for_plant(self, plant)
 
     @property
     def plants_with_prices(self):

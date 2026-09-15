@@ -39,7 +39,9 @@ class FormulaTestResultSerializer(serializers.ModelSerializer):
 
 class FormulaSerializer(serializers.ModelSerializer):
     material_type = serializers.CharField(source="material_type.name", default="N/A", read_only=True)
-    cost_predicted = FloatDecimalField()
+    # 成本不落库，实时算。调用方（MCP tool）应先预热 FormulaCostCalculator，
+    # 否则每个配方会各自装载一次价格。
+    cost_predicted = serializers.SerializerMethodField()
     bom = FormulaBOMSerializer(source="bom_lines", many=True, read_only=True)
     test_results = serializers.SerializerMethodField()
     description = serializers.CharField(default="", allow_blank=True, read_only=True)
@@ -56,6 +58,11 @@ class FormulaSerializer(serializers.ModelSerializer):
         data = super().to_representation(instance)
         data["description"] = data.get("description") or ""
         return data
+
+    def get_cost_predicted(self, obj):
+        """最新单价加权的 BOM 预测成本；任一行缺价 → None。"""
+        value = obj.cost('latest')
+        return float(value) if value is not None else None
 
     def get_test_results(self, obj):
         results = [

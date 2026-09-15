@@ -119,7 +119,7 @@
                         <h3 class="card-title text-orange mb-0">
                             <i class="ti ti-palette me-2"></i>色粉配比BOM
                             <span class="badge bg-green-lt ms-1">已填写</span>
-                            {% if selected_formula.color_powder_bom.cost %}
+                            {% if selected_formula.color_powder_bom and selected_formula.color_powder_bom.cost is not None %}
                             <span class="badge bg-yellow-lt ms-1">¥{{ selected_formula.color_powder_bom.cost }}/kg</span>
                             {% endif %}
                         </h3>

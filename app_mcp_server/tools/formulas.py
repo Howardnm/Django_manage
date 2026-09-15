@@ -14,13 +14,21 @@ def _formula_qs():
     )
 
 
+def _prime_costs(formulas):
+    """预热成本计算器 —— 成本不落库，序列化时实时算；
+    不预热的话每个配方都会各自装载一次价格（N+1）。"""
+    from app_formula.services import FormulaCostCalculator
+    FormulaCostCalculator.for_formulas(formulas)
+    return formulas
+
+
 @mcp.tool(annotations=READ_ONLY)
 def search_formulas(keyword: str = "") -> list[FormulaOut]:
     """Search for lab formulas by code or name. Returns matching formulas including BOM and test results."""
     qs = _formula_qs()
     if keyword:
         qs = qs.filter(Q(code__icontains=keyword) | Q(name__icontains=keyword))
-    return [serialize_formula(f) for f in qs[:10]]
+    return [serialize_formula(f) for f in _prime_costs(list(qs[:10]))]
 
 
 @mcp.tool(annotations=READ_ONLY)

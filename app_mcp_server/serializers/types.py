@@ -96,7 +96,7 @@ class FormulaOut(TypedDict):
     version: int
     name: str
     material_type: str
-    cost_predicted: float
+    cost_predicted: float | None  # 实时计算；BOM 任一行缺价时为 None
     bom: list[FormulaBOMOut]
     test_results: list[FormulaTestOut]
     description: str

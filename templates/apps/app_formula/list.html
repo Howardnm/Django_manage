@@ -99,8 +99,10 @@
 
                         <!-- 4. 成本 -->
                         <td>
-                            <div class="fw-bold text-orange">¥{{ formula.cost_predicted|floatformat:2 }}</div>
-                            {% if formula.unit_cost %}
+                            <div class="fw-bold text-orange">
+                                {% if formula.cost is not None %}¥{{ formula.cost|floatformat:2 }}{% else %}<span class="text-muted">-</span>{% endif %}
+                            </div>
+                            {% if formula.unit_cost is not None %}
                                 <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ formula.unit_cost|floatformat:2 }}</div>
                             {% endif %}
                         </td>

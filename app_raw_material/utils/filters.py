@@ -110,7 +110,9 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
             ('name', 'name'),
             ('model_name', 'model_name'),
             ('category__name', 'category'),
-            ('_latest_price', 'latest_price'),
+            # 排序用注解，由 RawMaterialListView 在排序时才 annotate
+            # （见 RawMaterial.annotate_latest_price），展示仍走 price_service
+            ('latest_price_sort', 'latest_price'),
             ('created_at', 'created_at'),
             # 动态性能指标排序 (需要在 View 中 annotate)
             ('val_density', 'density'),

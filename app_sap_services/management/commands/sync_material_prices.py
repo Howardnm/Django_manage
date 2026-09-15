@@ -469,21 +469,8 @@ class Command(BaseCommand):
                 f"(新建 {created}, 更新 {updated})"
             )
 
-        # ── 更新 _latest_price 触发 FormulaBOM 级联重算 ──
-        if affected_materials:
-            self.stdout.write(
-                f"\n   更新 {len(affected_materials)} 个物料的缓存价格..."
-            )
-            price_updated = 0
-            for rm in affected_materials:
-                new_price = rm.latest_price
-                if rm._latest_price != new_price:
-                    rm._latest_price = new_price
-                    rm.save(update_fields=["_latest_price"])
-                    price_updated += 1
-            self.stdout.write(
-                f"   价格变更: {price_updated} 个物料"
-            )
+        # 价格不落库：写入 RawMaterialPriceRecord 之后，原材料的最新单价/均价
+        # 与配方成本都会在读取时实时算出来，不需要再刷任何缓存、也不需要级联重算。
 
         self.stdout.write("")
         self.stdout.write(

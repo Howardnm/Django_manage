@@ -106,7 +106,9 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
     context_object_name = 'project'
 
     queryset = ResearchProject.objects.select_related('manager').prefetch_related(
-        'nodes', 'formulas', 'formulas__test_results', 'formulas__test_results__test_config'
+        'nodes', 'formulas', 'formulas__test_results', 'formulas__test_results__test_config',
+        # 成本计算需要 BOM 行与色粉条目（价格由 FormulaCostCalculator 批量装载）
+        'formulas__bom_lines', 'formulas__color_powder_bom__entries',
     )
 
     def get_object(self, queryset=None):
@@ -120,7 +122,11 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
         from app_raw_material.models import PriceAvgConfig
 
         # 挂载配方物性 (逻辑保持不变)
-        related_formulas = project.formulas.all().order_by('-created_at')
+        # 用 sorted 而非 .order_by()：后者会新建查询、丢掉上面 prefetch 的
+        # formulas / test_results / bom_lines 缓存
+        related_formulas = sorted(
+            project.formulas.all(), key=lambda f: f.created_at, reverse=True
+        )
         for f in related_formulas:
             props = {}
             for res in f.test_results.all():
@@ -136,6 +142,10 @@ class ResearchProjectDetailView(BasicResearchAccessMixin, DetailView):
                 elif '冲击' in name: props['impact'] = res.value
                 elif '热变形' in name: props['hdt'] = res.value
             f.display_props = props
+
+        # 预热成本计算器：模板逐个读 f.unit_cost，共用一次价格装载
+        from app_formula.services import FormulaCostCalculator
+        FormulaCostCalculator.for_formulas(related_formulas)
 
         context.update({
             'nodes': project.cached_nodes,

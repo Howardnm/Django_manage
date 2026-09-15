@@ -144,10 +144,12 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
 
     def get_queryset(self):
         # 1. 调用 Mixin 自动执行部门隔离过滤
+        # bom_lines / 色粉条目 供成本计算使用（价格由 FormulaCostCalculator 批量装载，
+        # 不比这里 prefetch 价格记录 —— 那会为了算一次成本把全部价格历史拉进内存）
         base_qs = super().get_queryset().select_related(
             'material_type', 'creator', 'process',
             'project__material', 'project_node__project__material'
-        ).prefetch_related('research_projects', 'bom_lines__raw_material__price_records')
+        ).prefetch_related('research_projects', 'bom_lines', 'color_powder_bom__entries')
         
         # 2. 动态指标排序逻辑 (保持原有功能)
         sort_params = self.request.GET.getlist('sort')
@@ -226,6 +228,11 @@ class LabFormulaListView(FormulaAccessMixin, ListView):
 
         from app_raw_material.models import PriceAvgConfig
 
+        # 预热成本计算器：模板里 20 个 formula.unit_cost 共用一次价格装载
+        # （不做的话每个配方各查一遍，20 × 2 次查询）
+        from app_formula.services import FormulaCostCalculator
+        FormulaCostCalculator.for_formulas(page_formulas)
+
         context.update({
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),
             'filter': self.filterset,
@@ -268,38 +275,46 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
         )
         context['sorted_test_results'] = sorted_results
 
+        from app_formula.services import FormulaCostCalculator
         from app_raw_material.models import Plant, PriceAvgConfig
 
+        # 一个计算器覆盖「全局趋势 + 各工厂趋势 + 各工厂成本」，
+        # 三者共享同一份价格数据（原先每个工厂各重查一遍 BOM 行价格）
+        formula = self.object
+        calculator = FormulaCostCalculator.for_formulas([formula])
+
         # 全局趋势（向后兼容）
-        trend = self.object.get_price_trend()
+        trend = calculator.trend(formula)
         context['has_trend'] = len(trend) >= 2
         context['price_trend_json'] = json.dumps(trend)
         context['avg_months'] = PriceAvgConfig.get().months
 
         # 按工厂的趋势（多线图表），全局趋势线放在最前面（用数组保证 JS 顺序）
-        trend_by_plant = self.object.get_price_trend_by_plant()
+        active_plants = list(Plant.objects.filter(is_active=True))
+        trend_by_plant = {
+            str(plant): data
+            for plant in active_plants
+            if len(data := calculator.trend(formula, plant)) >= 2
+        }
         trend_list = []
         if len(trend) >= 2:
             trend_list.append({'name': '全局均值', 'data': trend})
         for plant_name, data in trend_by_plant.items():
             trend_list.append({'name': plant_name, 'data': data})
-        has_plant_trend = len(trend_by_plant) > 0
-        context['has_plant_trend'] = has_plant_trend
+        context['has_plant_trend'] = len(trend_by_plant) > 0
         context['price_trend_by_plant_json'] = json.dumps(trend_list)
 
         # 各工厂成本（仅纳入全部BOM材料都有价格的工厂）
         plant_costs = []
-        active_plants = Plant.objects.filter(is_active=True)
         for plant in active_plants:
-            cost = self.object.calculate_cost_for_plant(plant)
+            cost = calculator.predicted_cost(formula, plant)
             if cost is None:
                 continue  # 该工厂缺少某原材料价格，跳过
-            unit = self.object.get_unit_cost_for_plant(plant)
             trend_data = trend_by_plant.get(str(plant), [])
             plant_costs.append({
                 'plant': plant,
                 'predicted': cost,
-                'avg': unit,
+                'avg': calculator.unit_cost(formula, plant),
                 'has_trend': len(trend_data) >= 2,
             })
         context['plant_costs'] = plant_costs
@@ -721,7 +736,6 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                         )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
-                formula.calculate_cost()
                 created.append(formula)
 
         return created
@@ -1034,7 +1048,6 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                             )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
-                formula.calculate_cost()
                 updated.append(formula)
 
         return updated
@@ -1062,7 +1075,6 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                     self.object = form.save()
                     bom_formset.save()
                     test_formset.save()
-                    self.object.calculate_cost()
                 messages.success(self.request, "配方已更新")
         except IntegrityError as e:
             messages.error(self.request, _build_integrity_error_message(e))
@@ -1297,7 +1309,6 @@ class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
                         )
 
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
-                formula.calculate_cost()
                 created.append(formula)
 
         return created
@@ -1440,7 +1451,6 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                         test_config=tc,
                     )
 
-                target_formula.calculate_cost()
                 total_bom += len(bom_merged)
                 total_tests += len(test_configs)
                 target_count += 1

@@ -26,14 +26,14 @@ class RawMaterialTypeForm(TablerFormMixin, forms.ModelForm):
 
 # 3. 原材料表单
 class RawMaterialForm(TablerFormMixin, forms.ModelForm):
-    latest_price = forms.DecimalField(
-        label="最新单价 (元/kg)", max_digits=10, decimal_places=2, required=False,
-        help_text="留空则自动取价格记录中最新的价格"
-    )
+    # 价格不在本表单维护：成交价走 RawMaterialPriceRecord（Admin 内联 / SAP 同步），
+    # 最新单价与均价都是由价格记录实时算出来的。
+    # （原先这里有个 `latest_price` 声明字段，但它不是模型字段，
+    #   form.save() 走 construct_instance 只写模型字段 → 用户填的值一直被静默丢弃。）
 
     class Meta:
         model = RawMaterial
-        exclude = ['updated_at', '_latest_price', '_avg_price']
+        exclude = ['updated_at']
         widgets = {
             'usage_method': forms.Textarea(attrs={'rows': 3}),
             'purchase_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),

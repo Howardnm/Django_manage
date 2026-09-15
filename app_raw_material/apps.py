@@ -6,8 +6,6 @@ class AppRawMaterialConfig(AppConfig):
     verbose_name = '原材料库'
 
     def ready(self):
-        import app_raw_material.signals
-
         # 注册自动补全
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
         from app_raw_material.mixins import RawMaterialAccessMixin, RawMaterialPickerAccessMixin
@@ -16,12 +14,11 @@ class AppRawMaterialConfig(AppConfig):
 
         register_autocomplete('raw_material',
             lambda q: RawMaterial.objects.select_related('category').only(
-                'pk', 'name', 'model_name', 'category__name', 'warehouse_code', '_latest_price'
+                'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
             ).filter(Q(name__icontains=q) | Q(model_name__icontains=q)),
             lambda r: {'value': r.pk,
                        'text': f'{r.name} {r.model_name or ""} ({r.category.name})'
-                               + (f' ({r.warehouse_code})' if r.warehouse_code else '')
-                               + (f' (￥{r._latest_price})' if r._latest_price is not None else ''),
+                               + (f' ({r.warehouse_code})' if r.warehouse_code else ''),
                        'category_name': r.category.name},
             'raw_material_detail',
             access_filter=make_autocomplete_access_filter(RawMaterialPickerAccessMixin),

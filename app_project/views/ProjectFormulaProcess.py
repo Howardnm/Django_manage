@@ -199,16 +199,16 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
         else:
             active_formulas = []
 
-        # 按 code (实验单号) 分组，用于侧边栏折叠显示
+        # 按 code (实验单号) 分组，用于侧边栏折叠显示。
+        # 所有实验单一律折叠（含只有一个版本的），列表形态保持统一；
+        # 选中配方所在的那一组会在下面被自动展开。
         active_formulas_sorted = sorted(active_formulas, key=lambda f: (f.code or '', f.version))
         formula_groups = []
         for code, items in groupby(active_formulas_sorted, key=lambda f: f.code):
-            group_list = list(items)
-            is_collapsed = len(group_list) > 1
             formula_groups.append({
                 'code': code,
-                'formulas': group_list,
-                'is_collapsed': is_collapsed,
+                'formulas': list(items),
+                'is_collapsed': True,
             })
 
         # 对比模式
@@ -280,6 +280,11 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                 columns, (bom_matrix, cpbom_matrix, test_matrix),
                 PriceAvgConfig.get().months, project,
             )
+        elif active_formulas:
+            # 单配方模式：侧边栏成本徽章、BOM 卡片、色粉卡片、信息卡片的合计成本
+            # 共用一次价格装载（对比模式上面已经预热过了）
+            from app_formula.services import FormulaCostCalculator
+            FormulaCostCalculator.for_formulas(active_formulas)
 
         # 客户竞品详细卡片 — 选中竞品配方时展示其关联工单的竞品信息
         selected_competitor_info = None

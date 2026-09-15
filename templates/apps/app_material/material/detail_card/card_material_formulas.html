@@ -66,8 +66,10 @@
                             <div class="text-muted small">{{ f.code }}</div>
                         </td>
                         <td>
-                            <div class="fw-bold text-orange">¥{{ f.cost_predicted }}</div>
-                            {% if f.unit_cost %}
+                            <div class="fw-bold text-orange">
+                                {% if f.cost is not None %}¥{{ f.cost }}{% else %}-{% endif %}
+                            </div>
+                            {% if f.unit_cost is not None %}
                                 <div class="fw-bold text-green" title="近{{ avg_months }}月均价">¥{{ f.unit_cost }}</div>
                             {% endif %}
                         </td>

@@ -70,8 +70,6 @@ def run(ctx: FakeContext) -> None:
             project_node=p_node,
             version=1,
             creator=pick_one(ctx.rnd_users),
-            cost_predicted=rand_decimal(10, 50, 2),
-            unit_cost=rand_decimal(12, 55, 2) if random.random() < 0.4 else None,
             material_color_name=random.choice(color_names),
             pantone_code=random.choice(pantone_codes),
             rgb_value=random.choice(rgb_values),
@@ -131,7 +129,6 @@ def run(ctx: FakeContext) -> None:
                     'project': f.project,
                     'project_node': f.project_node,
                     'creator': f.creator,
-                    'cost_predicted': f.cost_predicted,
                     'description': f.description,
                 },
             )

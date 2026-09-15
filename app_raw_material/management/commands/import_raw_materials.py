@@ -4,7 +4,7 @@ import logging
 from django.core.management.base import BaseCommand, CommandError
 from django.conf import settings
 from django.db import transaction
-from app_raw_material.models import RawMaterial, RawMaterialPriceRecord, Supplier, RawMaterialType
+from app_raw_material.models import RawMaterial, Supplier, RawMaterialType
 
 logger = logging.getLogger(__name__)
 
@@ -17,8 +17,14 @@ class Command(BaseCommand):
     """
     从 init/原材料数据.xlsx 文件批量导入或更新原材料信息
     python manage.py import_raw_materials
+
+    ⚠ 只导入原材料主数据，**不导入价格**。Excel 里的价格列会被忽略：
+    成交价统一由 RawMaterialPriceRecord 维护（Admin 内联 / SAP 同步），
+    最新单价与均价都是由价格记录实时算出来的。
+    （旧实现试图用 Excel 的价格建 RawMaterialPriceRecord，但漏传了必填的
+      plant，异常又被裸 except 吞掉，价格其实只落在了一个缓存列上。）
     """
-    help = '从 init/原材料数据.xlsx 文件批量导入或更新原材料信息'
+    help = '从 init/原材料数据.xlsx 批量导入或更新原材料主数据（不含价格）'
 
     def handle(self, *args, **kwargs):
         file_path = os.path.join(settings.BASE_DIR, 'init', '原材料数据.xlsx')
@@ -83,7 +89,6 @@ class Command(BaseCommand):
                         'model_name': model_name,
                         'category': category,
                         'supplier': supplier,
-                        '_latest_price': latest_price if latest_price is not None else 0,
                         'purchase_date': purchase_date,
                     }
 
@@ -107,18 +112,6 @@ class Command(BaseCommand):
                     else:
                         updated_count += 1
 
-                    # --- 导入历史价格记录 ---
-                    if latest_price and purchase_date:
-                        try:
-                            RawMaterialPriceRecord.objects.get_or_create(
-                                raw_material=obj,
-                                date=purchase_date,
-                                price=latest_price,
-                                defaults={'source': 'Excel批量导入'}
-                            )
-                        except Exception:
-                            pass  # 价格记录导入失败不影响原材料导入
-                        
                 except Exception as e:
                     self.stdout.write(self.style.ERROR(f'  [!] 处理第 {row_idx} 行时出错: {e}'))
                     skipped_count += 1

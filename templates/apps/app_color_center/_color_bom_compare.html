@@ -48,7 +48,7 @@
                 <td class="text-muted align-middle">元/kg</td>
                 {% for col in cpbom_columns %}
                 <td class="fw-bold text-pink align-middle">
-                    {% if col.obj.color_powder_bom and col.obj.color_powder_bom.cost %}{{ col.obj.color_powder_bom.cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
+                    {% if col.obj.color_powder_bom and col.obj.color_powder_bom.cost is not None %}{{ col.obj.color_powder_bom.cost }}{% else %}<span class="text-muted text-opacity-25">-</span>{% endif %}
                 </td>
                 {% endfor %}
             </tr>

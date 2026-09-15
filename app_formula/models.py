@@ -1,7 +1,5 @@
 from django.db import models
 from django.conf import settings
-import calendar
-from decimal import Decimal
 from django.utils import timezone
 from app_material.models import MaterialType, TestConfig, MaterialLibrary
 from app_raw_material.models import RawMaterial
@@ -40,33 +38,60 @@ class LabFormula(models.Model):
     # 版本号
     version = models.PositiveIntegerField("版本号", default=1, help_text="同一项目+节点的配方版本序号")
 
-    # 【新增】成本字段
-    cost_predicted = models.DecimalField("BOM预测成本 (元/kg)", max_digits=10, decimal_places=2, default=0, help_text="根据原材料最新单价自动计算")
-    _unit_cost = models.DecimalField(
-        "近N月均价成本 (元/kg)", max_digits=10, decimal_places=2,
-        null=True, blank=True,
-        help_text="根据原材料近N月均价计算"
-    )
+    # 成本不落库：预测成本与近N月均价成本都由 BOM 行 × 原材料实时价格算出，
+    # 口径的唯一实现在 services/cost_service.py。
+    # （历史上这里有 cost_predicted / _unit_cost 两个列，靠 RawMaterial 的价格
+    #   信号级联维护；因为「直接写价格记录」不走那条信号，物化值与实时值长期
+    #   不自洽，已连同信号一并删除。）
+
+    # ── 成本核算 ──
+    # 唯一实现在 app_formula/services/cost_service.py（Σ 加权与 LOCF 时间线）。
+    # 下列方法都只是薄委托，勿在此重新实现算术。
+
+    def cost_calculator(self):
+        """取本配方用的成本计算器。
+
+        优先复用已预热的 `_cost_calculator`（由 FormulaCostCalculator.prime() 挂载，
+        批量页面用它共享同一份价格数据）；没有则按单个配方临时建一个。
+        """
+        calculator = getattr(self, '_cost_calculator', None)
+        if calculator is None:
+            from app_formula.services import FormulaCostCalculator
+            calculator = FormulaCostCalculator.for_formulas([self])
+        return calculator
+
+    def cost(self, basis='latest', plant=None):
+        """唯一只读成本入口。
+
+        Args:
+            basis: 'latest' → 用最新单价加权（预测成本口径）
+                   'avg'    → 用近N月均价加权
+            plant: None 为全局口径；传 Plant 则只算该工厂，缺价即返回 None。
+        Returns:
+            Decimal（元/kg）或 None（任一行缺价 / 无有效 BOM 行）。
+        """
+        calculator = self.cost_calculator()
+        if basis == 'avg':
+            return calculator.unit_cost(self, plant)
+        return calculator.predicted_cost(self, plant)
 
     @property
     def unit_cost(self):
-        """近N月均价成本 — 用原材料的 avg_price 计算加权平均"""
+        """近N月均价成本 — 按 BOM 份数加权平均；无 BOM 行或任一行缺价 → None。"""
         if self.pk is None:
-            return self._unit_cost
-        total_amount = Decimal('0.00')
-        total_parts = Decimal('0.00')
-        for line in self.bom_lines.select_related('raw_material').all():
-            total_parts += line.percentage
-            price = line.raw_material.avg_price or line.raw_material.latest_price
-            if price:
-                total_amount += price * line.percentage
-        if total_parts > 0:
-            return (total_amount / total_parts).quantize(Decimal('0.01'))
-        return self._unit_cost
+            return None
+        return self.cost(basis='avg')
 
-    @unit_cost.setter
-    def unit_cost(self, value):
-        self._unit_cost = value
+    @property
+    def total_cost(self):
+        """合计成本 — 主BOM预测成本 + 色粉预测成本（元/kg，均为最新单价口径）。
+
+        相加规则与缺价处理见 FormulaCostCalculator.total_cost()：
+        没有色粉配比表按 0 计；任一部分缺价 → None。
+        """
+        if self.pk is None:
+            return None
+        return self.cost_calculator().total_cost(self)
 
     # 材料颜色信息
     material_color_name = models.CharField("材料颜色名称", max_length=100, blank=True, help_text="例如：哑光黑、亮白、透明蓝")
@@ -112,181 +137,30 @@ class LabFormula(models.Model):
 
         super().save(*args, **kwargs)
 
-    # 【修改】计算预测成本的方法 (加权平均)
-    def calculate_cost(self):
+    def get_price_trend(self, plant=None):
+        """构建配方单位成本时间线（LOCF 算法）。
+
+        Args:
+            plant: None 为全局口径；传 Plant 则只用该工厂的报价。
+        Returns:
+            [[timestamp_ms, unit_cost], ...] 按日期升序；任一原材料在某个日期前
+            无报价 → 该日期整点不输出。
+
+        合并了原先的 get_price_trend / get_price_trend_for_plant 两份拷贝，
+        日期的价格取「日均值」而非「当日最后一条记录」，同一天多条报价时走势确定。
         """
-        计算配方的每公斤理论成本。
-        逻辑：总金额 / 总份数
-        兼容总比例不等于 100% 的情况 (例如按份数录入)
+        return self.cost_calculator().trend(self, plant)
+
+    def get_price_trend_by_plant(self, plants=None):
+        """返回 {plant: [[ts, cost], ...], ...}，用于多线图表。
+
+        只保留至少 2 个数据点的工厂。复用同一个成本计算器，避免
+        「每工厂 × 每 BOM 行」各打一次查询。
         """
-        total_amount = Decimal('0.00')  # 总金额
-        total_parts = Decimal('0.00')  # 总份数 (比例之和)
-
-        # 预加载 raw_material 以避免 N+1
-        bom_lines = self.bom_lines.select_related('raw_material').all()
-
-        for line in bom_lines:
-            # 累加总份数
-            total_parts += line.percentage
-
-            # 如果原材料有成本价，则累加金额
-            if line.raw_material.latest_price:
-                amount = line.raw_material.latest_price * line.percentage
-                total_amount += amount
-
-        # 计算加权平均单价
-        if total_parts > 0:
-            avg_cost = total_amount / total_parts
-        else:
-            avg_cost = Decimal('0.00')
-
-        # 更新字段并保存
-        self.cost_predicted = avg_cost
-        self.save(update_fields=['cost_predicted'])
-        return avg_cost
-
-    def get_price_trend(self):
-        """
-        构建配方单位成本时间线（LOCF 算法）。
-
-        返回: [[timestamp_ms, unit_cost], ...]  按日期升序排列
-        任一原材料在某个日期前无价格记录 → 该日期不输出。
-        """
-        bom_lines = list(self.bom_lines.select_related('raw_material').all())
-        if not bom_lines:
-            return []
-
-        # 1. 收集所有原材料的价格记录日期
-        all_dates = set()
-        for line in bom_lines:
-            for record in line.raw_material.price_records.all():
-                all_dates.add(record.date)
-
-        if not all_dates:
-            return []
-
-        sorted_dates = sorted(all_dates)
-
-        # 2. 对每个日期，用 LOCF 计算配方成本
-        records_by_line = [
-            sorted(line.raw_material.price_records.all(), key=lambda r: r.date)
-            for line in bom_lines
-        ]
-
-        trend = []
-        for d in sorted_dates:
-            total_amount = Decimal('0.00')
-            total_parts = Decimal('0.00')
-            skip = False
-            for i, line in enumerate(bom_lines):
-                total_parts += line.percentage
-                price = None
-                for record in records_by_line[i]:
-                    if record.date <= d:
-                        price = record.price
-                    else:
-                        break
-                if price is None:
-                    skip = True
-                    break
-                total_amount += price * line.percentage
-            if not skip and total_parts > 0:
-                cost = total_amount / total_parts
-                trend.append([
-                    calendar.timegm(d.timetuple()) * 1000,
-                    float(cost.quantize(Decimal('0.01')))
-                ])
-
-        return trend
-
-    # ── 工厂维度扩展方法 ──
-
-    def calculate_cost_for_plant(self, plant):
-        """按工厂计算预测成本（加权平均），任一原材料缺失价格则返回 None"""
-        total_amount = Decimal('0.00')
-        total_parts = Decimal('0.00')
-        for line in self.bom_lines.select_related('raw_material').all():
-            price = line.raw_material.latest_price_for_plant(plant)
-            if price is None:
-                return None  # 该工厂缺少此原材料价格，成本无效
-            total_parts += line.percentage
-            total_amount += price * line.percentage
-        if total_parts > 0:
-            return (total_amount / total_parts).quantize(Decimal('0.01'))
-        return None
-
-    def get_unit_cost_for_plant(self, plant):
-        """按工厂计算近N月均价成本，任一原材料缺失价格则返回 None"""
-        total_amount = Decimal('0.00')
-        total_parts = Decimal('0.00')
-        for line in self.bom_lines.select_related('raw_material').all():
-            price = (line.raw_material.avg_price_for_plant(plant)
-                     or line.raw_material.latest_price_for_plant(plant))
-            if price is None:
-                return None  # 该工厂缺少此原材料价格，成本无效
-            total_parts += line.percentage
-            total_amount += price * line.percentage
-        if total_parts > 0:
-            return (total_amount / total_parts).quantize(Decimal('0.01'))
-        return None
-
-    def get_price_trend_for_plant(self, plant):
-        """按工厂构建配方单位成本时间线（LOCF 算法）"""
-        bom_lines = list(self.bom_lines.select_related('raw_material').all())
-        if not bom_lines:
-            return []
-
-        all_dates = set()
-        for line in bom_lines:
-            for record in line.raw_material.price_records.filter(plant=plant):
-                all_dates.add(record.date)
-
-        if not all_dates:
-            return []
-
-        sorted_dates = sorted(all_dates)
-        records_by_line = [
-            sorted(
-                line.raw_material.price_records.filter(plant=plant),
-                key=lambda r: r.date
-            )
-            for line in bom_lines
-        ]
-
-        trend = []
-        for d in sorted_dates:
-            total_amount = Decimal('0.00')
-            total_parts = Decimal('0.00')
-            skip = False
-            for i, line in enumerate(bom_lines):
-                total_parts += line.percentage
-                price = None
-                for record in records_by_line[i]:
-                    if record.date <= d:
-                        price = record.price
-                    else:
-                        break
-                if price is None:
-                    skip = True
-                    break
-                total_amount += price * line.percentage
-            if not skip and total_parts > 0:
-                cost = total_amount / total_parts
-                trend.append([
-                    calendar.timegm(d.timetuple()) * 1000,
-                    float(cost.quantize(Decimal('0.01')))
-                ])
-        return trend
-
-    def get_price_trend_by_plant(self):
-        """返回 {plant_display: [[ts, cost], ...], ...}，用于多线图表"""
-        from app_raw_material.models import Plant
-        trends = {}
-        for plant in Plant.objects.filter(is_active=True):
-            trend = self.get_price_trend_for_plant(plant)
-            if len(trend) >= 2:
-                trends[str(plant)] = trend
-        return trends
+        if plants is None:
+            from app_raw_material.models import Plant
+            plants = Plant.objects.filter(is_active=True)
+        return self.cost_calculator().trend_by_plant(self, plants)
 
     # 【新增】获取关键物性指标字典 (用于列表展示)
     def get_key_properties(self):
@@ -441,14 +315,21 @@ class ColorPowderBOM(models.Model):
 
     @property
     def cost(self):
-        """计算每kg主配方需要添加的色粉成本 (元) = Σ(份数 × 单价) / 100"""
-        if not self.pk:
-            return None
-        total = 0
-        for e in self.entries.select_related('raw_material').all():
-            if e.percentage and e.raw_material.latest_price:
-                total += float(e.percentage) * float(e.raw_material.latest_price)
-        return round(total / 100, 2) if total > 0 else None
+        """每 kg 主配方需要添加的色粉成本（元）= Σ(份数 × 最新单价) / 100。
+
+        返回 Decimal 或 None。实现在 app_formula/services/cost_service.py；
+        口径变更说明：旧实现返回 float，且会跳过缺价条目后返回「部分和」，
+        现在返回 Decimal，任一非 0 份数的条目缺价即返回 None。
+        """
+        return self.powder_cost()
+
+    def powder_cost(self, plant=None):
+        """色粉成本；plant 为 None 用全局口径，传 Plant 则限定该工厂。"""
+        calculator = getattr(self, '_cost_calculator', None)
+        if calculator is None:
+            from app_formula.services import FormulaCostCalculator
+            calculator = FormulaCostCalculator.for_powder(self)
+        return calculator.powder_cost(self, plant)
 
 
 class ColorPowderBOMEntry(AbstractBOMEntry):

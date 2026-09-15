@@ -45,7 +45,10 @@ class SupplierDetailView(RawMaterialAccessMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'供应商详情: {self.object.name}'
 
-        related_materials_list = RawMaterial.objects.filter(supplier=self.object).select_related('category').order_by('-created_at')
+        # price_records 供模板实时算 latest_price（不预取会 N+1）
+        related_materials_list = RawMaterial.objects.filter(
+            supplier=self.object
+        ).select_related('category').prefetch_related('price_records').order_by('-created_at')
         paginator = Paginator(related_materials_list, 10)
         page_number = self.request.GET.get('page')
         page_obj = paginator.get_page(page_number)

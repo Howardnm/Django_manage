@@ -237,12 +237,14 @@
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>预测成本</span>
-                        <span class="fw-bold text-orange">¥{{ formula.cost_predicted|floatformat:2 }}</span>
+                        <span class="fw-bold text-orange">
+                            {% if formula.cost is not None %}¥{{ formula.cost|floatformat:2 }}{% else %}-{% endif %}
+                        </span>
                     </div>
                     <div class="d-flex justify-content-between mb-0">
                         <span>近{{ avg_months }}月均价</span>
                         <span class="fw-bold text-green">
-                            {% if formula.unit_cost %}¥{{ formula.unit_cost|floatformat:2 }}{% else %}-{% endif %}
+                            {% if formula.unit_cost is not None %}¥{{ formula.unit_cost|floatformat:2 }}{% else %}-{% endif %}
                         </span>
                     </div>
                     {% if plant_costs %}

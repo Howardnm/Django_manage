@@ -88,7 +88,9 @@ class _ColorProjectContextMixin:
         ).prefetch_related(
             'bom_lines__raw_material__category',
             'test_results__test_config__category',
-            'color_powder_bom',
+            # 色粉条目必须一起 prefetch：模板读 color_powder_bom.cost，
+            # 只 prefetch color_powder_bom 的话每个配方仍会为 entries 打一次查询
+            'color_powder_bom__entries__raw_material__category',
         ).order_by('version')
 
         material_formulas = LabFormula.objects.none()
@@ -105,10 +107,17 @@ class _ColorProjectContextMixin:
                 'color_powder_bom',
             ).order_by('version')
 
-        return sorted(
+        formulas = sorted(
             list(project_formulas) + list(material_formulas),
             key=lambda f: (f.version if f.version else 1),
         )
+
+        # 预热成本计算器：模板多处读 color_powder_bom.cost（侧边栏/对比表/填充页），
+        # 共用一次价格装载
+        from app_formula.services import FormulaCostCalculator
+        FormulaCostCalculator.for_formulas(formulas)
+
+        return formulas
 
     def _build_color_powder_bom_matrix(self, formulas):
         if not formulas:
@@ -121,7 +130,8 @@ class _ColorProjectContextMixin:
             cpbom_map[f.id] = {}
             bom = getattr(f, 'color_powder_bom', None)
             if bom:
-                for entry in bom.entries.select_related('raw_material__category'):
+                # 只用 .all()：.select_related() 会新建查询、丢掉 prefetch 缓存
+                for entry in bom.entries.all():
                     all_raw_materials.add(entry.raw_material)
                     cpbom_map[f.id][entry.raw_material_id] = entry
         sorted_raw_materials = sorted(all_raw_materials, key=lambda x: (x.category.order, x.name))
@@ -195,13 +205,19 @@ class _ColorProjectContextMixin:
         return active_stage, active_round, []
 
     def _build_formula_groups(self, active_formulas, selected_formula):
-        """按 code 聚合配方组，并展开选中配方所在组。返回 formula_groups 列表"""
+        """按 code 聚合配方组，并展开选中配方所在组。返回 formula_groups 列表。
+
+        所有实验单一律折叠（含只有一个版本的），侧边栏形态保持统一 ——
+        与配方过程页 ProjectFormulaProcessView 的做法一致。
+        """
         active_formulas_sorted = sorted(active_formulas, key=lambda f: (f.code or '', f.version))
         formula_groups = []
         for code, items in groupby(active_formulas_sorted, key=lambda f: f.code):
-            group_list = list(items)
-            is_collapsed = len(group_list) > 1
-            formula_groups.append({'code': code, 'formulas': group_list, 'is_collapsed': is_collapsed})
+            formula_groups.append({
+                'code': code,
+                'formulas': list(items),
+                'is_collapsed': True,
+            })
 
         if selected_formula:
             for g in formula_groups:

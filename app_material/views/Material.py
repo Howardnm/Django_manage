@@ -240,21 +240,27 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
                 output_field=DecimalField()
             )
 
-        formulas = LabFormula.objects.filter(project__material=self.object).select_related('creator', 'process').annotate(
+        formulas = LabFormula.objects.filter(project__material=self.object).select_related('creator', 'process').prefetch_related(
+            'bom_lines', 'color_powder_bom__entries',
+        ).annotate(
             val_density=get_val_subquery('密度'), val_melt=get_val_subquery('熔融'),
             val_tensile=get_val_subquery('拉伸强度'), val_flex_strength=get_val_subquery('弯曲强度'),
             val_flex_modulus=get_val_subquery('弯曲模量'), val_impact=get_val_subquery('冲击'),
             val_hdt=get_val_subquery('热变形'),
         ).order_by('-created_at')
-        
+
         for f in formulas:
             f.display_props = {
                 'density': f.val_density, 'melt': f.val_melt, 'tensile': f.val_tensile,
                 'flex_strength': f.val_flex_strength, 'flex_modulus': f.val_flex_modulus,
                 'impact': f.val_impact, 'hdt': f.val_hdt,
             }
-            
+
         from app_raw_material.models import PriceAvgConfig
+
+        # 预热成本计算器：模板逐个读 f.unit_cost，共用一次价格装载
+        from app_formula.services import FormulaCostCalculator
+        FormulaCostCalculator.for_formulas(formulas)
 
         context.update({
             'related_formulas': formulas,

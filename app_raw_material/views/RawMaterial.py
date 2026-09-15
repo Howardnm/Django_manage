@@ -23,8 +23,10 @@ class RawMaterialListView(RawMaterialAccessMixin, ListView):
 
     def get_queryset(self):
         # 1. 调用 Mixin 基础查询 (enforce_dept_isolation=False 已在 Mixin 定义)
+        # price_records 必须 prefetch：模板逐个读 material.latest_price / avg_price，
+        # 而价格是实时算的 —— 不预取的话每个原材料各打一次查询（N+1）
         qs = super().get_queryset().select_related('category', 'supplier').prefetch_related(
-            'suitable_materials', 'properties__test_config'
+            'suitable_materials', 'properties__test_config', 'price_records'
         ).order_by('-created_at')
         
         # 2. 动态性能排序逻辑 (保持)
@@ -58,6 +60,10 @@ class RawMaterialListView(RawMaterialAccessMixin, ListView):
                         output_field=DecimalField()
                     )
                 })
+
+        # 3. 按成本排序：分页列表无法在 Python 侧排序，需要 SQL 表达式
+        if sort_param.lstrip('-') == 'latest_price':
+            qs = RawMaterial.annotate_latest_price(qs)
 
         self.filterset = RawMaterialFilter(self.request.GET, queryset=qs, request=self.request)
         return self.filterset.qs
@@ -103,7 +109,7 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related(
-            'properties__test_config', 'price_records', 'stock_snapshots__plant'
+            'properties__test_config', 'price_records__plant', 'stock_snapshots__plant'
         )
 
     def get_object(self, queryset=None):
@@ -118,28 +124,31 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
         context = super().get_context_data(**kwargs)
         material = self.object
 
-        price_records = material.price_records.order_by('date')
-        context['price_records'] = price_records
-        context['recent_records'] = material.price_records.select_related('plant').order_by('-date')[:5]
+        # 日聚合与单条价格统一走价格服务（唯一实现），并复用 get_queryset 的
+        # price_records prefetch —— 0 条新查询
+        from app_raw_material.services import RawMaterialPriceService
+        prices = RawMaterialPriceService.for_material(material)
+
+        # 只用 .all() 拿 prefetch 缓存；filter/order_by 会绕过它重建查询
+        all_records = list(material.price_records.all())
+        ascending = sorted(all_records, key=lambda r: r.date)
+        context['price_records'] = ascending
+        context['recent_records'] = sorted(all_records, key=lambda r: r.date, reverse=True)[:5]
         context['avg_months'] = PriceAvgConfig.get().months
 
-        # 全局走势线：按日期取各工厂均值
-        from collections import defaultdict as dd
-        date_prices = dd(list)
-        for record in price_records:
-            date_prices[record.date].append(record.price)
-        global_trend = []
-        for d in sorted(date_prices.keys()):
-            avg_price = sum(date_prices[d], Decimal('0')) / len(date_prices[d])
-            global_trend.append({
-                'x': calendar.timegm(d.timetuple()) * 1000,
-                'y': float(avg_price.quantize(Decimal('0.01'))),
+        # 全局走势线：按日期取各工厂均值（口径同「最新单价」的日聚合）
+        global_trend = [
+            {
+                'x': calendar.timegm(day.timetuple()) * 1000,
+                'y': float(day_avg.quantize(Decimal('0.01'))),
                 'source': '',
-            })
+            }
+            for day, day_avg in prices.series().get(material.pk, [])
+        ]
 
         # 按工厂分组构建多 series 图表数据（数组保证顺序，避免 JS for-in 数字key排序问题）
         plant_series = defaultdict(list)
-        for record in price_records.select_related('plant'):
+        for record in ascending:
             plant_name = str(record.plant) if record.plant else '未指定工厂'
             plant_series[plant_name].append({
                 'x': calendar.timegm(record.date.timetuple()) * 1000,
@@ -153,15 +162,16 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
             series_list.append({'name': plant_name, 'data': plant_series[plant_name]})
         context['price_series_json'] = json.dumps(series_list)
 
-        # 价格概览：各工厂最新价 / 均价
-        plants = material.plants_with_prices
-        plant_prices = []
-        for plant in plants:
-            plant_prices.append({
+        # 价格概览：各工厂最新价 / 均价 —— 复用同一个 prices 实例，
+        # 避免逐工厂重建查表（原路径每个工厂各打一次聚合）
+        plant_prices = [
+            {
                 'plant': plant,
-                'latest': material.latest_price_for_plant(plant),
-                'avg': material.avg_price_for_plant(plant),
-            })
+                'latest': prices.latest(material, plant),
+                'avg': prices.avg(material, plant),
+            }
+            for plant in material.plants_with_prices
+        ]
         context['plant_prices'] = plant_prices
 
         # ── 库存概览 ──

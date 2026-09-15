@@ -18,12 +18,19 @@ class FormulaTestResultInline(admin.TabularInline):
 # 3. 实验配方主表 Admin
 @admin.register(LabFormula)
 class LabFormulaAdmin(admin.ModelAdmin):
-    list_display = ('code', 'name', 'material_type', 'creator', 'cost_predicted', 'unit_cost', 'created_at')
+    list_display = ('code', 'name', 'material_type', 'creator', 'predicted_cost', 'unit_cost', 'created_at')
     list_filter = ('material_type', 'creator', 'created_at')
     search_fields = ('code', 'name', 'description', 'creator__username')
-    readonly_fields = ('code', 'created_at', 'cost_predicted')
+    # 这几个都是 property / 方法不是字段：必须列进 readonly_fields，
+    # 否则下面 fieldset 里的引用会被 Django 静默忽略
+    readonly_fields = ('code', 'created_at', 'predicted_cost', 'unit_cost')
     inlines = [FormulaBOMInline, FormulaTestResultInline]
-    
+
+    @admin.display(description='BOM预测成本 (元/kg)')
+    def predicted_cost(self, obj):
+        """实时计算，不落库（缺价时返回 None，admin 显示为 -）。"""
+        return obj.cost('latest')
+
     fieldsets = (
         ('基本信息', {
             'fields': ('code', 'name', 'material_type', 'process', 'creator', 'description')
@@ -32,8 +39,8 @@ class LabFormulaAdmin(admin.ModelAdmin):
             'fields': ('research_projects',)
         }),
         ('价格成本', {
-            'fields': ('cost_predicted', 'unit_cost'),
-            'description': 'cost_predicted=最新单价加权, unit_cost=近N月均价加权'
+            'fields': ('predicted_cost', 'unit_cost'),
+            'description': 'predicted_cost=最新单价加权, unit_cost=近N月均价加权（均为实时计算）'
         }),
     )
     

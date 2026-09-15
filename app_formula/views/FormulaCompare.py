@@ -240,10 +240,10 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         context['bom_matrix'] = bom_matrix
         context['cpbom_matrix'] = cpbom_matrix
         context['test_matrix'] = test_matrix
-        context['avg_months'] = PriceAvgConfig.get().months
+        avg_months = PriceAvgConfig.get().months
+        context['avg_months'] = avg_months
         context['compare_data'] = serialize_compare(
-            columns, (bom_matrix, cpbom_matrix, test_matrix),
-            PriceAvgConfig.get().months, None,
+            columns, (bom_matrix, cpbom_matrix, test_matrix), avg_months, None,
         )
         context['page_title'] = "综合对比分析"
         # 传递 material 对象以便模板兼容旧逻辑 (如果有且仅有一个材料且在第一位)
@@ -252,20 +252,53 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         
         return context
 
+    # 分区 → Excel 分区标题行的配色（与页面对比表的 section color 对应）
+    _SECTION_FILL = {
+        'orange': ('FFF5E6', 'FFA500'),
+        'pink': ('FCE7F3', 'DB2777'),
+        'purple': ('F3E5F5', '800080'),
+        'cyan': ('E0F7FA', '00838F'),
+        'green': ('E8F5E9', '2E7D32'),
+        'blue': ('E3F2FD', '1565C0'),
+    }
+
+    # 这些分区的值应写成数值单元格（可求和）；其余按文本原样写
+    _NUMERIC_SECTIONS = {'cost', 'avg_price', 'cp_cost', 'total_cost', 'bom', 'cpbom', 'performance'}
+
+    @staticmethod
+    def _num(value):
+        """把 _fmt() 出来的展示字符串反解回数值，保住 Excel 的数值类型。
+
+        直接写字符串会让单元格变成文本，财务/采购无法求和 —— 这是最容易漏的回归。
+        空值（'-'）写成空单元格；非数字文本（如测试结论「合格」）原样写回。
+        """
+        if value is None or value == '-':
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return value
+
     def export_excel(self, request):
-        """导出 Excel 报表"""
+        """导出 Excel 报表。
+
+        直接由 compare_data 渲染 —— 与页面消费同一份序列化结果，
+        由构造保证「页面显示什么，Excel 就是什么」（原先 Excel 自行用
+        property 重算，且漏了色粉成本行，两边口径会分叉）。
+        """
         context = self.get_context_data()
         if not context or 'columns' not in context:
             return redirect('formula_list')
-            
+
         columns = context['columns']
-        bom_matrix = context['bom_matrix']
-        test_matrix = context['test_matrix']
-        
+        compare_data = context.get('compare_data')
+        if not compare_data:
+            return redirect('formula_list')
+
         wb = openpyxl.Workbook()
         ws = wb.active
         ws.title = "对比报表"
-        
+
         # 样式
         header_font = Font(bold=True, size=12)
         header_fill = PatternFill(start_color="F0F0F0", end_color="F0F0F0", fill_type="solid")
@@ -274,10 +307,8 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
         border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
         red_font = Font(color="FF0000", bold=True)
         green_font = Font(color="008000", bold=True)
-        orange_font = Font(color="FFA500", bold=True)
-        
+
         # 1. 表头
-        # 修改表头结构：拆分第一列
         headers = ["分类 / 项目", "详情 / 标准", "单位"]
         for col in columns:
             if col['type'] == 'material':
@@ -288,105 +319,58 @@ class FormulaCompareView(FormulaAccessMixin, TemplateView):
             else:
                 headers.append(f"配方\n{col['obj'].code}\n{col['obj'].name}")
         ws.append(headers)
-        
+
         for cell in ws[1]:
             cell.font = header_font
             cell.fill = header_fill
             cell.alignment = center_align
             cell.border = border
-            
-        # 2. 描述
-        desc_row = ["描述/备注", "-", "-"]
-        for col in columns:
-            if col['type'] == 'material':
-                 desc_row.append(col['obj'].description or "-")
-            elif col['type'] == 'raw_material':
-                 desc_row.append(col['obj'].usage_method or "-")
-            else:
-                 desc_row.append(col['obj'].description or "-")
-        ws.append(desc_row)
-        
-        # 3. 成本
-        pred_cost_row = ["预测成本", "-", "元/kg"]
-        for col in columns:
-            if col['type'] == 'formula':
-                 pred_cost_row.append(col['obj'].cost_predicted)
-            elif col['type'] == 'raw_material':
-                 pred_cost_row.append(col['obj'].latest_price or "-")
-            else:
-                 pred_cost_row.append("-")
-        ws.append(pred_cost_row)
-        
-        act_cost_row = ["近N月均价", "-", "元/kg"]
-        for col in columns:
-            if col['type'] == 'formula':
-                 act_cost_row.append(col['obj'].unit_cost or "-")
-            else:
-                 act_cost_row.append("-")
-        ws.append(act_cost_row)
-        
-        # 4. BOM
-        ws.append(["BOM 结构对比"])
-        ws.merge_cells(start_row=ws.max_row, start_column=1, end_row=ws.max_row, end_column=len(headers))
-        ws.cell(row=ws.max_row, column=1).fill = PatternFill(start_color="FFF5E6", end_color="FFF5E6", fill_type="solid")
-        ws.cell(row=ws.max_row, column=1).font = orange_font
-        
-        for row in bom_matrix:
-            # 修改 BOM 行结构
-            # 第一列：原材料类型
-            # 第二列：原材料名称 + 型号
-            # 第三列：单位
-            item_name = f"{row['item'].name} {row['item'].model_name or ''}"
-            data_row = [row['item'].category.name, item_name, "%"]
-            for cell in row['values']:
-                data_row.append(cell['val'])
-            ws.append(data_row)
-            
-        # 5. 性能
-        ws.append(["性能指标对比"])
-        ws.merge_cells(start_row=ws.max_row, start_column=1, end_row=ws.max_row, end_column=len(headers))
-        ws.cell(row=ws.max_row, column=1).fill = PatternFill(start_color="F3E5F5", end_color="F3E5F5", fill_type="solid")
-        ws.cell(row=ws.max_row, column=1).font = Font(color="800080", bold=True)
-        
-        for row in test_matrix:
-            # 修改性能行结构
-            # 第一列：指标名称
-            # 第二列：标准 + 条件
-            # 第三列：单位
-            standard_info = row['item'].standard
-            if row['item'].condition:
-                standard_info += f" ({row['item'].condition})"
-                
-            data_row = [row['item'].name, standard_info, row['item'].unit]
-            ws.append(data_row + [c['val'] for c in row['values']])
-            current_row_idx = ws.max_row
-            
-            # 颜色标记 (从第4列开始，因为前3列是固定列)
-            for i, cell in enumerate(row['values']):
-                if cell.get('compare_class') == 'text-green':
-                    ws.cell(row=current_row_idx, column=i+4).font = green_font
-                elif cell.get('compare_class') == 'text-red':
-                    ws.cell(row=current_row_idx, column=i+4).font = red_font
-                    
+
+        # 2. 各分区 —— 与页面完全同源
+        for section in compare_data['sections']:
+            if section['band']:
+                ws.append([section['label']])
+                ws.merge_cells(start_row=ws.max_row, start_column=1,
+                               end_row=ws.max_row, end_column=len(headers))
+                fill_color, font_color = self._SECTION_FILL.get(
+                    section['color'], ('F0F0F0', '000000'))
+                title_cell = ws.cell(row=ws.max_row, column=1)
+                title_cell.fill = PatternFill(
+                    start_color=fill_color, end_color=fill_color, fill_type='solid')
+                title_cell.font = Font(color=font_color, bold=True)
+
+            to_cell = (self._num if section['key'] in self._NUMERIC_SECTIONS
+                       else (lambda v: v))
+            for row in section['rows']:
+                ws.append([row['label'], row['label2'], row['unit']]
+                          + [to_cell(v['v']) for v in row['values']])
+                current_row_idx = ws.max_row
+                # 性能分区的涨跌色（列偏移 3：前 3 列是固定列）
+                for i, value in enumerate(row['values']):
+                    if value['cls'] == 'text-green':
+                        ws.cell(row=current_row_idx, column=i + 4).font = green_font
+                    elif value['cls'] == 'text-red':
+                        ws.cell(row=current_row_idx, column=i + 4).font = red_font
+
         # 样式调整
         for row in ws.iter_rows(min_row=2):
             for cell in row:
                 cell.alignment = center_align
                 cell.border = border
-                if cell.column == 1 or cell.column == 2: # 前两列左对齐
+                if cell.column == 1 or cell.column == 2:  # 前两列左对齐
                     cell.alignment = left_align
-                    
-        ws.column_dimensions['A'].width = 20 # 分类/项目
-        ws.column_dimensions['B'].width = 30 # 详情/标准
-        ws.column_dimensions['C'].width = 10 # 单位
+
+        ws.column_dimensions['A'].width = 20  # 分类/项目
+        ws.column_dimensions['B'].width = 30  # 详情/标准
+        ws.column_dimensions['C'].width = 10  # 单位
         for i in range(4, len(headers) + 1):
             ws.column_dimensions[get_column_letter(i)].width = 20
-            
+
         response = HttpResponse(content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        filename = f"综合对比报表.xlsx"
+        filename = "综合对比报表.xlsx"
         # 处理中文文件名
         from django.utils.encoding import escape_uri_path
         response['Content-Disposition'] = f'attachment; filename="{escape_uri_path(filename)}"'
-        
+
         wb.save(response)
         return response

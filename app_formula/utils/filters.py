@@ -37,7 +37,8 @@ class LabFormulaFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.F
     sort = django_filters.OrderingFilter(
         fields=(
             ('created_at', 'created_at'),
-            ('cost_predicted', 'cost_predicted'),
+            # 成本不再落库、无法在 SQL 层排序，故不提供按成本排序
+            # （分页列表也无法在 Python 侧排，见 RawMaterial.annotate_latest_price 的取舍）
             ('val_density', 'density'),
             ('val_ash', 'ash'),
             ('val_melt', 'melt_index'),
