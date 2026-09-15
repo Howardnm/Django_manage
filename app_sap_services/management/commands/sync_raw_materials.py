@@ -1,11 +1,16 @@
 """
-Django 管理命令: 从 SAP 同步 A01*/A03* 原材料到 app_raw_material。
+Django 管理命令: 从 SAP 同步 A01*/A03*/1001*/1002* 原材料到 app_raw_material。
 
 用法:
     python manage.py sync_raw_materials                        # 全量同步
     python manage.py sync_raw_materials --dry-run              # 仅预览，不写入
-    python manage.py sync_raw_materials --limit 100            # 限制同步条数
+    python manage.py sync_raw_materials --limit 100            # 每段限制条数
     python manage.py sync_raw_materials --order-by MATNR        # 按编号排序同步
+
+实现说明:
+    每个料号段（SYNC_PATTERNS）单独发一次 RFC，服务端按前缀筛选后在 Polars
+    端合并。不要图省事改成单次 A0* 宽拉——那会让 1001*/1002* 段永远拿不到数据，
+    还得多拉几千条再在客户端丢掉。
 
 定时调度 (Windows Task Scheduler):
     触发器: 每小时 / 每天
@@ -27,12 +32,12 @@ from app_raw_material.models import RawMaterial, RawMaterialType
 DEFAULT_CATEGORY_NAME = "未分类"
 CHUNK_SIZE = 500
 
-# 同步的物料编号匹配模式（SAP 端 A0* 宽拉 + Polars 端按此列表精筛）
-SYNC_PATTERNS = ("A01*", "A03*")
+# 同步的物料编号匹配模式，每段单独下发到 SAP 服务端筛选
+SYNC_PATTERNS = ("A01*", "A03*", "1001*", "1002*")
 
 
 class Command(BaseCommand):
-    help = "从 SAP 同步 A01*/A03* 原材料到本地 RawMaterial 表"
+    help = "从 SAP 同步 A01*/A03*/1001*/1002* 原材料到本地 RawMaterial 表"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -41,7 +46,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit", type=int, default=0,
-            help="限制同步条数（0 = 不限制）",
+            help="每个料号段各自的条数上限（0 = 不限制）",
         )
         parser.add_argument(
             "--order-by", type=str, default="MATNR",
@@ -87,39 +92,46 @@ class Command(BaseCommand):
             },
         )
 
-        # ── 3. SAP 宽拉 + Polars 精筛 ──
-        try:
-            query = sap.rfc(MaterialQuery).filter(mat_range__cp="A0*")
-            if order_by:
-                query = query.order_by(
-                    *[f.strip() for f in order_by.split(",")]
+        # ── 3. SAP 逐段查询（每段一次 RFC，Polars 端合并）──
+        # RfcQuery.filter 内部是 dict.update，同名 kwarg 互相覆盖，
+        # 无法在一次调用里表达"A01* 或 1001*"这种 OR，故按段拆开调用。
+        chunks = []
+        failed = 0
+        for pattern in SYNC_PATTERNS:
+            try:
+                query = sap.rfc(MaterialQuery).filter(mat_range__cp=pattern)
+                if order_by:
+                    query = query.order_by(
+                        *[f.strip() for f in order_by.split(",")]
+                    )
+                if limit and limit > 0:
+                    query = query.limit(limit)
+                part = query.collect()
+            except Exception as e:
+                failed += 1
+                self.stdout.write(
+                    self.style.ERROR(f"   [{pattern}] SAP 查询失败: {e}")
                 )
-            if limit and limit > 0:
-                query = query.limit(limit)
+                continue
 
-            df = query.collect()
-            before = df.height
-            df = df.filter(
-                pl.any_horizontal(
-                    pl.col("MATNR").str.starts_with(p.rstrip("*"))
-                    for p in SYNC_PATTERNS
-                )
-            )
-            after = df.height
+            self.stdout.write(f"   [{pattern}] SAP 返回: {part.height} 条")
+            if not part.is_empty():
+                chunks.append(part)
+
+        if failed == len(SYNC_PATTERNS):
             self.stdout.write(
-                f"   SAP 宽拉 A0*: {before} 条 "
-                f"→ Polars 精筛 ({', '.join(SYNC_PATTERNS)}): "
-                f"{after} 条"
-            )
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"   [ERR] SAP 查询失败: {e}")
+                self.style.ERROR("   所有料号段的 SAP 查询均失败，同步终止")
             )
             return
 
-        if df.is_empty():
+        if not chunks:
             self.stdout.write(self.style.WARNING("   没有符合条件的数据，同步结束"))
             return
+
+        df = pl.concat(chunks)
+        self.stdout.write(
+            f"   合并 {len(chunks)}/{len(SYNC_PATTERNS)} 个料号段: {df.height} 条"
+        )
 
         # ── 4. 同步 ──
         if dry_run:
