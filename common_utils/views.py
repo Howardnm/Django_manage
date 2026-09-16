@@ -41,16 +41,29 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
         registry = get_registry()
         return registry.get(model_type)
 
-    def _format_item(self, model_type, item):
-        """对单个结果应用格式化器，并注入详情 URL。"""
+    def _format_items(self, model_type, objects):
+        """格式化一批结果，并注入详情 URL。
+
+        注册了 `bulk_formatter` 的类型走批量路径 —— 逐条格式化会把
+        「每条都要查一次关联表」的字段（如原材料价格）变成 N+1，
+        而自动补全是每敲一次键就请求一次的高频接口。
+        """
         entry = self._lookup(model_type)
         if not entry:
-            return {}
-        data = entry['formatter'](item)
+            return []
+
+        objects = list(objects)
+        bulk_formatter = entry.get('bulk_formatter')
+        if bulk_formatter:
+            data_list = bulk_formatter(objects)
+        else:
+            data_list = [entry['formatter'](obj) for obj in objects]
+
         url_name = entry.get('detail_url')
         if url_name:
-            data['url'] = reverse(url_name, kwargs={'pk': item.pk})
-        return data
+            for obj, data in zip(objects, data_list):
+                data['url'] = reverse(url_name, kwargs={'pk': obj.pk})
+        return data_list
 
     def get(self, request):
         model_type = request.GET.get('model')
@@ -83,7 +96,7 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
             page_size = int(request.GET.get('page_size', 10))
             total = qs.count()
             offset = (page - 1) * page_size
-            results = [self._format_item(model_type, item) for item in qs[offset:offset + page_size]]
+            results = self._format_items(model_type, qs[offset:offset + page_size])
             return JsonResponse({
                 'results': results,
                 'total': total,
@@ -93,7 +106,7 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
                 'has_prev': page > 1,
             })
 
-        data = [entry['formatter'](item) for item in qs[:20]]
+        data = self._format_items(model_type, qs[:20])
         return JsonResponse(data, safe=False)
 
 

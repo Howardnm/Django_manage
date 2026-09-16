@@ -39,3 +39,6 @@ class AppFormulaConfig(AppConfig):
             permission_parent_chain='formula',
             folder_id_resolver=lambda t: str(t.formula.pk),
         ))
+
+        # 注册附件清理信号：Attachment 是 GFK，删配方/测试结果时不会自动级联
+        from . import signals  # noqa: F401

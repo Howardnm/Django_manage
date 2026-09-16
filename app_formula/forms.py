@@ -44,6 +44,10 @@ class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
         super().__init__(*args, **kwargs)
         # code 字段设为非必填(自动生成)
         self.fields['code'].required = False
+        # code 由系统生成，模板只把它渲染成只读文本、从不提交（form.html）。
+        # 若不禁用，绑定表单会用空串覆盖实例字段（construct_instance），
+        # 进而触发 LabFormula.save() 的单号重生成 —— 配方会脱离原实验单的版本分组。
+        self.fields['code'].disabled = True
 
         # 关联商业项目 & 阶段节点：锁定不可编辑，由项目进度流程控制
         self.fields['project'].disabled = True
@@ -153,7 +157,7 @@ class FormulaBOMForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
         if self.instance and self.instance.pk and self.instance.raw_material_id:
             rm_ids.add(self.instance.raw_material_id)
         
-        # 3. 如果表单有初始数据 (例如从 LabFormulaDuplicateView 传入的 initial)，从 initial 中获取 raw_material 的 ID
+        # 3. 如果表单有初始数据 (例如新增页从实验单导入时传入的 initial)，从 initial 中获取 raw_material 的 ID
         # kwargs['initial'] 包含了当前 FormSet 中单个 Form 的初始数据
         if 'initial' in kwargs and kwargs['initial'] and 'raw_material' in kwargs['initial']:
             raw_material_val = kwargs['initial']['raw_material']

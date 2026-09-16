@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}均值回写 — {{ formula.code }}{% endblock %}
+{% block title %}测试数据回写 — {{ formula.code }}{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_project/test_result_writeback.css' %}">
+{% endblock %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -11,12 +15,12 @@
                 <ol class="breadcrumb">
                     <li class="breadcrumb-item"><a href="{% url 'project_detail' project.pk %}">{{ project.name }}</a></li>
                     <li class="breadcrumb-item"><a href="{% url 'project_formula_process' project.pk %}">配方过程</a></li>
-                    <li class="breadcrumb-item active">均值回写</li>
+                    <li class="breadcrumb-item active">测试数据回写</li>
                 </ol>
             </nav>
         </div>
         <h2 class="page-title">
-            <i class="ti ti-calculator me-2"></i>均值回写
+            <i class="ti ti-calculator me-2"></i>测试数据回写
             <span class="text-muted ms-2">{{ formula.code }} v{{ formula.version }}</span>
         </h2>
     </div>
@@ -39,6 +43,8 @@
                     <span class="text-muted">汇总工单：</span>
                     {% for code in order_codes %}
                     <span class="badge bg-blue-lt text-blue me-1">{{ code }}</span>
+                    {% empty %}
+                    <span class="text-muted">—</span>
                     {% endfor %}
                 </div>
             </div>
@@ -47,68 +53,162 @@
 
     <form method="POST">
         {% csrf_token %}
-        <div class="card">
+        {% comment %}
+        标记字段：本页表单是"整体覆盖"语义（未提交的行视为被移除），
+        没有它就无法区分"用户删光了所有行"和"请求被裁剪/构造"，
+        后者会导致手动录入数据被整体清空。
+        {% endcomment %}
+        <input type="hidden" name="writeback_form" value="1">
+
+        {% comment %}
+        卡片结构与样式一比一复制自成品材料编辑页的「物性指标」卡片
+        （templates/apps/app_material/material/form_card/form_data.html），
+        只去掉最小值/最大值两列，另加一列「各工单原始值」展示聚合来源。
+        注意：表格**不能**套 table-responsive —— 它有 overflow-x:auto，
+        会把 TomSelect 的下拉面板裁掉。
+        {% endcomment %}
+        <div class="card mb-3">
             <div class="card-header bg-purple-lt">
-                <h3 class="card-title text-purple"><i class="ti ti-table me-2"></i>汇总测试数据</h3>
-                <span class="text-muted small ms-2">数值字段为各工单均值，文本字段为最高频值 — 均可修改后提交</span>
+                <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
             </div>
-            <div class="table-responsive">
-                <table class="table table-vcenter card-table table-sm small">
+            <div>
+                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="data-table" style="font-size: 13px; table-layout: auto;">
                     <thead>
-                        <tr>
-                            <th>分类</th>
-                            <th>测试项目</th>
-                            <th>标准</th>
-                            <th>条件</th>
-                            <th>单位</th>
-                            <th>各工单原始值</th>
-                            <th style="min-width: 160px;">汇总值（可编辑）</th>
-                        </tr>
+                    <tr>
+                        <th style="width: 550px;">测试项目</th>
+                        <th style="width: auto;">各工单原始值</th>
+                        <th style="width: auto;">数值 / 结果</th>
+                        <th style="width: 110px;">测试日期</th>
+                        <th style="width: 100px;">备注</th>
+                        <th style="width: 50px;">删除</th>
+                    </tr>
                     </thead>
-                    <tbody>
-                        {% for row in rows %}
-                        <tr>
-                            <td><span class="text-muted">{{ row.test_config.category.name }}</span></td>
-                            <td class="fw-bold">{{ row.test_config.name }}</td>
-                            <td class="text-muted">{{ row.test_config.standard }}</td>
-                            <td class="text-muted">{{ row.test_config.condition|default:"-" }}</td>
-                            <td class="text-muted">{{ row.test_config.unit }}</td>
+                    <tbody id="writeback-rows">
+                    {% for row in rows %}
+                        {% comment %}
+                        data-persisted：库里已存在的行。删除时须"清空值 + 隐藏"而不是摘掉
+                        DOM —— 摘掉就不会随表单提交，服务端无从得知要清掉这一项。
+                        {% endcomment %}
+                        <tr class="writeback-row" data-persisted="1">
                             <td>
-                                {% if row.data_type == 'NUMBER' %}
-                                    {% for ov in row.order_values %}
-                                    <span class="badge bg-secondary-lt me-1 mb-1"
-                                          title="{{ ov.code }}">{{ ov.value|floatformat:2 }}</span>
+                                <select class="form-select form-select-search writeback-config" style="width: 550px;">
+                                    {% for tc in all_test_configs %}
+                                    <option value="{{ tc.pk }}" {% if tc.pk == row.test_config.pk %}selected{% endif %}>{{ tc }}</option>
                                     {% endfor %}
-                                {% else %}
-                                    {% for ov in row.order_values %}
-                                    <span class="badge bg-secondary-lt me-1 mb-1"
-                                          title="{{ ov.code }}">{{ ov.text }}</span>
-                                    {% endfor %}
+                                </select>
+                                {% comment %}
+                                记住本行原本对应的测试项（data-origin）。只有用户真改了下拉时
+                                才由 JS 补上 name=orig_{新pk}，服务端据此移除原测试项的记录 ——
+                                这样"改测试项目"能正确迁移，未提交的行依旧不受影响。
+                                {% endcomment %}
+                                <input type="hidden" class="writeback-origin" data-origin="{{ row.test_config.pk }}">
+                                {% if row.is_manual_only %}
+                                <div class="text-muted small mt-1" title="仅手动录入，没有工单回写值">手动录入</div>
                                 {% endif %}
                             </td>
                             <td>
+                                {% for ov in row.order_values %}
+                                <span class="badge bg-secondary-lt me-1 mb-1" title="{{ ov.code }}">
+                                    {% if row.data_type == 'NUMBER' %}{{ ov.value|floatformat:2 }}{% else %}{{ ov.text }}{% endif %}
+                                </span>
+                                {% empty %}
+                                <span class="text-muted">—</span>
+                                {% endfor %}
+                            </td>
+                            <td class="writeback-value-cell">
                                 {% if row.data_type == 'NUMBER' %}
-                                <input type="number" step="0.001" class="form-control form-control-sm"
+                                <input type="number" step="0.001" class="form-control value-number"
                                        name="num_{{ row.test_config.pk }}"
                                        value="{{ row.agg_value|default:'' }}">
+                                {% elif row.data_type == 'SELECT' %}
+                                <select class="form-select value-select" name="txt_{{ row.test_config.pk }}">
+                                    <option value=""></option>
+                                    {% for opt in row.test_config.get_options_list %}
+                                    <option value="{{ opt }}" {% if opt == row.agg_text %}selected{% endif %}>{{ opt }}</option>
+                                    {% endfor %}
+                                </select>
                                 {% else %}
-                                <input type="text" class="form-control form-control-sm"
+                                <input type="text" class="form-control value-text"
                                        name="txt_{{ row.test_config.pk }}"
                                        value="{{ row.agg_text }}">
                                 {% endif %}
                             </td>
+                            <td>
+                                <input type="date" class="form-control"
+                                       name="date_{{ row.test_config.pk }}"
+                                       value="{{ row.test_date|date:'Y-m-d' }}">
+                            </td>
+                            <td>
+                                <input type="text" class="form-control"
+                                       name="rem_{{ row.test_config.pk }}"
+                                       value="{{ row.remark }}" maxlength="50" placeholder="备注">
+                            </td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-writeback-row"
+                                        title="清除该测试项的值"><i class="ti ti-trash"></i></button>
+                            </td>
                         </tr>
-                        {% endfor %}
+                    {% empty %}
+                        <tr id="writeback-empty-row">
+                            <td colspan="6" class="text-center text-muted py-4">
+                                <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                                暂无测试数据 — 点下方「添加测试项」开始录入
+                            </td>
+                        </tr>
+                    {% endfor %}
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer d-flex justify-content-end gap-2">
-                <a href="{% url 'project_formula_process' project.pk %}" class="btn btn-link link-secondary">取消</a>
-                <button type="submit" class="btn btn-primary">
-                    <i class="ti ti-check me-1"></i>确认回写
+            <div class="card-footer">
+                <button type="button" class="btn btn-ghost-purple" id="add-writeback-row">
+                    <i class="ti ti-plus me-1"></i> 添加测试项
                 </button>
             </div>
         </div>
+
+        <div class="d-flex justify-content-end gap-2 mb-3">
+            <a href="{% url 'project_formula_process' project.pk %}" class="btn btn-link link-secondary">取消</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-check me-1"></i>确认保存
+            </button>
+        </div>
     </form>
 </div>
+
+{% comment %}
+新增行的骨架：选中测试项目后由 JS 按 data_type 生成值控件并补上各字段的 name。
+控件 class 与上面现存行保持一致（基础尺寸，不写 -sm）。
+{% endcomment %}
+<script type="text/template" id="writeback-empty-row-template">
+    <tr class="writeback-row">
+        <td>
+            <select class="form-select form-select-search writeback-config" style="width: 550px;">
+                <option value=""></option>
+                {% for tc in all_test_configs %}
+                <option value="{{ tc.pk }}">{{ tc }}</option>
+                {% endfor %}
+            </select>
+        </td>
+        <td class="text-muted">—</td>
+        <td class="writeback-value-cell">
+            <input type="text" class="form-control" disabled placeholder="请先选择测试项目">
+        </td>
+        <td><input type="date" class="form-control writeback-date" disabled></td>
+        <td>
+            <input type="text" class="form-control writeback-remark"
+                   disabled maxlength="50" placeholder="备注">
+        </td>
+        <td class="text-center">
+            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-writeback-row"
+                    title="移除该行"><i class="ti ti-trash"></i></button>
+        </td>
+    </tr>
+</script>
+
+{# Data bridge：测试项目元数据，供 JS 生成对应类型的值控件 #}
+{{ writeback_config_meta|json_script:"writeback-config-meta" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apps/app_project/test_result_writeback.js' %}"></script>
 {% endblock %}

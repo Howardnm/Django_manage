@@ -147,34 +147,132 @@ document.addEventListener('DOMContentLoaded', function () {
             '<select name="test-' + prefix + '-value_select_col' + colIdx + '" class="form-select value-select" style="display:none;"><option value="">---------</option></select>';
     }
 
-    function addColumn() {
-        currentNumColumns++;
-        document.getElementById('num_columns').value = currentNumColumns;
-        var colIdx = currentNumColumns - 1;
+    /* 列注册表：每列一个隐藏域，DOM 顺序即列序，值 = 该列对应的配方版本 pk（空串 = 新版本）。
+       后端只认这个顺序，列数也以它为准。 */
+    function registryInputs() {
+        var registry = document.getElementById('column-registry');
+        if (!registry) return [];
+        return Array.prototype.slice.call(
+            registry.querySelectorAll('input[name="column_formula_ids"]'));
+    }
 
+    function columnCount() {
+        var sumColumns = document.getElementById('bom-sum-columns');
+        return sumColumns ? sumColumns.querySelectorAll('.percentage-col').length : 1;
+    }
+
+    /* 按列在 DOM 中的实际位置重写所有后缀：data-col、input 的 name/id、表尾合计 id。
+       删除中间列后必须调用，否则第 2 列之后的数据会被写到错位的版本上。
+       只改属性、不重建 DOM，因此用户已填的值不会丢。 */
+    function reindexColumns() {
         document.querySelectorAll('#bom-formset tr.bom-form').forEach(function (row) {
             var prefix = getBomPrefix(row);
-            var container = row.querySelector('.percentage-columns');
-            var div = document.createElement('div');
-            div.className = 'percentage-col';
-            div.setAttribute('data-col', colIdx);
-            div.style.cssText = 'flex:0 0 70px; min-width:70px;';
-            div.innerHTML = makePctHTML(prefix, colIdx);
-            container.appendChild(div);
+            row.querySelectorAll('.percentage-columns > .percentage-col').forEach(function (col, i) {
+                col.setAttribute('data-col', i);
+                var input = col.querySelector('input[name*="percentage"]');
+                if (!input) return;
+                if (i === 0) {
+                    input.name = 'bom-' + prefix + '-percentage';
+                    input.id = 'id_bom-' + prefix + '-percentage';
+                } else {
+                    input.name = 'bom-' + prefix + '-percentage_col' + i;
+                    input.removeAttribute('id');
+                }
+            });
         });
 
         document.querySelectorAll('#test-formset tr.test-form').forEach(function (row) {
             var prefix = getTestPrefix(row);
-            var container = row.querySelector('.value-columns');
+            row.querySelectorAll('.value-columns > .value-col').forEach(function (col, i) {
+                col.setAttribute('data-col', i);
+                var suffix = i === 0 ? '' : '_col' + i;
+                var idPart = i === 0 ? 'id_test-' + prefix + '-' : null;
+                [['.value-number', 'value'], ['.value-text', 'value_text'], ['.value-select', 'value_select']]
+                    .forEach(function (pair) {
+                        var el = col.querySelector(pair[0]);
+                        if (!el) return;
+                        el.name = 'test-' + prefix + '-' + pair[1] + suffix;
+                        if (idPart) el.id = idPart + pair[1];
+                        else el.removeAttribute('id');
+                    });
+            });
+        });
+
+        var sumColumns = document.getElementById('bom-sum-columns');
+        if (sumColumns) {
+            sumColumns.querySelectorAll(':scope > .percentage-col').forEach(function (col, i) {
+                col.setAttribute('data-col', i);
+                var value = col.querySelector('.bom-sum-value');
+                if (value) value.id = 'bom-sum-' + i;
+            });
+        }
+
+        ['#bom-column-heads', '#test-column-heads'].forEach(function (selector) {
+            var heads = document.querySelector(selector);
+            if (!heads) return;
+            heads.querySelectorAll(':scope > .percentage-col, :scope > .value-col').forEach(function (col, i) {
+                col.setAttribute('data-col', i);
+                var btn = col.querySelector('.remove-pct-col');
+                if (btn) btn.setAttribute('data-col', i);
+            });
+        });
+
+        currentNumColumns = columnCount();
+        document.getElementById('num_columns').value = currentNumColumns;
+        updateBomSums();
+    }
+
+    function appendColumnHeads(colIdx) {
+        var bomHeads = document.getElementById('bom-column-heads');
+        if (bomHeads) {
+            var div = document.createElement('div');
+            div.className = 'percentage-col text-center';
+            div.setAttribute('data-col', colIdx);
+            div.innerHTML = '<span class="badge bg-orange-lt text-orange" title="尚未保存的新版本">新</span>' +
+                '<button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-pct-col" data-col="' +
+                colIdx + '" title="移除该版本"><i class="ti ti-x"></i></button>';
+            bomHeads.appendChild(div);
+        }
+        var testHeads = document.getElementById('test-column-heads');
+        if (testHeads) {
+            var tDiv = document.createElement('div');
+            tDiv.className = 'value-col text-center';
+            tDiv.setAttribute('data-col', colIdx);
+            tDiv.innerHTML = '<span class="badge bg-orange-lt text-orange" title="尚未保存的新版本">新</span>';
+            testHeads.appendChild(tDiv);
+        }
+    }
+
+    function addColumn() {
+        var colIdx = columnCount();
+
+        var registry = document.getElementById('column-registry');
+        if (registry) {
+            var hidden = document.createElement('input');
+            hidden.type = 'hidden';
+            hidden.name = 'column_formula_ids';
+            hidden.value = '';
+            registry.appendChild(hidden);
+        }
+
+        document.querySelectorAll('#bom-formset tr.bom-form').forEach(function (row) {
+            var div = document.createElement('div');
+            div.className = 'percentage-col';
+            div.setAttribute('data-col', colIdx);
+            div.style.cssText = 'flex:0 0 70px; min-width:70px;';
+            div.innerHTML = makePctHTML(getBomPrefix(row), colIdx);
+            row.querySelector('.percentage-columns').appendChild(div);
+        });
+
+        document.querySelectorAll('#test-formset tr.test-form').forEach(function (row) {
             var div = document.createElement('div');
             div.className = 'value-col';
             div.setAttribute('data-col', colIdx);
             div.style.cssText = 'flex:0 0 105px; min-width:105px;';
-            div.innerHTML = makeValueHTML(prefix, colIdx);
-            container.appendChild(div);
+            div.innerHTML = makeValueHTML(getTestPrefix(row), colIdx);
+            row.querySelector('.value-columns').appendChild(div);
         });
 
-        // 在 tfoot 中添加新列的合计单元格
         var sumColumns = document.getElementById('bom-sum-columns');
         if (sumColumns) {
             var sumDiv = document.createElement('div');
@@ -185,26 +283,46 @@ document.addEventListener('DOMContentLoaded', function () {
             sumColumns.appendChild(sumDiv);
         }
 
+        appendColumnHeads(colIdx);
+        reindexColumns();
         updateRemoveBtn();
-        updateBomSums();
+    }
+
+    /* 删除任意一列（不只是最后一列），随后整体重排后缀 */
+    function removeColumnAt(colIdx) {
+        if (columnCount() <= 1) {
+            window.alert('至少需要保留一个配方版本');
+            return;
+        }
+        var selector = '[data-col="' + colIdx + '"]';
+        document.querySelectorAll('.percentage-columns > .percentage-col' + selector)
+            .forEach(function (el) { el.remove(); });
+        document.querySelectorAll('.value-columns > .value-col' + selector)
+            .forEach(function (el) { el.remove(); });
+        ['#bom-column-heads', '#test-column-heads'].forEach(function (sel) {
+            var heads = document.querySelector(sel);
+            if (heads) heads.querySelectorAll(':scope > ' + selector).forEach(function (el) { el.remove(); });
+        });
+        var sumColumns = document.getElementById('bom-sum-columns');
+        if (sumColumns) {
+            sumColumns.querySelectorAll(':scope > .percentage-col' + selector)
+                .forEach(function (el) { el.remove(); });
+        }
+        var inputs = registryInputs();
+        if (inputs[colIdx]) inputs[colIdx].remove();
+
+        reindexColumns();
+        updateRemoveBtn();
     }
 
     function removeColumn() {
-        if (currentNumColumns <= 1) return;
-        currentNumColumns--;
-        document.getElementById('num_columns').value = currentNumColumns;
-
-        document.querySelectorAll('.percentage-columns .percentage-col:last-child').forEach(function (el) { el.remove(); });
-        document.querySelectorAll('.value-columns .value-col:last-child').forEach(function (el) { el.remove(); });
-
-        updateRemoveBtn();
-        updateBomSums();
+        removeColumnAt(columnCount() - 1);
     }
 
     function updateRemoveBtn() {
         var btn = document.getElementById('remove-pct-col');
         if (btn) {
-            if (currentNumColumns <= 1) { btn.classList.add('d-none'); }
+            if (columnCount() <= 1) { btn.classList.add('d-none'); }
             else { btn.classList.remove('d-none'); }
         }
     }
@@ -239,12 +357,23 @@ document.addEventListener('DOMContentLoaded', function () {
     if (addPctColBtn) addPctColBtn.addEventListener('click', addColumn);
     if (removePctColBtn) removePctColBtn.addEventListener('click', removeColumn);
 
+    // 每列表头的「移除该版本」按钮（列头是服务端渲染的，用事件委托）
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('.remove-pct-col');
+        if (!btn) return;
+        var colIdx = parseInt(btn.getAttribute('data-col'), 10);
+        if (!isNaN(colIdx)) removeColumnAt(colIdx);
+    });
+
     /* ── 表单集动态行管理 ── */
     function setupFormSet(prefix, btnId, containerId, templateId) {
         var addBtn = document.getElementById(btnId);
         var totalForms = document.getElementById('id_' + prefix + '-TOTAL_FORMS');
         var container = document.getElementById(containerId);
-        var template = document.getElementById(templateId).innerHTML;
+        var templateEl = document.getElementById(templateId);
+        // L3（已投产）编辑页整页只读：添加行按钮与空模板都不渲染，直接跳过绑定
+        if (!addBtn || !totalForms || !container || !templateEl) return;
+        var template = templateEl.innerHTML;
 
         addBtn.addEventListener('click', function () {
             var count = parseInt(totalForms.value);
@@ -310,6 +439,32 @@ document.addEventListener('DOMContentLoaded', function () {
     // 首次计算
     updateBomSums();
 
+    /* ── 保存前确认：版本结构变更会连带删除引用本实验单的草稿工单 ──
+       仅在前端做提示，真正的判定与执行都在服务端（FormulaEditPolicy）。 */
+    (function () {
+        var policyEl = document.getElementById('edit-policy');
+        var mainForm = document.querySelector('form');
+        if (!policyEl || !mainForm) return;
+
+        var policy;
+        try { policy = JSON.parse(policyEl.textContent); } catch (err) { return; }
+        var orderCodes = (policy && policy.removable_order_codes) || [];
+        if (!orderCodes.length) return;
+
+        var initialIds = registryInputs().map(function (el) { return el.value; });
+
+        mainForm.addEventListener('submit', function (e) {
+            var currentIds = registryInputs().map(function (el) { return el.value; });
+            var changed = currentIds.length !== initialIds.length ||
+                currentIds.some(function (value, i) { return value !== initialIds[i]; });
+            if (!changed) return;
+
+            var message = '配方版本结构已变更。保存后，以下引用本实验单的草稿工单会被一并删除，' +
+                '需要按新结构重新建单：\n\n' + orderCodes.join('、') + '\n\n确定继续保存吗？';
+            if (!window.confirm(message)) e.preventDefault();
+        });
+    })();
+
     /* ── 表单验证错误恢复：重建多列并回填数据 ── */
     if (currentNumColumns > 1) {
         for (var c = 1; c < currentNumColumns; c++) {
@@ -352,6 +507,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 })(c2);
             }
         }
+
+        // 归一化所有后缀（name/id/data-col/表尾合计 id），并同步 #num_columns
+        reindexColumns();
 
         // 回填变体数据
         var variantDataEl = document.getElementById('variant-data');

@@ -12,10 +12,15 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url|default:'' }}">
         <input type="hidden" name="num_columns" id="num_columns" value="{{ num_columns|default:1 }}">
+        {% comment %}
+        列注册表：每列一个隐藏域，DOM 顺序即列序；值为空串表示该列是尚未保存的新版本。
+        服务端只认这个列表的个数与顺序（不再信任 num_columns），
+        避免列数与实际提交不符时静默清空/串写某个版本的数据。
+        {% endcomment %}
         {% if batch_edit_mode %}
-            {% for f in formula_columns %}
-            <input type="hidden" name="formula_ids" value="{{ f.pk }}">
-            {% endfor %}
+        <div id="column-registry" class="d-none">
+            {% for value in column_ids %}<input type="hidden" name="column_formula_ids" value="{{ value }}">{% endfor %}
+        </div>
         {% endif %}
 
         <!-- Page Header -->
@@ -25,8 +30,6 @@
                         <h2 class="page-title">
                             {% if page_title == '编辑实验配方' %}
                                 <i class="ti ti-edit me-2"></i>
-                            {% elif page_title == '复制配方' %}
-                                <i class="ti ti-copy me-2"></i>
                             {% else %}
                                 <i class="ti ti-plus me-2"></i>
                             {% endif %}
@@ -46,15 +49,29 @@
                                 导入数据
                             </button>
                             {% endif %}
+                            {% if edit_policy.can_edit_content %}
                             <button type="submit" class="btn btn-primary">
                                 <i class="ti ti-device-floppy me-2"></i>
                                 保存配方
                             </button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
         </div>
 
+
+        {% if edit_policy.banner %}
+        <div class="alert {{ edit_policy.banner.css }} d-print-none" role="alert">
+            <div class="d-flex">
+                <div class="me-2"><i class="ti ti-lock fs-2"></i></div>
+                <div>
+                    <h4 class="alert-title mb-1">{{ edit_policy.banner.title }}</h4>
+                    <div class="text-muted">{{ edit_policy.banner.message }}</div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
 
         <!-- 1. 基础信息 -->
                 <div class="card mb-3">
@@ -181,16 +198,26 @@
                                 <th style="width: auto;">
                                     <div class="d-flex align-items-center justify-content-center">
                                         <span>比例/份数</span>
-                                        {% if not form.instance.pk %}
-                                        <button type="button" class="btn btn-sm btn-icon ms-1" id="add-pct-col" title="添加配方变体列"><i class="ti ti-plus"></i></button>
-                                        <button type="button" class="btn btn-sm btn-icon d-none" id="remove-pct-col" title="移除最后一个变体列"><i class="ti ti-minus"></i></button>
+                                        {% if edit_policy.can_manage_versions %}
+                                        <button type="button" class="btn btn-sm btn-icon ms-1" id="add-pct-col" title="添加配方版本列"><i class="ti ti-plus"></i></button>
+                                        {% if not batch_edit_mode %}
+                                        <button type="button" class="btn btn-sm btn-icon d-none" id="remove-pct-col" title="移除最后一个版本列"><i class="ti ti-minus"></i></button>
+                                        {% endif %}
                                         {% endif %}
                                     </div>
                                     {% if batch_edit_mode and formula_columns %}
-                                    <div class="d-flex gap-1 mt-1">
+                                    <div class="d-flex gap-1 mt-1" id="bom-column-heads">
                                         {% for f in formula_columns %}
-                                        <div class="percentage-col text-center">
+                                        <div class="percentage-col text-center" data-col="{{ forloop.counter0 }}">
+                                            {% if f %}
                                             <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                            {% else %}
+                                            <span class="badge bg-orange-lt text-orange" title="尚未保存的新版本">新</span>
+                                            {% endif %}
+                                            {% if edit_policy.can_manage_versions %}
+                                            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-pct-col"
+                                                    data-col="{{ forloop.counter0 }}" title="移除该版本"><i class="ti ti-x"></i></button>
+                                            {% endif %}
                                         </div>
                                         {% endfor %}
                                     </div>
@@ -267,11 +294,13 @@
                             </tfoot>
                         </table>
                     </div>
+                    {% if edit_policy.can_edit_content %}
                     <div class="card-footer">
                         <button type="button" class="btn btn-ghost-orange" id="add-bom">
                             <i class="ti ti-plus me-1"></i> 添加原料
                         </button>
                     </div>
+                    {% endif %}
                 </div>
 
                 <!-- 5. 测试结果 -->
@@ -287,10 +316,14 @@
                                 <th style="width: auto;" id="test-value-header">
                                     数值 / 结果
                                     {% if batch_edit_mode and formula_columns %}
-                                    <div class="d-flex gap-1 mt-1">
+                                    <div class="d-flex gap-1 mt-1" id="test-column-heads">
                                         {% for f in formula_columns %}
-                                        <div class="value-col text-center">
+                                        <div class="value-col text-center" data-col="{{ forloop.counter0 }}">
+                                            {% if f %}
                                             <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                                            {% else %}
+                                            <span class="badge bg-orange-lt text-orange" title="尚未保存的新版本">新</span>
+                                            {% endif %}
                                         </div>
                                         {% endfor %}
                                     </div>
@@ -344,11 +377,13 @@
                             </tbody>
                         </table>
                     </div>
+                    {% if edit_policy.can_edit_content %}
                     <div class="card-footer">
                         <button type="button" class="btn btn-ghost-purple" id="add-test">
                             <i class="ti ti-plus me-1"></i> 添加测试项
                         </button>
                     </div>
+                    {% endif %}
                 </div>
                 
     </form>
@@ -408,6 +443,9 @@
     {% if variant_data %}
     {{ variant_data|json_script:"variant-data" }}
     {% endif %}
+
+    <!-- Data bridge: 编辑分级策略（前端据此决定按钮显隐与保存前提示，业务规则只在服务端） -->
+    {{ edit_policy|json_script:"edit-policy" }}
 
     <!-- Coloris 颜色选择器库 -->
     <script src="{% static 'tabler/core-1.4.0/dist/libs/@melloware/coloris/dist/umd/coloris.min.js' %}"></script>

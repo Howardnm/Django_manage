@@ -715,7 +715,7 @@ class ProductionOrderDeleteView(RndAccessMixin, View):
             raise PermissionDenied('您不是该工单的创建者，无权删除')
 
         order_code = order.code
-        order.delete()
+        ProductionOrderService.delete_draft(order)
         messages.success(request, f'草稿工单 {order_code} 已删除')
         return redirect('trial_dashboard')
 

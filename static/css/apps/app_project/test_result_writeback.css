@@ -1,0 +1,35 @@
+/* ==========================================
+   测试数据回写页 — app_project/detail/_test_result_mean_writeback.html
+   逐字复制自 app_material/material/form_card/form_data.html 的「物性指标」卡片，
+   保证两张卡片的控件尺寸与字号完全一致。
+
+   两个关键点：
+   1. 控件用基础尺寸（form-control / form-select），统一由这里压紧，
+      不要混用 -sm 类 —— 那样会出现大小不一的选框。
+   2. 必须同时覆盖 .ts-wrapper .ts-control：TomSelect 会把原生 select 藏起来、
+      另外渲染一套控件，只调 .form-select 对它无效（字号/内边距都不会跟着变）。
+   ========================================== */
+
+#data-table .form-control,
+#data-table .form-select {
+    padding: 2px 6px;
+    font-size: 12px;
+    height: auto;
+    min-height: 28px;
+}
+
+#data-table .ts-wrapper .ts-control {
+    padding: 2px 6px;
+    font-size: 12px;
+    min-height: 28px;
+}
+
+#data-table td {
+    padding: 4px 4px;
+    vertical-align: middle;
+}
+
+#data-table th {
+    padding: 4px 6px;
+    white-space: nowrap;
+}

@@ -12,7 +12,6 @@ urlpatterns = [
     path('add/new/', FormulaStartFreshView.as_view(), name='formula_add_fresh'),
     path('<int:pk>/', LabFormulaDetailView.as_view(), name='formula_detail'),
     path('<int:pk>/edit/', LabFormulaUpdateView.as_view(), name='formula_edit'),
-    path('<int:pk>/duplicate/', LabFormulaDuplicateView.as_view(), name='formula_duplicate'),
     path('<int:pk>/edit/import/', FormulaImportFromView.as_view(), name='formula_import'),
     path('compare/', FormulaCompareView.as_view(), name='formula_compare'),
     path('chart-compare/', FormulaChartCompareView.as_view(), name='formula_chart_compare'),

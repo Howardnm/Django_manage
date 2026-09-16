@@ -9,6 +9,7 @@ from django.urls import reverse
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectStage, ProjectNode
 from app_formula.models import LabFormula, FormulaTestResult
+from app_material.models import TestConfig
 from app_trial_production.models.production_order import ProductionOrderFormulaDetail
 
 logger = logging.getLogger(__name__)
@@ -490,28 +491,44 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
         )
 
     def _aggregate(self, formula):
-        """聚合关联工单的测试结果，返回 (rows, order_codes)。"""
+        """汇总「工单回写值」与「已手动录入值」，返回 (rows, order_codes)。
+
+        行集合取两者的**并集**：只存在于手动录入、没有工单对应值的测试项也必须
+        出现在表里。否则它不在 POST 中，会被提交逻辑当成"已删除"而静默清掉。
+        """
         from collections import defaultdict, Counter
         from statistics import mean
 
-        results = FormulaTestResult.objects.filter(
+        order_result_qs = FormulaTestResult.objects.filter(
             formula=formula,
             production_order__isnull=False,
-        ).select_related('test_config__category', 'production_order').order_by(
-            'test_config__category__order', 'test_config__order',
-        )
+        ).select_related('test_config__category', 'production_order')
+
+        manual_map = {
+            r.test_config: r
+            for r in FormulaTestResult.objects.filter(
+                formula=formula, production_order__isnull=True,
+            ).select_related('test_config__category')
+        }
 
         groups = defaultdict(list)
         order_codes = []
         seen_orders = set()
-        for r in results:
+        for r in order_result_qs:
             groups[r.test_config].append(r)
             if r.production_order_id not in seen_orders:
                 seen_orders.add(r.production_order_id)
                 order_codes.append(r.production_order.code)
 
+        configs = sorted(
+            set(groups) | set(manual_map),
+            key=lambda tc: (tc.category.order if tc.category else 0, tc.order),
+        )
+
         rows = []
-        for tc, items in groups.items():
+        for tc in configs:
+            items = groups.get(tc, [])
+            manual = manual_map.get(tc)
             row = {
                 'test_config': tc,
                 'data_type': tc.data_type,
@@ -519,17 +536,28 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
                     {'code': r.production_order.code, 'value': r.value, 'text': r.value_text}
                     for r in items
                 ],
+                # 仅手动录入、无工单回写值的行，标记出来以区别于均值行
+                'is_manual_only': not items and manual is not None,
                 'agg_value': None,
                 'agg_text': '',
+                # 测试日期/备注属于手动录入的那条记录（与编辑页同字段）
+                'test_date': manual.test_date if manual else None,
+                'remark': manual.remark if manual else '',
             }
-            if tc.data_type == 'NUMBER':
-                vals = [r.value for r in items if r.value is not None]
-                if vals:
-                    row['agg_value'] = round(mean(vals), 3)
-            else:
-                texts = [r.value_text for r in items if r.value_text]
-                if texts:
-                    row['agg_text'] = Counter(texts).most_common(1)[0][0]
+            if items:
+                # 本页主用途：回显工单均值，用户确认后覆盖手动录入值
+                if tc.data_type == 'NUMBER':
+                    vals = [r.value for r in items if r.value is not None]
+                    if vals:
+                        row['agg_value'] = round(mean(vals), 3)
+                else:
+                    texts = [r.value_text for r in items if r.value_text]
+                    if texts:
+                        row['agg_text'] = Counter(texts).most_common(1)[0][0]
+            # 没有任何可聚合的值时退回已有手动录入值，否则提交一次就把它冲掉了
+            if row['agg_value'] is None and not row['agg_text'] and manual is not None:
+                row['agg_value'] = manual.value
+                row['agg_text'] = manual.value_text
             rows.append(row)
 
         return rows, order_codes
@@ -538,51 +566,119 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
         formula = self._get_formula(pk, formula_pk)
         rows, order_codes = self._aggregate(formula)
 
-        if not rows:
-            messages.warning(request, '该配方暂无工单回写的测试数据可汇总')
-            return redirect(self._redirect_url(pk, formula))
+        all_test_configs = TestConfig.objects.select_related('category').order_by(
+            'category__order', 'order')
 
+        # 不再因为"没有可汇总数据"而重定向：本页现在也用于新增测试项目，
+        # 空表时要能进来填（见模板的空状态提示）。
         return render(request, 'apps/app_project/detail/_test_result_mean_writeback.html', {
             'project': formula.project,
             'formula': formula,
             'rows': rows,
             'order_codes': order_codes,
+            'all_test_configs': all_test_configs,
+            # 新增行选中测试项目后，由 JS 按 type 生成对应的值控件；
+            # SELECT 型还要拿 options 填下拉，否则只能退化成文本框。
+            'writeback_config_meta': {
+                str(tc.pk): {
+                    'type': tc.data_type,
+                    'options': tc.get_options_list() if tc.data_type == 'SELECT' else [],
+                }
+                for tc in all_test_configs
+            },
         })
+
+    # 字段名前缀 → 归属。名称里嵌的是 TestConfig 的 pk：
+    #   num_{pk}  数值    txt_{pk}  文本/下拉结果
+    #   date_{pk} 测试日期  rem_{pk}  备注
+    _VALUE_PREFIXES = {'num_': 'value', 'txt_': 'value_text'}
 
     def post(self, request, pk, formula_pk):
         formula = self._get_formula(pk, formula_pk)
         from decimal import Decimal, InvalidOperation
 
-        with transaction.atomic():
-            # 删除现有手动录入数据
-            FormulaTestResult.objects.filter(
-                formula=formula, production_order__isnull=True,
-            ).delete()
+        from django.utils.dateparse import parse_date
 
-            created = 0
-            for key, val in request.POST.items():
-                if not val:
+        # 本表单是"整体覆盖"语义（未提交的行视为被移除），必须能区分
+        # "用户删光了所有行" 与 "请求被裁剪/构造" —— 后者会把手动录入数据整体清空。
+        if request.POST.get('writeback_form') != '1':
+            messages.error(request, '提交的数据不完整，请刷新页面后重试。')
+            return redirect(self._redirect_url(pk, formula))
+
+        # 只处理本次**真正提交**的测试项。
+        # 旧实现是"先清空全部手动录入再按 POST 重建"，而表里只列有工单回写值的
+        # 测试项 —— 只存在于手动录入、没有工单对应值的项每提交一次就被删一次。
+        values, dates, remarks, origins = {}, {}, {}, {}
+        for key, raw in request.POST.items():
+            for prefix, field in self._VALUE_PREFIXES.items():
+                if key.startswith(prefix) and key[len(prefix):].isdigit():
+                    values[key[len(prefix):]] = (field, raw)
+                    break
+            else:
+                if key.startswith('date_') and key[5:].isdigit():
+                    dates[key[5:]] = raw
+                elif key.startswith('rem_') and key[4:].isdigit():
+                    remarks[key[4:]] = raw
+                elif key.startswith('orig_') and key[5:].isdigit() and raw.isdigit():
+                    # orig_{新pk} = 原pk：该行的「测试项目」被改过
+                    origins[key[5:]] = raw
+
+        created = updated = removed = 0
+        with transaction.atomic():
+            for tc_id, (field, raw_value) in values.items():
+                # 改过测试项目 → 先移除原测试项的手动录入记录。
+                # 注意这里只依赖**显式提交**的 orig_ 字段，不做"未提交即删除"的推断 ——
+                # 后者会在并发场景下（别人刚加了一项而你提交的是旧表单）误删数据。
+                origin = origins.get(tc_id)
+                if origin and origin != tc_id:
+                    removed += FormulaTestResult.objects.filter(
+                        formula=formula, test_config_id=int(origin),
+                        production_order__isnull=True,
+                    ).delete()[0]
+
+                existing = FormulaTestResult.objects.filter(
+                    formula=formula, test_config_id=int(tc_id),
+                    production_order__isnull=True,
+                ).first()
+                value = (raw_value or '').strip()
+
+                if not value:
+                    # 值被清空 → 视为移除该测试项（仅当原本存在手动录入时才删）
+                    if existing:
+                        existing.delete()
+                        removed += 1
                     continue
-                if key.startswith('num_'):
-                    tc_id = int(key[4:])
+
+                if field == 'value':
                     try:
-                        value = Decimal(val)
+                        parsed = Decimal(value)
                     except InvalidOperation:
                         continue
+                    defaults = {'value': parsed, 'value_text': ''}
+                else:
+                    defaults = {'value': None, 'value_text': value}
+
+                # remark 是 max_length=50 的 CharField，超长会在 DB 层报错
+                defaults['test_date'] = parse_date(dates.get(tc_id) or '')
+                defaults['remark'] = (remarks.get(tc_id) or '').strip()[:50]
+
+                if existing:
+                    for attr, val in defaults.items():
+                        setattr(existing, attr, val)
+                    existing.save()
+                    updated += 1
+                else:
                     FormulaTestResult.objects.create(
-                        formula=formula, test_config_id=tc_id,
-                        production_order=None, value=value,
-                    )
-                    created += 1
-                elif key.startswith('txt_'):
-                    tc_id = int(key[4:])
-                    FormulaTestResult.objects.create(
-                        formula=formula, test_config_id=tc_id,
-                        production_order=None, value_text=val,
-                    )
+                        formula=formula, test_config_id=int(tc_id),
+                        production_order=None, **defaults)
                     created += 1
 
-        messages.success(request, f'均值回写完成，已录入 {created} 条测试数据')
+        if created or updated or removed:
+            messages.success(
+                request,
+                f'测试数据已保存：新增 {created} 项、更新 {updated} 项、清除 {removed} 项')
+        else:
+            messages.info(request, '没有需要保存的改动')
         return redirect(self._redirect_url(pk, formula))
 
     @staticmethod

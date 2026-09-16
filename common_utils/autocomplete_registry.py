@@ -22,7 +22,7 @@ _registry = {}
 
 
 def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=None,
-                          access_filter=None, filter_fn=None):
+                          access_filter=None, filter_fn=None, bulk_formatter_fn=None):
     """
     注册一个模型类型的自动补全处理器。
 
@@ -40,6 +40,12 @@ def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=N
                    前端把每个 search_fields 字段以字段名为参数名发过来
                    （只发非空字段），由本函数决定如何映射到查询集。
                    如果为 None，具名参数被忽略（旧行为不变）。
+        bulk_formatter_fn: 可选的批量格式化函数 (items) -> [dict, ...]，
+                           与 formatter_fn 输出同构、且与入参同序。
+                           用于带出「关联表实时算出来」的字段（如价格）：
+                           自动补全每敲一次键都会打接口，逐条格式化会变成 N+1。
+                           提供后两种响应模式都走它；formatter_fn 仍是必填项，
+                           可写成 `lambda x: bulk_fn([x])[0]` 保持两者一致。
 
     用法（多字段筛选）:
         def _filter_my_model(qs, params):
@@ -52,6 +58,7 @@ def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=N
     _registry[model_key] = {
         'builder': builder_fn,
         'formatter': formatter_fn,
+        'bulk_formatter': bulk_formatter_fn,
         'detail_url': detail_url_name,
         'access_filter': access_filter,
         'filter_fn': filter_fn,

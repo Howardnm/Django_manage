@@ -13,6 +13,7 @@ from app_formula.models import LabFormula, FormulaBOM, FormulaTestResult
 from app_formula.forms import LabFormulaForm, FormulaBOMFormSet, FormulaTestResultFormSet
 from app_formula.utils.filters import LabFormulaFilter
 from app_formula.mixins import FormulaAccessMixin
+from app_formula.services import FormulaEditPolicy, FormulaVersionError
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project
 from app_formula.utils.search_picker_config import for_formula_import
@@ -401,6 +402,8 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         context['page_title'] = '新增实验配方'
         context['show_import_button'] = True
         context['enable_multi_column'] = True
+        # 新建页操作的是尚不存在的实验单，不可能被工单引用 → 无限制
+        context['edit_policy'] = FormulaEditPolicy.unrestricted()
         context['search_picker'] = for_formula_import()
         session_data = self._get_session_data()
         project_node_id = session_data.get('project_node_id')
@@ -783,28 +786,83 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
     def get_object(self, queryset=None):
         return self.get_object_or_deny()
 
+    # ── 实验单分组与编辑策略 ──
+
+    _experiment_formulas_cache = None
+
+    def experiment_formulas(self):
+        """本实验单（同 code）下的全部配方版本，按版本号升序。
+
+        单号取**数据库**中的值而非 ``self.object.code``：``form.is_valid()`` 会
+        通过 ``construct_instance`` 就地改写 ``self.object``，被改写过的字段在
+        ``form_valid`` 里读出来是脏的。用它分组会查不到任何版本，让分级判断
+        静默退化成 L1（= 绕过全部锁定）。
+
+        结果按请求缓存（视图实例每请求新建）。结构变更发生在策略判定之后，
+        因此缓存不会被写坏。
+        """
+        if self._experiment_formulas_cache is None:
+            pk = self.object.pk
+            code = LabFormula.objects.filter(pk=pk).values_list('code', flat=True).first()
+            self._experiment_formulas_cache = list(
+                LabFormula.objects.filter(code=code)
+                .prefetch_related(
+                    'bom_lines__raw_material__category',
+                    'test_results__test_config__category',
+                )
+                .order_by('version')
+            )
+        return self._experiment_formulas_cache
+
+    def edit_policy(self):
+        """当前实验单的编辑分级（L1/L2/L3），由关联工单状态推导。见 FormulaEditPolicy。"""
+        return FormulaEditPolicy.resolve(self.experiment_formulas())
+
+    def submitted_column_ids(self):
+        """读取客户端提交的「列顺序 → 版本标识」列表（空串 = 尚未保存的新列）。
+
+        旧页面兼容：旧版编辑页用 ``formula_ids`` 提交它渲染出来的那几列。它从不
+        增删版本，所以这份列表精确等于页面上实际显示的列 —— 不能用"本实验单现有
+        的全部版本"去顶替，否则页面渲染时还不存在的版本会被按空列处理、
+        静默清掉它已有的 BOM 与测试数据。
+        """
+        return (self.request.POST.getlist('column_formula_ids')
+                or self.request.POST.getlist('formula_ids'))
+
+    def formulas_for_columns(self, column_ids):
+        """把列标识还原成配方对象列表，顺序与列一致；新增列用 None 占位。"""
+        def _as_pk(value):
+            return int(value) if value and value.isdigit() else None
+
+        pks = [pk for pk in map(_as_pk, column_ids) if pk]
+        by_pk = {f.pk: f for f in LabFormula.objects.filter(pk__in=pks)}
+        return [by_pk.get(_as_pk(value)) for value in column_ids]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        policy = self.edit_policy()
+        context['edit_policy'] = policy
         context['page_title'] = '编辑实验配方'
-        context['show_import_button'] = True
+        # 导入会重写 BOM 与测试项目，L3 下必须一并封禁
+        context['show_import_button'] = policy['can_edit_content']
         context['search_picker'] = for_formula_import()
         context['project_node_stage'] = self.object.project_node.stage if self.object.project_node else None
         context['can_be_mature'] = self.object.project_node.can_be_mature if self.object.project_node else True
         context['project_name'] = self.object.project.name if self.object.project else None
         context['project_node_display'] = str(self.object.project_node) if self.object.project_node else None
 
-        # 检测同 code 的兄弟配方，决定是否进入批量编辑模式
+        # 每个配方版本一列。单版本实验单同样走这条路径 —— 否则编辑页加不出新版本。
+        # 下面的 else 分支是防御性兜底：self.object 自身必然是一个版本，
+        # all_formulas 不会为空，正常走不到那里。
         if not self.request.POST:
-            siblings = LabFormula.objects.filter(code=self.object.code).prefetch_related(
-                'bom_lines__raw_material__category',
-                'test_results__test_config__category',
-            ).order_by('version')
-            if siblings.count() > 1:
-                all_formulas = list(siblings)
+            all_formulas = self.experiment_formulas()
+            if all_formulas:
                 context['enable_multi_column'] = True
                 context['batch_edit_mode'] = True
                 context['num_columns'] = len(all_formulas)
                 context['formula_columns'] = all_formulas
+                # 列顺序 → 版本标识（模板渲染成隐藏域，提交时按同一顺序回传）
+                context['column_ids'] = [f.pk for f in all_formulas]
 
                 # 构建 BOM 并集 (按 raw_material_id + feeding_port 去重)
                 from collections import OrderedDict
@@ -885,40 +943,106 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
 
                 context['variant_data'] = variant_map
             else:
-                context['enable_multi_column'] = False
-                context['num_columns'] = 1
+                # 防御性兜底：self.object 自身必然是一个版本，experiment_formulas()
+                # 不会为空。真走到这里说明数据异常（例如单号为空），
+                # 给一套空表单集让页面能渲染出来，而不是 500。
                 FormulaBOMFormSet.extra = 1
                 FormulaTestResultFormSet.extra = 1
-                context['bom_formset'] = FormulaBOMFormSet(instance=self.object, prefix='bom')
-                context['test_formset'] = FormulaTestResultFormSet(instance=self.object, prefix='test')
-        else:
-            # POST 请求
-            formula_ids = self.request.POST.getlist('formula_ids')
-            if formula_ids:
-                context['enable_multi_column'] = True
-                context['batch_edit_mode'] = True
-                context['num_columns'] = len(formula_ids)
-                context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
-                context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
-                context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
-                context['formula_columns'] = LabFormula.objects.filter(
-                    pk__in=formula_ids
-                ).order_by('version')
-            else:
                 context['enable_multi_column'] = False
                 context['num_columns'] = 1
-                context['bom_formset'] = FormulaBOMFormSet(self.request.POST, instance=self.object, prefix='bom')
-                context['test_formset'] = FormulaTestResultFormSet(self.request.POST, instance=self.object, prefix='test')
+                context['column_ids'] = []
+                context['formula_columns'] = []
+                context['bom_formset'] = FormulaBOMFormSet(
+                    prefix='bom', queryset=FormulaBOM.objects.none())
+                context['test_formset'] = FormulaTestResultFormSet(
+                    prefix='test', queryset=FormulaTestResult.objects.none())
+        else:
+            # POST 回显（校验失败重渲染）：按提交的列标识逐位还原，
+            # 保序、且保留尚未保存的新列 —— 否则用户刚填的新列会凭空消失。
+            # 完全拿不到列标识时只影响**渲染**（按库中现状画出来），
+            # 写入路径仍会拒绝这种请求（见 _update_formula_variants 的空列表检查）。
+            column_ids = (self.submitted_column_ids()
+                          or [str(f.pk) for f in self.experiment_formulas()])
+            context['enable_multi_column'] = True
+            context['batch_edit_mode'] = True
+            context['num_columns'] = len(column_ids)
+            context['column_ids'] = column_ids
+            context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
+            context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
+            context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
+            context['formula_columns'] = self.formulas_for_columns(column_ids)
+
+        if not policy['can_edit_content']:
+            self._lock_readonly_forms(context)
 
         context['next_url'] = self.request.GET.get(
             'next', self.request.META.get('HTTP_REFERER', '')
         )
         return context
 
+    @staticmethod
+    def _lock_readonly_forms(context):
+        """L3 只读：把主表单与两个表单集的所有字段设为 disabled。
+
+        Django 的 ``BoundField`` 会据此输出 ``disabled`` 属性；表单集同时关掉
+        ``can_delete``，模板里的删除按钮随之消失。前端只负责展示，
+        真正的拦截在 ``form_valid`` 的 L3 短路与 ``_update_formula_variants`` 的结构守卫。
+        """
+        forms = [context.get('form')]
+        for formset in (context.get('bom_formset'), context.get('test_formset')):
+            if formset is None:
+                continue
+            formset.can_delete = False
+            forms.extend(formset.forms)
+        for form in forms:
+            if form is None:
+                continue
+            for field in form.fields.values():
+                field.disabled = True
+
     def _update_formula_variants(self, form, bom_formset, test_formset):
-        """批量更新：共享字段来自 column 0，variant 数据来自各列"""
-        formula_ids = [int(x) for x in self.request.POST.getlist('formula_ids')]
+        """批量更新：共享字段来自 column 0，variant 数据来自各列。
+
+        一列 = 一个配方版本。列标识为空表示新增版本；库中存在但未提交的版本会被
+        删除；发生增删后按列顺序重排版本号。列数**只认提交的列标识个数**，
+        不再用 POST 里的 num_columns —— 两者不一致时按 num_columns 重建列会
+        静默清空对应版本的数据。
+        """
+        column_ids = self.submitted_column_ids()
         post_data = self.request.POST
+        policy = self.edit_policy()
+
+        if not column_ids:
+            raise FormulaVersionError('没有收到任何配方版本列，请刷新页面后重试。')
+
+        def _as_pk(value):
+            return int(value) if value and value.isdigit() else None
+
+        submitted_pks = [pk for pk in map(_as_pk, column_ids) if pk]
+        pending_pks = set(submitted_pks)
+        if len(submitted_pks) != len(pending_pks):
+            raise FormulaVersionError('同一个配方版本被放进了多个列，请刷新页面后重试。')
+
+        existing = self.experiment_formulas()
+        existing_ids = {f.pk for f in existing}
+        if pending_pks - existing_ids:
+            raise FormulaVersionError('提交的数据包含不属于本实验单的配方版本，已拒绝。')
+
+        has_new_column = any(_as_pk(value) is None for value in column_ids)
+        structural_change = has_new_column or pending_pks != existing_ids
+
+        # 版本结构冻结（L2）：提交的版本集合必须与库中完全一致。
+        # 前端在 L2 不渲染增删按钮，但请求可以手搓 —— 服务端必须自己拦。
+        # （L3 已在 form_valid 里整体短路，走不到这里。）
+        if structural_change and not policy['can_manage_versions']:
+            raise FormulaVersionError(
+                f'该实验单已被工单 {"、".join(policy["blocking_order_codes"])} 引用且已提交审批，'
+                '版本结构已冻结，不能增删配方版本。'
+            )
+
+        # pk 来自客户端 POST，不可信 —— 逐个补一次编辑权限校验
+        for formula in existing:
+            self.check_edit_permission(formula)
 
         bom_rows = []
         for i, bf in enumerate(bom_formset):
@@ -947,17 +1071,37 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             })
 
         updated = []
-        formula_map = {
-            f.pk: f for f in LabFormula.objects.filter(pk__in=formula_ids).prefetch_related('test_results', 'bom_lines')
-        }
-
-        # 逐公式校验编辑权限（formula_ids 来自客户端 POST，不可信）
-        for formula in formula_map.values():
-            self.check_edit_permission(formula)
+        formula_map = {f.pk: f for f in existing}
+        experiment_code = existing[0].code
 
         with transaction.atomic():
-            for col_idx, formula_id in enumerate(formula_ids):
-                formula = formula_map[formula_id]
+            # 1. 结构变更 → 建立于旧版本结构上的草稿工单整体作废（级联清干净引用路径）。
+            #    这一步必须早于删版本，否则会撞上工单侧的 PROTECT 外键。
+            if structural_change:
+                removed_orders = FormulaEditPolicy.delete_removable_orders(existing)
+                if removed_orders:
+                    messages.warning(
+                        self.request,
+                        f'版本结构已变更，以下关联的草稿工单已一并删除，请按新结构重新建单：'
+                        f'{"、".join(removed_orders)}'
+                    )
+
+            # 2. 删除未提交的版本
+            for formula in existing:
+                if formula.pk not in pending_pks:
+                    formula.delete()
+
+            for col_idx, column_id in enumerate(column_ids):
+                pk = _as_pk(column_id)
+                if pk is None:
+                    formula = LabFormula(
+                        code=experiment_code,
+                        creator=self.request.user,
+                        # 临时高位版本号，收尾时由 renumber() 统一重排
+                        version=FormulaEditPolicy.staging_version(col_idx),
+                    )
+                else:
+                    formula = formula_map[pk]
 
                 formula.name = form.cleaned_data['name']
                 formula.material_type = form.cleaned_data['material_type']
@@ -1050,6 +1194,9 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                 formula.research_projects.set(form.cleaned_data.get('research_projects', []))
                 updated.append(formula)
 
+            # 3. 收尾：按列顺序把版本号重排为连续的 1..N
+            FormulaEditPolicy.renumber(updated)
+
         return updated
 
     def form_invalid(self, form):
@@ -1058,6 +1205,19 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
 
     def form_valid(self, form):
         self.check_edit_permission(self.object)
+
+        # L3（已投产）整页拒绝写入，必须在此短路：
+        # 编辑页在 L3 是只读的，变体列的百分比不会随表单提交，
+        # 若继续走"整体删除 + 重建"，会把各变体 BOM 全部读成 0 并覆盖掉。
+        policy = self.edit_policy()
+        if policy['tier'] == FormulaEditPolicy.TIER_L3:
+            messages.error(
+                self.request,
+                f'该实验单已投产（工单 {"、".join(policy["blocking_order_codes"])}），'
+                '已整体锁定，不可编辑。如需补录测试数据，请使用配方过程页的「均值回写」。'
+            )
+            return redirect(self.request.get_full_path())
+
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
@@ -1066,16 +1226,16 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             return self.render_to_response(self.get_context_data(form=form))
 
         try:
-            if context.get('batch_edit_mode'):
-                updated = self._update_formula_variants(form, bom_formset, test_formset)
-                self.object = updated[0]
-                messages.success(self.request, f"已更新 {len(updated)} 个配方")
-            else:
-                with transaction.atomic():
-                    self.object = form.save()
-                    bom_formset.save()
-                    test_formset.save()
-                messages.success(self.request, "配方已更新")
+            # 编辑页只有这一条写入路径：所有版本统一按列处理（含单版本实验单）。
+            # 旧版「单配方」分支已删除 —— 它靠 form.save() 落库，而模板从不提交
+            # code 字段，会把实验单号清空触发放 LabFormula.save() 的单号重生成，
+            # 导致配方脱离原实验单的版本分组。
+            updated = self._update_formula_variants(form, bom_formset, test_formset)
+            self.object = updated[0]
+            messages.success(self.request, f"已更新 {len(updated)} 个配方")
+        except FormulaVersionError as e:
+            messages.error(self.request, str(e))
+            return self.render_to_response(self.get_context_data(form=form))
         except IntegrityError as e:
             messages.error(self.request, _build_integrity_error_message(e))
             return self.render_to_response(self.get_context_data(form=form))
@@ -1089,262 +1249,6 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         return reverse('formula_detail', kwargs={'pk': self.object.pk})
 
 
-class LabFormulaDuplicateView(FormulaAccessMixin, UpdateView):
-    """
-    复制配方：
-    - 逻辑：基于现有配方内容创建一个新对象。
-    - 权限：需具备 add 权限，且基于原部门配方进行复制。
-    """
-    permission_required = 'app_formula.add_labformula'
-    model = LabFormula
-    form_class = LabFormulaForm
-    template_name = 'apps/app_formula/form.html'
-
-    def get_object(self, queryset=None):
-        return self.get_object_or_deny()
-
-    # 重新实现为 CreateView 逻辑
-    @property
-    def original_formula(self):
-        """鉴权后懒加载原配方对象"""
-        if not hasattr(self, '_original_formula'):
-            self._original_formula = self.get_object()
-        return self._original_formula
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['page_title'] = '复制配方'
-        context['enable_multi_column'] = True
-        context['project_node_stage'] = self.original_formula.project_node.stage if self.original_formula.project_node else None
-        context['can_be_mature'] = self.original_formula.project_node.can_be_mature if self.original_formula.project_node else True
-        context['project_name'] = self.original_formula.project.name if self.original_formula.project else None
-        context['project_node_display'] = str(self.original_formula.project_node) if self.original_formula.project_node else None
-
-        # 如果是 GET 请求，预填充 FormSet 数据
-        if not self.request.POST:
-            bom_initial = [{
-                'feeding_port': bom.feeding_port, 'weighing_scale': bom.weighing_scale,
-                'raw_material': bom.raw_material, 'percentage': bom.percentage,
-                'is_tail': bom.is_tail, 'is_pre_mix': bom.is_pre_mix,
-                'pre_mix_order': bom.pre_mix_order, 'pre_mix_time': bom.pre_mix_time,
-            } for bom in self.original_formula.bom_lines.all()]
-            context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
-            # 关键：设置 extra 为列表长度，以显示所有初始数据
-            context['bom_formset'].extra = len(bom_initial)
-            
-            test_initial = [{
-                'test_config': res.test_config, 'value': res.value,
-                'test_date': res.test_date, 'remark': res.remark,
-            } for res in self.original_formula.test_results.filter(production_order__isnull=True)]
-            context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
-            context['test_formset'].extra = len(test_initial)
-        else:
-            context['bom_formset'] = FormulaBOMFormSet(self.request.POST, prefix='bom')
-            context['test_formset'] = FormulaTestResultFormSet(self.request.POST, prefix='test')
-        if self.request.POST:
-            context['num_columns'] = int(self.request.POST.get('num_columns', 1))
-            context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
-        else:
-            context['num_columns'] = 1
-        context['next_url'] = self.request.GET.get(
-            'next', self.request.META.get('HTTP_REFERER', '')
-        )
-        return context
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial.update({
-            'name': f"{self.original_formula.name} (副本)",
-            'material_type': self.original_formula.material_type,
-            'process': self.original_formula.process,
-            'description': self.original_formula.description,
-            'material_color_name': self.original_formula.material_color_name,
-            'pantone_code': self.original_formula.pantone_code,
-            'rgb_value': self.original_formula.rgb_value,
-            'research_projects': self.original_formula.research_projects.all(),
-            'is_mature': False,
-        })
-        return initial
-
-    @staticmethod
-    def _column_has_data(col_idx, bom_rows, test_rows, post_data):
-        """检查变体列 col_idx 是否有任何非空数据"""
-        for row in bom_rows:
-            pct = post_data.get(f"bom-{row['form_idx']}-percentage_col{col_idx}", '').strip()
-            if pct:
-                return True
-        for row in test_rows:
-            for suffix in ('value', 'value_text', 'value_select'):
-                val = post_data.get(f"test-{row['form_idx']}-{suffix}_col{col_idx}", '').strip()
-                if val:
-                    return True
-        return False
-
-    def _create_formula_variants(self, form, bom_formset, test_formset):
-        """多列批量创建配方，返回 created_formulas 列表"""
-        num_columns = int(self.request.POST.get('num_columns', 1))
-        project = form.cleaned_data.get('project')
-        project_node = form.cleaned_data.get('project_node')
-
-        bom_rows = []
-        for i, bom_form in enumerate(bom_formset):
-            if (not bom_form.cleaned_data) or bom_form.cleaned_data.get('DELETE'):
-                continue
-            bom_rows.append({
-                'feeding_port': bom_form.cleaned_data['feeding_port'],
-                'weighing_scale': bom_form.cleaned_data['weighing_scale'],
-                'raw_material': bom_form.cleaned_data['raw_material'],
-                'is_tail': bom_form.cleaned_data.get('is_tail', False),
-                'is_pre_mix': bom_form.cleaned_data.get('is_pre_mix', False),
-                'pre_mix_order': bom_form.cleaned_data.get('pre_mix_order', 0),
-                'pre_mix_time': bom_form.cleaned_data.get('pre_mix_time', 0),
-                'form_idx': i,
-            })
-
-        test_rows = []
-        for j, test_form in enumerate(test_formset):
-            if (not test_form.cleaned_data) or test_form.cleaned_data.get('DELETE'):
-                continue
-            test_rows.append({
-                'test_config': test_form.cleaned_data['test_config'],
-                'test_date': test_form.cleaned_data.get('test_date'),
-                'remark': test_form.cleaned_data.get('remark', ''),
-                'form_idx': j,
-            })
-
-        post_data = self.request.POST
-        created = []
-        # 生成批次共享实验单号
-        from django.utils import timezone
-        today_str = timezone.now().strftime('%Y%m%d')
-        prefix = f"L{today_str}"
-        last_formula = LabFormula.objects.filter(code__startswith=prefix).order_by('code').last()
-        if last_formula:
-            try:
-                last_seq = int(last_formula.code.split('-')[-1])
-                new_seq = last_seq + 1
-            except (ValueError, IndexError):
-                new_seq = 1
-        else:
-            new_seq = 1
-        shared_code = f"{prefix}-{new_seq:02d}"
-        with transaction.atomic():
-            versions = list(range(1, num_columns + 1))
-
-            for col_idx in range(num_columns):
-                if col_idx > 0 and not self._column_has_data(col_idx, bom_rows, test_rows, post_data):
-                    break
-
-                formula = LabFormula(
-                    name=form.cleaned_data['name'],
-                    material_type=form.cleaned_data['material_type'],
-                    process=form.cleaned_data.get('process'),
-                    project=project,
-                    project_node=project_node,
-                    is_mature=form.cleaned_data.get('is_mature', False),
-                    description=form.cleaned_data.get('description', ''),
-                    material_color_name=form.cleaned_data.get('material_color_name', ''),
-                    pantone_code=form.cleaned_data.get('pantone_code', ''),
-                    rgb_value=form.cleaned_data.get('rgb_value', ''),
-                    creator=self.request.user,
-                    version=versions[col_idx],
-                    code=shared_code,
-                )
-                formula.save()
-
-                for row in bom_rows:
-                    if col_idx == 0:
-                        percentage = bom_formset.forms[row['form_idx']].cleaned_data['percentage']
-                    else:
-                        pct_str = post_data.get(f"bom-{row['form_idx']}-percentage_col{col_idx}", '')
-                        try:
-                            percentage = Decimal(pct_str) if pct_str else Decimal('0')
-                        except (InvalidOperation, ValueError):
-                            percentage = Decimal('0')
-                    if percentage == 0:
-                        continue
-                    FormulaBOM.objects.create(
-                        formula=formula,
-                        feeding_port=row['feeding_port'],
-                        weighing_scale=row['weighing_scale'],
-                        raw_material=row['raw_material'],
-                        percentage=percentage,
-                        is_tail=row['is_tail'],
-                        is_pre_mix=row['is_pre_mix'],
-                        pre_mix_order=row['pre_mix_order'],
-                        pre_mix_time=row['pre_mix_time'],
-                    )
-
-                for row in test_rows:
-                    test_config = row['test_config']
-                    if col_idx == 0:
-                        tf = test_formset.forms[row['form_idx']]
-                        value = tf.cleaned_data.get('value')
-                        value_text = tf.cleaned_data.get('value_text', '')
-                        value_select = tf.cleaned_data.get('value_select', '')
-                        if test_config.data_type == 'SELECT':
-                            value_text = value_select or value_text
-                    else:
-                        val_str = post_data.get(f"test-{row['form_idx']}-value_col{col_idx}", '')
-                        text_str = post_data.get(f"test-{row['form_idx']}-value_text_col{col_idx}", '')
-                        select_str = post_data.get(f"test-{row['form_idx']}-value_select_col{col_idx}", '')
-                        try:
-                            value = Decimal(val_str) if val_str else None
-                        except (InvalidOperation, ValueError):
-                            value = None
-                        if test_config.data_type == 'SELECT':
-                            value_text = select_str or text_str
-                        elif test_config.data_type == 'TEXT':
-                            value_text = text_str
-                        else:
-                            value_text = ''
-                    if value is not None or value_text:
-                        FormulaTestResult.objects.create(
-                            formula=formula,
-                            test_config=test_config,
-                            value=value,
-                            value_text=value_text,
-                            test_date=row['test_date'],
-                            remark=row['remark'],
-                        )
-
-                formula.research_projects.set(form.cleaned_data.get('research_projects', []))
-                created.append(formula)
-
-        return created
-
-    def form_invalid(self, form):
-        messages.error(self.request, _build_formula_error_message(form))
-        return super().form_invalid(form)
-
-    def form_valid(self, form):
-        context = self.get_context_data()
-        bom_formset = context['bom_formset']
-        test_formset = context['test_formset']
-        if not (bom_formset.is_valid() and test_formset.is_valid()):
-            messages.error(self.request, _build_formula_error_message(form, bom_formset, test_formset))
-            return self.render_to_response(self.get_context_data(form=form))
-        form.instance.pk = None
-        form.instance.code = None
-        try:
-            created = self._create_formula_variants(form, bom_formset, test_formset)
-        except IntegrityError as e:
-            messages.error(self.request, _build_integrity_error_message(e))
-            return self.render_to_response(self.get_context_data(form=form))
-        self.object = created[0]
-        count = len(created)
-        if count == 1:
-            messages.success(self.request, "配方已复制并创建")
-        else:
-            messages.success(self.request,
-                f"已创建 {count} 个配方变体 (版本 {created[0].version} ~ {created[-1].version})")
-        return redirect(self.get_success_url())
-
-    def get_success_url(self):
-        next_url = self.request.POST.get('next', '')
-        if next_url:
-            return next_url
-        return reverse('formula_detail', kwargs={'pk': self.object.pk})
 
 
 class FormulaImportFromView(FormulaAccessMixin, View):
@@ -1354,6 +1258,16 @@ class FormulaImportFromView(FormulaAccessMixin, View):
     def post(self, request, pk):
         target = get_object_or_404(LabFormula, pk=pk)
         self.check_object_permission(target)
+
+        # 导入会重建 BOM 明细与测试项目，属于"内容编辑"，L3（已投产）下必须一并封禁
+        policy = FormulaEditPolicy.resolve(LabFormula.objects.filter(code=target.code))
+        if policy['tier'] == FormulaEditPolicy.TIER_L3:
+            messages.error(
+                request,
+                f'实验单「{target.code}」已投产（工单 {"、".join(policy["blocking_order_codes"])}），'
+                '不可再导入数据。'
+            )
+            return redirect(reverse('formula_edit', kwargs={'pk': pk}))
 
         experiment_code = request.POST.get('experiment_code')
         if not experiment_code:

@@ -86,9 +86,6 @@
                         <td class="text-muted">{{ f.created_at|date:"Y-m-d" }}</td>
                         <td class="text-end">
                             <div class="btn-list flex-nowrap">
-                                <a href="{% url 'formula_duplicate' f.pk %}" class="btn btn-sm btn-icon btn-ghost-secondary" title="复制副本">
-                                    <i class="ti ti-copy"></i>
-                                </a>
                                 <a href="{% url 'formula_detail' f.pk %}" target="_blank" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
                                     <i class="ti ti-arrow-right"></i>
                                 </a>

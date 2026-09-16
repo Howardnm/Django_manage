@@ -17,6 +17,24 @@ class ProductionOrderService:
 
     @staticmethod
     @transaction.atomic
+    def delete_draft(order):
+        """删除草稿工单及其全部关联数据（模具需求、配方明细、测试项目关联等）。
+
+        调用方负责确认 ``order.status == DRAFT``。
+
+        为什么不直接 ``order.delete()``：``MoldRequirement.production_order`` 是
+        ``null=True`` + ``CASCADE``，而 Django 的 Collector 在无法延迟约束检查的后端
+        （MySQL）上，会先把该外键置空再删父行 —— ``DELETE`` 之前先执行
+        ``UPDATE ... SET production_order_id = NULL``，这一步立刻撞上
+        ``MoldRequirement`` 的 ``CheckConstraint(mold_req_has_production_order)``，
+        抛 IntegrityError。先把模具需求显式删掉，collector 就收集不到子对象，
+        也就不会发出那条 UPDATE。（PostgreSQL 可延迟约束检查，不受影响。）
+        """
+        order.mold_requirements.all().delete()
+        order.delete()
+
+    @staticmethod
+    @transaction.atomic
     def create_order(user, trial_code, project_id, project_node_id=None,
                      process_profile_id=None, formula_details=None,
                      test_item_ids=None,
