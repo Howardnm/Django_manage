@@ -62,6 +62,12 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
 
         qs = entry['builder'](query)
 
+        # 应用字段筛选（多字段搜索模式下前端以字段名为参数名发来的具名参数）。
+        # 放在 count/分页之前，且早于权限过滤 —— 权限过滤必须是最后一道。
+        filter_fn = entry.get('filter_fn')
+        if filter_fn:
+            qs = filter_fn(qs, request.GET)
+
         # 应用权限过滤（L1 角色检查 / L4 部门隔离 / L5 工作组隔离）
         access_filter = entry.get('access_filter')
         if access_filter:

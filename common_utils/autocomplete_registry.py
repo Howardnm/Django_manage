@@ -21,7 +21,8 @@
 _registry = {}
 
 
-def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=None, access_filter=None):
+def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=None,
+                          access_filter=None, filter_fn=None):
     """
     注册一个模型类型的自动补全处理器。
 
@@ -34,12 +35,26 @@ def register_autocomplete(model_key, builder_fn, formatter_fn, detail_url_name=N
                        用于在 autocomplete 中应用 L1/L4 权限隔离。
                        如果为 None，不做额外过滤（仅 LoginRequired 保护）。
                        可用 make_autocomplete_access_filter() 工厂创建。
+        filter_fn: 可选的字段筛选函数 (queryset, params) -> queryset，
+                   params 是请求的 QueryDict。供搜索选择器多字段模式使用：
+                   前端把每个 search_fields 字段以字段名为参数名发过来
+                   （只发非空字段），由本函数决定如何映射到查询集。
+                   如果为 None，具名参数被忽略（旧行为不变）。
+
+    用法（多字段筛选）:
+        def _filter_my_model(qs, params):
+            if v := params.get('category_id', '').strip():
+                qs = qs.filter(category_id=v)
+            return qs
+
+        register_autocomplete('my_model', build_qs, fmt, filter_fn=_filter_my_model)
     """
     _registry[model_key] = {
         'builder': builder_fn,
         'formatter': formatter_fn,
         'detail_url': detail_url_name,
         'access_filter': access_filter,
+        'filter_fn': filter_fn,
     }
 
 

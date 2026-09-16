@@ -13,8 +13,11 @@ urlpatterns = [
     # 1. 材料库 (Material)
     path('materials/', MaterialListView.as_view(), name='material_list'),
     path('materials/add/', MaterialCreateView.as_view(), name='material_add'),
+    # 「导入数据」：新增页走 prepare（写 session 预填），编辑页走 <pk>/import（事务内替换）
+    path('materials/import/prepare/', MaterialImportPrepareView.as_view(), name='material_import_prepare'),
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='material_detail'),
     path('materials/<int:pk>/edit/', MaterialUpdateView.as_view(), name='material_edit'),
+    path('materials/<int:pk>/import/', MaterialImportFromView.as_view(), name='material_import'),
     path('materials/<int:pk>/export-tds/', MaterialTdsExportView.as_view(), name='material_export_tds'),
 
     # 【新增】批量发布/下架

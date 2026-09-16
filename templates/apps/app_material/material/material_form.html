@@ -25,6 +25,17 @@
                 <div class="page-pretitle">{% if is_edit %}Edit Material{% else %}New Material{% endif %}</div>
                 <h2 class="page-title">{{ page_title }}</h2>
             </div>
+            <!-- 顶部操作按钮 -->
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    {% if show_import_button %}
+                    <button type="button" class="btn btn-outline-teal" data-bs-toggle="modal" data-bs-target="#modal-import-material">
+                        <i class="ti ti-file-import me-1"></i>
+                        导入数据
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 
@@ -58,6 +69,19 @@
 
 
     </form>
+
+    <!-- ============================================================ -->
+    <!-- 「导入数据」模态框 —— 独立的 POST 表单，必须放在主表单之外 -->
+    <!-- 若嵌进主表单，浏览器会丢弃内层 form，_confirm() 的 closest('form') -->
+    <!-- 会命中外层主表单，把用户填了一半的材料数据提交到导入 URL 上 -->
+    <!-- ============================================================ -->
+    {% if show_import_button %}
+    <form method="post" action="{% if is_edit %}{% url 'material_import' form.instance.pk %}{% else %}{% url 'material_import_prepare' %}{% endif %}">
+        {% csrf_token %}
+        <input type="hidden" name="source_material_id" class="search-picker-value">
+        {% include 'includes/search_picker_modal.html' %}
+    </form>
+    {% endif %}
 
 
     <!-- ============================================================ -->

@@ -23,7 +23,7 @@
                     <div class="card card-sm"><div class="card-body p-2 d-flex align-items-center gap-2"><span class="small fw-bold">材料牌号</span><a href="{% url 'material_detail' material.pk %}" target="_blank" class="fw-bold text-truncate" title="点击查看详情">{{ material.grade_name }}</a></div></div>
                 </div>
                 <div class="col-6">
-                    <div class="card card-sm"><div class="card-body p-2 d-flex align-items-center gap-2"><span class="small fw-bold">生产厂家</span><span class="fw-bold text-truncate">{{ material.manufacturer|default:"—" }}</span></div></div>
+                    <div class="card card-sm"><div class="card-body p-2 d-flex align-items-center gap-2"><span class="small fw-bold">生产基地</span><span class="fw-bold text-truncate">{{ material.manufacturer|default:"—" }}</span></div></div>
                 </div>
                 <div class="col-6">
                     <div class="card card-sm"><div class="card-body p-2 d-flex align-items-center gap-2"><span class="small fw-bold">材料类型</span><span class="badge bg-green text-white">{{ material.category.name }}</span></div></div>

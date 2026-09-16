@@ -20,7 +20,7 @@
 <script type="application/json" id="{{ cfg.modal_id }}-config">{{ cfg.json|safe }}</script>
 
 <div class="modal modal-blur fade" id="{{ cfg.modal_id }}" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered{% if cfg.modal_size %} modal-{{ cfg.modal_size }}{% endif %}">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">

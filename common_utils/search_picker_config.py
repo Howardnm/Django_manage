@@ -56,6 +56,8 @@ class SearchPickerConfig:
     search_url: str                        # 已解析的 API URL（通过 reverse()）
     display_mode: str = 'list'             # 'list' | 'table'
     search_mode: str = 'simple'            # 'simple' | 'multi'
+    modal_size: str = ''                   # '' = Bootstrap 默认宽度；'lg' | 'xl' → modal-lg / modal-xl
+                                           # 列数多（≥5 列）或列内容较长时建议设 'xl'
     placeholder: str = '输入关键词搜索...'
     page_size: int = 8
     show_detail_button: bool = False

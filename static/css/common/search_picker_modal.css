@@ -46,6 +46,8 @@
 .search-picker-table-wrapper {
     max-height: 50vh;
     overflow-y: auto;
+    /* 表格带 text-nowrap，列多时超出容器宽度，兜底允许横向滚动 */
+    overflow-x: auto;
 }
 .search-picker-table {
     margin-bottom: 0;
