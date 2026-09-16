@@ -1099,6 +1099,14 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                         creator=self.request.user,
                         # 临时高位版本号，收尾时由 renumber() 统一重排
                         version=FormulaEditPolicy.staging_version(col_idx),
+                        # 项目/节点不在下面那份共享字段赋值里（已有版本从
+                        # formula_map 取实例、原值还在，新增版本是新建对象），
+                        # 漏掉会让新版本成为无项目的孤儿，从项目的配方过程页消失。
+                        # 取表单的初始值 —— 编辑页上这两个字段是 disabled，
+                        # cleaned_data 即当前实验单的关联；**不要读 session**，
+                        # 那里可能残留着上一次「新增配方」留下的别的项目。
+                        project=form.cleaned_data.get('project'),
+                        project_node=form.cleaned_data.get('project_node'),
                     )
                 else:
                     formula = formula_map[pk]

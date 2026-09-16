@@ -14,6 +14,7 @@ from django.urls import reverse
 from app_material.models import MaterialType
 from app_formula.models import LabFormula
 from app_formula.services import FormulaEditPolicy, FormulaVersionError
+from app_project.models import Project, ProjectNode, ProjectStage
 from app_mold_injection.models import (
     MoldRequirement, MoldRequirementFormulaDetail, MoldType)
 from app_trial_production.models import ProductionOrder, ProductionOrderFormulaDetail
@@ -371,6 +372,38 @@ class VersionEditViewTests(TestCase):
         resp = self._post([str(self.v1.pk), str(self.v1.pk)])
         self.assertEqual(resp.status_code, 200, '被拒后重渲染而非报错')
         self.assertEqual(self._versions(), [1, 2, 3], '被拒时不得改动数据')
+
+    def test_new_version_inherits_project_and_node(self):
+        """新增版本必须带上实验单的项目/项目节点。
+
+        这两个字段不在逐列赋值的共享字段里（已有版本从库里取实例、原值还在，
+        新增版本是新建对象），漏掉就会变成无项目的孤儿 —— 在项目的配方过程页
+        和材料详情页都看不到它。
+        """
+        project = Project.objects.create(name='项目X', manager=self.user)
+        node = ProjectNode.objects.create(
+            project=project, stage=ProjectStage.RND, round=1)
+        for version in (self.v1, self.v2, self.v3):
+            version.project = project
+            version.project_node = node
+            version.save()
+
+        resp = self._post([str(self.v1.pk), str(self.v2.pk), str(self.v3.pk), ''])
+        self.assertEqual(resp.status_code, 302)
+
+        new_version = LabFormula.objects.filter(code=self.code, version=4).first()
+        self.assertIsNotNone(new_version, '应新增一个版本')
+        self.assertEqual(new_version.project_id, project.pk, '新版本必须关联项目')
+        self.assertEqual(new_version.project_node_id, node.pk, '新版本必须关联项目节点')
+
+    def test_new_version_keeps_null_project_when_experiment_has_none(self):
+        """实验单本身没有关联项目时，新版本也应为空 —— 不能凭空塞一个项目。"""
+        resp = self._post([str(self.v1.pk), str(self.v2.pk), str(self.v3.pk), ''])
+        self.assertEqual(resp.status_code, 302)
+
+        new_version = LabFormula.objects.filter(code=self.code, version=4).first()
+        self.assertIsNone(new_version.project_id)
+        self.assertIsNone(new_version.project_node_id)
 
 
 class FormulaFormRenderSmokeTests(TestCase):
