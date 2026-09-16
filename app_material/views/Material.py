@@ -14,7 +14,7 @@ from app_material.models.material import MaterialLibrary, MaterialDataPoint
 from app_material.utils.filters import MaterialFilter
 from app_material.utils.search_picker_config import for_material_import
 from app_formula.models import FormulaTestResult, LabFormula
-from app_material.mixins import MaterialAccessMixin
+from app_material.mixins import MaterialAccessMixin, MaterialFormErrorMixin
 from app_material.services.material_cache import MaterialCache
 from common_utils.constants import STD_TABS
 
@@ -141,7 +141,7 @@ class MaterialListView(MaterialAccessMixin, ListView):
         return context
 
 
-class MaterialCreateView(MaterialAccessMixin, CreateView):
+class MaterialCreateView(MaterialFormErrorMixin, MaterialAccessMixin, CreateView):
     """录入材料：需具备 add_materiallibrary 权限。"""
     permission_required = 'app_material.add_materiallibrary'
     model = MaterialLibrary
@@ -218,6 +218,7 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
             else:
                 # 事务块内返回必须显式回滚，否则主表会被提交，留下没有物性数据的半成品材料
                 transaction.set_rollback(True)
+                messages.error(self.request, self._build_error_message(form, data_formset))
                 return self.render_to_response(self.get_context_data(form=form))
             if processing_form.is_valid():
                 processing_form.instance.material = self.object
@@ -228,7 +229,7 @@ class MaterialCreateView(MaterialAccessMixin, CreateView):
         return reverse('material_detail', kwargs={'pk': self.object.pk})
 
 
-class MaterialUpdateView(MaterialAccessMixin, UpdateView):
+class MaterialUpdateView(MaterialFormErrorMixin, MaterialAccessMixin, UpdateView):
     """编辑材料：需具备 change_materiallibrary 权限。"""
     permission_required = 'app_material.change_materiallibrary'
     model = MaterialLibrary
@@ -254,35 +255,6 @@ class MaterialUpdateView(MaterialAccessMixin, UpdateView):
             'search_picker': for_material_import(),
         })
         return context
-
-    def _build_error_message(self, form, formset=None):
-        """构建详细的字段错误信息"""
-        from django.utils.safestring import mark_safe
-        lines = ['<strong>保存失败，请修正以下问题：</strong>']
-
-        for field_name, errs in form.errors.items():
-            label = form[field_name].label if field_name != '__all__' and field_name in form.fields else field_name
-            for e in errs:
-                lines.append(f'• {label}: {e}')
-
-        if formset:
-            for i, sf in enumerate(formset):
-                if not sf.errors:
-                    continue
-                for field_name, errs in sf.errors.items():
-                    if field_name == '__all__':
-                        for e in errs:
-                            lines.append(f'• 第{i+1}行: {e}')
-                    else:
-                        label = sf[field_name].label if field_name in sf.fields else field_name
-                        for e in errs:
-                            lines.append(f'• 第{i+1}行 {label}: {e}')
-
-        return mark_safe('<br>'.join(lines))
-
-    def form_invalid(self, form):
-        messages.error(self.request, self._build_error_message(form))
-        return super().form_invalid(form)
 
     def form_valid(self, form):
         self.check_edit_permission(self.object)  # 仅创建人或超管可编辑

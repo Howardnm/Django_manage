@@ -217,9 +217,11 @@ class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
         if self.request.POST:
             context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST)
         else:
-            # 【修改】预留 4 行空表单
-            RawMaterialPropertyFormSet.extra = 4
-            context['property_formset'] = RawMaterialPropertyFormSet(queryset=RawMaterialProperty.objects.none())
+            # 【修改】预留 4 行空表单。
+            # 改实例属性 —— 改类属性会跨请求泄漏到同一 worker 的其他请求。
+            formset = RawMaterialPropertyFormSet(queryset=RawMaterialProperty.objects.none())
+            formset.extra = 4
+            context['property_formset'] = formset
         return context
 
     def form_valid(self, form):
@@ -231,6 +233,9 @@ class RawMaterialCreateView(RawMaterialAccessMixin, CreateView):
                 property_formset.instance = self.object
                 property_formset.save()
             else:
+                # 事务块内返回必须显式回滚，否则主表会被提交，
+                # 留下一条没有物性数据的半成品原材料
+                transaction.set_rollback(True)
                 return self.render_to_response(self.get_context_data(form=form))
         messages.success(self.request, "原材料已添加")
         return redirect(self.get_success_url())
@@ -263,6 +268,8 @@ class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
         if not self.request.POST:
             prop_initial = [{
                 'test_config': p.test_config, 'value': p.value, 'value_text': p.value_text,
+                'min_value': p.min_value, 'max_value': p.max_value,
+                'min_value_text': p.min_value_text, 'max_value_text': p.max_value_text,
                 'test_date': p.test_date, 'remark': p.remark,
             } for p in self.original_material.properties.all()]
             context['property_formset'] = RawMaterialPropertyFormSet(initial=prop_initial)
@@ -290,12 +297,14 @@ class RawMaterialDuplicateView(RawMaterialAccessMixin, UpdateView):
         context = self.get_context_data()
         property_formset = context['property_formset']
         with transaction.atomic():
-            form.instance.pk = None 
+            form.instance.pk = None
             self.object = form.save()
             if property_formset.is_valid():
                 property_formset.instance = self.object
                 property_formset.save()
             else:
+                # 同新增：不回滚会留下副本半成品
+                transaction.set_rollback(True)
                 return self.render_to_response(self.get_context_data(form=form))
         messages.success(self.request, "原材料已复制并创建")
         return redirect(self.get_success_url())
@@ -319,9 +328,11 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
         if self.request.POST:
             context['property_formset'] = RawMaterialPropertyFormSet(self.request.POST, instance=self.object)
         else:
-            # 【修改】编辑时，如果已有数据少于4行，补足到4行 (这里简单设为1，方便添加)
-            RawMaterialPropertyFormSet.extra = 1
-            context['property_formset'] = RawMaterialPropertyFormSet(instance=self.object)
+            # 【修改】编辑时额外留 1 行空表单方便添加。
+            # 实例属性，勿改类属性（会跨请求泄漏）
+            formset = RawMaterialPropertyFormSet(instance=self.object)
+            formset.extra = 1
+            context['property_formset'] = formset
         return context
 
     def form_valid(self, form):
@@ -333,6 +344,8 @@ class RawMaterialUpdateView(RawMaterialAccessMixin, UpdateView):
             if property_formset.is_valid():
                 property_formset.save()
             else:
+                # 同新增：不回滚会把主表改动提交、物性改动丢弃
+                transaction.set_rollback(True)
                 return self.render_to_response(self.get_context_data(form=form))
         messages.success(self.request, "原材料已更新")
         return redirect(self.get_success_url())

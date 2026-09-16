@@ -62,14 +62,23 @@ class RawMaterialForm(TablerFormMixin, forms.ModelForm):
 # 4. 原材料性能指标行表单
 class RawMaterialPropertyForm(TablerFormMixin, forms.ModelForm):
     value_select = forms.ChoiceField(choices=[], required=False, widget=forms.Select(attrs={'class': 'form-select value-select', 'style': 'display:none;'}))
+    # no-tomselect 不可省略：TablerFormMixin 用精确类名排除，
+    # value-min-select / value-max-select 不在排除名单里，会被追加 form-select-search
+    # 并被 TomSelect 接管，导致数据类型切换时的显隐失效
+    min_value_select = forms.ChoiceField(choices=[], required=False, widget=forms.Select(attrs={'class': 'form-select value-min-select no-tomselect', 'style': 'display:none;'}))
+    max_value_select = forms.ChoiceField(choices=[], required=False, widget=forms.Select(attrs={'class': 'form-select value-max-select no-tomselect', 'style': 'display:none;'}))
 
     class Meta:
         model = RawMaterialProperty
-        fields = ['test_config', 'value', 'value_text', 'test_date', 'remark']
+        fields = ['test_config', 'value', 'value_text', 'min_value', 'max_value', 'min_value_text', 'max_value_text', 'test_date', 'remark']
         widgets = {
             'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
+            'min_value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-min'}),
+            'max_value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-max'}),
+            'min_value_text': forms.TextInput(attrs={'class': 'form-control value-min-text', 'style': 'display:none;'}),
+            'max_value_text': forms.TextInput(attrs={'class': 'form-control value-max-text', 'style': 'display:none;'}),
             'test_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
             'remark': forms.TextInput(attrs={'placeholder': '备注'}),
         }
@@ -77,44 +86,78 @@ class RawMaterialPropertyForm(TablerFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['test_config'].queryset = TestConfig.objects.select_related('category').order_by('category__order', 'order')
-        
+
+        # 所有 select 变体无条件隐藏，仅 SELECT 类型时打开
+        self.fields['value_select'].widget.attrs['style'] = 'display:none;'
+        self.fields['min_value_select'].widget.attrs['style'] = 'display:none;'
+        self.fields['max_value_select'].widget.attrs['style'] = 'display:none;'
+
         if self.instance and self.instance.pk:
             dtype = self.instance.test_config.data_type
             if dtype == 'TEXT':
                 self.fields['value'].widget.attrs['style'] = 'display:none;'
                 self.fields['value_text'].widget.attrs['style'] = 'display:block;'
+                self.fields['min_value'].widget.attrs['style'] = 'display:none;'
+                self.fields['max_value'].widget.attrs['style'] = 'display:none;'
+                self.fields['min_value_text'].widget.attrs['style'] = 'display:block;'
+                self.fields['max_value_text'].widget.attrs['style'] = 'display:block;'
             elif dtype == 'SELECT':
                 self.fields['value'].widget.attrs['style'] = 'display:none;'
                 self.fields['value_text'].widget.attrs['style'] = 'display:none;'
                 self.fields['value_select'].widget.attrs['style'] = 'display:block;'
-                
+                self.fields['min_value'].widget.attrs['style'] = 'display:none;'
+                self.fields['max_value'].widget.attrs['style'] = 'display:none;'
+                self.fields['min_value_text'].widget.attrs['style'] = 'display:none;'
+                self.fields['max_value_text'].widget.attrs['style'] = 'display:none;'
+                self.fields['min_value_select'].widget.attrs['style'] = 'display:block;'
+                self.fields['max_value_select'].widget.attrs['style'] = 'display:block;'
+
                 options = self.instance.test_config.get_options_list()
                 self.fields['value_select'].choices = [(opt, opt) for opt in options]
                 self.fields['value_select'].initial = self.instance.value_text
                 self.fields['value_select'].widget.attrs['data-current-value'] = self.instance.value_text
-        
+                self.fields['min_value_select'].choices = [(opt, opt) for opt in options]
+                self.fields['max_value_select'].choices = [(opt, opt) for opt in options]
+                self.fields['min_value_select'].initial = self.instance.min_value_text
+                self.fields['max_value_select'].initial = self.instance.max_value_text
+            else:
+                # NUMBER: NumberInput 默认可见，隐藏 text/select
+                self.fields['value_text'].widget.attrs['style'] = 'display:none;'
+                self.fields['min_value_text'].widget.attrs['style'] = 'display:none;'
+                self.fields['max_value_text'].widget.attrs['style'] = 'display:none;'
+
         if self.data:
             prefix = self.prefix or ''
             test_config_key = f"{prefix}-test_config" if prefix else "test_config"
             test_config_id = self.data.get(test_config_key)
-            
+
             if test_config_id:
                 try:
                     config = TestConfig.objects.get(pk=test_config_id)
                     if config.data_type == 'SELECT':
                         options = config.get_options_list()
                         self.fields['value_select'].choices = [(opt, opt) for opt in options]
+                        self.fields['min_value_select'].choices = [(opt, opt) for opt in options]
+                        self.fields['max_value_select'].choices = [(opt, opt) for opt in options]
                 except (TestConfig.DoesNotExist, ValueError):
                     pass
 
     def clean(self):
         cleaned_data = super().clean()
         test_config = cleaned_data.get('test_config')
-        value_select = cleaned_data.get('value_select')
-        
-        if test_config and test_config.data_type == 'SELECT':
-            cleaned_data['value_text'] = value_select
-            
+
+        if test_config:
+            if test_config.data_type == 'SELECT':
+                cleaned_data['value_text'] = cleaned_data.get('value_select')
+                cleaned_data['min_value_text'] = cleaned_data.get('min_value_select')
+                cleaned_data['max_value_text'] = cleaned_data.get('max_value_select')
+            # min > max 校验仅对 NUMBER 类型
+            if test_config.data_type == 'NUMBER':
+                min_val = cleaned_data.get('min_value')
+                max_val = cleaned_data.get('max_value')
+                if min_val is not None and max_val is not None and min_val > max_val:
+                    raise forms.ValidationError("最小值不能大于最大值")
+
         return cleaned_data
 
 # 定义 FormSet

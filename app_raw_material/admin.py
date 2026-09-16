@@ -44,7 +44,7 @@ class RawMaterialAdmin(admin.ModelAdmin):
 
 @admin.register(RawMaterialProperty)
 class RawMaterialPropertyAdmin(admin.ModelAdmin):
-    list_display = ('raw_material', 'test_config', 'value', 'value_text', 'test_date')
+    list_display = ('raw_material', 'test_config', 'value', 'value_text', 'min_value', 'max_value', 'test_date')
     search_fields = ('raw_material__name', 'test_config__name')
     list_filter = ('test_config', 'test_date')
     autocomplete_fields = ['raw_material', 'test_config']

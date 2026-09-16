@@ -8,6 +8,7 @@ app_raw_material 伪数据生成器
 """
 
 import random
+from decimal import Decimal
 from django.db import transaction
 from ._base import FakeContext, pick_one, pick, rand_decimal
 
@@ -22,11 +23,16 @@ def run(ctx: FakeContext) -> None:
     sample_raw_materials = pick(ctx.raw_materials, min(15, len(ctx.raw_materials)))
     for rm in sample_raw_materials:
         for tc in pick(ctx.test_configs, random.randint(3, 8)):
+            is_number = tc.data_type == "NUMBER"
+            value = rand_decimal(0.1, 300, 1) if is_number else None
             _, created = RawMaterialProperty.objects.get_or_create(
                 raw_material=rm, test_config=tc,
                 defaults={
-                    'value': rand_decimal(0.1, 300, 1) if tc.data_type == "NUMBER" else None,
-                    'value_text': pick_one(["合格", "优", "-"]) if tc.data_type != "NUMBER" else "",
+                    'value': value,
+                    'value_text': pick_one(["合格", "优", "-"]) if not is_number else "",
+                    # 数值类型给一个围绕实测值的允许范围，供详情页范围渲染
+                    'min_value': round(value * Decimal('0.9'), 3) if is_number else None,
+                    'max_value': round(value * Decimal('1.1'), 3) if is_number else None,
                 },
             )
             if created:

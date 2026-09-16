@@ -240,7 +240,18 @@ class RawMaterialProperty(models.Model):
     
     # 【新增】文本型数据 (用于存储非数字结果，如阻燃等级 V-0)
     value_text = models.CharField("文本结果", max_length=50, blank=True)
-    
+
+    # 【新增】允许范围：字段定义对齐成品材料库 MaterialDataPoint，
+    # 两边共用同一张 TestConfig，行为必须一致
+    min_value = models.DecimalField("最小值", max_digits=10, decimal_places=3, null=True, blank=True,
+                                    help_text="允许范围下限（含），数值类型使用")
+    max_value = models.DecimalField("最大值", max_digits=10, decimal_places=3, null=True, blank=True,
+                                    help_text="允许范围上限（含），数值类型使用")
+    min_value_text = models.CharField("最小值(文本)", max_length=50, blank=True,
+                                      help_text="文本/选择类型的最小值")
+    max_value_text = models.CharField("最大值(文本)", max_length=50, blank=True,
+                                      help_text="文本/选择类型的最大值")
+
     # 【新增】测试日期
     test_date = models.DateField("测试日期", null=True, blank=True)
     remark = models.CharField("备注", max_length=50, blank=True)

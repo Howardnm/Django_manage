@@ -32,11 +32,14 @@
             <div class="container-xl">
 
                 {# 关键修改：在这里显示非字段错误 #}
-                {% if form.non_field_errors %}
+                {% if form.non_field_errors or property_formset.non_form_errors %}
                     <div class="alert alert-danger" role="alert">
                         <h4 class="alert-title">保存失败</h4>
                         <div class="text-muted">
                             {% for error in form.non_field_errors %}
+                                <p class="mb-0">{{ error }}</p>
+                            {% endfor %}
+                            {% for error in property_formset.non_form_errors %}
                                 <p class="mb-0">{{ error }}</p>
                             {% endfor %}
                         </div>
@@ -119,23 +122,40 @@
                                 <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="property-table" style="font-size: 13px; table-layout: auto;">
                                     <thead>
                                     <tr>
-                                        <th style="width: 35%;">测试项目</th>
+                                        <th style="width: 30%;">测试项目</th>
                                         <th style="width: auto;">数值 / 结果</th>
-                                        <th style="width: 100px;">测试日期</th>
-                                        <th style="width: 100px;">备注</th>
+                                        <th style="width: 90px;">最小值</th>
+                                        <th style="width: 90px;">最大值</th>
+                                        <th style="width: 90px;">测试日期</th>
+                                        <th style="width: 90px;">备注</th>
                                         <th style="width: 50px;">删除</th>
                                     </tr>
                                     </thead>
                                     <tbody id="property-formset">
                                     {{ property_formset.management_form }}
                                     {% for form in property_formset %}
-                                        <tr class="property-form">
+                                        <tr class="property-form {% if form.errors %}table-danger{% endif %}">
                                             {{ form.id }}
-                                            <td>{{ form.test_config }}</td>
+                                            <td>
+                                                {{ form.test_config }}
+                                                {% for error in form.non_field_errors %}
+                                                    <div class="text-danger small">{{ error }}</div>
+                                                {% endfor %}
+                                            </td>
                                             <td>
                                                 {{ form.value }}
                                                 {{ form.value_text }}
                                                 {{ form.value_select }}
+                                            </td>
+                                            <td>
+                                                {{ form.min_value }}
+                                                {{ form.min_value_text }}
+                                                {{ form.min_value_select }}
+                                            </td>
+                                            <td>
+                                                {{ form.max_value }}
+                                                {{ form.max_value_text }}
+                                                {{ form.max_value_select }}
                                             </td>
                                             <td>{{ form.test_date }}</td>
                                             <td>{{ form.remark }}</td>
@@ -192,6 +212,16 @@
                 {{ property_formset.empty_form.value_text }}
                 {{ property_formset.empty_form.value_select }}
             </td>
+            <td>
+                {{ property_formset.empty_form.min_value }}
+                {{ property_formset.empty_form.min_value_text }}
+                {{ property_formset.empty_form.min_value_select }}
+            </td>
+            <td>
+                {{ property_formset.empty_form.max_value }}
+                {{ property_formset.empty_form.max_value_text }}
+                {{ property_formset.empty_form.max_value_select }}
+            </td>
             <td>{{ property_formset.empty_form.test_date }}</td>
             <td>{{ property_formset.empty_form.remark }}</td>
             <td class="text-center">
@@ -215,57 +245,50 @@
 
         function toggleValueInput(selectElement) {
             const row = selectElement.closest('tr');
-            const valueInput = row.querySelector('.value-number');
-            const textInput = row.querySelector('.value-text');
-            const selectInput = row.querySelector('.value-select');
             const configId = selectElement.value;
-
             if (!configId) return;
 
             const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+            const isSwitch = selectElement.dataset.initialized === 'true';
 
-            // 重置显示
-            valueInput.style.display = 'none';
-            textInput.style.display = 'none';
-            selectInput.style.display = 'none';
+            // 三个控件组：数值 / 文本 / 选择 — 每组包含 [值, 最小值, 最大值]
+            const groups = {
+                num: ['.value-number', '.value-min', '.value-max'],
+                txt: ['.value-text', '.value-min-text', '.value-max-text'],
+                sel: ['.value-select', '.value-min-select', '.value-max-select'],
+            };
+            const dom = {};
+            for (const [k, selectors] of Object.entries(groups)) {
+                dom[k] = selectors.map(s => row.querySelector(s));
+            }
 
-            if (meta.type === 'NUMBER') {
-                valueInput.style.display = 'block';
-                if (selectElement.dataset.initialized === 'true') {
-                     textInput.value = '';
-                     selectInput.value = '';
+            // 1. 全部隐藏
+            Object.values(dom).flat().forEach(el => el.style.display = 'none');
+
+            // 2. 当前类型可见
+            const key = meta.type === 'NUMBER' ? 'num' : meta.type === 'TEXT' ? 'txt' : 'sel';
+            dom[key].forEach(el => el.style.display = 'block');
+
+            // 3. 切换类型时清空其他组的旧值
+            if (isSwitch) {
+                for (const [k, group] of Object.entries(dom)) {
+                    if (k !== key) group.forEach(el => el.value = '');
                 }
-            } else if (meta.type === 'TEXT') {
-                textInput.style.display = 'block';
-                if (selectElement.dataset.initialized === 'true') {
-                    valueInput.value = '';
-                    selectInput.value = '';
-                }
-            } else if (meta.type === 'SELECT') {
-                selectInput.style.display = 'block';
-                if (selectElement.dataset.initialized === 'true') {
-                    valueInput.value = '';
-                    textInput.value = '';
-                }
+            }
 
-                // 动态填充选项
-                if (selectInput.options.length <= 1) {
-                    const currentValue = selectInput.getAttribute('data-current-value') || selectInput.value;
-
-                    selectInput.innerHTML = '';
-                    const emptyOpt = document.createElement('option');
-                    emptyOpt.value = '';
-                    emptyOpt.text = '---------';
-                    selectInput.appendChild(emptyOpt);
-
-                    meta.options.forEach(opt => {
-                        const option = document.createElement('option');
-                        option.value = opt;
-                        option.text = opt;
-                        if (opt === currentValue) {
-                            option.selected = true;
-                        }
-                        selectInput.appendChild(option);
+            // 4. SELECT 类型：动态填充选项
+            if (meta.type === 'SELECT') {
+                dom.sel.forEach(sel => {
+                    if (sel.options.length <= 1) {
+                        sel.innerHTML = '';
+                        sel.appendChild(new Option('---------', ''));
+                        meta.options.forEach(opt => sel.appendChild(new Option(opt, opt)));
+                    }
+                });
+                if (!isSwitch) {
+                    dom.sel.forEach(sel => {
+                        const v = sel.getAttribute('data-current-value');
+                        if (v) sel.value = v;
                     });
                 }
             }
@@ -309,13 +332,17 @@
                 document.querySelectorAll('#property-table .form-select-search').forEach(select => {
                     if (select.value) {
                         const row = select.closest('tr');
-                        const selectInput = row.querySelector('.value-select');
-                        const textInput = row.querySelector('.value-text');
-                        const configId = select.value;
-                        const meta = testConfigMeta[configId];
+                        const meta = testConfigMeta[select.value];
 
-                        if (meta && meta.type === 'SELECT' && textInput.value) {
-                            selectInput.setAttribute('data-current-value', textInput.value);
+                        // SELECT 类型：将 text 字段中保存的值传给 select（用于回显）
+                        if (meta && meta.type === 'SELECT') {
+                            [['.value-text', '.value-select'],
+                             ['.value-min-text', '.value-min-select'],
+                             ['.value-max-text', '.value-max-select']].forEach(([txtCls, selCls]) => {
+                                const txt = row.querySelector(txtCls);
+                                const sel = row.querySelector(selCls);
+                                if (txt.value) sel.setAttribute('data-current-value', txt.value);
+                            });
                         }
 
                         toggleValueInput(select);
