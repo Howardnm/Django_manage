@@ -1,5 +1,7 @@
 import logging
 
+from dataclasses import dataclass
+
 from django.db import transaction
 from django.db.models import Sum
 from django.forms import modelformset_factory
@@ -166,6 +168,58 @@ def _build_mold_formset_initial(order, formulas):
         pk__in=[i.pk for i in instances]
     ) if instances else MoldRequirement.objects.none()
     return queryset, variant_qty_map
+
+
+def _resolve_planned_quantity(post_data, formula_id, fallback=0):
+    """解析某个配方版本的「计划产量」提交值 —— 创建页与编辑页共用同一条规则。
+
+    不能空串 → 0；解析失败 → fallback。
+    创建页没有旧值可保留，fallback 用默认的 0；编辑页传库里的当前值，
+    因为原实现对 ValueError 是 pass（即保留旧值），不是置 0。
+
+    抽到模块级是为了让「计划产量合计是否为 0」的校验与真正写进去的值
+    不可能漂移 —— 两处各写一份解析是这类校验最容易出的错。
+    """
+    raw = post_data.get(f'planned_qty_{formula_id}', '')
+    if not raw:
+        return 0
+    try:
+        return float(raw)
+    except (ValueError, TypeError):
+        return fallback
+
+
+@dataclass(frozen=True)
+class _PostedFormulaDetail:
+    """校验失败重渲染时用来回显用户输入的精简对象。
+
+    只暴露模板与 _build_merged_bom 实际读取的两个属性，避免去动数据库实例。
+    """
+    planned_quantity: float
+    needs_color_matching: bool
+
+
+def _posted_formula_details_map(post_data, formulas, stored_details=None):
+    """构建回显用的 formula_details_map —— 以 POST 里用户刚填的值为准。
+
+    计划产量/配色标记的输入框取值来自 formula_details_map。若这里不回显 POST，
+    用户一被校验拦下就会看到自己填的内容被重置：编辑页退回库里的旧值，
+    创建页更糟 —— 它的 map 在没有工单时恒为空，于是全部返回 0。
+
+    Args:
+        stored_details: {formula_pk: ProductionOrderFormulaDetail}，编辑页传库里的
+            记录，解析失败时回落到它的现值（与写入规则一致）；创建页无旧值可不传。
+    """
+    stored_details = stored_details or {}
+    result = {}
+    for f in formulas:
+        stored = stored_details.get(f.pk)
+        result[f.pk] = _PostedFormulaDetail(
+            planned_quantity=_resolve_planned_quantity(
+                post_data, f.pk, stored.planned_quantity if stored else 0),
+            needs_color_matching=post_data.get(f'needs_color_{f.pk}') == 'on',
+        )
+    return result
 
 
 def _build_variant_qty_map_from_post(post_data, formula_pks):
@@ -418,6 +472,10 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 context['variant_qty_map'] = _build_variant_qty_map_from_post(
                     self.request.POST, formula_pks,
                 )
+                # 同理恢复计划产量与配色标记 —— 本页原先只在没有工单时给空 map，
+                # 不做这一步的话用户填的产量会被全部重置为 0
+                context['formula_details_map'] = _posted_formula_details_map(
+                    self.request.POST, formulas)
             else:
                 initial = [{'mold': m} for m in test_molds]
                 # Django modelformset 的 initial 分配给 extra 表单，
@@ -462,16 +520,10 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
 
         formula_details = []
         for f in formulas:
-            qty_str = self.request.POST.get(f'planned_qty_{f.pk}', '0')
-            try:
-                qty = float(qty_str)
-            except (ValueError, TypeError):
-                qty = 0
-            needs_cm = self.request.POST.get(f'needs_color_{f.pk}') == 'on'
             formula_details.append({
                 'formula_id': f.pk,
-                'planned_quantity': qty,
-                'needs_color_matching': needs_cm,
+                'planned_quantity': _resolve_planned_quantity(self.request.POST, f.pk),
+                'needs_color_matching': self.request.POST.get(f'needs_color_{f.pk}') == 'on',
             })
 
         # 测试项目
@@ -485,6 +537,15 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
         if not mold_formset.is_valid():
             error_msg = _build_mold_formset_error_message(mold_formset)
             messages.error(self.request, error_msg)
+            return self.form_invalid(form)
+
+        # ★ 计划产量合计必须大于 0
+        # 与编辑页同一条规则：全为 0（或全部留空）的工单没有排产意义 ——
+        # 下游按 planned_quantity 摊投料量，全 0 会让 BOM 投料量整片变成 0。
+        if sum(fd['planned_quantity'] for fd in formula_details) <= 0:
+            messages.error(
+                self.request,
+                '计划产量合计必须大于 0 —— 请至少为一个配方版本填写计划产量。')
             return self.form_invalid(form)
 
         with transaction.atomic():
@@ -545,9 +606,16 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
         context['trial_formulas'] = formulas
 
         # 现有配方明细 → 预填计划产量 & 配色标记
-        formula_details_map = {}
+        stored_details_map = {}
         for fd in order.formula_details.all():
-            formula_details_map[fd.formula_id] = fd
+            stored_details_map[fd.formula_id] = fd
+
+        # POST 回显：校验失败重渲染时用用户刚填的值，否则会被库里的旧值覆盖
+        if self.request.method == 'POST':
+            formula_details_map = _posted_formula_details_map(
+                self.request.POST, formulas, stored_details_map)
+        else:
+            formula_details_map = stored_details_map
         context['formula_details_map'] = formula_details_map
 
         # BOM 合并展示 + JS 计算数据
@@ -590,20 +658,29 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
             messages.error(self.request, error_msg)
             return self.form_invalid(form)
 
+        # ★ 计划产量合计必须大于 0
+        # 全为 0（或全部留空）的工单没有排产意义：下游按 planned_quantity 摊投料量，
+        # 计划产量全 0 会让 BOM 投料量整片变成 0，挤出、注塑都拿不到有效数据。
+        planned_total = sum(
+            float(_resolve_planned_quantity(
+                self.request.POST, fd.formula_id, fd.planned_quantity) or 0)
+            for fd in self.object.formula_details.all()
+        )
+        if planned_total <= 0:
+            messages.error(
+                self.request,
+                '计划产量合计必须大于 0 —— 请至少为一个配方版本填写计划产量。')
+            return self.form_invalid(form)
+
         with transaction.atomic():
             order = form.save()
 
             # 更新配方明细 & 计划总产量
             total_qty = 0
             for fd in order.formula_details.all():
-                qty_str = self.request.POST.get(f'planned_qty_{fd.formula_id}', '')
-                if qty_str:
-                    try:
-                        fd.planned_quantity = float(qty_str)
-                    except (ValueError, TypeError):
-                        pass
-                else:
-                    fd.planned_quantity = 0
+                # 解析失败保留库里的旧值（fallback 传当前值），不是置 0
+                fd.planned_quantity = _resolve_planned_quantity(
+                    self.request.POST, fd.formula_id, fd.planned_quantity)
                 fd.needs_color_matching = self.request.POST.get(
                     f'needs_color_{fd.formula_id}') == 'on'
                 fd.save(update_fields=['planned_quantity', 'needs_color_matching'])
