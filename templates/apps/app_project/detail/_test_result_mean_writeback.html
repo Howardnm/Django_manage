@@ -102,9 +102,6 @@
                                 这样"改测试项目"能正确迁移，未提交的行依旧不受影响。
                                 {% endcomment %}
                                 <input type="hidden" class="writeback-origin" data-origin="{{ row.test_config.pk }}">
-                                {% if row.is_manual_only %}
-                                <div class="text-muted small mt-1" title="仅手动录入，没有工单回写值">手动录入</div>
-                                {% endif %}
                             </td>
                             <td>
                                 {% for ov in row.order_values %}
