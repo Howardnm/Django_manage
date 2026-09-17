@@ -12,11 +12,16 @@ RfcSchema — RFC 函数声明式定义的基类。
 """
 
 from typing import Any, Dict, List, Type, ClassVar
+import logging
 
 from ..converters import safe_str
+from ..exceptions import SAPBusinessError
 
+from .messages import SapMessage, normalize_type, WARN_TYPES
 from .params import RangeTableParam, ImportParam, TableInput, OP_SUFFIX_MAP
 from .outputs import OutputTable
+
+logger = logging.getLogger("sap.schema")
 
 
 class RfcSchemaMeta(type):
@@ -28,6 +33,7 @@ class RfcSchemaMeta(type):
     - _import_params: {attr_name → ImportParam}
     - _table_inputs: {attr_name → TableInput}
     - _output_tables: {inner_class_name → OutputTable class}
+    - _structures: {结构名 → [描述符, ...]}（声明了 structure= 的参数按归属分组）
     """
 
     def __new__(mcs, name, bases, namespace):
@@ -71,7 +77,27 @@ class RfcSchemaMeta(type):
         cls._table_inputs = table_inputs
         cls._output_tables = output_tables
 
-        # 验证：子类必须定义 function_name
+        # 按 structure 分组，供 build_params 定位嵌套容器
+        structures: Dict[str, list] = {}
+        for p in list(range_params.values()) + list(import_params.values()):
+            if getattr(p, "structure", None):
+                structures.setdefault(p.structure, []).append(p)
+        cls._structures = structures
+
+        # 验证 1：结构名不得与顶层参数重名，否则写入时会互相覆盖
+        top_level_names = (
+            {p.rfc_name for p in range_params.values() if not p.structure}
+            | {p.rfc_name for p in import_params.values() if not p.structure}
+            | {p.rfc_name for p in table_inputs.values()}
+        )
+        for sname in structures:
+            if sname in top_level_names:
+                raise TypeError(
+                    f"RfcSchema 子类 {name!r} 的 Import 结构名 {sname!r} "
+                    f"与顶层 RFC 参数重名，组装参数时会互相覆盖。"
+                )
+
+        # 验证 2：子类必须定义 function_name
         if not cls.function_name:
             raise TypeError(
                 f"RfcSchema 子类 {name!r} 必须定义 function_name 类属性。\n"
@@ -112,10 +138,25 @@ class RfcSchema(metaclass=RfcSchemaMeta):
 
     function_name: ClassVar[str] = ""
 
+    # ---- 消息检查（默认关闭；声明后 parse_response 会自动检查）----
+    # 典型用法（Z 开头 RFC 常带 E_RTYPE/E_RTMSG 这对 Export）:
+    #     msg_type_field = "E_RTYPE"
+    #     msg_text_field = "E_RTMSG"
+    msg_type_field: ClassVar[str] = ""
+    msg_text_field: ClassVar[str] = ""
+
+    # 这些消息文本表示「本次查询没有数据」，属正常空结果而非业务错误。
+    # 部分 Z 开头 RFC 用 E 级 + 特定文本表达「查无数据」（如 ZRFC_GET_MBEWH
+    # 返回 '未查询到数据'），若一律当错误，会让「该物料没有价格」这种正常
+    # 情况中断整个调用方流程。
+    # 只能用文本区分 —— 真实错误（如无授权）同样返回 0 行，行数无法作为判据。
+    msg_empty_texts: ClassVar[tuple] = ()
+
     _range_params: ClassVar[Dict[str, RangeTableParam]] = {}
     _import_params: ClassVar[Dict[str, ImportParam]] = {}
     _table_inputs: ClassVar[Dict[str, TableInput]] = {}
     _output_tables: ClassVar[Dict[str, Type[OutputTable]]] = {}
+    _structures: ClassVar[Dict[str, list]] = {}
 
     @classmethod
     def build_params(cls, **kwargs) -> Dict[str, Any]:
@@ -128,6 +169,9 @@ class RfcSchema(metaclass=RfcSchemaMeta):
             iv_xxx=value      → 对应 ImportParam
             it_xxx=[...]      → 对应 TableInput
 
+        声明了 structure 的参数会被写入嵌套 dict 而非顶层：
+            s_matnr__cp="A01*"  → IS_QUERY: {"S_MATNR": [{"SIGN":"I","OPTION":"CP",...}]}
+
         Returns:
             dict: 可直接传给 conn.call(function_name, **result) 的参数字典
         """
@@ -137,6 +181,12 @@ class RfcSchema(metaclass=RfcSchemaMeta):
         range_attr_to_rfc = {p._attr_name: p for p in cls._range_params.values()}
         import_attr_to_rfc = {p._attr_name: p for p in cls._import_params.values()}
         table_attr_to_rfc = {p._attr_name: p for p in cls._table_inputs.values()}
+
+        def _target(structure: str | None) -> Dict[str, Any]:
+            """参数应写入的容器：顶层 params，或 params[structure] 这个嵌套 dict。"""
+            if not structure:
+                return params
+            return params.setdefault(structure, {})
 
         for key, value in kwargs.items():
             matched = False
@@ -154,7 +204,7 @@ class RfcSchema(metaclass=RfcSchemaMeta):
 
                     # 构建 range table 行
                     row = cls._make_range_row(rp, sap_option, value)
-                    params.setdefault(rp.rfc_name, []).append(row)
+                    _target(rp.structure).setdefault(rp.rfc_name, []).append(row)
                     matched = True
                     break
 
@@ -164,10 +214,10 @@ class RfcSchema(metaclass=RfcSchemaMeta):
             # 尝试匹配 ImportParam
             if key in import_attr_to_rfc:
                 ip = import_attr_to_rfc[key]
-                params[ip.rfc_name] = value
+                _target(ip.structure)[ip.rfc_name] = value
                 matched = True
 
-            # 尝试匹配 TableInput
+            # 尝试匹配 TableInput（表输入始终是顶层参数）
             if not matched and key in table_attr_to_rfc:
                 ti = table_attr_to_rfc[key]
                 params[ti.rfc_name] = value
@@ -183,6 +233,27 @@ class RfcSchema(metaclass=RfcSchemaMeta):
                 )
 
         return params
+
+    @classmethod
+    def _range_rows(cls, params: Dict[str, Any], rp: RangeTableParam) -> List[Dict[str, str]]:
+        """
+        取出某个 RangeTableParam 在 params 里的条件行列表。
+
+        统一处理顶层与嵌套结构两种归属，供 builder 的 exclude 处理、
+        describe() 与测试复用 —— 避免各处重复实现「假设 range 在顶层」的逻辑。
+
+        Args:
+            params: build_params 的产物
+            rp: 目标 RangeTableParam
+
+        Returns:
+            条件行列表；不存在时返回空列表
+        """
+        container = params.get(rp.structure) if rp.structure else params
+        if not isinstance(container, dict):
+            return []
+        rows = container.get(rp.rfc_name)
+        return rows if isinstance(rows, list) else []
 
     @classmethod
     def _make_range_row(
@@ -216,16 +287,99 @@ class RfcSchema(metaclass=RfcSchemaMeta):
             }
 
     @classmethod
-    def parse_response(cls, raw_response: Dict[str, Any]) -> Dict[str, List]:
+    def extract_messages(cls, raw_response: Dict[str, Any]) -> List[SapMessage]:
         """
-        解析 SAP RFC 返回的原始 dict，将输出表转换为类型化记录。
+        从 RFC 原始返回中抽取业务消息。
+
+        只读 raw_response，不依赖解析结果 —— 因此可以在类型化之前调用。
+        未声明 msg_type_field / msg_text_field 时始终返回空列表。
 
         Args:
             raw_response: conn.call() 返回的原始字典
 
         Returns:
-            dict: {table_name: [OutputRecord, ...] 或原始值}
+            List[SapMessage]，按「标量消息 → 表消息」顺序
         """
+        messages: List[SapMessage] = []
+
+        if cls.msg_type_field:
+            mtype = normalize_type(raw_response.get(cls.msg_type_field))
+            text = str(raw_response.get(cls.msg_text_field) or "").strip()
+            if mtype or text:
+                messages.append(SapMessage(mtype, text, cls.msg_type_field))
+
+        return messages
+
+    @classmethod
+    def is_empty_result_message(cls, message: SapMessage) -> bool:
+        """该消息是否表示「查询无数据」（由 msg_empty_texts 声明）。"""
+        if not message.text or not cls.msg_empty_texts:
+            return False
+        return message.text.strip() in cls.msg_empty_texts
+
+    @classmethod
+    def check_messages(cls, raw_response: Dict[str, Any]) -> List[SapMessage]:
+        """
+        检查 RFC 返回的业务消息，E（错误）/ A（终止）级时抛出 SAPBusinessError。
+
+        S（成功）/ I（信息）/ 空值 / 字段缺失均视为正常 —— 大量 RFC 成功时
+        返回的是空串，把「没有消息」当成失败会让同步整体误报。
+
+        文本命中 msg_empty_texts 的消息视为「查询无数据」，不算错误。
+
+        Args:
+            raw_response: conn.call() 返回的原始字典
+
+        Returns:
+            全部消息（含被记日志的警告级）
+
+        Raises:
+            SAPBusinessError: 存在 E / A 级、且不属于空结果的消息时
+        """
+        if not cls.msg_type_field:
+            return []
+
+        messages = cls.extract_messages(raw_response)
+
+        for m in messages:
+            if m.type in WARN_TYPES:
+                logger.warning("[%s] SAP 警告: %s", cls.function_name, m.text)
+
+        fatal = [
+            m for m in messages
+            if m.is_fatal and not cls.is_empty_result_message(m)
+        ]
+        if fatal:
+            raise SAPBusinessError(cls.function_name, fatal)
+
+        return messages
+
+    @classmethod
+    def parse_response(
+        cls,
+        raw_response: Dict[str, Any],
+        check: bool = True,
+    ) -> Dict[str, List]:
+        """
+        解析 SAP RFC 返回的原始 dict，将输出表转换为类型化记录。
+
+        声明了 msg_type_field 的 Schema 会先做业务消息检查（check=True 时），
+        E / A 级消息抛 SAPBusinessError，避免「SAP 报错」被上层误认为「无数据」。
+        诊断 / 回放场景可传 check=False 跳过。
+
+        Args:
+            raw_response: conn.call() 返回的原始字典
+            check: 是否检查业务消息（默认 True）
+
+        Returns:
+            dict: {table_name: [OutputRecord, ...] 或原始值}
+
+        Raises:
+            SAPBusinessError: check=True 且 SAP 返回 E / A 级消息时
+        """
+        if check:
+            cls.check_messages(raw_response)
+
         result = {}
         for key, value in raw_response.items():
             # 检查是否匹配已声明的输出表
@@ -252,17 +406,36 @@ class RfcSchema(metaclass=RfcSchemaMeta):
         if cls._range_params:
             lines.append("  Range Table 参数:")
             for name, rp in cls._range_params.items():
-                lines.append(f"    {name} → {rp.rfc_name} (field={rp.field})")
+                path = f"{rp.structure}.{rp.rfc_name}" if rp.structure else rp.rfc_name
+                lines.append(f"    {name} → {path} (field={rp.field})")
 
         if cls._import_params:
             lines.append("  Import 参数:")
             for name, ip in cls._import_params.items():
-                lines.append(f"    {name} → {ip.rfc_name}")
+                path = f"{ip.structure}.{ip.rfc_name}" if ip.structure else ip.rfc_name
+                lines.append(f"    {name} → {path}")
 
         if cls._table_inputs:
             lines.append("  Table 输入参数:")
             for name, ti in cls._table_inputs.items():
                 lines.append(f"    {name} → {ti.rfc_name}")
+
+        if cls._structures:
+            lines.append("  嵌套 Import 结构:")
+            for sname, members in cls._structures.items():
+                lines.append(
+                    f"    {sname}: " + ", ".join(p.rfc_name for p in members)
+                )
+
+        if cls.msg_type_field:
+            lines.append(
+                f"  消息检查: {cls.msg_type_field} / {cls.msg_text_field}"
+                f" (E/A 级抛 SAPBusinessError)"
+            )
+            if cls.msg_empty_texts:
+                lines.append(
+                    f"    视为空结果(不抛错)的文本: {list(cls.msg_empty_texts)}"
+                )
 
         if cls._output_tables:
             lines.append("  输出表:")

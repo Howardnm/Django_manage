@@ -41,16 +41,24 @@ class ParseResponseListRegressionTest(SimpleTestCase):
 
     def test_price_query_it_item_list(self):
         raw = {
+            "E_RTYPE": "S", "E_RTMSG": "查询成功",
             "IT_ITEM": [
-                {"MATNR": "0000A01001", "BWKEY": "1010", "VERPR": "123.45",
-                 "PEINH": "1000", "LFGJA": "2026", "LFMON": "07"},
+                {"MATNR": "A01005000057", "BWKEY": "3011", "VERPR": "93751.06",
+                 "PEINH": "10000", "BDATJ": "2026", "POPER": "009",
+                 "VPRSV": "V", "STPRS": "0.00", "WAERS": "CNY",
+                 "KALNR": "000100473814"},
             ]
         }
         parsed = MaterialPriceQuery.parse_response(raw)
         row = parsed["IT_ITEM"][0]
-        self.assertEqual(row.MATNR, "A01001")
-        self.assertEqual(row.VERPR, pytest_approx(123.45))
-        self.assertEqual(row.PEINH, 1000)
+        self.assertEqual(row.MATNR, "A01005000057")
+        self.assertEqual(row.VERPR, pytest_approx(93751.06))
+        self.assertEqual(row.PEINH, 10000)
+        # NUMC 前导零 → int，便于客户端按 YYYYMM 整数比较
+        self.assertEqual(row.BDATJ, 2026)
+        self.assertEqual(row.POPER, 9)
+        self.assertEqual(row.WAERS, "CNY")
+        self.assertEqual(row.KALNR, "000100473814")
 
     def test_stock_query_it_item_decimal(self):
         raw = {

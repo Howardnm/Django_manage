@@ -2,12 +2,16 @@
 Django 管理命令: 从 SAP 同步物料评估价格到 app_raw_material。
 
 用法:
-    python manage.py sync_material_prices                              # 默认: 近12个月
-    python manage.py sync_material_prices --periods 6                  # 近6个月
-    python manage.py sync_material_prices --all                        # 全量一次性拉取(慢)
-    python manage.py sync_material_prices --fiscal-year 2025 --fiscal-month 12  # 指定单月
-    python manage.py sync_material_prices --dry-run                    # 仅预览
-    python manage.py sync_material_prices --bwkey 3011                 # 按工厂筛选
+    python manage.py sync_material_prices                              # 全部本地物料，全历史
+    python manage.py sync_material_prices --limit 50                   # 只处理前 50 个物料
+    python manage.py sync_material_prices --bwkey 3011                 # 只看某工厂的价格
+    python manage.py sync_material_prices --periods 12                 # 只入库近 12 个月
+    python manage.py sync_material_prices --fiscal-year 2026           # 只入库该年度
+    python manage.py sync_material_prices --fiscal-year 2026 --fiscal-month 9   # 只入库该月
+    python manage.py sync_material_prices --dry-run                    # 仅预览，不写库
+    python manage.py sync_material_prices --verbose                    # 逐物料打印明细
+    python manage.py sync_material_prices --purge --dry-run            # 预览「清空重建」
+    python manage.py sync_material_prices --purge                      # 清空本地价格后重建
 
 定时调度 (Windows Task Scheduler):
     触发器: 每月1号
@@ -15,33 +19,84 @@ Django 管理命令: 从 SAP 同步物料评估价格到 app_raw_material。
     参数:   manage.py sync_material_prices
     起始于: 项目根目录
 
+取数策略：逐物料遍历
+    遍历本地 RawMaterial.warehouse_code，每个物料一次 RFC 调用，取回该物料的
+    全部历史价格（含其在所有工厂的记录）。实测 2654 个物料约 25~50 秒、
+    约 6.8 万行；而「按工厂全量拉取再筛掉非本地物料」要 50 万行以上，
+    「不传工厂」更是 556 万行、近 10 分钟。
+
+    之所以能这样做：ZRFC_GET_MBEWH 支持 IS_QUERY.S_MATNR 服务端筛选，
+    而旧接口 ZRFC_GET_MBEW 没有。
+
+接口说明：
+    ZRFC_GET_MBEWH **没有期间入参**，一次返回全部历史月份。因此
+    --fiscal-year / --fiscal-month / --periods 都是客户端过滤，只决定哪些
+    期间会被写入本地；SAP 侧仅 --bwkey 是真正的服务端筛选。
+    默认不过滤期间，即全历史入库。
+
+写入语义（幂等 upsert）：
+    按 (物料, 工厂, 日期) 覆盖 —— SAP 某天价格更新时会覆盖该物料当天对应
+    工厂的价格，确保同一物料+工厂+日期不会同时存在两条记录。
+    幂等键是模型的 unique_together('raw_material','plant','date')，
+    重复执行安全。
+
+--purge（清空重建）：
+    删除 RawMaterialPriceRecord 全表后重新同步。用于丢弃历史遗留的不可信数据
+    （旧 RFC 写入的期间错位记录、指向从无数据的工厂的幻影记录等）。
+    **不可逆**，执行前会先做一次探针查询确认价格 RFC 真的可用，
+    避免「清空后才发现 SAP 不可用」。
+
 注意：
-    每个物料+工厂+会计期间独立存储，不再做跨工厂价格聚合。
-    未知工厂代码将在同步时自动创建 Plant 记录。
+    - 未知工厂代码将在同步时自动创建 Plant 记录。
+    - 单价口径: UNIT_PRICE = VERPR / PEINH
+      （实测 STPRS/PVPRS 恒为 0，只有 VERPR 有值；PEINH 取值为 1 与 10000）。
+
+数据稀疏性（不是 bug）:
+    SAP 的 MBEWH 表只在估值发生变化时记录一行，因此某些物料只有少数几个
+    期间的记录，中间会「缺月」；另有一部分物料（实测约 6~10%）在 SAP 里
+    完全没有价格数据，命令会跳过它们并保留本地已有记录。
+    价格序列在读取时由 app_raw_material/services/price_service.py 按可用点
+    计算，缺月不影响正确性。
 """
 
+from collections import Counter
 from datetime import date
+from decimal import Decimal
 
 import polars as pl
 from dateutil.relativedelta import relativedelta
 
-from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
 
-from app_sap_services import sap, sap_health_check
+from app_sap_services import (
+    sap,
+    sap_health_check,
+    SAPError,
+    SAPBusinessError,
+)
 from app_sap_services.definitions.price import MaterialPriceQuery
 from app_raw_material.models import Plant, RawMaterial, RawMaterialPriceRecord
 
 
-CHUNK_SIZE = 500
-DEFAULT_PERIODS = 12  # 默认同步近12个月
+CHUNK_SIZE = 500          # 写库分批大小
+PROGRESS_EVERY = 200      # 每处理多少个物料打印一次进度
 
 # 价格异常阈值 (CNY/kg)，超过此值发出警告
 PRICE_WARN_THRESHOLD = 100000
 
+# RawMaterialPriceRecord.price 的语义是「元/kg」，模型没有币种字段，
+# 非该币种记录写进去会永久污染均价口径，因此直接跳过
+ALLOWED_CURRENCY = "CNY"
+
 
 class Command(BaseCommand):
-    help = "从 SAP 同步物料评估价格到本地 RawMaterialPriceRecord 表"
+    help = "从 SAP 同步物料评估价格到本地 RawMaterialPriceRecord 表（逐物料遍历）"
+
+    # 由 handle() 按 --include-future 覆盖；类属性给默认值，
+    # 使 _apply_period_filter 可被单独调用/测试
+    include_future = False
+    verbose = False
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -50,95 +105,91 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit", type=int, default=0,
-            help="限制同步条数（0 = 不限制）",
-        )
-        parser.add_argument(
-            "--all", action="store_true", dest="all_periods",
-            help="全量模式：不传会计期间参数，SAP一次性返回全部数据（数据量大，较慢）",
-        )
-        parser.add_argument(
-            "--fiscal-year", type=str, default=None,
-            help="会计年度，如 '2025'。不传则从当前月往前推",
-        )
-        parser.add_argument(
-            "--fiscal-month", type=str, default=None,
-            help="会计期间，如 '01'。需配合 --fiscal-year 使用",
-        )
-        parser.add_argument(
-            "--periods", type=int, default=None,
-            help=f"同步最近N个月（默认: {DEFAULT_PERIODS}）。与 --fiscal-year/month 配合时表示以指定月为终点"
+            help="只处理排序后的前 N 个物料（0 = 全部）。用于小样本试跑",
         )
         parser.add_argument(
             "--bwkey", type=str, default=None,
-            help="评估范围/工厂代码，如 '1010'（可选，不传则查全部工厂）",
+            help="评估范围/工厂代码，如 '3011'。只看该工厂的价格（服务端筛选）",
+        )
+        parser.add_argument(
+            "--periods", type=int, default=None,
+            help="只入库最近 N 个期间（默认不启用 = 全历史）",
+        )
+        parser.add_argument(
+            "--fiscal-year", type=int, default=None,
+            help="只入库指定会计年度，如 2025（客户端过滤）",
+        )
+        parser.add_argument(
+            "--fiscal-month", type=int, default=None,
+            help="只入库指定会计期间，如 1~12（客户端过滤）。需配合 --fiscal-year",
+        )
+        parser.add_argument(
+            "--include-future", action="store_true", dest="include_future",
+            help="保留晚于当前会计期间的记录（默认截断，避免未来期间被当成最新价格）",
         )
         parser.add_argument(
             "--chunk-size", type=int, default=CHUNK_SIZE,
-            help=f"数据库分批大小（默认: {CHUNK_SIZE}）",
+            help=f"写库分批大小（默认: {CHUNK_SIZE}）",
         )
+        parser.add_argument(
+            "--purge", action="store_true",
+            help="清空本地全部价格记录后重新同步（干净重建；不可逆，请先用 --dry-run 预览）",
+        )
+        parser.add_argument(
+            "--verbose", action="store_true",
+            help="逐物料打印明细（默认只在每个物料批次打印进度）",
+        )
+
+    # ------------------------------------------------------------------
+    # 入口
+    # ------------------------------------------------------------------
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         limit = options["limit"]
-        all_periods = options["all_periods"]
+        bwkey = options["bwkey"]
+        chunk_size = max(1, options["chunk_size"])
         fiscal_year = options["fiscal_year"]
         fiscal_month = options["fiscal_month"]
-        bwkey = options["bwkey"]
-        chunk_size = options["chunk_size"]
+        self.include_future = options["include_future"]
+        self.verbose = options["verbose"]
 
-        # ── 确定查询模式 ──
-        if all_periods:
-            mode = "all"
-            months = None
-            scope_desc = "全量（一次性拉取全部期间，较慢）"
-        elif fiscal_year and fiscal_month:
-            periods = max(1, options["periods"] or 1)
-            end_date = date(int(fiscal_year), int(fiscal_month), 1)
-            start_date = end_date - relativedelta(months=periods - 1)
-            months = self._build_month_list(start_date, end_date)
-            if periods == 1:
-                mode = "single"
-                scope_desc = f"会计年度: {fiscal_year} / 会计期间: {fiscal_month}"
-            else:
-                mode = "multi"
-                scope_desc = (
-                    f"{start_date.strftime('%Y-%m')} → {end_date.strftime('%Y-%m')}"
-                    f" ({periods} 个月, 终点: {fiscal_year}-{fiscal_month})"
+        if fiscal_month and not fiscal_year:
+            raise CommandError("--fiscal-month 需配合 --fiscal-year 使用")
+        if fiscal_month and not 1 <= fiscal_month <= 12:
+            raise CommandError("--fiscal-month 取值范围为 1~12")
+
+        # --purge 是「整表清空 + 全量重建」。若同时收窄了重建范围，
+        # 清掉的数据不会被补回来（例如 --limit 20 会清空全表却只重建 20 个物料），
+        # 因此直接拒绝这种组合，而不是留下一个静默丢数据的坑。
+        if options["purge"]:
+            narrowing = [
+                name for name, given in (
+                    ("--limit", limit),
+                    ("--bwkey", bwkey),
+                    ("--periods", options["periods"]),
+                    ("--fiscal-year", fiscal_year),
+                    ("--fiscal-month", fiscal_month),
+                ) if given
+            ]
+            if narrowing:
+                raise CommandError(
+                    f"--purge 是整表清空后全量重建，不能与 {', '.join(narrowing)} 同时使用 —— "
+                    f"清掉却不在重建范围内的数据会永久丢失。"
+                    f"若要单独试跑请去掉 --purge。"
                 )
-        elif fiscal_year:
-            # 只传年度 → 同步该年全部 12 个月
-            end_date = date(int(fiscal_year), 12, 1)
-            start_date = date(int(fiscal_year), 1, 1)
-            months = self._build_month_list(start_date, end_date)
-            mode = "multi"
-            scope_desc = f"{fiscal_year} 全年 (01-12)"
-        elif fiscal_month:
-            # 只传月份不传年度 → 报错
-            self.stdout.write(
-                self.style.ERROR(
-                    "   [ERR] --fiscal-month 需配合 --fiscal-year 使用"
-                )
-            )
-            return
-        else:
-            periods = max(1, options["periods"] or DEFAULT_PERIODS)
-            today = date.today()
-            end_date = date(today.year, today.month, 1)
-            start_date = end_date - relativedelta(months=periods - 1)
-            months = self._build_month_list(start_date, end_date)
-            mode = "multi"
-            scope_desc = (
-                f"近 {periods} 个月: "
-                f"{start_date.strftime('%Y-%m')} → {end_date.strftime('%Y-%m')}"
-            )
+
+        scope_desc, ym_range = self._resolve_scope(
+            fiscal_year=fiscal_year,
+            fiscal_month=fiscal_month,
+            periods=max(1, options["periods"] or 0) if options["periods"] else None,
+        )
 
         self.stdout.write(
             self.style.MIGRATE_HEADING(
                 f"\n=== 开始 SAP 物料价格同步 ===\n"
-                f"    范围: {scope_desc}\n"
+                f"    期间: {scope_desc}\n"
                 f"    工厂: {bwkey or '全部'}"
-                + (f"\n    模式: {'逐月查询' if mode == 'multi' else '单次查询'}"
-                   if mode != 'single' else "")
             )
         )
         if dry_run:
@@ -149,149 +200,411 @@ class Command(BaseCommand):
         # ── 1. 健康检查 ──
         health = sap_health_check()
         if health.get("status") != "healthy":
-            self.stdout.write(
-                self.style.ERROR(
-                    f"   [ERR] SAP 连接失败: {health.get('error', '未知错误')}"
-                )
-            )
-            return
+            raise CommandError(f"SAP 连接失败: {health.get('error', '未知错误')}")
         self.stdout.write(
             f"   [OK] SAP 连接正常 "
             f"(ashost={health.get('ashost')}, client={health.get('client')})"
         )
 
-        # ── 2. 预加载本地物料映射（只做一次）──
+        # ── 2. 预载本地物料 ──
         warehouse_map = {
             rm.warehouse_code: rm
             for rm in RawMaterial.objects.all()
+            if rm.warehouse_code
         }
-        valid_codes = {k for k in warehouse_map.keys() if k}
-        self.stdout.write(f"   本地物料总数: {len(valid_codes)}")
+        codes = sorted(warehouse_map)
+        if limit and limit > 0:
+            codes = codes[:limit]
+        self.stdout.write(f"   本地物料: {len(codes)} 个（共 {len(warehouse_map)} 个有编码）")
 
-        # ── 3. SAP 查询 ──
-        try:
-            if mode == "all":
-                df = self._query_sap(bwkey, None, None)
-            elif mode in ("single", "multi"):
-                all_dfs = []
-                errors = 0
-                for fy, fm in months:
-                    try:
-                        df_month = self._query_sap(bwkey, fy, fm)
-                        if not df_month.is_empty():
-                            all_dfs.append(df_month)
-                    except Exception as e:
-                        errors += 1
-                        self.stdout.write(
-                            self.style.ERROR(
-                                f"   [{fy}-{fm}] SAP 查询失败: {e}"
-                            )
-                        )
-                if errors == len(months):
-                    self.stdout.write(
-                        self.style.ERROR("   所有月份的 SAP 查询均失败，同步终止")
-                    )
-                    return
-                if not all_dfs:
-                    self.stdout.write(
-                        self.style.WARNING("   没有符合条件的数据，同步结束")
-                    )
-                    return
-                df = pl.concat(all_dfs)
-                self.stdout.write(
-                    f"   合并 {len(all_dfs)} 个月: {df.height} 条原始记录"
-                )
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"   [ERR] SAP 查询失败: {e}")
-            )
+        if not codes:
+            self.stdout.write(self.style.WARNING("   没有可同步的物料，结束"))
             return
 
-        if df.is_empty():
-            self.stdout.write(self.style.WARNING("   没有符合条件的数据，同步结束"))
-            return
+        # ── 3. 清空本地价格记录（可选）──
+        if options["purge"]:
+            self._purge(dry_run=dry_run, probe_code=codes[0], bwkey=bwkey)
 
-        # ── 4. Polars 端数据处理 ──
-        df = self._transform_prices(df)
-
-        if df.is_empty():
-            self.stdout.write(self.style.WARNING("   有效价格数据为空，同步结束"))
-            return
-
-        # 仅保留本地已存在的物料
-        before_match = df.height
-        df = df.filter(pl.col("MATNR").is_in(valid_codes))
-        after_match = df.height
-        self.stdout.write(
-            f"   物料匹配: {before_match} 条 → {after_match} 条 "
-            f"(过滤 {before_match - after_match} 条非本地物料)"
+        # ── 4. 逐物料遍历 ──
+        stats = self._sync_materials(
+            codes=codes,
+            warehouse_map=warehouse_map,
+            ym_range=ym_range,
+            bwkey=bwkey,
+            chunk_size=chunk_size,
+            dry_run=dry_run,
         )
 
-        if df.is_empty():
+        # ── 5. 汇总 ──
+        self._report(stats, dry_run=dry_run)
+
+        if stats["failed"]:
+            raise CommandError(
+                f"有 {stats['failed']} 个物料同步失败，详见上方日志"
+            )
+
+    # ------------------------------------------------------------------
+    # 清空本地价格记录（干净重建）
+    # ------------------------------------------------------------------
+
+    def _purge(self, dry_run, probe_code, bwkey):
+        """
+        清空 RawMaterialPriceRecord 全表。
+
+        不可逆操作，因此先做一次探针查询：确认价格 RFC 真能调通再删。
+        否则「清空后才发现 SAP 不可用」会白丢全部数据（健康检查只验连通性，
+        验不了这个 RFC 的授权与可用性）。
+        """
+        existing = RawMaterialPriceRecord.objects.count()
+
+        if dry_run:
             self.stdout.write(
-                self.style.WARNING("   没有可匹配本地物料的数据，同步结束")
+                self.style.WARNING(
+                    f"   [PURGE] 将清空本地全部 {existing} 条价格记录（预览，未执行）"
+                )
             )
             return
 
-        # limit 在过滤后执行
-        if limit and limit > 0:
-            df = df.sort("MATNR").head(limit)
+        # 探针：空结果（该物料没价格）是合法的，只有真异常才中止
+        try:
+            self._query_one(probe_code, bwkey)
+        except SAPError as e:
+            raise CommandError(
+                f"清空前探针查询失败，已中止以避免数据丢失: {e}"
+            )
 
-        # ── 5. 同步 ──
-        if dry_run:
-            self._dry_run(df, warehouse_map)
-        else:
-            self._live_sync(df, warehouse_map, chunk_size)
+        if not existing:
+            self.stdout.write("   [PURGE] 本地无价格记录，跳过")
+            return
 
-    # ------------------------------------------------------------------
-    # SAP 单月查询
-    # ------------------------------------------------------------------
-
-    def _query_sap(self, bwkey, fiscal_year, fiscal_month) -> pl.DataFrame:
-        """执行单次 SAP 查询，返回 Polars DataFrame"""
-        filters = {}
-        if fiscal_year:
-            filters["p_lfgja"] = fiscal_year
-        if fiscal_month:
-            filters["p_lfmon"] = str(fiscal_month).zfill(2)
-        if bwkey:
-            filters["s_bwkey__eq"] = bwkey
-
-        query = sap.rfc(MaterialPriceQuery)
-        if filters:
-            query = query.filter(**filters)
-
-        df = query.collect()
-        label = f"{fiscal_year}-{fiscal_month}" if fiscal_year else "全量"
-        self.stdout.write(f"   [{label}] SAP 返回: {df.height} 条")
-        return df
+        self.stdout.write(
+            self.style.WARNING(f"   [PURGE] 清空本地全部 {existing} 条价格记录……")
+        )
+        RawMaterialPriceRecord.objects.all().delete()
+        self.stdout.write(f"   [PURGE] 已清空（原 {existing} 条），开始重建")
 
     # ------------------------------------------------------------------
-    # 月份列表生成
+    # 期间范围解析（全部为客户端过滤）
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_month_list(start_date: date, end_date: date):
-        """生成 [(fiscal_year, fiscal_month), ...] 从 start → end"""
-        months = []
-        current = start_date
-        while current <= end_date:
-            months.append((str(current.year), f"{current.month:02d}"))
-            current += relativedelta(months=1)
-        return months
+    def _resolve_scope(fiscal_year, fiscal_month, periods):
+        """
+        解析期间范围。默认不启用任何过滤（全历史）。
+
+        Returns:
+            (范围描述, ym_range)
+            ym_range 为 None 表示不过滤；否则为闭区间 (lo, hi)，两端形如 YYYYMM
+        """
+        if fiscal_year and fiscal_month:
+            return (
+                f"会计年度 {fiscal_year} / 会计期间 {fiscal_month:02d}",
+                (fiscal_year * 100 + fiscal_month, fiscal_year * 100 + fiscal_month),
+            )
+
+        if fiscal_year:
+            return (
+                f"{fiscal_year} 全年 (01-12)",
+                (fiscal_year * 100 + 1, fiscal_year * 100 + 12),
+            )
+
+        if periods:
+            today = date.today()
+            end = date(today.year, today.month, 1)
+            start = end - relativedelta(months=periods - 1)
+            return (
+                f"近 {periods} 个月: {start.strftime('%Y-%m')} → {end.strftime('%Y-%m')}",
+                (start.year * 100 + start.month, end.year * 100 + end.month),
+            )
+
+        return "全历史（SAP 返回的全部期间）", None
+
+    # ------------------------------------------------------------------
+    # 核心：逐物料遍历
+    # ------------------------------------------------------------------
+
+    def _sync_materials(self, codes, warehouse_map, ym_range, bwkey, chunk_size, dry_run):
+        """
+        遍历物料逐个取数并累积写库。
+
+        Returns:
+            dict: 统计计数（total / empty / failed / skipped / written / rows / price_warn）
+                  以及 warnings（Counter：future / currency / dedupe / plants_created）
+        """
+        stats = {
+            "total": len(codes),
+            "with_price": 0,   # 实际产出了有效价格记录的物料
+            "empty": 0,        # SAP 完全没返回该物料的行
+            "no_price": 0,     # SAP 有行，但全部价格无效（VERPR=0 等）被过滤
+            "failed": 0,       # 调用异常
+            "skipped": 0,      # 单行无法构造（日期非法、无工厂等）
+            "written": 0,      # 实际写入（或 dry-run 下将写入）的条数
+            "price_warn": 0,   # 价格异常计数
+        }
+        warnings = Counter()
+        errors = []
+
+        plant_map = {p.code: p for p in Plant.objects.all()}
+        pending = []
+
+        for idx, code in enumerate(codes, 1):
+            try:
+                df = self._query_one(code, bwkey)
+            except SAPBusinessError as e:
+                # 已声明的空结果文本不会走到这里；能到这里的是真业务错误
+                stats["failed"] += 1
+                errors.append((code, str(e)))
+                self.stderr.write(self.style.ERROR(f"   [{code}] SAP 业务错误: {e}"))
+                continue
+            except SAPError as e:
+                stats["failed"] += 1
+                errors.append((code, str(e)))
+                self.stderr.write(self.style.ERROR(f"   [{code}] SAP 调用失败: {e}"))
+                continue
+
+            if df.is_empty():
+                stats["empty"] += 1
+                continue
+
+            df = self._apply_period_filter(df, ym_range, warnings)
+            df = self._transform_prices(df, warnings)
+
+            # 区分「SAP 没这条记录」与「有记录但价格全是 0 被过滤」——
+            # 后者实测占相当大的比例（很多物料在 MBEWH 里有行但 VERPR=0），
+            # 混在一起统计会让人误以为大量物料同步失败。
+            if df.is_empty():
+                stats["no_price"] += 1
+                continue
+
+            rm = warehouse_map[code]
+            before = len(pending)
+            for row in df.iter_rows(named=True):
+                obj = self._build_record(rm, row, plant_map, warnings, dry_run)
+                if obj is None:
+                    stats["skipped"] += 1
+                    continue
+                if row["UNIT_PRICE"] > PRICE_WARN_THRESHOLD:
+                    stats["price_warn"] += 1
+                pending.append(obj)
+            if len(pending) > before:
+                stats["with_price"] += 1
+
+            if self.verbose:
+                self.stdout.write(
+                    f"   [{code}] {df.height} 条"
+                    + (f"（累计待写 {len(pending)}）" if pending else "")
+                )
+
+            # 累积到批大小就落库，避免 2654 次小事务
+            if len(pending) >= chunk_size:
+                stats["written"] += self._flush(pending, dry_run=dry_run)
+                pending.clear()
+
+            if idx % PROGRESS_EVERY == 0:
+                self.stdout.write(
+                    f"   进度: {idx}/{stats['total']} "
+                    f"（累计待写 {stats['written'] + len(pending)} 条, "
+                    f"有价格 {stats['with_price']} 个, "
+                    f"SAP 无记录 {stats['empty']} 个, "
+                    f"失败 {stats['failed']} 个）"
+                )
+
+        # 收尾 flush
+        if pending:
+            stats["written"] += self._flush(pending, dry_run=dry_run)
+            pending.clear()
+
+        stats["warnings"] = warnings
+        stats["errors"] = errors
+        return stats
+
+    def _query_one(self, code, bwkey=None) -> pl.DataFrame:
+        """单物料查询：服务端按物料号（可选再按工厂）筛选。"""
+        filters = {"s_matnr__eq": code}
+        if bwkey:
+            filters["s_bwkey__eq"] = bwkey
+        return sap.rfc(MaterialPriceQuery).filter(**filters).collect()
+
+    def _build_record(self, rm, row, plant_map, warnings, dry_run):
+        """单行 → RawMaterialPriceRecord；无法构造时返回 None。"""
+        bwkey = (row.get("BWKEY") or "").strip()
+        if not bwkey:
+            return None
+
+        price_date = self._to_date(row["BDATJ"], row["POPER"])
+        if price_date is None:
+            return None
+
+        plant = plant_map.get(bwkey)
+        if plant is None:
+            if dry_run:
+                # 预览模式不建工厂，只记账
+                warnings["plants_created"] += 1
+                return None
+            plant, _ = Plant.objects.get_or_create(code=bwkey, defaults={"name": ""})
+            plant_map[bwkey] = plant
+            warnings["plants_created"] += 1
+            self.stdout.write(f"   自动创建工厂: {bwkey}")
+
+        return RawMaterialPriceRecord(
+            raw_material=rm,
+            plant=plant,
+            date=price_date,
+            price=Decimal(str(row["UNIT_PRICE"])),
+            source=self._make_source(row["BDATJ"], row["POPER"], bwkey),
+        )
+
+    def _flush(self, objs, dry_run) -> int:
+        """
+        批量 upsert 一批记录。
+
+        幂等键 unique_together('raw_material','plant','date') 直接映射到 upsert：
+        已存在则更新 price/source，不存在则插入（幂等，重复执行安全）。
+
+        Returns:
+            本次处理的条数
+        """
+        if dry_run:
+            return len(objs)
+
+        # unique_fields 是否要传取决于后端能力，见 _conflict_kwargs()
+        with transaction.atomic():
+            RawMaterialPriceRecord.objects.bulk_create(
+                objs,
+                batch_size=len(objs),
+                update_conflicts=True,
+                update_fields=["price", "source"],
+                **self._conflict_kwargs(),
+            )
+        return len(objs)
+
+    @staticmethod
+    def _conflict_kwargs() -> dict:
+        """
+        bulk_create(update_conflicts=True) 的 unique_fields 参数，按后端能力给出。
+
+        这是 Django ORM 的 API 约束，不是手写 SQL：Django 的 upsert 能力按后端
+        分为两类，MySQL 那一类不支持指定冲突目标，传了 unique_fields 会直接抛
+        NotSupportedError。两种情况下 Django 都会自己决定生成什么语句。
+
+        Returns:
+            {"unique_fields": [...]} 或 {}
+        """
+        if connection.features.supports_update_conflicts_with_target:
+            return {"unique_fields": ["raw_material", "plant", "date"]}
+        return {}
+
+    # ------------------------------------------------------------------
+    # 报告
+    # ------------------------------------------------------------------
+
+    def _report(self, stats, dry_run):
+        w = stats["warnings"]
+        verb = "将写入" if dry_run else "已写入"
+
+        self.stdout.write("")
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"[OK] 同步完成！物料 {stats['total']} 个："
+                f"有价格 {stats['with_price']} 个，"
+                f"SAP 无记录 {stats['empty']} 个，"
+                f"有记录但无有效价格 {stats['no_price']} 个，"
+                f"失败 {stats['failed']} 个"
+            )
+        )
+        self.stdout.write(f"     {verb} {stats['written']} 条价格记录")
+        self.stdout.write(
+            "     （同一物料+工厂+日期已存在的会被覆盖更新，不单独统计数量）"
+        )
+
+        if w.get("future"):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"     截断未来期间 {w['future']} 条（如需保留请加 --include-future）"
+                )
+            )
+        if w.get("currency"):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"     跳过非 {ALLOWED_CURRENCY} 记录 {w['currency']} 条"
+                )
+            )
+        if w.get("dedupe"):
+            self.stdout.write(
+                self.style.WARNING(
+                    f"     同一(物料,工厂,期间)多条成本估算，按 KALNR 最大者去重 {w['dedupe']} 条"
+                )
+            )
+        if w.get("plants_created"):
+            self.stdout.write(f"     自动创建工厂 {w['plants_created']} 个")
+        if stats["skipped"]:
+            self.stdout.write(f"     无效数据跳过: {stats['skipped']} 条")
+        if stats["price_warn"]:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"     价格异常 (>CNY{PRICE_WARN_THRESHOLD}/kg): {stats['price_warn']} 条"
+                )
+            )
+
+        if stats["failed"]:
+            self.stdout.write(
+                self.style.ERROR("     失败示例（最多 10 个）:")
+            )
+            for code, err in stats["errors"][:10]:
+                self.stdout.write(self.style.ERROR(f"       {code}: {err}"))
+
+    # ------------------------------------------------------------------
+    # 客户端期间过滤
+    # ------------------------------------------------------------------
+
+    def _apply_period_filter(self, df: pl.DataFrame, ym_range, warnings) -> pl.DataFrame:
+        """按 BDATJ/POPER 过滤期间。两端均形如 YYYYMM，整数比较最省事。"""
+        # BDATJ/POPER 无法解析（NUMC 异常值）→ 丢弃，避免带着 None 往下走
+        df = df.drop_nulls(subset=["BDATJ", "POPER"])
+        ym = pl.col("BDATJ") * 100 + pl.col("POPER")
+
+        # 未来期间护栏：price_service 取「最大日期」作为最新单价，一条未来期间的
+        # 记录会静默变成当前价格并污染配方成本。SAP 会预建整年的空期间（VERPR=0，
+        # 通常已被 UNIT_PRICE>0 过滤），但这里不依赖那个巧合。
+        if not self.include_future:
+            current_ym = self._current_ym()
+            future = df.filter(ym > current_ym)
+            if future.height:
+                warnings["future"] += future.height
+                df = df.filter(ym <= current_ym)
+
+        if ym_range is None:
+            return df
+
+        lo, hi = ym_range
+        return df.filter((ym >= lo) & (ym <= hi))
+
+    @staticmethod
+    def _current_ym() -> int:
+        """当前会计期间，形如 YYYYMM。"""
+        today = date.today()
+        return today.year * 100 + today.month
 
     # ------------------------------------------------------------------
     # Polars 价格转换
     # ------------------------------------------------------------------
 
-    def _transform_prices(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Polars 端：价格单位换算 + 异常值过滤（保留工厂维度）"""
-        before = df.height
+    def _transform_prices(self, df: pl.DataFrame, warnings) -> pl.DataFrame:
+        """Polars 端：价格单位换算 + 货币守卫 + 去重（保留工厂维度）"""
+        # 价格/单位字段为空（NUMC/DEC 解析失败）→ 丢弃
+        df = df.drop_nulls(subset=["BDATJ", "POPER", "PEINH", "VERPR"])
 
-        # 过滤 PEINH <= 0（除零保护）
+        # 币种守卫：price 列语义是「元/kg」，模型没有币种字段
+        currency = pl.col("WAERS").fill_null("")
+        other = df.filter(currency != ALLOWED_CURRENCY)
+        if other.height:
+            warnings["currency"] += other.height
+            df = df.filter(currency == ALLOWED_CURRENCY)
+
+        # 过滤 PEINH <= 0（除零保护，必须在除法之前）
         df = df.filter(pl.col("PEINH") > 0)
 
-        # 计算单价: VERPR / PEINH
+        # 计算单价: VERPR / PEINH（实测只有 VERPR 有值，STPRS/PVPRS 恒为 0）
         df = df.with_columns(
             (pl.col("VERPR") / pl.col("PEINH")).round(2).alias("UNIT_PRICE")
         )
@@ -299,190 +612,48 @@ class Command(BaseCommand):
         # 过滤无效价格
         df = df.filter(pl.col("UNIT_PRICE") > 0)
 
-        after = df.height
-        self.stdout.write(
-            f"   价格换算: {before} 条 → 有效 {after} 条 "
-            f"(VERPR/PEINH=单价, 保留工厂维度)"
-        )
+        # ORM 的批量 upsert 不允许同一批内出现重复的幂等键（否则后端会直接报错），
+        # 因此必须先去重。实测 (MATNR,BWKEY,BDATJ,POPER) 无重复，这里是防御性处理。
+        keys = ["MATNR", "BWKEY", "BDATJ", "POPER"]
+        dup_count = df.height - df.select(keys).unique().height
+        if dup_count:
+            warnings["dedupe"] += dup_count
+            df = df.sort(keys + ["KALNR"]).unique(subset=keys, keep="last")
 
         return df
+
+    # ------------------------------------------------------------------
+    # 会计期间 → 日期
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _to_date(bdatj, poper):
+        """
+        会计年度 + 会计期间 → 该期间首日。
+
+        Args:
+            bdatj: 会计年度（int，如 2026）
+            poper: 会计期间（int，如 9）
+
+        Returns:
+            date(2026, 9, 1)；任一值缺失或非法（如 POPER=13）时返回 None
+        """
+        if not bdatj or not poper:
+            return None
+        try:
+            return date(int(bdatj), int(poper), 1)
+        except (ValueError, TypeError):
+            return None
 
     # ------------------------------------------------------------------
     # 每行 source 文本
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _make_source(lfgja: str, lfmon: str, bwkey: str = "") -> str:
-        """生成价格来源标识"""
-        base = f"SAP MBEW {lfgja}-{lfmon}"
+    def _make_source(bdatj: int, poper: int, bwkey: str = "") -> str:
+        """生成价格来源标识，如 'SAP MBEWH 2026-01 [3011]'。
+
+        从 MBEW 改为 MBEWH 是有意为之 —— 新旧两代 RFC 写出的来源必须可区分。
+        """
+        base = f"SAP MBEWH {bdatj}-{poper:02d}"
         return f"{base} [{bwkey}]" if bwkey else base
-
-    # ------------------------------------------------------------------
-    # dry-run
-    # ------------------------------------------------------------------
-
-    def _dry_run(self, df: pl.DataFrame, warehouse_map: dict):
-        will_create = 0
-        will_update = 0
-        skipped_invalid = 0
-        price_warns = 0
-
-        for row in df.iter_rows(named=True):
-            matnr = row["MATNR"]
-            unit_price = row["UNIT_PRICE"]
-            bwkey = row.get("BWKEY", "")
-
-            rm = warehouse_map.get(matnr)
-            if rm is None:
-                skipped_invalid += 1
-                continue
-
-            try:
-                price_date = date(int(row["LFGJA"]), int(row["LFMON"]), 1)
-            except (ValueError, TypeError):
-                skipped_invalid += 1
-                continue
-
-            if unit_price > PRICE_WARN_THRESHOLD:
-                price_warns += 1
-
-            plant = Plant.objects.filter(code=bwkey).first()
-            existing = RawMaterialPriceRecord.objects.filter(
-                raw_material=rm, plant=plant, date=price_date
-            ).first()
-
-            source = self._make_source(row["LFGJA"], row["LFMON"], bwkey)
-            if existing:
-                will_update += 1
-                self.stdout.write(
-                    f"   [~] 将更新: {rm.name} ({matnr}) [{bwkey}] "
-                    f"{price_date}: {existing.price} -> {unit_price}"
-                )
-            else:
-                will_create += 1
-                self.stdout.write(
-                    f"   [+] 将创建: {rm.name} ({matnr}) [{bwkey}] "
-                    f"{price_date}: CNY{unit_price} [{source}]"
-                )
-
-        total = will_create + will_update
-        self.stdout.write("")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"[OK] 预览完成！共 {total} 条 "
-                f"(将创建 {will_create}, 将更新 {will_update})"
-            )
-        )
-        if price_warns:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"   价格异常 (>CNY{PRICE_WARN_THRESHOLD}/kg): {price_warns} 条"
-                )
-            )
-        if skipped_invalid:
-            self.stdout.write(f"   无效数据跳过: {skipped_invalid} 条")
-
-    # ------------------------------------------------------------------
-    # live sync（Polars iter_slices 分批 + transaction.atomic）
-    # ------------------------------------------------------------------
-
-    def _live_sync(
-        self,
-        df: pl.DataFrame,
-        warehouse_map: dict,
-        chunk_size: int,
-    ):
-        total = df.height
-        created = 0
-        updated = 0
-        skipped_invalid = 0
-        processed = 0
-        affected_materials = set()
-        price_warn_count = 0
-
-        for chunk_df in df.iter_slices(chunk_size):
-            with transaction.atomic():
-                for row in chunk_df.iter_rows(named=True):
-                    matnr = row["MATNR"]
-                    unit_price = row["UNIT_PRICE"]
-                    bwkey = row.get("BWKEY", "")
-
-                    rm = warehouse_map.get(matnr)
-                    if rm is None:
-                        skipped_invalid += 1
-                        continue
-
-                    # 跳过无工厂记录
-                    if not bwkey:
-                        skipped_invalid += 1
-                        continue
-
-                    try:
-                        price_date = date(
-                            int(row["LFGJA"]), int(row["LFMON"]), 1
-                        )
-                    except (ValueError, TypeError):
-                        skipped_invalid += 1
-                        continue
-
-                    if unit_price > PRICE_WARN_THRESHOLD:
-                        price_warn_count += 1
-
-                    # 获取或自动创建工厂
-                    plant, _ = Plant.objects.get_or_create(
-                        code=bwkey, defaults={'name': ''}
-                    )
-
-                    source_text = self._make_source(
-                        row["LFGJA"], row["LFMON"], bwkey
-                    )
-
-                    try:
-                        record, is_new = RawMaterialPriceRecord.objects.update_or_create(
-                            raw_material=rm,
-                            plant=plant,
-                            date=price_date,
-                            defaults={
-                                "price": unit_price,
-                                "source": source_text,
-                            },
-                        )
-                    except Exception as e:
-                        self.stdout.write(
-                            self.style.ERROR(
-                                f"   [ERR] 保存失败: {rm.name} ({matnr}) [{bwkey}] — {e}"
-                            )
-                        )
-                        skipped_invalid += 1
-                        continue
-
-                    if is_new:
-                        created += 1
-                    else:
-                        updated += 1
-
-                    affected_materials.add(rm)
-
-            processed += chunk_df.height
-            self.stdout.write(
-                f"   进度: {min(processed, total)}/{total} "
-                f"(新建 {created}, 更新 {updated})"
-            )
-
-        # 价格不落库：写入 RawMaterialPriceRecord 之后，原材料的最新单价/均价
-        # 与配方成本都会在读取时实时算出来，不需要再刷任何缓存、也不需要级联重算。
-
-        self.stdout.write("")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"[OK] 同步完成！总计 {processed} 条, "
-                f"新建 {created} 个, 更新 {updated} 个, "
-                f"无效 {skipped_invalid} 个"
-            )
-        )
-        if price_warn_count:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"   价格异常 (>CNY{PRICE_WARN_THRESHOLD}/kg): {price_warn_count} 条"
-                )
-            )

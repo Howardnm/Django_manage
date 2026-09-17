@@ -43,6 +43,7 @@ from .exceptions import (
     SAPRfcError,
     SAPFilterError,
     SAPResultParseError,
+    SAPBusinessError,
     DoesNotExist,
     MultipleObjectsReturned,
 )
@@ -60,6 +61,7 @@ __all__ = [
     "SAPRfcError",
     "SAPFilterError",
     "SAPResultParseError",
+    "SAPBusinessError",
     "DoesNotExist",
     "MultipleObjectsReturned",
     # 配置

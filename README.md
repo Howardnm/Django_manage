@@ -2,6 +2,11 @@
 
 企业级研发项目管理后台，覆盖项目管理、物料配方、工作流审批、试验排产、SAP 集成、AI MCP 服务等业务域。
 
+## 用户文档
+
+- [项目管理系统用户操作手册（Markdown）](docs/用户操作手册.md)：便于在线阅读和持续维护。
+- [项目管理系统用户操作手册（Word）](docs/用户操作手册.docx)：便于下载、打印和线下分发。
+
 ## 功能模块
 
 | 模块 | 路由 | 说明 |
@@ -309,7 +314,7 @@ AWS ALB / 阿里云 SLB 默认不缓冲，无需额外配置。
 | MaterialService | `ZRFC_MATERIAL_MESN` · `ZFG_CHECK_MATERIAL` | 物料主数据查询/校验 |
 | CustomerService | `ZRFC_GET_CUSTOMER` · `ZRFC_MODIFY_CUSTOMER` · `ZRFC_GET_KNMT` | 客户主数据 CRUD |
 | SalesService | `ZRFC_GET_SALE_ORDERS` · `ZRFC_CREATE_SALE_ORDERS` · `ZRFC_GET_SALES_PRICE_LIST` | 销售订单 |
-| PriceService | `ZRFC_GET_MBEW` · `ZRFC_GET_LAST_INVOICE_PRICE` | 价格/成本 |
+| PriceService | `ZRFC_GET_MBEWH` · `ZRFC_GET_LAST_INVOICE_PRICE` | 价格/成本（历史月份） |
 | DeliveryService | `ZRFC_CREATE_OUTB_DELIVERY` · `ZRFC_UPDATE_OUTB_DELIVERY` | 交货单 |
 | ProductionService | `ZIF_MES_GET_OPEN_PROD` · `ZIF_JJGZ_CREATE_PRODORDCF` · … | 生产订单/报工 |
 | VendorService | `ZFG_CHECK_VENDOR` | 供应商校验 |

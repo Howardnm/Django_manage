@@ -12,6 +12,7 @@ from django.test import SimpleTestCase
 from app_sap_services import SAPFilterError
 from app_sap_services.query.gateway import SAPGateway
 from app_sap_services.definitions.material import MaterialQuery
+from app_sap_services.definitions.price import MaterialPriceQuery
 from app_sap_services.definitions.vendor import VendorCheckQuery
 
 from .helpers import FakeConnMgr
@@ -60,11 +61,59 @@ class CallStructuredTest(SimpleTestCase):
 
     def test_works_with_list_based_query_too(self):
         # call_structured 对表格输出同样可用（返回 dict 而非扁平 list）
-        conn = FakeConnMgr({"IT_ITEM": [{"MATNR": "0000A01001", "VERPR": "1.5"}]})
+        conn = FakeConnMgr({
+            "E_RTYPE": "S", "E_RTMSG": "查询成功",
+            "IT_ITEM": [{"MATNR": "A01005000057", "VERPR": "1.5"}],
+        })
         gw = SAPGateway(conn)
-        from app_sap_services.definitions.price import MaterialPriceQuery
-        result = gw.call_structured(MaterialPriceQuery, p_lfgja="2026", p_lfmon="07")
+        result = gw.call_structured(MaterialPriceQuery, s_bwkey__eq="3011")
         self.assertEqual(result["IT_ITEM"][0].VERPR, 1.5)
+        # 未声明为 OutputTable 的 Export 键原样透传
+        self.assertEqual(result["E_RTYPE"], "S")
+
+
+class NestedStructureQueryTest(SimpleTestCase):
+    """端到端参数形状 —— 嵌套在 IS_QUERY 里的 range 必须原样传给 pyrfc。"""
+
+    _RAW = {
+        "E_RTYPE": "S", "E_RTMSG": "查询成功",
+        "IT_ITEM": [
+            {"MATNR": "A01005000057", "BWKEY": "3011", "BDATJ": "2026",
+             "POPER": "009", "PEINH": "10000", "VPRSV": "V",
+             "VERPR": "93751.06", "STPRS": "0.00", "PVPRS": "0.00",
+             "WAERS": "CNY", "KALNR": "000100473814"},
+        ],
+    }
+
+    def test_params_sent_to_sap_are_nested(self):
+        conn = FakeConnMgr(self._RAW)
+        gw = SAPGateway(conn)
+        gw.rfc(MaterialPriceQuery).filter(s_bwkey__eq="3011").call()
+        fn, params = conn.calls[0]
+        self.assertEqual(fn, "ZRFC_GET_MBEWH")
+        self.assertEqual(
+            params,
+            {"IS_QUERY": {"S_BWKEY": [
+                {"SIGN": "I", "OPTION": "EQ", "LOW": "3011", "HIGH": ""}
+            ]}},
+        )
+
+    def test_exclude_on_nested_range_sets_sign_e(self):
+        """exclude 作用于嵌套 range —— 曾经会因假设顶层而静默失效。"""
+        gw = SAPGateway(FakeConnMgr(self._RAW))
+        q = gw.rfc(MaterialPriceQuery).exclude(s_bwkey__eq="3011")
+        q.call()
+        self.assertEqual(
+            q._build_params()["IS_QUERY"]["S_BWKEY"][0]["SIGN"], "E"
+        )
+
+    def test_collect_parses_row(self):
+        gw = SAPGateway(FakeConnMgr(self._RAW))
+        df = gw.rfc(MaterialPriceQuery).filter(s_bwkey__eq="3011").collect()
+        self.assertEqual(df.height, 1)
+        self.assertEqual(df["POPER"][0], 9)
+        self.assertEqual(df["PEINH"][0], 10000)
+        self.assertAlmostEqual(df["VERPR"][0] / df["PEINH"][0], 9.375106)
 
 
 class RfcQueryRegressionTest(SimpleTestCase):

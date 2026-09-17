@@ -332,7 +332,11 @@ class RfcQuery:
             lines.append(f"  Excludes: {self._excludes}")
         try:
             p = self._schema.build_params(**{**self._filters, **self._excludes})
-            lines.append(f"  Params: {list(p.keys())}")
+            # 嵌套 Import 结构展开一层，否则只看到 {'IS_QUERY'} 无法定位问题
+            lines.append("  Params: " + ", ".join(
+                f"{k}={list(v.keys()) if isinstance(v, dict) else v}"
+                for k, v in p.items()
+            ))
         except Exception as e:
             lines.append(f"  [参数构建失败: {e}]")
         for label, val in [
@@ -417,16 +421,16 @@ class RfcQuery:
         # exclude → SIGN="E"
         for key in self._excludes:
             attr = key.split("__")[0]
-            if attr not in self._schema._range_params:
+            rp = self._schema._range_params.get(attr)
+            if rp is None:
                 raise SAPFilterError(
                     f"exclude() 未知参数 {attr!r}，可用: "
                     f"{list(self._schema._range_params.keys())}"
                 )
-            pname = self._schema._range_params[attr].rfc_name
-            if pname in params:
-                for row in params[pname]:
-                    if row.get("SIGN") == "I":
-                        row["SIGN"] = "E"
+            # 经 _range_rows 定位，兼容顶层与嵌套在 Import 结构内的 range
+            for row in self._schema._range_rows(params, rp):
+                if row.get("SIGN") == "I":
+                    row["SIGN"] = "E"
         return params
 
     def _apply_transforms(self):

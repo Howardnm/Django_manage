@@ -17,9 +17,65 @@ from app_sap_services.definitions.stock import MaterialStockQuery
 class FunctionNameTest(SimpleTestCase):
     def test_all_function_names(self):
         self.assertEqual(MaterialQuery.function_name, "ZRFC_MATERIAL_MESN")
-        self.assertEqual(MaterialPriceQuery.function_name, "ZRFC_GET_MBEW")
+        self.assertEqual(MaterialPriceQuery.function_name, "ZRFC_GET_MBEWH")
         self.assertEqual(MaterialStockQuery.function_name, "ZRFC_GET_MAT_STOCK")
         self.assertEqual(VendorCheckQuery.function_name, "ZFG_CHECK_VENDOR")
+
+
+class MaterialPriceQueryStructureTest(SimpleTestCase):
+    """ZRFC_GET_MBEWH 定义结构回归 —— 两个 range 嵌在 IS_QUERY 结构内。"""
+
+    def test_ranges_are_nested_in_is_query(self):
+        self.assertEqual(
+            MaterialPriceQuery._range_params["s_matnr"].structure, "IS_QUERY"
+        )
+        self.assertEqual(
+            MaterialPriceQuery._range_params["s_bwkey"].structure, "IS_QUERY"
+        )
+
+    def test_structure_members(self):
+        self.assertEqual(list(MaterialPriceQuery._structures.keys()), ["IS_QUERY"])
+        names = {p.rfc_name for p in MaterialPriceQuery._structures["IS_QUERY"]}
+        self.assertEqual(names, {"S_MATNR", "S_BWKEY"})
+
+    def test_no_import_scalar_params(self):
+        # 新接口没有任何标量 Import —— 期间筛选已下移到客户端
+        self.assertEqual(MaterialPriceQuery._import_params, {})
+
+    def test_it_item_has_all_13_fields(self):
+        fields = MaterialPriceQuery.IT_ITEM._fields
+        for f in ("KALNR", "BDATJ", "POPER", "PEINH", "VPRSV", "STPRS", "PVPRS",
+                  "WAERS", "SALK3", "SALKV", "MATNR", "BWKEY", "VERPR"):
+            self.assertIn(f, fields, f"IT_ITEM 缺少字段 {f}")
+        self.assertEqual(len(fields), 13)
+
+    def test_it_item_field_types(self):
+        fields = MaterialPriceQuery.IT_ITEM._fields
+        for f in ("BDATJ", "POPER", "PEINH", "KALNR"):
+            self.assertEqual(
+                type(fields[f]).__name__,
+                "IntField" if f != "KALNR" else "CharField",
+                f"{f} 类型不符",
+            )
+        for f in ("STPRS", "PVPRS", "SALK3", "SALKV", "VERPR"):
+            self.assertEqual(type(fields[f]).__name__, "DecimalField")
+        # MATNR 必须用 clean_leading_zeros 才能对齐 RawMaterial.warehouse_code
+        self.assertIsNotNone(fields["MATNR"].converter)
+
+    def test_message_fields_declared(self):
+        self.assertEqual(MaterialPriceQuery.msg_type_field, "E_RTYPE")
+        self.assertEqual(MaterialPriceQuery.msg_text_field, "E_RTMSG")
+
+    def test_describe_shows_structure_path(self):
+        desc = MaterialPriceQuery.describe()
+        self.assertIn("IS_QUERY.S_MATNR", desc)
+        self.assertIn("IS_QUERY.S_BWKEY", desc)
+        self.assertIn("嵌套 Import 结构", desc)
+
+    def test_other_queries_have_no_structures(self):
+        for cls in (MaterialQuery, MaterialStockQuery, VendorCheckQuery):
+            self.assertEqual(cls._structures, {}, f"{cls.__name__} 不应有嵌套结构")
+            self.assertEqual(cls.msg_type_field, "", f"{cls.__name__} 不应开启消息检查")
 
 
 class DescribeTest(SimpleTestCase):

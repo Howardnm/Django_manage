@@ -40,6 +40,25 @@ class SAPResultParseError(SAPError):
     pass
 
 
+class SAPBusinessError(SAPError):
+    """
+    SAP 业务错误：RFC 调用本身成功（无通信异常），但 SAP 返回 E/A 级业务消息。
+
+    与 SAPResultParseError 的区别：后者是结构性的（返回的 payload 形状不对），
+    本异常是业务性的（payload 完全合法，但 SAP 明确拒绝了这次查询，
+    例如「工厂不存在」「无授权」）。上层据此可区分「该修参数」与「该改代码」。
+    """
+
+    def __init__(self, function: str, messages: list = None):
+        self.function = function
+        self.messages = list(messages or [])
+        first = self.messages[0] if self.messages else None
+        self.rtype = first.type if first else ""
+        self.rtmsg = first.text if first else ""
+        text = "; ".join(str(m) for m in self.messages) or "SAP 返回错误"
+        super().__init__(f"[{function}] {text}")
+
+
 class DoesNotExist(SAPError):
     """查询结果为空（用于 get() 方法）"""
     pass

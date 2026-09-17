@@ -49,6 +49,10 @@ class RangeTableParam:
         field: SAP 字段名，如 "MATNR"
         low_field: LOW 值的字段名，默认为 "LOW"（特殊表如 MTART 用 "MTART_LOW"）
         high_field: HIGH 值的字段名，默认为 "HIGH"
+        structure: 所属的 Import 结构名，默认为 None = 顶层参数。
+            部分 RFC 把 range 嵌在结构里（如 ZRFC_GET_MBEWH 的 IS_QUERY），
+            声明 structure 后 build_params 产出 {"IS_QUERY": {"S_MATNR": [...]}}
+            而非平铺的 {"S_MATNR": [...]}。调用方式与顶层 range 完全一致。
 
     使用示例:
         mat_range = RangeTableParam("MAT_RANGE", field="MATNR")
@@ -59,6 +63,10 @@ class RangeTableParam:
 
         # 调用时链式筛选
         MaterialQuery.call(mat_range__cp="A01*", mat_range__eq="B0200500001")
+
+        # 嵌套在 Import 结构内 —— 筛选语法完全相同
+        class MaterialPriceQuery(RfcSchema):
+            s_matnr = RangeTableParam("S_MATNR", field="MATNR", structure="IS_QUERY")
     """
 
     def __init__(
@@ -67,11 +75,14 @@ class RangeTableParam:
         field: str,
         low_field: str = "LOW",
         high_field: str = "HIGH",
+        structure: str | None = None,
     ):
         self.rfc_name = rfc_name
         self.field = field
         self.low_field = low_field
         self.high_field = high_field
+        # 所属 Import 结构名；None = 顶层参数（绝大多数 RFC）
+        self.structure = structure
         # 由 RfcSchema 元类设置
         self._attr_name = ""
 
@@ -174,7 +185,8 @@ class RangeTableParam:
     def __repr__(self):
         return (
             f"RangeTableParam(rfc_name={self.rfc_name!r}, field={self.field!r}, "
-            f"low={self.low_field!r}, high={self.high_field!r})"
+            f"low={self.low_field!r}, high={self.high_field!r}, "
+            f"structure={self.structure!r})"
         )
 
 
@@ -184,20 +196,28 @@ class ImportParam:
 
     Args:
         rfc_name: RFC 函数中的参数名，如 "IV_MATNR"
+        structure: 所属的 Import 结构名，默认为 None = 顶层参数
 
     使用示例:
         iv_matnr = ImportParam("IV_MATNR")
 
         # 构建参数
         params = {"IV_MATNR": "A01001000003"}
+
+        # 嵌在结构内的标量
+        iv_mode = ImportParam("IV_MODE", structure="IS_QUERY")
     """
 
-    def __init__(self, rfc_name: str):
+    def __init__(self, rfc_name: str, structure: str | None = None):
         self.rfc_name = rfc_name
+        self.structure = structure
         self._attr_name = ""
 
     def __repr__(self):
-        return f"ImportParam(rfc_name={self.rfc_name!r})"
+        return (
+            f"ImportParam(rfc_name={self.rfc_name!r}, "
+            f"structure={self.structure!r})"
+        )
 
 
 class TableInput:
