@@ -338,10 +338,15 @@ class UnifiedAccessMixin(PermissionRequiredMixin):
         pk = self.kwargs[self.pk_url_kwarg]
         qs = self.model.objects.all()
         base_qs = self.get_queryset()
-        if base_qs and base_qs.query.select_related:
-            qs = qs.select_related(*base_qs.query.select_related)
-        if base_qs and getattr(base_qs, '_prefetch_related_lookups', None):
-            qs = qs.prefetch_related(*base_qs._prefetch_related_lookups)
+        # 注意：这里只能用 `is not None` 判断。get_queryset() 返回的是**未按 pk 过滤**的
+        # queryset，对它做真值判断（`if base_qs`）会触发 QuerySet.__bool__ → 全量求值，
+        # 把整张表连同 prefetch_related 的关联数据全拉一遍（详情页因此常慢几秒）。
+        if base_qs is not None:
+            if base_qs.query.select_related:
+                qs = qs.select_related(*base_qs.query.select_related)
+            lookups = getattr(base_qs, '_prefetch_related_lookups', None)
+            if lookups:
+                qs = qs.prefetch_related(*lookups)
         obj = get_object_or_404(qs, pk=pk)
         self.check_object_permission(obj)
         return obj
