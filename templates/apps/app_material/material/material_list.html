@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load project_extras %}
+{% load project_extras attachment_tags %}
 
 {% block content %}
     <div class="page-header">
@@ -41,6 +41,9 @@
 
         <!-- 筛选区域（复用通用筛选器组件，保留 std 参数 + 性能折叠面板） -->
         {% include 'apps/list_modules/tools_search_filter.html' with preserve_std=True advanced_panel=True %}
+
+        {# 文档列的附件一次查完，否则每行各查一次 #}
+        {% attachment_prime page_obj %}
 
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap table-hover" style="font-size: 13px;">
@@ -107,7 +110,6 @@
                         </td>
                         <td>
                             <div class="d-flex gap-1">
-                                {% load attachment_tags %}
                                 {% attachment_url mat 'TDS' as tds_url %}{% if tds_url %}<a href="{{ tds_url }}" target="_blank" class="text-azure"><i class="ti ti-file-text"></i></a>{% endif %}
                                 {% attachment_url mat 'MSDS' as msds_url %}{% if msds_url %}<a href="{{ msds_url }}" target="_blank" class="text-red"><i class="ti ti-flask"></i></a>{% endif %}
                                 {% attachment_url mat 'RoHS' as rohs_url %}{% if rohs_url %}<a href="{{ rohs_url }}" target="_blank" class="text-green"><i class="ti ti-leaf"></i></a>{% endif %}

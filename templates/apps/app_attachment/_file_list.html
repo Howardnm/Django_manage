@@ -2,6 +2,11 @@
 {# 文件列表表格（HTMX 局部刷新目标）                          #}
 {# 请求：GET /attachment/<ct_id>/<obj_id>/                    #}
 {# ============================================================ #}
+{# 面板头部的数量徽标：随列表一起下发，用 OOB 换掉原地的空 span。 #}
+{# 放在这里而不是面板模板里，是为了不做「面板渲染 + 列表加载」两次统计。 #}
+<span id="attachment-count-{{ content_type_id }}-{{ object_id }}"
+      class="badge bg-blue-lt ms-2" hx-swap-oob="true">{{ attachments|length }}</span>
+
 <div class="table-responsive">
     <table class="table card-table table-vcenter text-nowrap">
         <thead>

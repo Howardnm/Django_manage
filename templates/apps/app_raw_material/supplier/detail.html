@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load project_extras %}
+{% load project_extras attachment_tags %}
 
 {% block page_title %}{{ page_title }}{% endblock %}
 
@@ -78,6 +78,9 @@
                 <div class="card-header">
                     <h3 class="card-title">供应的原材料 ({{ paginator.count }})</h3>
                 </div>
+                {# 文档列的附件一次查完，否则每行各查一次 #}
+                {% attachment_prime page_obj %}
+
                 <div class="table-responsive">
                     <table class="table card-table table-vcenter text-nowrap">
                         <thead>
@@ -112,7 +115,6 @@
                                 </td>
                                 <td>
                                     <div class="d-flex gap-1">
-                                        {% load attachment_tags %}
                                         {% attachment_url material 'TDS' as tds_url %}{% if tds_url %}
                                             <a href="{{ tds_url }}" target="_blank" class="text-azure" title="TDS" data-bs-toggle="tooltip"><i class="ti ti-file-text"></i></a>
                                         {% endif %}

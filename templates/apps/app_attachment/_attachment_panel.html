@@ -7,7 +7,9 @@
     <div class="card-header">
         <h3 class="card-title">
             <i class="ti ti-paperclip me-2 text-blue"></i>附件管理
-            <span class="badge bg-blue-lt ms-2">{{ attachments.count }}</span>
+            {# 数量由 _file_list.html 以 hx-swap-oob 回填，此处不做统计查询 #}
+            <span class="badge bg-blue-lt ms-2"
+                  id="attachment-count-{{ content_type_id }}-{{ object_id }}"></span>
         </h3>
         <div class="card-actions">
             {% if config and config.allow_upload %}

@@ -379,7 +379,8 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
         )
         context['sorted_properties'] = sorted_properties
 
-        related_projects = self.object.projects.select_related('manager').prefetch_related('nodes').order_by('-created_at')
+        # 项目卡只读 Project 自己的列（进度/阶段是冗余字段，不从 nodes 现算），故不 prefetch nodes
+        related_projects = self.object.projects.select_related('manager').order_by('-created_at')
         context['related_projects'] = related_projects
 
         current_std = self.request.GET.get('std', 'ISO')
@@ -393,7 +394,10 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
                 output_field=DecimalField()
             )
 
-        formulas = LabFormula.objects.filter(project__material=self.object).select_related('creator', 'process').prefetch_related(
+        # select_related 只留 project —— 成熟配方卡要显示所属项目名，模板不再读别的关联
+        formulas = LabFormula.objects.filter(project__material=self.object).select_related(
+            'project',
+        ).prefetch_related(
             'bom_lines', 'color_powder_bom__entries',
         ).annotate(
             val_density=get_val_subquery('密度'), val_melt=get_val_subquery('熔融'),
@@ -409,14 +413,19 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
                 'impact': f.val_impact, 'hdt': f.val_hdt,
             }
 
+        # 成熟配方是上面这批实例的子集，不再另起 queryset —— 模板里的 f.cost
+        # 因此能复用下面那份价格快照，而不是逐个配方各建一次查表。
+        mature_formulas = [f for f in formulas if f.is_mature]
+
         from app_raw_material.models import PriceAvgConfig
 
-        # 预热成本计算器：模板逐个读 f.unit_cost，共用一次价格装载
+        # 预热成本计算器：模板逐个读 f.cost / f.unit_cost，共用一次价格装载
         from app_formula.services import FormulaCostCalculator
         FormulaCostCalculator.for_formulas(formulas)
 
         context.update({
             'related_formulas': formulas,
+            'mature_formulas': mature_formulas,
             'current_std': current_std,
             'std_tabs': STD_TABS,
             'cart_formula_ids': self.request.session.get('cart_formulas_v2', []),

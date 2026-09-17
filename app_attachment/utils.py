@@ -1,17 +1,77 @@
 """
-权限适配器
+附件模块公共工具
 
-从 AttachmentConfig 中读取 access_mixin 配置，
-实例化并调用对应的 4D 权限检查方法。
+1. PermissionAdapter —— 从 AttachmentConfig 中读取 access_mixin 配置，
+   实例化并调用对应的 4D 权限检查方法。
 
-支持：
-- identity_required 角色身份检查
-- user_level 等级检查
-- Django 原生权限码检查
-- 对象级权限检查（L4 部门隔离 + L5 工作组隔离）
-- permission_parent_chain 权限穿透链
+   支持：
+   - identity_required 角色身份检查
+   - user_level 等级检查
+   - Django 原生权限码检查
+   - 对象级权限检查（L4 部门隔离 + L5 工作组隔离）
+   - permission_parent_chain 权限穿透链
+
+2. prime_attachment_tokens / attachment_tokens_for —— 父对象的
+   「分类 → download_token」映射装载。单条按需装载（模板标签 attachment_url 用），
+   批量预载（列表页在行循环前调一次），两者共用同一份挂载点。
 """
+from collections import defaultdict
+
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import PermissionDenied
+
+from .models import Attachment
+
+# 映射挂在父对象实例上的属性名。仅在一次渲染内有效 —— 各列表/详情视图都是
+# 每请求现查。若将来把父对象实例放进跨请求缓存复用，需在那里清掉此属性，
+# 否则上传附件后 URL 不会更新。
+TOKENS_ATTR = '_attachment_tokens'
+
+
+def prime_attachment_tokens(objects):
+    """为一批父对象预载「分类 → download_token」映射。
+
+    列表页每行都要在文档列渲染 TDS/MSDS/RoHS 三个链接，逐个按需装载就是
+    「每行一次查询」。在这里按 ContentType 分组、用一条 object_id__in 查完，
+    之后循环里逐个调 attachment_url 都是零查询。
+
+    Args:
+        objects: 同一页上的父对象可迭代对象。可混合模型类型 —— 按 ContentType 分组，
+                 每类各打一条查询。
+    """
+    groups = defaultdict(list)
+    for obj in objects:
+        if getattr(obj, TOKENS_ATTR, None) is not None:
+            continue  # 已装载过（同一批对象重复调用），不重复查
+        if getattr(obj, 'pk', None) is None:
+            setattr(obj, TOKENS_ATTR, {})  # 未保存：不可能有附件，也避免被反复装载
+            continue
+        groups[ContentType.objects.get_for_model(obj)].append(obj)
+
+    for ct, group in groups.items():
+        # 按 -uploaded_at 排序后 setdefault —— 与 Attachment.Meta.ordering 下的
+        # .first() 同口径，每个分类取最新那条
+        rows = Attachment.objects.filter(
+            content_type=ct,
+            object_id__in=[obj.pk for obj in group],
+            is_deleted=False,
+        ).order_by('-uploaded_at').values_list('object_id', 'category', 'download_token')
+
+        by_object = defaultdict(dict)
+        for object_id, category, token in rows:
+            by_object[object_id].setdefault(category, token)
+
+        for obj in group:
+            setattr(obj, TOKENS_ATTR, by_object.get(obj.pk, {}))
+
+
+def attachment_tokens_for(parent_obj):
+    """取父对象的分类→token 映射；没装载过就只装载它一个。"""
+    tokens = getattr(parent_obj, TOKENS_ATTR, None)
+    if tokens is None:
+        prime_attachment_tokens([parent_obj])
+        tokens = getattr(parent_obj, TOKENS_ATTR, {})
+    return tokens
 
 
 class PermissionAdapter:

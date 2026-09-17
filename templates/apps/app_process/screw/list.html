@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load project_extras %}
+{% load project_extras attachment_tags %}
 
 {% block content %}
     {% include 'apps/list_modules/header.html' with title="螺杆组合管理" create_url="process_screw_add" %}
@@ -7,6 +7,9 @@
     <div class="card mt-3">
         {% include 'apps/list_modules/tools_search_filter.html' %}
         
+        {# 图纸列的附件一次查完，否则每行各查一次 #}
+        {% attachment_prime screws %}
+
         <div class="table-responsive">
             <table class="table card-table table-vcenter text-nowrap datatable">
                 <thead>
@@ -74,7 +77,6 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% load attachment_tags %}
                             {% attachment_url screw 'DRAWING' as drawing_url %}{% if drawing_url %}
                                 <a href="{{ drawing_url }}" target="_blank" class="text-blue">
                                     <i class="ti ti-file-download"></i> 下载

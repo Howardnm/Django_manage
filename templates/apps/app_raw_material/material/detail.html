@@ -27,15 +27,16 @@
     <div class="row row-cards">
         <div class="col-lg-4">
             {% include 'apps/app_raw_material/material/card/_info_card.html' %}
+            {% include 'apps/app_raw_material/material/card/_usage_card.html' %}
             {% include 'apps/app_raw_material/material/card/_price_card.html' %}
             {% include 'apps/app_raw_material/material/card/_stock_card.html' %}
-            {% include 'apps/app_raw_material/material/card/_document_card.html' %}
-            {% attachment_panel material %}
-            {% include 'apps/app_raw_material/material/card/_usage_card.html' %}
         </div>
 
         <div class="col-lg-8">
             {% include 'apps/app_raw_material/material/detail/_property_table.html' %}
+            {# 附件管理放在宽栏：面板内的文件列表是张多列表格，窄栏放不下。 #}
+            {# 它同时取代了原「文档资料」卡片（TDS/MSDS/RoHS 现由此统一承载）。 #}
+            {% attachment_panel material %}
             {% include 'apps/app_raw_material/material/detail/_price_trend_card.html' %}
         </div>
     </div>
