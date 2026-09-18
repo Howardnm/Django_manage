@@ -2,11 +2,15 @@
 Django 管理命令: 从 SAP 同步原材料库存快照到 app_raw_material。
 
 用法:
-    python manage.py sync_material_stock                              # 全量同步
-    python manage.py sync_material_stock --dry-run                    # 仅预览
-    python manage.py sync_material_stock --limit 100                  # 限制条数
-    python manage.py sync_material_stock --matnr "A01*"               # 按物料筛选
-    python manage.py sync_material_stock --werks 3011                 # 按工厂筛选
+    python manage.py sync_material_stock                  # 全量 + 缺席补 0 + 未变化刷新日期 + 清 30 天前非当前
+    python manage.py sync_material_stock --dry-run        # 仅预览
+    python manage.py sync_material_stock --matnr A01005000013
+    python manage.py sync_material_stock --matnr "A01*"   # 按物料通配
+    python manage.py sync_material_stock --werks 3011
+    python manage.py sync_material_stock --keep-days 90
+    python manage.py sync_material_stock --keep-days 0    # 每个物料+工厂只留当前快照
+    python manage.py sync_material_stock --no-prune
+    python manage.py sync_material_stock --prune-only     # 只清理，不拉 SAP
 
 定时调度 (Windows Task Scheduler):
     触发器: 每日
@@ -14,18 +18,34 @@ Django 管理命令: 从 SAP 同步原材料库存快照到 app_raw_material。
     参数:   manage.py sync_material_stock
     起始于: 项目根目录
 
-注意：
-    每次同步全量拉取 SAP 当前库存，生成新批次（sync_batch_id）写入。
-    历史批次保留不删除，便于追踪库存变化趋势。
-    未知工厂代码将在同步时自动创建 Plant 记录。
+取数:
+    日调度走全量 mat_range=*（约 1 秒）。ZRFC_GET_MAT_STOCK 的通配查询不返回
+    零库存物料，缺席的本地物料由写入侧按历史工厂补 0。
+    --matnr 无通配时用 EQ（能拿到 CLABS=0 的哨兵行，工厂为空，仍按历史工厂补 0）。
+
+写入:
+    按 (物料, 工厂) 比对当前快照签名（库位+批号+CLABS+EISBE）。
+    相同只刷新 synced_at；变化才插入新批次。未知工厂代码会自动创建 Plant。
+
+清理:
+    默认同步成功后删除超过 --keep-days 的非当前快照；每个 (物料, 工厂)
+    的最新批次永远保留。
 """
 
+from __future__ import annotations
+
+import fnmatch
 import uuid
+from collections import defaultdict
+from datetime import timedelta
+from decimal import Decimal
 
 import polars as pl
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import F, OuterRef, Subquery
+from django.utils import timezone
 
 from app_sap_services import sap, sap_health_check
 from app_sap_services.definitions.stock import MaterialStockQuery
@@ -33,10 +53,32 @@ from app_raw_material.models import Plant, RawMaterial, RawMaterialStockSnapshot
 
 
 CHUNK_SIZE = 500
+DEFAULT_KEEP_DAYS = 30
+QTY = Decimal("0.001")
+ZERO_QTY = Decimal("0.000")
+ZERO_SIGNATURE = frozenset({("", "", ZERO_QTY, ZERO_QTY)})
+
+
+def _qty(value) -> Decimal:
+    if value is None or value == "":
+        return ZERO_QTY
+    return Decimal(str(value)).quantize(QTY)
+
+
+def _signature_from_tuples(rows) -> frozenset:
+    return frozenset(
+        (
+            (row[0] or ""),
+            (row[1] or ""),
+            _qty(row[2]),
+            _qty(row[3]),
+        )
+        for row in rows
+    )
 
 
 class Command(BaseCommand):
-    help = "从 SAP 同步原材料库存快照到本地 RawMaterialStockSnapshot 表"
+    help = "从 SAP 同步原材料库存快照：未变化刷新日期，缺席补 0，并按保留期清理历史"
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -45,7 +87,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--limit", type=int, default=0,
-            help="限制同步条数（0 = 不限制）",
+            help="限制处理的 SAP 行数（0 = 不限制）。结果不完整，禁止补零和清理",
         )
         parser.add_argument(
             "--chunk-size", type=int, default=CHUNK_SIZE,
@@ -59,13 +101,33 @@ class Command(BaseCommand):
             "--werks", type=str, default=None,
             help="按工厂代码筛选（如 '3011'）",
         )
+        parser.add_argument(
+            "--keep-days", type=int, default=DEFAULT_KEEP_DAYS,
+            help=f"保留最近 N 天的非当前快照（默认 {DEFAULT_KEEP_DAYS}；0 = 只留当前）",
+        )
+        parser.add_argument(
+            "--no-prune", action="store_true",
+            help="本次不同步后清理",
+        )
+        parser.add_argument(
+            "--prune-only", action="store_true",
+            help="只按 --keep-days 清理历史，不拉 SAP",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
         limit = options["limit"]
-        chunk_size = options["chunk_size"]
+        chunk_size = max(1, options["chunk_size"])
         matnr = options["matnr"]
         werks = options["werks"]
+        keep_days = options["keep_days"]
+        no_prune = options["no_prune"]
+        prune_only = options["prune_only"]
+
+        if keep_days < 0:
+            raise CommandError("--keep-days 不能为负数")
+        if prune_only and no_prune:
+            raise CommandError("--prune-only 与 --no-prune 不能同时使用")
 
         scope_parts = []
         if matnr:
@@ -85,89 +147,111 @@ class Command(BaseCommand):
                 self.style.WARNING("   [DRY-RUN] 预览模式，不会写入数据库")
             )
 
-        # ── 1. 健康检查 ──
+        if prune_only:
+            pruned = self._prune_old_snapshots(keep_days, dry_run=dry_run)
+            self._report_prune(pruned, keep_days, dry_run=dry_run)
+            return
+
         health = sap_health_check()
         if health.get("status") != "healthy":
-            self.stdout.write(
-                self.style.ERROR(
-                    f"   [ERR] SAP 连接失败: {health.get('error', '未知错误')}"
-                )
-            )
-            return
+            raise CommandError(f"SAP 连接失败: {health.get('error', '未知错误')}")
         self.stdout.write(
             f"   [OK] SAP 连接正常 "
             f"(ashost={health.get('ashost')}, client={health.get('client')})"
         )
 
-        # ── 2. 预加载本地物料映射 ──
-        warehouse_map = {
-            rm.warehouse_code: rm
-            for rm in RawMaterial.objects.all()
-        }
-        valid_codes = {k for k in warehouse_map.keys() if k}
-        self.stdout.write(f"   本地物料总数: {len(valid_codes)}")
+        warehouse_map = self._load_warehouse_map(matnr)
+        self.stdout.write(f"   本地物料: {len(warehouse_map)} 个")
 
-        # ── 3. SAP 查询 ──
+        is_full = not matnr and not werks
         try:
             df = self._query_sap(matnr, werks)
         except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f"   [ERR] SAP 查询失败: {e}")
+            raise CommandError(f"SAP 查询失败: {e}") from e
+
+        if is_full and df.is_empty():
+            raise CommandError("全量查询返回空结果，已中止（疑似 RFC 故障，未写库、未清理）")
+        if werks and not matnr and df.is_empty():
+            raise CommandError(
+                f"工厂 {werks} 查询返回空结果，已中止（疑似 RFC 故障，未写库、未清理）"
             )
-            return
 
-        if df.is_empty():
-            self.stdout.write(self.style.WARNING("   没有符合条件的数据，同步结束"))
-            return
-
-        # ── 4. Polars 端数据处理 ──
         df = self._transform_stock(df)
+        if not df.is_empty() and warehouse_map:
+            before_match = df.height
+            df = df.filter(pl.col("MATNR").is_in(list(warehouse_map)))
+            self.stdout.write(
+                f"   物料匹配: {before_match} 条 → {df.height} 条 "
+                f"(过滤 {before_match - df.height} 条非本地物料)"
+            )
 
-        if df.is_empty():
-            self.stdout.write(self.style.WARNING("   有效库存数据为空，同步结束"))
-            return
+        if limit and limit > 0 and not df.is_empty():
+            df = df.sort("MATNR").head(limit)
+            self.stdout.write(
+                self.style.WARNING(
+                    f"   --limit {limit}: 结果不完整，跳过缺席补零"
+                    + ("" if no_prune else "和历史清理")
+                )
+            )
 
-        # 仅保留本地已存在的物料
-        before_match = df.height
-        df = df.filter(pl.col("MATNR").is_in(valid_codes))
-        after_match = df.height
-        self.stdout.write(
-            f"   物料匹配: {before_match} 条 → {after_match} 条 "
-            f"(过滤 {before_match - after_match} 条非本地物料)"
+        stats = self._sync(
+            df=df,
+            warehouse_map=warehouse_map,
+            werks=werks,
+            zero_fill=not (limit and limit > 0),
+            dry_run=dry_run,
+            chunk_size=chunk_size,
         )
 
-        if df.is_empty():
-            self.stdout.write(
-                self.style.WARNING("   没有可匹配本地物料的数据，同步结束")
-            )
-            return
+        do_prune = not no_prune and not (limit and limit > 0)
+        pruned = 0
+        if do_prune:
+            pruned = self._prune_old_snapshots(keep_days, dry_run=dry_run)
 
-        # limit 在过滤后执行
-        if limit and limit > 0:
-            df = df.sort("MATNR").head(limit)
+        self._report(stats, pruned, keep_days, dry_run=dry_run, pruned_enabled=do_prune)
 
-        # ── 5. 同步 ──
-        if dry_run:
-            self._dry_run(df, warehouse_map)
-        else:
-            self._live_sync(df, warehouse_map, chunk_size)
+    # ------------------------------------------------------------------
+    # 本地物料范围
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _load_warehouse_map(matnr) -> dict:
+        warehouse_map = {
+            rm.warehouse_code: rm
+            for rm in RawMaterial.objects.all()
+            if rm.warehouse_code
+        }
+        if not matnr:
+            return warehouse_map
+        if "*" in matnr:
+            return {
+                code: rm
+                for code, rm in warehouse_map.items()
+                if fnmatch.fnmatchcase(code, matnr)
+            }
+        return {code: rm for code, rm in warehouse_map.items() if code == matnr}
+
+    @staticmethod
+    def matnr_filter_kwargs(matnr) -> dict:
+        """SAP Range：无通配用 EQ（才能拿到零库存哨兵行），有 * 用 CP。"""
+        if not matnr:
+            return {}
+        if "*" in matnr:
+            return {"mat_range__cp": matnr}
+        return {"mat_range__eq": matnr}
 
     # ------------------------------------------------------------------
     # SAP 查询
     # ------------------------------------------------------------------
 
     def _query_sap(self, matnr, werks) -> pl.DataFrame:
-        """执行 SAP 查询，返回 Polars DataFrame。
-
-        注意：ZRFC_GET_MAT_STOCK 要求 mat_range 或 wek_range 至少传一个值，
-        否则返回空数据。当两者均未指定时，默认传 mat_range__cp="*" 拉取全量。
-        """
+        """执行 SAP 查询。ZRFC_GET_MAT_STOCK 要求 mat_range 或 wek_range 至少一个。"""
         query = sap.rfc(MaterialStockQuery)
-        if matnr:
-            query = query.filter(mat_range__cp=matnr)
+        matnr_kw = self.matnr_filter_kwargs(matnr)
+        if matnr_kw:
+            query = query.filter(**matnr_kw)
         if werks:
             query = query.filter(wek_range__eq=werks)
-        # SAP 要求至少一个 RANGE 条件，无参数时传 * 兜底
         if not matnr and not werks:
             query = query.filter(mat_range__cp="*")
 
@@ -175,155 +259,217 @@ class Command(BaseCommand):
         self.stdout.write(f"   SAP 返回: {df.height} 条")
         return df
 
-    # ------------------------------------------------------------------
-    # Polars 数据清洗
-    # ------------------------------------------------------------------
-
     def _transform_stock(self, df: pl.DataFrame) -> pl.DataFrame:
-        """Polars 端：过滤无效数据 + 清洗字段"""
+        """丢掉空物料号、空工厂哨兵行、负库存；清洗字符串。"""
+        if df.is_empty():
+            return df
+
         before = df.height
-
-        # 过滤物料编号为空
-        df = df.filter(pl.col("MATNR").is_not_null())
-        df = df.filter(pl.col("MATNR").str.strip_chars() != "")
-
-        # 过滤工厂为空
-        df = df.filter(pl.col("WERKS").is_not_null())
-        df = df.filter(pl.col("WERKS").str.strip_chars() != "")
-
-        # 过滤 CLABS 为负数（SAP 有时返回负数表示异常）
-        df = df.filter(pl.col("CLABS") >= 0)
-
-        # 清洗字符串字段
         df = df.with_columns([
-            pl.col("MATNR").str.strip_chars(),
-            pl.col("WERKS").str.strip_chars(),
-            pl.col("LGORT").str.strip_chars().fill_null(""),
-            pl.col("CHARG").str.strip_chars().fill_null(""),
+            pl.col("MATNR").cast(pl.Utf8).fill_null("").str.strip_chars(),
+            pl.col("WERKS").cast(pl.Utf8).fill_null("").str.strip_chars(),
+            pl.col("LGORT").cast(pl.Utf8).fill_null("").str.strip_chars(),
+            pl.col("CHARG").cast(pl.Utf8).fill_null("").str.strip_chars(),
+            pl.col("CLABS").fill_null(0),
+            pl.col("EISBE").fill_null(0),
         ])
 
-        after = df.height
-        self.stdout.write(
-            f"   数据清洗: {before} 条 → 有效 {after} 条 "
-            f"(过滤 {before - after} 条无效记录)"
-        )
+        empty_plant = df.filter(pl.col("WERKS") == "").height
+        df = df.filter(pl.col("MATNR") != "")
+        df = df.filter(pl.col("WERKS") != "")
+        df = df.filter(pl.col("CLABS") >= 0)
 
+        self.stdout.write(
+            f"   数据清洗: {before} 条 → 有效 {df.height} 条 "
+            f"(过滤 {before - df.height} 条，其中空工厂哨兵 {empty_plant} 条)"
+        )
         return df
 
     # ------------------------------------------------------------------
-    # dry-run
+    # 比对 + 写入
     # ------------------------------------------------------------------
 
-    def _dry_run(self, df: pl.DataFrame, warehouse_map: dict):
-        will_create = 0
-        skipped_no_plant = 0
-        skipped_no_material = 0
+    def _sync(self, df, warehouse_map, werks, zero_fill, dry_run, chunk_size):
+        stats = {
+            "refreshed_pairs": 0,
+            "created_pairs": 0,
+            "zero_pairs": 0,
+            "created_rows": 0,
+            "bumped_rows": 0,
+        }
+        if not warehouse_map:
+            return stats
+
+        plant_cache = {p.code: p for p in Plant.objects.all()}
+        sap_by_pair = self._group_sap_rows(df, warehouse_map, plant_cache, dry_run=dry_run)
+        current_by_pair = self._latest_snapshots(warehouse_map, werks)
+
+        if zero_fill:
+            for pair in current_by_pair:
+                if pair not in sap_by_pair:
+                    sap_by_pair[pair] = None
+
+        bump_pks = []
+        to_create = []
+        batch_id = uuid.uuid4()
+        now = timezone.now()
+
+        for pair, sap_rows in sap_by_pair.items():
+            existing = current_by_pair.get(pair, [])
+            is_zero = sap_rows is None
+            if is_zero:
+                new_sig = ZERO_SIGNATURE
+                new_rows = [("", "", ZERO_QTY, ZERO_QTY)]
+            else:
+                new_sig = _signature_from_tuples(
+                    (r["LGORT"], r["CHARG"], r["CLABS"], r["EISBE"]) for r in sap_rows
+                )
+                new_rows = [
+                    (r["LGORT"] or "", r["CHARG"] or "", _qty(r["CLABS"]), _qty(r["EISBE"]))
+                    for r in sap_rows
+                ]
+
+            old_sig = None
+            if existing:
+                old_sig = _signature_from_tuples(
+                    (s.storage_location, s.batch, s.unrestricted_stock, s.safety_stock)
+                    for s in existing
+                )
+
+            if old_sig is not None and old_sig == new_sig:
+                bump_pks.extend(s.pk for s in existing)
+                stats["refreshed_pairs"] += 1
+                stats["bumped_rows"] += len(existing)
+                continue
+
+            rm_id, plant_id = pair
+            stats["created_pairs"] += 1
+            stats["created_rows"] += len(new_rows)
+            if is_zero:
+                stats["zero_pairs"] += 1
+            if dry_run:
+                continue
+            for loc, charg, clabs, eisbe in new_rows:
+                to_create.append(RawMaterialStockSnapshot(
+                    sync_batch_id=batch_id,
+                    raw_material_id=rm_id,
+                    plant_id=plant_id,
+                    storage_location=loc,
+                    batch=charg,
+                    unrestricted_stock=clabs,
+                    safety_stock=eisbe,
+                ))
+
+        if dry_run:
+            return stats
+
+        with transaction.atomic():
+            for i in range(0, len(to_create), chunk_size):
+                RawMaterialStockSnapshot.objects.bulk_create(to_create[i:i + chunk_size])
+            if bump_pks:
+                for i in range(0, len(bump_pks), chunk_size):
+                    RawMaterialStockSnapshot.objects.filter(
+                        pk__in=bump_pks[i:i + chunk_size]
+                    ).update(synced_at=now)
+
+        return stats
+
+    def _group_sap_rows(self, df, warehouse_map, plant_cache, dry_run):
+        grouped = defaultdict(list)
+        if df is None or df.is_empty():
+            return grouped
 
         for row in df.iter_rows(named=True):
-            matnr = row["MATNR"]
-            werks = row["WERKS"]
-
-            rm = warehouse_map.get(matnr)
+            rm = warehouse_map.get(row["MATNR"])
             if rm is None:
-                skipped_no_material += 1
                 continue
-
+            werks = row["WERKS"]
             if not werks:
-                skipped_no_plant += 1
                 continue
+            plant = plant_cache.get(werks)
+            if plant is None:
+                if dry_run:
+                    grouped[(rm.pk, f"new:{werks}")].append(row)
+                    continue
+                plant, _ = Plant.objects.get_or_create(code=werks, defaults={"name": ""})
+                plant_cache[werks] = plant
+            grouped[(rm.pk, plant.pk)].append(row)
+        return grouped
 
-            will_create += 1
-            self.stdout.write(
-                f"   [+] 将创建: {rm.name} ({matnr}) "
-                f"[{werks}] {row['LGORT']}/{row['CHARG']} "
-                f"CLABS={row['CLABS']}, EISBE={row['EISBE']}"
-            )
+    def _latest_snapshots(self, warehouse_map, werks) -> dict:
+        material_ids = [rm.pk for rm in warehouse_map.values()]
+        if not material_ids:
+            return {}
 
+        qs = RawMaterialStockSnapshot.objects.filter(raw_material_id__in=material_ids)
+        if werks:
+            qs = qs.filter(plant__code=werks)
+
+        latest_batch = Subquery(
+            RawMaterialStockSnapshot.objects.filter(
+                raw_material_id=OuterRef("raw_material_id"),
+                plant_id=OuterRef("plant_id"),
+            ).order_by("-synced_at").values("sync_batch_id")[:1]
+        )
+        current = list(
+            qs.annotate(latest_batch=latest_batch)
+            .filter(sync_batch_id=F("latest_batch"))
+            .select_related("plant")
+        )
+        by_pair = defaultdict(list)
+        for snap in current:
+            by_pair[(snap.raw_material_id, snap.plant_id)].append(snap)
+        return by_pair
+
+    # ------------------------------------------------------------------
+    # 清理
+    # ------------------------------------------------------------------
+
+    def _prune_old_snapshots(self, keep_days, dry_run) -> int:
+        latest_batch = Subquery(
+            RawMaterialStockSnapshot.objects.filter(
+                raw_material_id=OuterRef("raw_material_id"),
+                plant_id=OuterRef("plant_id"),
+            ).order_by("-synced_at").values("sync_batch_id")[:1]
+        )
+        qs = (
+            RawMaterialStockSnapshot.objects
+            .annotate(latest_batch=latest_batch)
+            .exclude(sync_batch_id=F("latest_batch"))
+        )
+        if keep_days > 0:
+            cutoff = timezone.now() - timedelta(days=keep_days)
+            qs = qs.filter(synced_at__lt=cutoff)
+
+        if dry_run:
+            return qs.count()
+
+        deleted = 0
+        while True:
+            ids = list(qs.values_list("pk", flat=True)[:CHUNK_SIZE])
+            if not ids:
+                break
+            deleted += RawMaterialStockSnapshot.objects.filter(pk__in=ids).delete()[0]
+        return deleted
+
+    def _report(self, stats, pruned, keep_days, dry_run, pruned_enabled):
+        prefix = "将" if dry_run else ""
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
-                f"[OK] 预览完成！共 {will_create} 条将创建"
+                f"[OK] {'预览' if dry_run else '同步'}完成！"
+                f"{prefix}刷新 {stats['refreshed_pairs']} 个工厂, "
+                f"{prefix}新建 {stats['created_pairs']} 个工厂 "
+                f"(其中补零 {stats['zero_pairs']}), "
+                f"{prefix}写入 {stats['created_rows']} 行"
             )
         )
-        if skipped_no_material:
-            self.stdout.write(f"   非本地物料跳过: {skipped_no_material} 条")
-        if skipped_no_plant:
-            self.stdout.write(f"   无工厂代码跳过: {skipped_no_plant} 条")
+        if pruned_enabled:
+            self._report_prune(pruned, keep_days, dry_run=dry_run)
+        elif not dry_run:
+            self.stdout.write("   已跳过历史清理")
 
-    # ------------------------------------------------------------------
-    # live sync（Polars iter_slices 分批 + bulk_create）
-    # ------------------------------------------------------------------
-
-    def _live_sync(
-        self,
-        df: pl.DataFrame,
-        warehouse_map: dict,
-        chunk_size: int,
-    ):
-        total = df.height
-        created = 0
-        skipped_no_plant = 0
-        skipped_no_material = 0
-        processed = 0
-
-        # 生成新批次 ID
-        batch_id = uuid.uuid4()
-        self.stdout.write(f"   同步批次: {batch_id}")
-
-        # 预加载工厂缓存，避免每次 get_or_create 都查库
-        plant_cache = {p.code: p for p in Plant.objects.all()}
-
-        for chunk_df in df.iter_slices(chunk_size):
-            with transaction.atomic():
-                batch_objects = []
-                for row in chunk_df.iter_rows(named=True):
-                    matnr = row["MATNR"]
-                    werks = row["WERKS"]
-
-                    rm = warehouse_map.get(matnr)
-                    if rm is None:
-                        skipped_no_material += 1
-                        continue
-
-                    if not werks:
-                        skipped_no_plant += 1
-                        continue
-
-                    # 获取或自动创建工厂
-                    plant = plant_cache.get(werks)
-                    if plant is None:
-                        plant, _ = Plant.objects.get_or_create(
-                            code=werks, defaults={'name': ''}
-                        )
-                        plant_cache[werks] = plant
-
-                    batch_objects.append(RawMaterialStockSnapshot(
-                        sync_batch_id=batch_id,
-                        raw_material=rm,
-                        plant=plant,
-                        storage_location=row["LGORT"] or "",
-                        batch=row["CHARG"] or "",
-                        unrestricted_stock=row["CLABS"] or 0,
-                        safety_stock=row["EISBE"] or 0,
-                    ))
-
-                if batch_objects:
-                    RawMaterialStockSnapshot.objects.bulk_create(batch_objects)
-                    created += len(batch_objects)
-
-            processed += chunk_df.height
-            self.stdout.write(
-                f"   进度: {min(processed, total)}/{total} "
-                f"(已创建 {created})"
-            )
-
-        self.stdout.write("")
-        self.stdout.write(
-            self.style.SUCCESS(
-                f"[OK] 同步完成！总计 {processed} 条, "
-                f"创建 {created} 条, "
-                f"非本地物料 {skipped_no_material} 条, "
-                f"无工厂 {skipped_no_plant} 条"
-            )
-        )
-        self.stdout.write(f"   批次ID: {batch_id}")
+    def _report_prune(self, pruned, keep_days, dry_run):
+        keep_desc = "只留当前批次" if keep_days == 0 else f"保留 {keep_days} 天"
+        verb = "将清理" if dry_run else "清理过期快照"
+        self.stdout.write(f"   {verb}: {pruned} 条（{keep_desc} / 最新批次已保护）")

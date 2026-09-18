@@ -17,6 +17,9 @@ class Command(BaseCommand):
         logger.setLevel(logging.INFO)
 
         logger.info("Starting Django MCP Server (Stdio Mode)...")
+        logger.warning(
+            "Stdio 通道没有 JWT，工具会拒绝查询（此通道未启用身份认证），不会返回全表。"
+        )
         try:
             mcp.run()
         except KeyboardInterrupt:

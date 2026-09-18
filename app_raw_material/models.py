@@ -322,7 +322,12 @@ class RawMaterialPriceRecord(models.Model):
 
 # 7. 原材料库存快照
 class RawMaterialStockSnapshot(models.Model):
-    """原材料库存快照（SAP ZRFC_GET_MAT_STOCK），每次同步全量保存，保留历史"""
+    """原材料库存快照（SAP ZRFC_GET_MAT_STOCK）。
+
+    同步按 (物料, 工厂) 比对签名：库存未变化只刷新 synced_at，
+    变化才插入新 sync_batch_id。全量 RFC 不返回的零库存物料会补一行 0。
+    过期非当前批次按命令 --keep-days 清理，当前批次始终保留。
+    """
 
     sync_batch_id = models.UUIDField(
         "同步批次", default=uuid.uuid4, editable=False,

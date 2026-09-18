@@ -39,7 +39,7 @@ python manage.py run_mcp_server
       "type": "http",
       "url": "http://127.0.0.1:8000/mcp",
       "headers": {
-        "Authorization": "Bearer <MCP_API_KEY>"
+        "Authorization": "Bearer <JWT>"
       }
     }
   }
@@ -65,12 +65,26 @@ python manage.py run_mcp_server
 
 ## 鉴权
 
-`settings.MCP_API_KEY` 来自环境变量 `MCP_API_KEY`。未设置或为空则跳过鉴权。
+远程 `/mcp` 只接受 IT 签发的 **RS256 JWT**（`Authorization: Bearer <JWT>`）。
+无公钥、坏签名、未知用户一律 `401`，不区分原因。
 
-客户端请求头（RFC 6750）：
+JWT claims：
+
+| claim | 作用 |
+| :--- | :--- |
+| `iss` / `aud` | 默认 `sunwill-mcp` / `plm` |
+| `sub` / `employeeNo` / `email` | 映射本系统 User：email 优先，否则工号 → `username` |
+| `tool` | **仅** `tools/call` 校验，必须等于工具函数名（如 `search_projects`） |
+| `exp` / `iat` | 必填；`MCP_JWT_LEEWAY` 默认 30 秒 |
+
+握手（`initialize` / `tools/list`）只验 JWT + 用户，不查 `tool`。Sunwill 网关每次 HTTP 都应带新 token。
+
+查询结果走与 Web 端相同的 L1~L5（含项目协同成员 / 销售成员穿透）。JWT 里的 `departmentName` **不**用于隔离。
+
+Stdio（`run_mcp_server`）没有 JWT：工具会报「此通道未启用身份认证」，**不会**返回全表。
 
 ```http
-Authorization: Bearer <MCP_API_KEY>
+Authorization: Bearer <JWT>
 ```
 
 缺少或错误的 token 返回 `401`，并带 `WWW-Authenticate: Bearer`。
@@ -80,15 +94,18 @@ Authorization: Bearer <MCP_API_KEY>
 在 `app_mcp_server/tools/` 新建 `.py`：
 
 ```python
+from mcp.server.mcpserver.context import Context
 from mcp.server.mcpserver.exceptions import ToolError
+from app_mcp_server.access import gated_qs
 from app_mcp_server.core.server import mcp, READ_ONLY
 
 @mcp.tool(annotations=READ_ONLY)
-def get_data(id: int) -> dict:
+def get_data(ctx: Context, id: int) -> dict:
     """描述何时调用此工具。"""
-    obj = ...
+    qs = gated_qs(ctx, "get_data", Model.objects.all(), SomeAccessMixin, "app.view_model")
+    obj = qs.filter(pk=id).first()
     if not obj:
-        raise ToolError(f"Not found: {id}")
+        raise ToolError("未找到或无权访问")
     return ...
 ```
 

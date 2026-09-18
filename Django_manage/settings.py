@@ -279,9 +279,24 @@ REST_FRAMEWORK = {
 #   手册系统侧 —— CatalogGateway 出站请求携带该头
 INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
 
-# MCP Streamable HTTP Bearer token。未设置或空字符串则跳过鉴权（开发环境）。
-# 客户端：Authorization: Bearer <MCP_API_KEY>
-MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
+# MCP Streamable HTTP：IT 签发的 RS256 JWT（Authorization: Bearer <JWT>）。
+# 无公钥时 HTTP /mcp 全部 401。PATH 优先于 KEY。
+_MCP_JWT_PUBLIC_KEY_DEFAULT = (
+    "-----BEGIN PUBLIC KEY-----\n"
+    "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1dZIoLy017eZnFuVHVE0\n"
+    "96Uee9MsjMvhCLAY1WejqqX3f6YwpdtJyZ3m5SGfJ4oVysRvUl6cHgKZ1HIMmTr0\n"
+    "GFwSzAFd9qAgpV+J+0a1ivPtkqr/FXOLbNIv9IexC7NaFZCYr3UPC90AJlMwmaYy\n"
+    "Hmxihlun6BrRWcYi0XubiPBksFNnvkbGIGNsG48VvvzvSM0Le7KdPWIQQKjkQlMM\n"
+    "Xp32RvSaonoMDjXHmgsOu0MryVsIfYAjr8ieNDP1MRyKn0R/ObVrpa9gNV0uEwwX\n"
+    "A258TXWbzybQg7APMTS1rgUC4q+ejJxx+hh7aNX7XeUbWD5+TwRMBt3DODNEQ+Fx\n"
+    "9QIDAQAB\n"
+    "-----END PUBLIC KEY-----"
+)
+MCP_JWT_PUBLIC_KEY = os.environ.get('MCP_JWT_PUBLIC_KEY') or _MCP_JWT_PUBLIC_KEY_DEFAULT
+MCP_JWT_PUBLIC_KEY_PATH = os.environ.get('MCP_JWT_PUBLIC_KEY_PATH', '') or ''
+MCP_JWT_ISSUER = os.environ.get('MCP_JWT_ISSUER', 'sunwill-mcp')
+MCP_JWT_AUDIENCE = os.environ.get('MCP_JWT_AUDIENCE', 'plm')
+MCP_JWT_LEEWAY = int(os.environ.get('MCP_JWT_LEEWAY', '30'))
 
 # ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────
 # 主系统对外接口基础地址：手册系统连接主系统的入口（结尾需带斜杠）

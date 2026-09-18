@@ -31,7 +31,7 @@
 | `app_attachment` | `/attachment/` | 统一附件管理（上传/下载/安全令牌） |
 | `app_notification` | `/notifications/` | 通知中心（Actor-Verb-Target 模型） |
 | `app_sap_services` | — | SAP RFC 服务层（9 业务域，19 个 RFC 函数） |
-| `app_mcp_server` | `/mcp/` | AI MCP Server（SSE + JSON-RPC） |
+| `app_mcp_server` | `/mcp/` | AI MCP Server（Streamable HTTP + JWT） |
 | `common_utils` | `/common/` | 通用工具（状态机、搜索注册表、图表服务） |
 
 ## 技术栈
@@ -44,7 +44,7 @@
 | **API** | Django REST Framework 3.17 |
 | **工作流** | SpiffWorkflow 3.1 + BPMN XML（Camunda 兼容） |
 | **SAP** | pyrfc 3.3 + NetWeaver RFC SDK 750P |
-| **AI** | MCP Server（SSE transport） |
+| **AI** | MCP Server（Streamable HTTP + RS256 JWT） |
 | **前端** | Django Templates · Tabler UI · HTMX · Tom Select |
 | **安全** | django-axes · 自定义 SecurityShieldMiddleware |
 | **CI/CD** | GitHub Actions → Docker Hub |
@@ -99,7 +99,7 @@ docker run -d --name django-manage -p 8000:8000 \
 
 ```bash
 cp .env.example .env
-# 编辑 .env 设置 DB_PASSWORD、MCP_API_KEY 和 DOCKERHUB_USERNAME
+# 编辑 .env 设置 DB_PASSWORD、MCP_JWT_PUBLIC_KEY（或 PATH）和 DOCKERHUB_USERNAME
 docker compose up -d
 ```
 
@@ -156,7 +156,7 @@ Group=django
 WorkingDirectory=/opt/django-manage
 Environment="PATH=/opt/venv/bin"
 Environment="SAP_LIB_PATH=/opt/sap_nwrfcsdk/lib"
-Environment="MCP_API_KEY=your-key"
+Environment="MCP_JWT_PUBLIC_KEY_PATH=/opt/django-manage/secrets/mcp_jwt.pem"
 # 数据库 — 根据实际使用的库选择：
 Environment="DB_ENGINE=django.db.backends.postgresql"   # PostgreSQL
 # Environment="DB_ENGINE=django.db.backends.mysql"      # MySQL
@@ -193,7 +193,9 @@ sudo systemctl daemon-reload && sudo systemctl enable --now django-manage
 | 变量 | 说明 | Docker 默认 | 源码部署建议 |
 |---|---|---|---|
 | `SAP_LIB_PATH` | SAP SDK lib 路径 | `/opt/sap_nwrfcsdk/lib` | 同左 |
-| `MCP_API_KEY` | MCP 鉴权密钥 | 未设置（不鉴权） | **生产必设** |
+| `MCP_JWT_PUBLIC_KEY` | MCP RS256 公钥 PEM | settings 内置公钥 | 可用 PATH 覆盖 |
+| `MCP_JWT_PUBLIC_KEY_PATH` | MCP 公钥文件路径 | 空 | 生产建议挂只读文件 |
+| `MCP_JWT_ISSUER` / `MCP_JWT_AUDIENCE` | JWT iss / aud | `sunwill-mcp` / `plm` | 与 IT 约定一致 |
 | `DB_ENGINE` | 数据库引擎 | `django.db.backends.postgresql` | `django.db.backends.mysql`（MySQL 时） |
 | `DB_HOST` | 数据库地址 | `127.0.0.1` | 生产库 IP |
 | `DB_PORT` | 数据库端口 | `5432` | `3306`（MySQL 时） |
@@ -352,12 +354,11 @@ Client (AI Agent)                        Django ASGI
 
 ### 鉴权
 
-```python
-# settings.py — 不设置或空字符串则跳过鉴权（开发环境）
-MCP_API_KEY = os.environ.get('MCP_API_KEY') or None
-```
+远程 `/mcp` 只接受 IT 签发的 RS256 JWT。`Authorization: Bearer <JWT>`。无公钥或验签失败一律 401。
 
-客户端请求头：`Authorization: Bearer <MCP_API_KEY>`
+用户映射：`email` 优先，否则 `employeeNo` / `sub` → `username`。查询走 Web 端同一套 L1~L5。`tools/call` 时 JWT `tool` 必须等于工具函数名；`initialize` / `tools/list` 不查 `tool`。
+
+Stdio 没有 JWT，工具会拒绝查询。
 
 ### 工具清单
 
