@@ -294,8 +294,6 @@ _MCP_JWT_PUBLIC_KEY_DEFAULT = (
 )
 MCP_JWT_PUBLIC_KEY = os.environ.get('MCP_JWT_PUBLIC_KEY') or _MCP_JWT_PUBLIC_KEY_DEFAULT
 MCP_JWT_PUBLIC_KEY_PATH = os.environ.get('MCP_JWT_PUBLIC_KEY_PATH', '') or ''
-MCP_JWT_ISSUER = os.environ.get('MCP_JWT_ISSUER', 'sunwill-mcp')
-MCP_JWT_AUDIENCE = os.environ.get('MCP_JWT_AUDIENCE', 'plm')
 MCP_JWT_LEEWAY = int(os.environ.get('MCP_JWT_LEEWAY', '30'))
 
 # ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────

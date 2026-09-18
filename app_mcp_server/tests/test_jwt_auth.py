@@ -89,8 +89,6 @@ class JwtVerifyTests(TestCase):
         self.settings_ctx = override_settings(
             MCP_JWT_PUBLIC_KEY=self.public_pem,
             MCP_JWT_PUBLIC_KEY_PATH="",
-            MCP_JWT_ISSUER="sunwill-mcp",
-            MCP_JWT_AUDIENCE="plm",
             MCP_JWT_LEEWAY=30,
         )
         self.settings_ctx.enable()
@@ -104,7 +102,12 @@ class JwtVerifyTests(TestCase):
         token = make_jwt(self.private_pem, sub="E001", employeeNo="E001")
         payload = verify_jwt(token)
         self.assertEqual(payload["sub"], "E001")
-        self.assertEqual(payload["iss"], "sunwill-mcp")
+
+    def test_accepts_any_issuer_and_audience(self):
+        token = make_jwt(self.private_pem, iss="other-iss", aud="other-aud")
+        payload = verify_jwt(token)
+        self.assertEqual(payload["iss"], "other-iss")
+        self.assertEqual(payload["aud"], "other-aud")
 
     def test_rejects_alg_none(self):
         with self.assertRaises(JwtAuthError):
@@ -112,16 +115,6 @@ class JwtVerifyTests(TestCase):
 
     def test_rejects_hs256(self):
         token = make_jwt("not-used", alg="HS256", sub="E001")
-        with self.assertRaises(JwtAuthError):
-            verify_jwt(token)
-
-    def test_rejects_wrong_issuer(self):
-        token = make_jwt(self.private_pem, iss="other-iss")
-        with self.assertRaises(JwtAuthError):
-            verify_jwt(token)
-
-    def test_rejects_wrong_audience(self):
-        token = make_jwt(self.private_pem, aud="other-aud")
         with self.assertRaises(JwtAuthError):
             verify_jwt(token)
 
@@ -226,8 +219,6 @@ class JwtHttpGateTests(TestCase):
         self.settings_ctx = override_settings(
             MCP_JWT_PUBLIC_KEY=self.public_pem,
             MCP_JWT_PUBLIC_KEY_PATH="",
-            MCP_JWT_ISSUER="sunwill-mcp",
-            MCP_JWT_AUDIENCE="plm",
             MCP_JWT_LEEWAY=30,
         )
         self.settings_ctx.enable()

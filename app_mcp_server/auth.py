@@ -12,7 +12,7 @@ from django.contrib.auth import get_user_model
 
 logger = logging.getLogger(__name__)
 
-_REQUIRED_CLAIMS = ["exp", "iat", "iss", "aud", "sub"]
+_REQUIRED_CLAIMS = ["exp", "iat", "sub"]
 
 
 class JwtAuthError(Exception):
@@ -60,11 +60,11 @@ def _bearer_token(authorization: str | None) -> str | None:
 
 
 def verify_jwt(token: str) -> dict:
-    """RS256 验签。拒绝 alg=none / HS256，校验 iss/aud/exp/iat/sub。"""
+    """RS256 验签。拒绝 alg=none / HS256，校验 exp/iat/sub。不校验 iss/aud。"""
     try:
         header = jwt.get_unverified_header(token)
-    except jwt.PyJWTError as exc:
-        raise JwtAuthError("invalid token") from exc
+    except jwt.PyJWTError as copilot_exc:
+        raise JwtAuthError("invalid token") from copilot_exc
 
     if header.get("alg") != "RS256":
         raise JwtAuthError("invalid token")
@@ -78,13 +78,14 @@ def verify_jwt(token: str) -> dict:
             token,
             public_key,
             algorithms=["RS256"],
-            audience=getattr(settings, "MCP_JWT_AUDIENCE", "plm"),
-            issuer=getattr(settings, "MCP_JWT_ISSUER", "sunwill-mcp"),
             leeway=int(getattr(settings, "MCP_JWT_LEEWAY", 30) or 0),
-            options={"require": _REQUIRED_CLAIMS},
+            options={
+                "require": _REQUIRED_CLAIMS,
+                "verify_aud": False,
+            },
         )
-    except jwt.PyJWTError as exc:
-        raise JwtAuthError("invalid token") from exc
+    except jwt.PyJWTError as copilot_exc:
+        raise JwtAuthError("invalid token") from copilot_exc
 
 
 def resolve_user(payload: dict):

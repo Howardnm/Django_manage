@@ -195,7 +195,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now django-manage
 | `SAP_LIB_PATH` | SAP SDK lib 路径 | `/opt/sap_nwrfcsdk/lib` | 同左 |
 | `MCP_JWT_PUBLIC_KEY` | MCP RS256 公钥 PEM | settings 内置公钥 | 可用 PATH 覆盖 |
 | `MCP_JWT_PUBLIC_KEY_PATH` | MCP 公钥文件路径 | 空 | 生产建议挂只读文件 |
-| `MCP_JWT_ISSUER` / `MCP_JWT_AUDIENCE` | JWT iss / aud | `sunwill-mcp` / `plm` | 与 IT 约定一致 |
+| `MCP_JWT_LEEWAY` | JWT 时钟容差（秒） | `30` | 同左 |
 | `DB_ENGINE` | 数据库引擎 | `django.db.backends.postgresql` | `django.db.backends.mysql`（MySQL 时） |
 | `DB_HOST` | 数据库地址 | `127.0.0.1` | 生产库 IP |
 | `DB_PORT` | 数据库端口 | `5432` | `3306`（MySQL 时） |

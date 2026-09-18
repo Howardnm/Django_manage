@@ -52,8 +52,6 @@ x-app-env: &app-env
   # MCP JWT（RS256）。公钥默认走 settings 内置 PEM；生产建议挂 PATH。
   MCP_JWT_PUBLIC_KEY: ${MCP_JWT_PUBLIC_KEY:-}
   MCP_JWT_PUBLIC_KEY_PATH: ${MCP_JWT_PUBLIC_KEY_PATH:-}
-  MCP_JWT_ISSUER: ${MCP_JWT_ISSUER:-sunwill-mcp}
-  MCP_JWT_AUDIENCE: ${MCP_JWT_AUDIENCE:-plm}
   MCP_JWT_LEEWAY: ${MCP_JWT_LEEWAY:-30}
 
 services:
