@@ -1,3 +1,5 @@
+import logging
+
 from django.db.models import Q
 from mcp.server.mcpserver.context import Context
 from mcp.server.mcpserver.exceptions import ToolError
@@ -10,6 +12,8 @@ from app_mcp_server.access import gated_get, gated_qs
 from app_mcp_server.core.server import READ_ONLY, mcp
 from app_mcp_server.serializers import serialize_formula, serialize_material
 from app_mcp_server.serializers.types import MaterialOut, MaterialWithFormulasOut
+
+logger = logging.getLogger(__name__)
 
 _MATERIAL_PERM = "app_material.view_materiallibrary"
 _FORMULA_PERM = "app_formula.view_labformula"
@@ -54,6 +58,10 @@ def get_material_and_formulas(ctx: Context, grade_name: str) -> MaterialWithForm
         )
         formulas = list(formula_qs)
     except ToolError:
+        logger.debug(
+            "MCP formula gate denied, returning empty list grade=%s",
+            grade_name,
+        )
         formulas = []
 
     data = serialize_material(material)

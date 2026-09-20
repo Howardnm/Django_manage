@@ -4,10 +4,13 @@
 不要读 ctx.headers：SDK 标明那是客户端输入。
 同步工具跑在 anyio.to_thread 里，不要用 ContextVar。
 """
+import logging
 from types import SimpleNamespace
 
 from django.contrib.auth import get_user_model
 from mcp.server.mcpserver.exceptions import ToolError
+
+logger = logging.getLogger(__name__)
 
 _STDIO_DENIED = "此通道未启用身份认证"
 _TOOL_DENIED = "无权调用该工具"
@@ -34,6 +37,7 @@ def get_mcp_user(ctx):
     state = _request_state(ctx)
     user_id = getattr(state, "mcp_user_id", None) if state is not None else None
     if not user_id:
+        logger.warning("MCP access denied: stdio or missing identity state")
         raise ToolError(_STDIO_DENIED)
 
     User = get_user_model()
@@ -43,6 +47,7 @@ def get_mcp_user(ctx):
         .first()
     )
     if not user:
+        logger.warning("MCP access denied: user gone or inactive mcp_user_id=%s", user_id)
         raise ToolError(_ACCESS_DENIED)
     return user
 
@@ -52,7 +57,12 @@ def require_tool(ctx, tool_name: str):
     user = get_mcp_user(ctx)
     state = _request_state(ctx)
     payload = getattr(state, "mcp_jwt", None) or {}
-    if payload.get("tool") != tool_name:
+    actual = payload.get("tool")
+    if actual != tool_name:
+        logger.warning(
+            "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s",
+            tool_name, actual or "", user.username,
+        )
         raise ToolError(_TOOL_DENIED)
     return user
 
@@ -65,7 +75,15 @@ def gated_qs(ctx, tool_name, qs, mixin_cls, perm):
     mixin.permission_required = perm
     mixin.queryset = qs
     if not mixin.has_permission():
+        logger.warning(
+            "MCP access denied: L1/L3 user=%s mixin=%s perm=%s tool=%s",
+            user.username, mixin_cls.__name__, perm, tool_name,
+        )
         raise ToolError(_ACCESS_DENIED)
+    logger.debug(
+        "MCP gated_qs ok user=%s tool=%s perm=%s mixin=%s",
+        user.username, tool_name, perm, mixin_cls.__name__,
+    )
     return mixin.get_queryset()
 
 
@@ -74,5 +92,11 @@ def gated_get(ctx, tool_name, qs, mixin_cls, perm, **filters):
     isolated = gated_qs(ctx, tool_name, qs, mixin_cls, perm)
     obj = isolated.filter(**filters).first()
     if not obj:
+        state = _request_state(ctx)
+        user_id = getattr(state, "mcp_user_id", None) if state is not None else None
+        logger.debug(
+            "MCP gated_get empty tool=%s user_id=%s filters=%s",
+            tool_name, user_id, filters,
+        )
         raise ToolError(_NOT_FOUND)
     return obj

@@ -123,8 +123,10 @@ class JwtVerifyTests(TestCase):
             self.private_pem,
             exp=datetime.now(timezone.utc) - timedelta(minutes=5),
         )
-        with self.assertRaises(JwtAuthError):
-            verify_jwt(token)
+        with self.assertLogs("app_mcp_server.auth", level="WARNING") as cm:
+            with self.assertRaises(JwtAuthError):
+                verify_jwt(token)
+        self.assertTrue(any("expired" in line for line in cm.output))
 
     def test_rejects_missing_sub(self):
         token = make_jwt(self.private_pem, drop=("sub",))
@@ -188,8 +190,11 @@ class JwtResolveUserTests(TestCase):
         self.assertEqual(user.pk, self.user.pk)
 
     def test_email_present_but_unknown_does_not_fallback(self):
-        with self.assertRaises(JwtAuthError):
-            resolve_user({"email": "nobody@corp.com", "employeeNo": "E001", "sub": "E001"})
+        with self.assertLogs("app_mcp_server.auth", level="WARNING") as cm:
+            with self.assertRaises(JwtAuthError):
+                resolve_user({"email": "nobody@corp.com", "employeeNo": "E001", "sub": "E001"})
+        self.assertTrue(any("nobody@corp.com" in line for line in cm.output))
+        self.assertTrue(any("no employeeNo/sub fallback" in line for line in cm.output))
 
     def test_employee_no_fallback_when_email_null(self):
         user = resolve_user({"email": None, "employeeNo": "E001", "sub": "other"})

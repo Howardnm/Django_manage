@@ -84,7 +84,8 @@ HANDLERS = {
     'file_error': _file_handler('error.log', level=WARNING),
     # 核心模块独立日志
     'file_sap': _file_handler('sap.log'),
-    'file_mcp': _file_handler('mcp.log'),
+    # DEBUG 级由 logger 控制：DEBUG=True / DJANGO_LOG_LEVEL=DEBUG 时才写入
+    'file_mcp': _file_handler('mcp.log', level=DEBUG),
     'file_trial': _file_handler('trial_production.log'),
     'file_workflow': _file_handler('workflow.log'),
     'file_catalog': _file_handler('catalog.log'),

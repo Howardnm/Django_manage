@@ -46,7 +46,7 @@ Authorization: Bearer <JWT>
         ▼
 MCPASGIApp（OPTIONS 仍 204）
         │  PyJWT RS256：签名 / exp / iat / alg
-        │  失败 → 401（不枚举原因）
+        │  失败 → 401（对外不枚举原因；原因在 logs/mcp.log）
         ▼
 resolve_user（email → username=employeeNo/sub；is_active）
         │  映射失败 → 401
