@@ -28,6 +28,10 @@
                     <div><span class="badge bg-blue-lt">{{ user.username }}</span></div>
                 </div>
                 <div class="mb-3">
+                    <label class="form-label">工号</label>
+                    <div>{% if user.employee_no %}<span class="badge bg-azure-lt">{{ user.employee_no }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
+                </div>
+                <div class="mb-3">
                     <label class="form-label">姓名</label>
                     <div><span class="badge bg-teal-lt">{{ user.get_full_name|default:"—" }}</span></div>
                 </div>

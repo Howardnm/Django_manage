@@ -27,9 +27,9 @@ def _project_detail_qs():
 
 @mcp.tool(annotations=READ_ONLY)
 def search_projects(
-    ctx: Context, keyword: str = "", is_terminated: bool = False,
+    ctx: Context, keyword: str = "", is_terminated: bool | None = None,
 ) -> list[ProjectListOut]:
-    """Search for projects by name, manager, customer, or OEM. Returns a list of matching projects with basic info."""
+    """Search for projects by name, manager, customer, or OEM. Returns all matching projects (including terminated) unless is_terminated is set."""
     qs = gated_qs(ctx, "search_projects", _project_list_qs(), ProjectAccessMixin, _PERM)
     if keyword:
         qs = qs.filter(
@@ -38,8 +38,9 @@ def search_projects(
             | Q(repository__customer__short_name__icontains=keyword)
             | Q(repository__oem__name__icontains=keyword)
         )
-    qs = qs.filter(is_terminated=is_terminated)
-    return [serialize_project(p) for p in qs[:20]]
+    if is_terminated is not None:
+        qs = qs.filter(is_terminated=is_terminated)
+    return [serialize_project(p) for p in qs]
 
 
 @mcp.tool(annotations=READ_ONLY)

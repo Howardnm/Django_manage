@@ -37,7 +37,7 @@ def search_material_library(
         qs = qs.filter(Q(grade_name__icontains=keyword) | Q(manufacturer__icontains=keyword))
     if category:
         qs = qs.filter(category__name__icontains=category)
-    return [serialize_material(m) for m in qs[:20]]
+    return [serialize_material(m) for m in qs]
 
 
 @mcp.tool(annotations=READ_ONLY)

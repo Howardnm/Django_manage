@@ -33,7 +33,7 @@ def search_formulas(ctx: Context, keyword: str = "") -> list[FormulaOut]:
     qs = gated_qs(ctx, "search_formulas", _formula_qs(), FormulaAccessMixin, _PERM)
     if keyword:
         qs = qs.filter(Q(code__icontains=keyword) | Q(name__icontains=keyword))
-    return [serialize_formula(f) for f in _prime_costs(list(qs[:10]))]
+    return [serialize_formula(f) for f in _prime_costs(list(qs))]
 
 
 @mcp.tool(annotations=READ_ONLY)
