@@ -9,7 +9,7 @@
     <p class="text-secondary mb-2">离开本页后无法再次查看明文，丢失请刷新生成新 Key（旧 Key 立即失效）。</p>
     <div class="input-group">
         <input id="mcp-api-key-once" type="text" class="form-control font-monospace" value="{{ mcp_api_key_once }}" readonly>
-        <button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('mcp-api-key-once').value)">复制</button>
+        <button type="button" class="btn" id="mcp-api-key-copy">复制</button>
     </div>
 </div>
 {% endif %}
@@ -159,4 +159,50 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if mcp_api_key_once %}
+<script>
+(function () {
+    var input = document.getElementById("mcp-api-key-once");
+    var btn = document.getElementById("mcp-api-key-copy");
+    if (!input || !btn) return;
+
+    function fallbackCopy() {
+        input.focus();
+        input.select();
+        input.setSelectionRange(0, input.value.length);
+        return document.execCommand("copy");
+    }
+
+    function markCopied() {
+        btn.textContent = "已复制";
+        btn.classList.add("btn-success");
+        setTimeout(function () {
+            btn.textContent = "复制";
+            btn.classList.remove("btn-success");
+        }, 2000);
+    }
+
+    function markFailed() {
+        input.focus();
+        input.select();
+        btn.textContent = "请手动复制";
+    }
+
+    btn.addEventListener("click", function () {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(input.value).then(markCopied).catch(function () {
+                if (fallbackCopy()) markCopied();
+                else markFailed();
+            });
+            return;
+        }
+        if (fallbackCopy()) markCopied();
+        else markFailed();
+    });
+})();
+</script>
+{% endif %}
 {% endblock %}
