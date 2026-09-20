@@ -4,6 +4,7 @@
 不要读 ctx.headers：SDK 标明那是客户端输入。
 同步工具跑在 anyio.to_thread 里，不要用 ContextVar。
 """
+import json
 import logging
 from types import SimpleNamespace
 
@@ -29,6 +30,26 @@ def _request_state(ctx):
     if request is None:
         return None
     return getattr(request, "state", None)
+
+
+def _tool_arguments_json(ctx) -> str:
+    """tools/call 的 arguments，给日志用。不是 Authorization / JWT。"""
+    arguments = None
+    try:
+        request_context = ctx.request_context
+    except (AttributeError, ValueError):
+        request_context = None
+    params = getattr(request_context, "params", None) if request_context is not None else None
+    if isinstance(params, dict):
+        arguments = params.get("arguments")
+    elif params is not None:
+        arguments = getattr(params, "arguments", None)
+    if arguments is None:
+        input_params = getattr(ctx, "_input_params", None)
+        arguments = getattr(input_params, "arguments", None)
+    if not isinstance(arguments, dict):
+        return "{}"
+    return json.dumps(arguments, ensure_ascii=False, default=str, sort_keys=True)
 
 
 def get_mcp_user(ctx):
@@ -64,8 +85,8 @@ def require_tool(ctx, tool_name: str):
     actual = payload.get("tool")
     if actual != tool_name:
         logger.warning(
-            "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s claims=%s",
-            tool_name, actual or "", user.username, claims_json(payload),
+            "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s args=%s claims=%s",
+            tool_name, actual or "", user.username, _tool_arguments_json(ctx), claims_json(payload),
         )
         raise ToolError(_TOOL_DENIED)
     return user
@@ -82,15 +103,17 @@ def gated_qs(ctx, tool_name, qs, mixin_cls, perm):
         state = _request_state(ctx)
         payload = getattr(state, "mcp_jwt", None) if state is not None else None
         logger.warning(
-            "MCP access denied: L1/L3 user=%s mixin=%s perm=%s tool=%s claims=%s",
-            user.username, mixin_cls.__name__, perm, tool_name, claims_json(payload),
+            "MCP access denied: L1/L3 user=%s mixin=%s perm=%s tool=%s args=%s claims=%s",
+            user.username, mixin_cls.__name__, perm, tool_name,
+            _tool_arguments_json(ctx), claims_json(payload),
         )
         raise ToolError(_ACCESS_DENIED)
     state = _request_state(ctx)
     payload = getattr(state, "mcp_jwt", None) if state is not None else None
     logger.info(
-        "MCP tool call user=%s tool=%s perm=%s mixin=%s claims=%s",
-        user.username, tool_name, perm, mixin_cls.__name__, claims_json(payload),
+        "MCP tool call user=%s tool=%s perm=%s mixin=%s args=%s claims=%s",
+        user.username, tool_name, perm, mixin_cls.__name__,
+        _tool_arguments_json(ctx), claims_json(payload),
     )
     return mixin.get_queryset()
 
@@ -104,8 +127,8 @@ def gated_get(ctx, tool_name, qs, mixin_cls, perm, **filters):
         user_id = getattr(state, "mcp_user_id", None) if state is not None else None
         payload = getattr(state, "mcp_jwt", None) if state is not None else None
         logger.debug(
-            "MCP gated_get empty tool=%s user_id=%s filters=%s claims=%s",
-            tool_name, user_id, filters, claims_json(payload),
+            "MCP gated_get empty tool=%s user_id=%s filters=%s args=%s claims=%s",
+            tool_name, user_id, filters, _tool_arguments_json(ctx), claims_json(payload),
         )
         raise ToolError(_NOT_FOUND)
     return obj

@@ -140,6 +140,22 @@ class McpToolAccessTests(TestCase):
         results = search_projects(ctx)
         self.assertIsInstance(results, list)
 
+    def test_tool_call_logs_arguments(self):
+        ctx = fake_ctx(self.alice, "search_projects")
+        ctx.request_context.params = {
+            "name": "search_projects",
+            "arguments": {"keyword": "比亚迪", "is_terminated": False},
+        }
+        with self.assertLogs("app_mcp_server.access", level="INFO") as cm:
+            search_projects(ctx, keyword="比亚迪", is_terminated=False)
+        self.assertTrue(
+            any(
+                'args={"is_terminated": false, "keyword": "比亚迪"}' in line
+                for line in cm.output
+            ),
+            cm.output,
+        )
+
     def test_stdio_no_state(self):
         with self.assertRaises(ToolError) as cm:
             search_projects(empty_ctx())

@@ -56,6 +56,7 @@ request.state.mcp_jwt + mcp_user_id
         ├─ initialize / tools/list：不查 tool
         └─ tools/call：JWT 校验 tool claim；API Key 跳过 claim
            → gated_qs(AccessMixin) 仍走 L1~L5
+              INFO 记 user / tool / args / claims
 ```
 
 身份只信 ASGI 验签后的 `request.state`。`ctx.headers` 是客户端输入，不能当身份。同步工具跑在 `anyio.to_thread` 里，**不要用 ContextVar**。

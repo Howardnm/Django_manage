@@ -70,7 +70,7 @@ python manage.py run_mcp_server
 1. **IT RS256 JWT**（网关按工具签发）
 2. **个人 MCP API Key**（`mcp_` 前缀，管理员在 User 后台勾选开通后，用户在个人中心生成，90 天过期）
 
-无公钥、坏签名、未知用户、过期或未开通的个人 Key 一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。验签成功后会把 JWT claims JSON 打进日志；个人 Key 只记用户与前缀，不记录明文。
+无公钥、坏签名、未知用户、过期或未开通的个人 Key 一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。验签成功后会把 JWT claims JSON 打进日志；个人 Key 只记用户与前缀，不记录明文。工具调用还会记 `args=`（`tools/call` 的 arguments JSON），方便对照谁用什么参数查了什么。不记录原始 JWT / Authorization / API Key 明文。
 
 JWT claims：
 
