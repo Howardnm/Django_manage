@@ -331,14 +331,30 @@ class User(AbstractUser):
     address = models.CharField("联系地址", max_length=255, blank=True)
     description = models.TextField("个人备注", blank=True)
 
+    mcp_api_key_enabled = models.BooleanField(
+        "允许个人 MCP API Key", default=False,
+        help_text="关闭后个人中心不能生成/刷新，已有 Key 立即失效。不影响 IT JWT。",
+    )
+    mcp_api_key_hash = models.CharField(
+        max_length=64, unique=True, null=True, blank=True, editable=False,
+    )
+    mcp_api_key_prefix = models.CharField(
+        "MCP Key 前缀", max_length=16, blank=True, editable=False,
+    )
+    mcp_api_key_expires_at = models.DateTimeField(
+        "MCP Key 过期时间", null=True, blank=True,
+    )
+
     class Meta:
         verbose_name = "用户"
         verbose_name_plural = "用户"
 
     def save(self, *args, **kwargs):
-        """空工号存 NULL，避免多个空串撞 unique。"""
+        """空工号 / 空 key 哈希存 NULL，避免多个空串撞 unique。"""
         if isinstance(self.employee_no, str):
             self.employee_no = self.employee_no.strip() or None
+        if isinstance(self.mcp_api_key_hash, str):
+            self.mcp_api_key_hash = self.mcp_api_key_hash.strip() or None
         super().save(*args, **kwargs)
 
     def __str__(self):

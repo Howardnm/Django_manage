@@ -331,9 +331,13 @@ class MyUserAdmin(UserAdmin):
         'subsidiary',          # 子公司/基地归属
         'department',          # L4: 部门数据隔离
         'get_work_groups',     # L5: 工作组数据隔离
+        'mcp_api_key_enabled',
         'phone', 'is_staff',
     )
-    list_filter = ('user_type', 'is_staff', 'is_superuser', 'is_active', 'subsidiary', 'department')
+    list_filter = (
+        'user_type', 'is_staff', 'is_superuser', 'is_active',
+        'mcp_api_key_enabled', 'subsidiary', 'department',
+    )
     
     # 在详情页管理 5D 权限和公司归属
     fieldsets = UserAdmin.fieldsets + (
@@ -345,6 +349,9 @@ class MyUserAdmin(UserAdmin):
         }),
         ('个人详细资料', {
             'fields': ('employee_no', 'job_title', 'phone', 'address', 'description'),
+        }),
+        ('MCP API Key', {
+            'fields': ('mcp_api_key_enabled', 'mcp_api_key_prefix', 'mcp_api_key_expires_at'),
         }),
     )
     
@@ -361,7 +368,7 @@ class MyUserAdmin(UserAdmin):
 
     search_fields = ('username', 'employee_no', 'first_name', 'last_name', 'email', 'phone')
     ordering = ('username',)
-    readonly_fields = ('member_token',) # 令牌设为只读，由系统自动维护
+    readonly_fields = ('member_token', 'mcp_api_key_prefix', 'mcp_api_key_expires_at')
 
     @admin.display(description='[L3] 权限组')
     def get_groups(self, obj):

@@ -1,10 +1,11 @@
 """认证视图模块。处理登录、注册、个人资料、密码重置、验证码生成和浏览器验证。
 
-导出: CustomLoginView, RegisterView, ProfileView, PasswordResetView, ChangePasswordView, captcha_view, verify_browser, send_email_code。"""
+导出: CustomLoginView, RegisterView, ProfileView, GenerateMcpApiKeyView, PasswordResetView, ChangePasswordView, captcha_view, verify_browser, send_email_code。"""
 import json
 from django.shortcuts import render
 from django.contrib.auth.views import LoginView
 from django.views.decorators.http import require_GET
+from django.views import View
 from django.views.generic import CreateView, TemplateView, FormView
 from django.urls import reverse_lazy
 from django.contrib import messages
@@ -267,6 +268,38 @@ class ProfileView(HomeAccessMixin, TemplateView):
     """
     permission_required = []  # 纯只读展示页，零数据查询
     template_name = 'apps/app_user/profile.html'
+
+    def get_context_data(self, **kwargs):
+        from django.utils import timezone
+
+        context = super().get_context_data(**kwargs)
+        context['mcp_api_key_once'] = self.request.session.pop('mcp_api_key_once', None)
+        context['now'] = timezone.now()
+        return context
+
+
+class GenerateMcpApiKeyView(HomeAccessMixin, View):
+    """个人中心生成 / 刷新 MCP API Key。明文只放进 session 一次。"""
+    permission_required = []
+    http_method_names = ['post']
+
+    def post(self, request, *args, **kwargs):
+        from django.shortcuts import redirect
+
+        from app_user.services.mcp_api_key import McpApiKeyDisabled, generate_mcp_api_key
+
+        user = request.user
+        if not user.mcp_api_key_enabled:
+            messages.error(request, "尚未开通个人 MCP API Key，请联系管理员在后台勾选「允许个人 MCP API Key」。")
+            return redirect('user_profile')
+        try:
+            token = generate_mcp_api_key(user)
+        except McpApiKeyDisabled:
+            messages.error(request, "尚未开通个人 MCP API Key，请联系管理员在后台勾选「允许个人 MCP API Key」。")
+            return redirect('user_profile')
+        request.session['mcp_api_key_once'] = token
+        messages.success(request, "MCP API Key 已生成，请立即复制。离开本页后将无法再次查看明文。")
+        return redirect('user_profile')
 
 # 4. 密码重置视图
 class PasswordResetView(FormView):

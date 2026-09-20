@@ -313,3 +313,64 @@ class JwtHttpGateTests(TestCase):
             status, _, _ = _asgi_call("POST", {"Authorization": f"Bearer {token}"})
             self.assertEqual(status, 401)
         clear_public_key_cache()
+
+
+class McpApiKeyHttpGateTests(TestCase):
+    def setUp(self):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        from app_user.services.mcp_api_key import generate_mcp_api_key
+
+        self.user = User.objects.create_user(
+            username="keyuser", email="keyuser@corp.com", password="x",
+            mcp_api_key_enabled=True,
+        )
+        self.plain = generate_mcp_api_key(self.user)
+        self.timezone = timezone
+        self.timedelta = timedelta
+
+    def test_valid_api_key_sets_state(self):
+        from app_mcp_server.auth import authenticate_http
+
+        request = _starlette_request(f"Bearer {self.plain}")
+        user = authenticate_http(request)
+        self.assertEqual(user.pk, self.user.pk)
+        self.assertEqual(request.state.mcp_user_id, self.user.pk)
+        self.assertEqual(request.state.mcp_jwt["auth"], "api_key")
+
+    def test_unknown_api_key_401(self):
+        status, _, body = _asgi_call(
+            "POST", {"Authorization": "Bearer mcp_this_is_not_a_real_key_value_xx"},
+        )
+        self.assertEqual(status, 401)
+        self.assertEqual(json.loads(body)["error"], "invalid_token")
+
+    def test_expired_api_key_401(self):
+        self.user.mcp_api_key_expires_at = self.timezone.now() - self.timedelta(days=1)
+        self.user.save(update_fields=["mcp_api_key_expires_at"])
+        status, _, body = _asgi_call(
+            "POST", {"Authorization": f"Bearer {self.plain}"},
+        )
+        self.assertEqual(status, 401)
+        self.assertEqual(json.loads(body)["error"], "invalid_token")
+
+    def test_disabled_api_key_401(self):
+        self.user.mcp_api_key_enabled = False
+        self.user.save(update_fields=["mcp_api_key_enabled"])
+        status, _, body = _asgi_call(
+            "POST", {"Authorization": f"Bearer {self.plain}"},
+        )
+        self.assertEqual(status, 401)
+        self.assertEqual(json.loads(body)["error"], "invalid_token")
+
+    def test_refresh_invalidates_old_key(self):
+        from app_user.services.mcp_api_key import generate_mcp_api_key
+
+        generate_mcp_api_key(self.user)
+        status, _, body = _asgi_call(
+            "POST", {"Authorization": f"Bearer {self.plain}"},
+        )
+        self.assertEqual(status, 401)
+        self.assertEqual(json.loads(body)["error"], "invalid_token")

@@ -55,10 +55,12 @@ def get_mcp_user(ctx):
 
 
 def require_tool(ctx, tool_name: str):
-    """校验 JWT `tool` claim 等于当前工具函数名。不认通配。"""
+    """JWT 要求 `tool` claim 等于函数名；个人 API Key 跳过 claim，仍走 L1~L5。"""
     user = get_mcp_user(ctx)
     state = _request_state(ctx)
     payload = getattr(state, "mcp_jwt", None) or {}
+    if payload.get("auth") == "api_key":
+        return user
     actual = payload.get("tool")
     if actual != tool_name:
         logger.warning(

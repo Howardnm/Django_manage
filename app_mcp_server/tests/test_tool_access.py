@@ -134,6 +134,12 @@ class McpToolAccessTests(TestCase):
             search_projects(ctx)
         self.assertIn("无权调用该工具", str(cm.exception))
 
+    def test_api_key_skips_tool_claim(self):
+        ctx = fake_ctx(self.alice, None)
+        ctx.request_context.request.state.mcp_jwt = {"auth": "api_key"}
+        results = search_projects(ctx)
+        self.assertIsInstance(results, list)
+
     def test_stdio_no_state(self):
         with self.assertRaises(ToolError) as cm:
             search_projects(empty_ctx())

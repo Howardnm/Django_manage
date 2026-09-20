@@ -39,7 +39,7 @@ python manage.py run_mcp_server
       "type": "http",
       "url": "http://127.0.0.1:8000/mcp",
       "headers": {
-        "Authorization": "Bearer <JWT>"
+        "Authorization": "Bearer <JWT 或个人 mcp_ API Key>"
       }
     }
   }
@@ -65,8 +65,12 @@ python manage.py run_mcp_server
 
 ## 鉴权
 
-远程 `/mcp` 只接受 IT 签发的 **RS256 JWT**（`Authorization: Bearer <JWT>`）。
-无公钥、坏签名、未知用户一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。验签成功后会把 JWT claims JSON 打进日志，便于对照是谁在调哪个工具；不记录原始 token。
+远程 `/mcp` 接受两种 Bearer：
+
+1. **IT RS256 JWT**（网关按工具签发）
+2. **个人 MCP API Key**（`mcp_` 前缀，管理员在 User 后台勾选开通后，用户在个人中心生成，90 天过期）
+
+无公钥、坏签名、未知用户、过期或未开通的个人 Key 一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。验签成功后会把 JWT claims JSON 打进日志；个人 Key 只记用户与前缀，不记录明文。
 
 JWT claims：
 
@@ -76,7 +80,7 @@ JWT claims：
 | `tool` | **仅** `tools/call` 校验，必须等于工具函数名（如 `search_projects`） |
 | `exp` / `iat` | 必填；`MCP_JWT_LEEWAY` 默认 30 秒 |
 
-握手（`initialize` / `tools/list`）只验 JWT + 用户，不查 `tool`。Sunwill 网关每次 HTTP 都应带新 token。
+握手（`initialize` / `tools/list`）只验身份，不查 `tool`。Sunwill 网关每次 HTTP 都应带新 JWT。个人 API Key 调用 `tools/call` **不校验** `tool` claim，可调全部只读工具，仍走该用户的 L1~L5。
 
 查询结果走与 Web 端相同的 L1~L5（含项目协同成员 / 销售成员穿透）。JWT 里的 `departmentName` **不**用于隔离。
 

@@ -2,7 +2,11 @@
 
 from django.urls import path
 from django.contrib.auth.views import LogoutView
-from .views import CustomLoginView, RegisterView, ProfileView, captcha_view, send_email_code, RegisterSuccessView, PasswordResetView, ChangePasswordView, verify_browser
+from .views import (
+    CustomLoginView, RegisterView, ProfileView, GenerateMcpApiKeyView,
+    captcha_view, send_email_code, RegisterSuccessView, PasswordResetView,
+    ChangePasswordView, verify_browser,
+)
 
 urlpatterns = [
     path('login/', CustomLoginView.as_view(), name='login'),
@@ -12,6 +16,7 @@ urlpatterns = [
     path('register/success/', RegisterSuccessView.as_view(), name='register_success'),
     path('password-reset/', PasswordResetView.as_view(), name='password_reset'),
     path('profile/', ProfileView.as_view(), name='user_profile'),
+    path('profile/mcp-api-key/', GenerateMcpApiKeyView.as_view(), name='generate_mcp_api_key'),
     path('profile/change-password/', ChangePasswordView.as_view(), name='change_password'),
     path('captcha/', captcha_view, name='captcha'),
     path('send_email_code/', send_email_code, name='send_email_code'),

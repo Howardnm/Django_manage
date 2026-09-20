@@ -3,6 +3,16 @@
 {% block title %}个人资料{% endblock %}
 
 {% block content %}
+{% if mcp_api_key_once %}
+<div class="alert alert-warning" role="alert">
+    <h4 class="alert-title">请立即复制 MCP API Key</h4>
+    <p class="text-secondary mb-2">离开本页后无法再次查看明文，丢失请刷新生成新 Key（旧 Key 立即失效）。</p>
+    <div class="input-group">
+        <input id="mcp-api-key-once" type="text" class="form-control font-monospace" value="{{ mcp_api_key_once }}" readonly>
+        <button type="button" class="btn" onclick="navigator.clipboard.writeText(document.getElementById('mcp-api-key-once').value)">复制</button>
+    </div>
+</div>
+{% endif %}
 <div class="page-header mb-3">
     <div class="row align-items-center">
         <div class="col">
@@ -51,6 +61,46 @@
                     <label class="form-label">所属子公司/基地</label>
                     <div>{% if user.subsidiary %}<span class="badge bg-indigo-lt">{{ user.subsidiary }}</span>{% else %}<span class="badge bg-secondary-lt">—</span>{% endif %}</div>
                 </div>
+            </div>
+        </div>
+        <div class="card mt-3">
+            <div class="card-header">
+                <h3 class="card-title">MCP 连接</h3>
+            </div>
+            <div class="card-body">
+                {% if not user.mcp_api_key_enabled %}
+                    <p class="text-secondary mb-0">尚未开通个人 MCP API Key。请联系管理员在后台勾选「允许个人 MCP API Key」。</p>
+                {% else %}
+                    <div class="mb-3">
+                        <label class="form-label">当前 Key</label>
+                        <div>
+                            {% if user.mcp_api_key_prefix %}
+                                <span class="badge bg-blue-lt font-monospace">{{ user.mcp_api_key_prefix }}…</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">尚未生成</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">过期时间</label>
+                        <div>
+                            {% if user.mcp_api_key_expires_at %}
+                                <span class="badge {% if user.mcp_api_key_expires_at > now %}bg-green-lt{% else %}bg-red-lt{% endif %}">{{ user.mcp_api_key_expires_at }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">—</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <form method="post" action="{% url 'generate_mcp_api_key' %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-primary">
+                            <i class="ti ti-refresh me-2"></i>{% if user.mcp_api_key_prefix %}刷新 API Key{% else %}生成 API Key{% endif %}
+                        </button>
+                    </form>
+                    {% if user.mcp_api_key_prefix %}
+                    <p class="text-secondary small mt-2 mb-0">刷新后旧 Key 立即失效，有效期重新计算为 90 天。</p>
+                    {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>

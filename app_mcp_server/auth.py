@@ -191,6 +191,9 @@ def authenticate_http(request):
             logger.warning("MCP JWT auth failed: missing bearer")
         raise JwtAuthError("invalid token")
 
+    if token.startswith("mcp_"):
+        return _authenticate_api_key(request, token)
+
     payload = verify_jwt(token)
     user = resolve_user(payload)
     request.state.mcp_jwt = payload
@@ -200,3 +203,47 @@ def authenticate_http(request):
         user.pk, user.username, _client_ip(request), claims_json(payload),
     )
     return user
+
+
+def _authenticate_api_key(request, token: str):
+    from django.contrib.auth import get_user_model
+    from django.utils import timezone
+
+    from app_user.services.mcp_api_key import authenticate_mcp_api_key, hash_mcp_api_key
+
+    user = authenticate_mcp_api_key(token)
+    if user is not None:
+        payload = {"auth": "api_key"}
+        request.state.mcp_jwt = payload
+        request.state.mcp_user_id = user.pk
+        logger.info(
+            "MCP API key authenticated user_id=%s username=%s prefix=%s expires=%s client=%s",
+            user.pk, user.username, user.mcp_api_key_prefix,
+            user.mcp_api_key_expires_at, _client_ip(request),
+        )
+        return user
+
+    User = get_user_model()
+    digest = hash_mcp_api_key(token)
+    stored = User.objects.filter(mcp_api_key_hash=digest).first()
+    if stored is None:
+        logger.warning("MCP API key auth failed: unknown api key")
+    elif not stored.is_active:
+        logger.warning(
+            "MCP API key auth failed: inactive user pk=%s username=%s",
+            stored.pk, stored.username,
+        )
+    elif not stored.mcp_api_key_enabled:
+        logger.warning(
+            "MCP API key auth failed: api key disabled user=%s", stored.username,
+        )
+    else:
+        expires = stored.mcp_api_key_expires_at
+        if expires is None or expires <= timezone.now():
+            logger.warning(
+                "MCP API key auth failed: expired api key user=%s", stored.username,
+            )
+        else:
+            logger.warning("MCP API key auth failed: unknown api key")
+    raise JwtAuthError("invalid token")
+

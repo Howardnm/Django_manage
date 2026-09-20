@@ -41,20 +41,21 @@ Streamable HTTP **不在** Django `urls.py`。官方 SDK 返回的是 Starlette 
 ### 鉴权
 
 ```
-Authorization: Bearer <JWT>
+Authorization: Bearer <token>
         │
-        ▼
-MCPASGIApp（OPTIONS 仍 204）
-        │  PyJWT RS256：签名 / exp / iat / alg
+        ├─ mcp_ 前缀 → 个人 API Key（哈希、开通开关、未过期）
+        └─ 否则     → PyJWT RS256（签名 / exp / iat / alg）
         │  失败 → 401（对外不枚举原因；原因在 logs/mcp.log）
         ▼
-resolve_user（email → username=employeeNo/sub；is_active）
-        │  映射失败 → 401
+JWT：resolve_user（email → employee_no → username）
+API Key：已绑定 User
+        │  映射失败 / 未开通 / 过期 → 401
         ▼
 request.state.mcp_jwt + mcp_user_id
         │
         ├─ initialize / tools/list：不查 tool
-        └─ tools/call：require_tool → gated_qs(AccessMixin)
+        └─ tools/call：JWT 校验 tool claim；API Key 跳过 claim
+           → gated_qs(AccessMixin) 仍走 L1~L5
 ```
 
 身份只信 ASGI 验签后的 `request.state`。`ctx.headers` 是客户端输入，不能当身份。同步工具跑在 `anyio.to_thread` 里，**不要用 ContextVar**。
