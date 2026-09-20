@@ -4,8 +4,9 @@
 （握手 initialize / tools/list 没有工具名）。
 
 失败原因只写日志，对外一律 JwtAuthError("invalid token")。
-不记录原始 JWT / Authorization / PEM。
+不记录原始 JWT / Authorization / PEM；验签后的 claims JSON 会写入 mcp.log。
 """
+import json
 import logging
 from functools import lru_cache
 
@@ -68,6 +69,13 @@ def _client_ip(request) -> str:
     return host or "-"
 
 
+def claims_json(payload) -> str:
+    """验签后的 claims，给日志用。不是原始 JWT。"""
+    if not isinstance(payload, dict):
+        return "{}"
+    return json.dumps(payload, ensure_ascii=False, default=str, sort_keys=True)
+
+
 def verify_jwt(token: str) -> dict:
     """RS256 验签。拒绝 alg=none / HS256，校验 exp/iat/sub。不校验 iss/aud。"""
     try:
@@ -113,13 +121,7 @@ def verify_jwt(token: str) -> dict:
         logger.warning("MCP JWT verify failed: %s", type(exc).__name__)
         raise JwtAuthError("invalid token") from exc
 
-    logger.debug(
-        "MCP JWT verified sub=%s email=%s employeeNo=%s tool=%s",
-        payload.get("sub"),
-        payload.get("email"),
-        payload.get("employeeNo"),
-        payload.get("tool"),
-    )
+    logger.debug("MCP JWT verified claims=%s", claims_json(payload))
     return payload
 
 
@@ -191,7 +193,7 @@ def authenticate_http(request):
     request.state.mcp_jwt = payload
     request.state.mcp_user_id = user.pk
     logger.info(
-        "MCP JWT authenticated user_id=%s username=%s email=%s tool=%s client=%s",
-        user.pk, user.username, user.email, payload.get("tool"), _client_ip(request),
+        "MCP JWT authenticated user_id=%s username=%s client=%s claims=%s",
+        user.pk, user.username, _client_ip(request), claims_json(payload),
     )
     return user

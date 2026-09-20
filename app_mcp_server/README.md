@@ -66,7 +66,7 @@ python manage.py run_mcp_server
 ## 鉴权
 
 远程 `/mcp` 只接受 IT 签发的 **RS256 JWT**（`Authorization: Bearer <JWT>`）。
-无公钥、坏签名、未知用户一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。
+无公钥、坏签名、未知用户一律 `401`，不区分原因。具体原因写在服务端 `logs/mcp.log`（本地可设 `DEBUG=True` 或 `DJANGO_LOG_LEVEL=DEBUG`）。验签成功后会把 JWT claims JSON 打进日志，便于对照是谁在调哪个工具；不记录原始 token。
 
 JWT claims：
 

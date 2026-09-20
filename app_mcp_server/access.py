@@ -10,6 +10,8 @@ from types import SimpleNamespace
 from django.contrib.auth import get_user_model
 from mcp.server.mcpserver.exceptions import ToolError
 
+from app_mcp_server.auth import claims_json
+
 logger = logging.getLogger(__name__)
 
 _STDIO_DENIED = "此通道未启用身份认证"
@@ -60,8 +62,8 @@ def require_tool(ctx, tool_name: str):
     actual = payload.get("tool")
     if actual != tool_name:
         logger.warning(
-            "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s",
-            tool_name, actual or "", user.username,
+            "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s claims=%s",
+            tool_name, actual or "", user.username, claims_json(payload),
         )
         raise ToolError(_TOOL_DENIED)
     return user
@@ -75,14 +77,18 @@ def gated_qs(ctx, tool_name, qs, mixin_cls, perm):
     mixin.permission_required = perm
     mixin.queryset = qs
     if not mixin.has_permission():
+        state = _request_state(ctx)
+        payload = getattr(state, "mcp_jwt", None) if state is not None else None
         logger.warning(
-            "MCP access denied: L1/L3 user=%s mixin=%s perm=%s tool=%s",
-            user.username, mixin_cls.__name__, perm, tool_name,
+            "MCP access denied: L1/L3 user=%s mixin=%s perm=%s tool=%s claims=%s",
+            user.username, mixin_cls.__name__, perm, tool_name, claims_json(payload),
         )
         raise ToolError(_ACCESS_DENIED)
-    logger.debug(
-        "MCP gated_qs ok user=%s tool=%s perm=%s mixin=%s",
-        user.username, tool_name, perm, mixin_cls.__name__,
+    state = _request_state(ctx)
+    payload = getattr(state, "mcp_jwt", None) if state is not None else None
+    logger.info(
+        "MCP tool call user=%s tool=%s perm=%s mixin=%s claims=%s",
+        user.username, tool_name, perm, mixin_cls.__name__, claims_json(payload),
     )
     return mixin.get_queryset()
 
@@ -94,9 +100,10 @@ def gated_get(ctx, tool_name, qs, mixin_cls, perm, **filters):
     if not obj:
         state = _request_state(ctx)
         user_id = getattr(state, "mcp_user_id", None) if state is not None else None
+        payload = getattr(state, "mcp_jwt", None) if state is not None else None
         logger.debug(
-            "MCP gated_get empty tool=%s user_id=%s filters=%s",
-            tool_name, user_id, filters,
+            "MCP gated_get empty tool=%s user_id=%s filters=%s claims=%s",
+            tool_name, user_id, filters, claims_json(payload),
         )
         raise ToolError(_NOT_FOUND)
     return obj
