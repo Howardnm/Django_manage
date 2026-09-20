@@ -72,7 +72,7 @@ JWT claims：
 
 | claim | 作用 |
 | :--- | :--- |
-| `sub` / `employeeNo` / `email` | 映射本系统 User：email 优先，否则工号 → `username` |
+| `sub` / `employeeNo` / `email` | 映射本系统 User：email 优先，否则 `employeeNo` → `User.employee_no`；再否则 `sub` → 工号，再回退 `username` |
 | `tool` | **仅** `tools/call` 校验，必须等于工具函数名（如 `search_projects`） |
 | `exp` / `iat` | 必填；`MCP_JWT_LEEWAY` 默认 30 秒 |
 

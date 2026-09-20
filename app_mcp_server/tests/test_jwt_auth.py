@@ -176,13 +176,19 @@ class JwtResolveUserTests(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.user = User.objects.create_user(
-            username="E001", email="alice@corp.com", password="x",
+            username="alice", email="alice@corp.com", password="x",
+            employee_no="E001",
         )
         cls.other = User.objects.create_user(
-            username="E002", email="bob@corp.com", password="x",
+            username="bob", email="bob@corp.com", password="x",
+            employee_no="E002",
         )
         cls.inactive = User.objects.create_user(
-            username="E003", email="old@corp.com", password="x", is_active=False,
+            username="old", email="old@corp.com", password="x",
+            employee_no="E003", is_active=False,
+        )
+        cls.legacy = User.objects.create_user(
+            username="0604019", email="legacy@corp.com", password="x",
         )
 
     def test_email_case_and_space(self):
@@ -200,17 +206,33 @@ class JwtResolveUserTests(TestCase):
         user = resolve_user({"email": None, "employeeNo": "E001", "sub": "other"})
         self.assertEqual(user.pk, self.user.pk)
 
-    def test_sub_fallback_when_email_and_employee_no_missing(self):
+    def test_employee_no_does_not_match_username(self):
+        with self.assertRaises(JwtAuthError):
+            resolve_user({"email": None, "employeeNo": "0604019", "sub": "other"})
+
+    def test_real_employee_no_when_email_null(self):
+        self.user.employee_no = "0604019"
+        self.user.save()
+        user = resolve_user({"email": None, "employeeNo": "0604019", "sub": "0604019"})
+        self.assertEqual(user.pk, self.user.pk)
+
+    def test_sub_matches_employee_no_then_username(self):
         user = resolve_user({"email": "", "sub": "E002"})
         self.assertEqual(user.pk, self.other.pk)
+
+    def test_sub_falls_back_to_username(self):
+        user = resolve_user({"email": "", "sub": "0604019"})
+        self.assertEqual(user.pk, self.legacy.pk)
 
     def test_inactive_user_rejected(self):
         with self.assertRaises(JwtAuthError):
             resolve_user({"email": "old@corp.com"})
 
     def test_unknown_user_rejected(self):
-        with self.assertRaises(JwtAuthError):
-            resolve_user({"employeeNo": "NOPE", "sub": "NOPE"})
+        with self.assertLogs("app_mcp_server.auth", level="WARNING") as cm:
+            with self.assertRaises(JwtAuthError):
+                resolve_user({"employeeNo": "NOPE", "sub": "NOPE"})
+        self.assertTrue(any("unknown employeeNo=NOPE" in line for line in cm.output))
 
 
 class JwtHttpGateTests(TestCase):
@@ -229,7 +251,8 @@ class JwtHttpGateTests(TestCase):
         self.settings_ctx.enable()
         clear_public_key_cache()
         self.user = User.objects.create_user(
-            username="E001", email="alice@corp.com", password="x",
+            username="alice", email="alice@corp.com", password="x",
+            employee_no="E001",
         )
 
     def tearDown(self):

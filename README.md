@@ -356,7 +356,7 @@ Client (AI Agent)                        Django ASGI
 
 远程 `/mcp` 只接受 IT 签发的 RS256 JWT。`Authorization: Bearer <JWT>`。无公钥或验签失败一律 401。
 
-用户映射：`email` 优先，否则 `employeeNo` / `sub` → `username`。查询走 Web 端同一套 L1~L5。`tools/call` 时 JWT `tool` 必须等于工具函数名；`initialize` / `tools/list` 不查 `tool`。
+用户映射：`email` 优先，否则 `employeeNo` → `User.employee_no`；再否则 `sub` 先工号再 `username`。查询走 Web 端同一套 L1~L5。`tools/call` 时 JWT `tool` 必须等于工具函数名；`initialize` / `tools/list` 不查 `tool`。
 
 Stdio 没有 JWT，工具会拒绝查询。
 

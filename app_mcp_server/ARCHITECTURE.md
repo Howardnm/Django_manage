@@ -61,7 +61,7 @@ request.state.mcp_jwt + mcp_user_id
 
 `tool` claim 必须等于工具函数名。握手可以用任意有效用户 JWT。
 
-用户映射：`email`（strip + iexact）优先；缺失再用 `employeeNo` / `sub` 查 `username`。不创建用户，不按 JWT `departmentName` 改部门。
+用户映射：`email`（strip + iexact）优先；缺失再用 `employeeNo` 查 `User.employee_no`；再否则 `sub` 先工号再 `username`。不创建用户，不按 JWT `departmentName` / `employeeName` 改资料。
 
 ### 业务
 

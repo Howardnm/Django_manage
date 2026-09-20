@@ -322,6 +322,10 @@ class User(AbstractUser):
 
     job_title = models.CharField("职称/职位", max_length=50, blank=True)
     phone = models.CharField("个人电话", max_length=20, blank=True)
+    employee_no = models.CharField(
+        "工号", max_length=32, unique=True, null=True, blank=True,
+        help_text="IT / HR 工号，对应 JWT employeeNo。未填则 MCP 无法用工号映射。",
+    )
     email = models.EmailField("电子邮箱", unique=True,
                               help_text="登录账号，必填且唯一。历史缺失/重复邮箱已由迁移自动补齐。")
     address = models.CharField("联系地址", max_length=255, blank=True)
@@ -330,6 +334,12 @@ class User(AbstractUser):
     class Meta:
         verbose_name = "用户"
         verbose_name_plural = "用户"
+
+    def save(self, *args, **kwargs):
+        """空工号存 NULL，避免多个空串撞 unique。"""
+        if isinstance(self.employee_no, str):
+            self.employee_no = self.employee_no.strip() or None
+        super().save(*args, **kwargs)
 
     def __str__(self):
         """返回 "[部门] 角色 - 用户名" 格式。"""

@@ -125,10 +125,24 @@ def verify_jwt(token: str) -> dict:
     return payload
 
 
-def resolve_user(payload: dict):
-    """email（strip + iexact）优先；缺失再用 employeeNo / sub 查 username。
+def _reject_inactive_or_missing(user, *, key: str, value: str):
+    if user is None:
+        logger.warning("MCP JWT user mapping failed: unknown %s=%s", key, value)
+        raise JwtAuthError("invalid token")
+    if not user.is_active:
+        logger.warning(
+            "MCP JWT user mapping failed: inactive user pk=%s username=%s",
+            user.pk, user.username,
+        )
+        raise JwtAuthError("invalid token")
+    return user
 
-    不创建用户，不按 JWT departmentName 改部门。未映射或停用 → 失败。
+
+def resolve_user(payload: dict):
+    """email（strip + iexact）优先；否则 employeeNo → User.employee_no；
+    再否则 sub → employee_no，再回退 username。
+
+    不创建用户，不按 JWT departmentName / employeeName 改资料。
     查询不预滤 is_active，以便日志区分 unknown / inactive。
     """
     User = get_user_model()
@@ -144,33 +158,22 @@ def resolve_user(payload: dict):
                 email,
             )
             raise JwtAuthError("invalid token")
-        if not user.is_active:
-            logger.warning(
-                "MCP JWT user mapping failed: inactive user pk=%s username=%s",
-                user.pk, user.username,
-            )
-            raise JwtAuthError("invalid token")
-        return user
+        return _reject_inactive_or_missing(user, key="email", value=email)
 
-    if isinstance(payload.get("employeeNo"), str) and payload["employeeNo"].strip():
-        key, username = "employeeNo", payload["employeeNo"].strip()
-    elif isinstance(payload.get("sub"), str) and payload["sub"].strip():
-        key, username = "sub", payload["sub"].strip()
-    else:
-        logger.warning("MCP JWT user mapping failed: no email/employeeNo/sub")
-        raise JwtAuthError("invalid token")
+    employee_no = payload.get("employeeNo")
+    if isinstance(employee_no, str) and employee_no.strip():
+        employee_no = employee_no.strip()
+        user = qs.filter(employee_no=employee_no).first()
+        return _reject_inactive_or_missing(user, key="employeeNo", value=employee_no)
 
-    user = qs.filter(username=username).first()
-    if user is None:
-        logger.warning("MCP JWT user mapping failed: unknown %s=%s", key, username)
-        raise JwtAuthError("invalid token")
-    if not user.is_active:
-        logger.warning(
-            "MCP JWT user mapping failed: inactive user pk=%s username=%s",
-            user.pk, user.username,
-        )
-        raise JwtAuthError("invalid token")
-    return user
+    sub = payload.get("sub")
+    if isinstance(sub, str) and sub.strip():
+        sub = sub.strip()
+        user = qs.filter(employee_no=sub).first() or qs.filter(username=sub).first()
+        return _reject_inactive_or_missing(user, key="sub", value=sub)
+
+    logger.warning("MCP JWT user mapping failed: no email/employeeNo/sub")
+    raise JwtAuthError("invalid token")
 
 
 def authenticate_http(request):

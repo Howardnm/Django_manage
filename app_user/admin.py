@@ -324,7 +324,7 @@ class MyUserAdmin(UserAdmin):
     """自定义 User Admin。展示 L1~L5 五层权限字段，按权限模型分层组织 fieldsets。"""
     # L1 角色 / L2 等级 / L3 权限组 / L4 部门 / L5 工作组
     list_display = (
-        'username', 'email',
+        'username', 'employee_no', 'email',
         'user_type',           # L1: 角色白名单
         'user_level',          # L2: 用户等级
         'get_groups',          # L3: Django 权限组（权限码容器）
@@ -344,7 +344,7 @@ class MyUserAdmin(UserAdmin):
             'fields': ('associated_customer', 'associated_oem', 'member_token'),
         }),
         ('个人详细资料', {
-            'fields': ('job_title', 'phone', 'address', 'description'),
+            'fields': ('employee_no', 'job_title', 'phone', 'address', 'description'),
         }),
     )
     
@@ -352,14 +352,14 @@ class MyUserAdmin(UserAdmin):
     add_form = AdminUserCreationForm  # 新增用户时邮箱必填且唯一
     add_fieldsets = (
         (None, {
-            'fields': ('username', 'email', 'password1', 'password2'),
+            'fields': ('username', 'employee_no', 'email', 'password1', 'password2'),
         }),
         ('初始业务分配', {
             'fields': ('user_type', 'subsidiary', 'department', 'phone'),
         }),
     )
 
-    search_fields = ('username', 'first_name', 'last_name', 'email', 'phone')
+    search_fields = ('username', 'employee_no', 'first_name', 'last_name', 'email', 'phone')
     ordering = ('username',)
     readonly_fields = ('member_token',) # 令牌设为只读，由系统自动维护
 
