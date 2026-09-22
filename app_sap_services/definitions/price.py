@@ -79,6 +79,10 @@ class MaterialPriceQuery(RfcSchema):
     注意:
         - 实测（工厂 3011 / 2639 行抽样）STPRS 与 PVPRS 恒为 0，只有 VERPR 有值，
           因此单价口径固定用 VERPR / PEINH；PEINH 实测取值为 1 和 10000，除法不可省。
+        - 补充实测（2026-09，180 个物料 / 715 行，覆盖 A01* 段）：**VPRSV='S'（标准价
+          控制）的物料行同样 STPRS=0**，全样本无一例外。也就是说标准价控制物料并没有
+          「价格记在 STPRS」这回事，VERPR/PEINH 是唯一可用口径，无需按 VPRSV 分支取数。
+          （VPRSV='S' 确实存在，约占 4%；它们多数 VERPR=0，即该期间本就无可用价格。）
         - MBEWH 只在估值发生变化时记行，数据是稀疏的 —— 某些物料只有少数几个
           期间的记录，缺月属 SAP 语义而非同步失败。
         - S_MATNR 的 LOW/HIGH 是 CHAR40，实测返回的 MATNR 无前导零、无补位，

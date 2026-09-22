@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import fnmatch
 import uuid
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import timedelta
 from decimal import Decimal
 
@@ -49,6 +49,7 @@ from django.utils import timezone
 
 from app_sap_services import sap, sap_health_check
 from app_sap_services.definitions.stock import MaterialStockQuery
+from app_sap_services.transforms import blank, clean_stock, matnr_filter_kwargs
 from app_raw_material.models import Plant, RawMaterial, RawMaterialStockSnapshot
 
 
@@ -231,15 +232,6 @@ class Command(BaseCommand):
             }
         return {code: rm for code, rm in warehouse_map.items() if code == matnr}
 
-    @staticmethod
-    def matnr_filter_kwargs(matnr) -> dict:
-        """SAP Range：无通配用 EQ（才能拿到零库存哨兵行），有 * 用 CP。"""
-        if not matnr:
-            return {}
-        if "*" in matnr:
-            return {"mat_range__cp": matnr}
-        return {"mat_range__eq": matnr}
-
     # ------------------------------------------------------------------
     # SAP 查询
     # ------------------------------------------------------------------
@@ -247,7 +239,7 @@ class Command(BaseCommand):
     def _query_sap(self, matnr, werks) -> pl.DataFrame:
         """执行 SAP 查询。ZRFC_GET_MAT_STOCK 要求 mat_range 或 wek_range 至少一个。"""
         query = sap.rfc(MaterialStockQuery)
-        matnr_kw = self.matnr_filter_kwargs(matnr)
+        matnr_kw = matnr_filter_kwargs(matnr)
         if matnr_kw:
             query = query.filter(**matnr_kw)
         if werks:
@@ -260,24 +252,18 @@ class Command(BaseCommand):
         return df
 
     def _transform_stock(self, df: pl.DataFrame) -> pl.DataFrame:
-        """丢掉空物料号、空工厂哨兵行、负库存；清洗字符串。"""
-        if df.is_empty():
+        """丢掉空物料号、空工厂哨兵行、负库存；清洗字符串。
+
+        清洗逻辑与导出命令共用 app_sap_services/transforms.clean_stock，
+        此处只负责复现原有的操作日志文本。
+        """
+        if blank(df):
             return df
 
         before = df.height
-        df = df.with_columns([
-            pl.col("MATNR").cast(pl.Utf8).fill_null("").str.strip_chars(),
-            pl.col("WERKS").cast(pl.Utf8).fill_null("").str.strip_chars(),
-            pl.col("LGORT").cast(pl.Utf8).fill_null("").str.strip_chars(),
-            pl.col("CHARG").cast(pl.Utf8).fill_null("").str.strip_chars(),
-            pl.col("CLABS").fill_null(0),
-            pl.col("EISBE").fill_null(0),
-        ])
-
-        empty_plant = df.filter(pl.col("WERKS") == "").height
-        df = df.filter(pl.col("MATNR") != "")
-        df = df.filter(pl.col("WERKS") != "")
-        df = df.filter(pl.col("CLABS") >= 0)
+        warnings = Counter()
+        df = clean_stock(df, warnings)
+        empty_plant = warnings["empty_plant"]
 
         self.stdout.write(
             f"   数据清洗: {before} 条 → 有效 {df.height} 条 "

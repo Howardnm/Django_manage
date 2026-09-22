@@ -76,6 +76,14 @@ from app_sap_services import (
     SAPBusinessError,
 )
 from app_sap_services.definitions.price import MaterialPriceQuery
+from app_sap_services.transforms import (
+    ALLOWED_CURRENCY,
+    apply_period_filter,
+    current_ym,
+    make_price_source,
+    period_to_date,
+    transform_prices,
+)
 from app_raw_material.models import Plant, RawMaterial, RawMaterialPriceRecord
 
 
@@ -85,16 +93,12 @@ PROGRESS_EVERY = 200      # 每处理多少个物料打印一次进度
 # 价格异常阈值 (CNY/kg)，超过此值发出警告
 PRICE_WARN_THRESHOLD = 100000
 
-# RawMaterialPriceRecord.price 的语义是「元/kg」，模型没有币种字段，
-# 非该币种记录写进去会永久污染均价口径，因此直接跳过
-ALLOWED_CURRENCY = "CNY"
-
 
 class Command(BaseCommand):
     help = "从 SAP 同步物料评估价格到本地 RawMaterialPriceRecord 表（逐物料遍历）"
 
     # 由 handle() 按 --include-future 覆盖；类属性给默认值，
-    # 使 _apply_period_filter 可被单独调用/测试
+    # 使期间过滤可被单独调用/测试
     include_future = False
     verbose = False
 
@@ -366,8 +370,13 @@ class Command(BaseCommand):
                 stats["empty"] += 1
                 continue
 
-            df = self._apply_period_filter(df, ym_range, warnings)
-            df = self._transform_prices(df, warnings)
+            df = apply_period_filter(
+                df, ym_range,
+                current_ym=current_ym(),
+                include_future=self.include_future,
+                warnings=warnings,
+            )
+            df = transform_prices(df, warnings)
 
             # 区分「SAP 没这条记录」与「有记录但价格全是 0 被过滤」——
             # 后者实测占相当大的比例（很多物料在 MBEWH 里有行但 VERPR=0），
@@ -431,7 +440,7 @@ class Command(BaseCommand):
         if not bwkey:
             return None
 
-        price_date = self._to_date(row["BDATJ"], row["POPER"])
+        price_date = period_to_date(row["BDATJ"], row["POPER"])
         if price_date is None:
             return None
 
@@ -451,7 +460,7 @@ class Command(BaseCommand):
             plant=plant,
             date=price_date,
             price=Decimal(str(row["UNIT_PRICE"])),
-            source=self._make_source(row["BDATJ"], row["POPER"], bwkey),
+            source=make_price_source(row["BDATJ"], row["POPER"], bwkey),
         )
 
     def _flush(self, objs, dry_run) -> int:
@@ -552,108 +561,3 @@ class Command(BaseCommand):
             )
             for code, err in stats["errors"][:10]:
                 self.stdout.write(self.style.ERROR(f"       {code}: {err}"))
-
-    # ------------------------------------------------------------------
-    # 客户端期间过滤
-    # ------------------------------------------------------------------
-
-    def _apply_period_filter(self, df: pl.DataFrame, ym_range, warnings) -> pl.DataFrame:
-        """按 BDATJ/POPER 过滤期间。两端均形如 YYYYMM，整数比较最省事。"""
-        # BDATJ/POPER 无法解析（NUMC 异常值）→ 丢弃，避免带着 None 往下走
-        df = df.drop_nulls(subset=["BDATJ", "POPER"])
-        ym = pl.col("BDATJ") * 100 + pl.col("POPER")
-
-        # 未来期间护栏：price_service 取「最大日期」作为最新单价，一条未来期间的
-        # 记录会静默变成当前价格并污染配方成本。SAP 会预建整年的空期间（VERPR=0，
-        # 通常已被 UNIT_PRICE>0 过滤），但这里不依赖那个巧合。
-        if not self.include_future:
-            current_ym = self._current_ym()
-            future = df.filter(ym > current_ym)
-            if future.height:
-                warnings["future"] += future.height
-                df = df.filter(ym <= current_ym)
-
-        if ym_range is None:
-            return df
-
-        lo, hi = ym_range
-        return df.filter((ym >= lo) & (ym <= hi))
-
-    @staticmethod
-    def _current_ym() -> int:
-        """当前会计期间，形如 YYYYMM。"""
-        today = date.today()
-        return today.year * 100 + today.month
-
-    # ------------------------------------------------------------------
-    # Polars 价格转换
-    # ------------------------------------------------------------------
-
-    def _transform_prices(self, df: pl.DataFrame, warnings) -> pl.DataFrame:
-        """Polars 端：价格单位换算 + 货币守卫 + 去重（保留工厂维度）"""
-        # 价格/单位字段为空（NUMC/DEC 解析失败）→ 丢弃
-        df = df.drop_nulls(subset=["BDATJ", "POPER", "PEINH", "VERPR"])
-
-        # 币种守卫：price 列语义是「元/kg」，模型没有币种字段
-        currency = pl.col("WAERS").fill_null("")
-        other = df.filter(currency != ALLOWED_CURRENCY)
-        if other.height:
-            warnings["currency"] += other.height
-            df = df.filter(currency == ALLOWED_CURRENCY)
-
-        # 过滤 PEINH <= 0（除零保护，必须在除法之前）
-        df = df.filter(pl.col("PEINH") > 0)
-
-        # 计算单价: VERPR / PEINH（实测只有 VERPR 有值，STPRS/PVPRS 恒为 0）
-        df = df.with_columns(
-            (pl.col("VERPR") / pl.col("PEINH")).round(2).alias("UNIT_PRICE")
-        )
-
-        # 过滤无效价格
-        df = df.filter(pl.col("UNIT_PRICE") > 0)
-
-        # ORM 的批量 upsert 不允许同一批内出现重复的幂等键（否则后端会直接报错），
-        # 因此必须先去重。实测 (MATNR,BWKEY,BDATJ,POPER) 无重复，这里是防御性处理。
-        keys = ["MATNR", "BWKEY", "BDATJ", "POPER"]
-        dup_count = df.height - df.select(keys).unique().height
-        if dup_count:
-            warnings["dedupe"] += dup_count
-            df = df.sort(keys + ["KALNR"]).unique(subset=keys, keep="last")
-
-        return df
-
-    # ------------------------------------------------------------------
-    # 会计期间 → 日期
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _to_date(bdatj, poper):
-        """
-        会计年度 + 会计期间 → 该期间首日。
-
-        Args:
-            bdatj: 会计年度（int，如 2026）
-            poper: 会计期间（int，如 9）
-
-        Returns:
-            date(2026, 9, 1)；任一值缺失或非法（如 POPER=13）时返回 None
-        """
-        if not bdatj or not poper:
-            return None
-        try:
-            return date(int(bdatj), int(poper), 1)
-        except (ValueError, TypeError):
-            return None
-
-    # ------------------------------------------------------------------
-    # 每行 source 文本
-    # ------------------------------------------------------------------
-
-    @staticmethod
-    def _make_source(bdatj: int, poper: int, bwkey: str = "") -> str:
-        """生成价格来源标识，如 'SAP MBEWH 2026-01 [3011]'。
-
-        从 MBEW 改为 MBEWH 是有意为之 —— 新旧两代 RFC 写出的来源必须可区分。
-        """
-        base = f"SAP MBEWH {bdatj}-{poper:02d}"
-        return f"{base} [{bwkey}]" if bwkey else base

@@ -19,6 +19,9 @@ logs/
 # Upload files
 upload_files/
 
+# Generated exports (export_material_price_stock 等命令的输出)
+exports/
+
 # IDE
 .idea/
 *.iml

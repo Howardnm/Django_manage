@@ -80,7 +80,7 @@ class RawMaterial(models.Model):
     # 关键修改：移除了 name 字段的 unique=True
     name = models.CharField("原材料名称", max_length=100, help_text="如：PA66")
     model_name = models.CharField("原材料型号", max_length=100, blank=True, help_text="如：2600, 101L")
-    warehouse_code = models.CharField("内部物料编码", max_length=50, blank=True, unique=True, null=True, help_text="ERP/WMS编码")
+    warehouse_code = models.CharField("内部物料编码", max_length=50, blank=True, unique=True, null=True, help_text="SAP编码")
     
     category = models.ForeignKey(RawMaterialType, on_delete=models.PROTECT, verbose_name="所属类型")
     

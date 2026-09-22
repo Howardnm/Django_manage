@@ -21,11 +21,6 @@
                     <i class="ti ti-columns me-1"></i> 直接对比
                 </button>
 
-                <!-- 新增配方按钮 -->
-                <a href="{% url 'formula_add' %}?material_id={{ material.pk }}" class="btn btn-sm btn-primary">
-                    <i class="ti ti-plus me-1"></i> 新增配方
-                </a>
-
                 <!-- ISO/ASTM 切换按钮 -->
                 {% url_tabs tabs=std_tabs param='std' style='buttons' %}
             </div>

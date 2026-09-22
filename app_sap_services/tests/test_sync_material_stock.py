@@ -25,6 +25,7 @@ from app_raw_material.models import (
     RawMaterialType,
 )
 from app_sap_services.management.commands.sync_material_stock import Command
+from app_sap_services.transforms import matnr_filter_kwargs
 
 
 HEALTH = {"status": "healthy", "ashost": "192.168.103.182", "client": "800"}
@@ -113,12 +114,16 @@ class StockSyncTests(TestCase):
         return RawMaterialStockSnapshot.objects.count()
 
     def test_matnr_filter_uses_eq_without_wildcard(self):
+        """该函数已移到 app_sap_services.transforms，此处保留端到端回归。
+
+        函数本身的用例见 test_transforms.MatnrFilterKwargsTests。
+        """
         self.assertEqual(
-            Command.matnr_filter_kwargs("A01005000013"),
+            matnr_filter_kwargs("A01005000013"),
             {"mat_range__eq": "A01005000013"},
         )
-        self.assertEqual(Command.matnr_filter_kwargs("A01*"), {"mat_range__cp": "A01*"})
-        self.assertEqual(Command.matnr_filter_kwargs(None), {})
+        self.assertEqual(matnr_filter_kwargs("A01*"), {"mat_range__cp": "A01*"})
+        self.assertEqual(matnr_filter_kwargs(None), {})
 
     def test_keep_days_rejects_negative(self):
         with self.assertRaisesMessage(CommandError, "不能为负数"):
