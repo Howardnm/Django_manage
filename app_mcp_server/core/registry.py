@@ -9,6 +9,10 @@
 只依赖 stdlib，避免与 core/server.py、apps.py 形成循环 import。
 """
 import logging
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app_mcp_server.serializers.types import ToolLoadFailure
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +31,7 @@ def record_duplicate(name: str, fn_module: str = "") -> None:
     DUPLICATES.append({"name": name, "fn_module": fn_module})
 
 
-def load_failures() -> list[dict]:
+def load_failures() -> "list[ToolLoadFailure]":
     """只投影 ToolLoadFailure 声明的字段。
 
     多出来的键在直接调用工具时能溜出去、走 SDK 校验时又会被丢掉，
@@ -45,6 +49,7 @@ def duplicate_names() -> list[str]:
 
 
 def reset() -> None:
-    """测试用：清空记录。"""
+    """清空记录。`AppConfig.ready()` 开头会调一次，保证 ready() 可重复执行；
+    测试也用它隔离用例之间的状态。"""
     LOAD_REPORT.clear()
     DUPLICATES.clear()

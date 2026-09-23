@@ -13,6 +13,7 @@ from .base import (
     attachments_for,
     blank_to_none,
 )
+from .types import ProjectDetailOut, ProjectListOut
 
 logger = logging.getLogger(__name__)
 
@@ -104,11 +105,11 @@ class ProjectDetailSerializer(WarningMixin, ProjectListSerializer):
         return self.attach_warnings(data)
 
 
-def serialize_project(project):
+def serialize_project(project) -> ProjectListOut:
     """Basic project serialization for list view."""
     return as_plain(ProjectListSerializer(project).data)
 
 
-def serialize_project_full(project):
+def serialize_project_full(project) -> ProjectDetailOut:
     """Ultimate Project Serializer including Archive, Timeline and Files."""
     return as_plain(ProjectDetailSerializer(project).data)

@@ -36,8 +36,12 @@ ALL_TOOLS = (
 )
 
 
-def fake_ctx(user, tool):
-    state = SimpleNamespace(mcp_user_id=user.pk if user else None, mcp_jwt={"tool": tool})
+def fake_ctx(user, tool, auth_kind="jwt"):
+    state = SimpleNamespace(
+        mcp_user_id=user.pk if user else None,
+        mcp_jwt={"tool": tool} if auth_kind == "jwt" else {"auth": "api_key"},
+        mcp_auth_kind=auth_kind,
+    )
     request = SimpleNamespace(state=state)
     return SimpleNamespace(request_context=SimpleNamespace(request=request))
 
@@ -112,6 +116,11 @@ class McpToolFixtureMixin:
             grade_name="PA66-B", sap_material_code="SAP-B",
             category=self.mt, creator=self.bob,
         )
+        # 同部门第二个牌号：用来验证列表里 warnings 不会从一条串到另一条
+        self.mat_alice_2 = MaterialLibrary.objects.create(
+            grade_name="PA66-A2", sap_material_code="SAP-A2",
+            category=self.mt, creator=self.alice,
+        )
 
         self.p_alice = Project.objects.create(
             code="PA", name="Alice项目", manager=self.alice, material=self.mat_alice,
@@ -168,6 +177,20 @@ class McpToolFixtureMixin:
             formula=self.f_alice, test_config=self.tc_blank, unique_key="mcp-test-blank",
         )
 
+        # 同 code 跨部门两版：alice 只看得到 v1，v2 在 bob 部门
+        # （项目名刻意不含"项目"二字，免得影响按名称搜索的用例）
+        self.p_cross = Project.objects.create(
+            code="PC", name="跨部门版本对照", manager=self.alice,
+        )
+        LabFormula.objects.create(
+            code="FC-001", name="跨部门配方v1", material_type=self.mt,
+            project=self.p_cross, creator=self.alice, version=1,
+        )
+        LabFormula.objects.create(
+            code="FC-001", name="跨部门配方v2", material_type=self.mt,
+            project=self.p_bob, creator=self.bob, version=2,
+        )
+
     def _test_config(self, name, standard, data_type, unit, order):
         return TestConfig.objects.create(
             category=self.metric_cat, name=name, standard=standard,
@@ -199,11 +222,19 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         self.assertFailure(search_projects(ctx), "TOOL_NOT_ALLOWED")
 
     def test_api_key_skips_tool_claim(self):
-        ctx = fake_ctx(self.alice, None)
-        ctx.request_context.request.state.mcp_jwt = {"auth": "api_key"}
-        result = search_projects(ctx)
+        result = search_projects(fake_ctx(self.alice, None, auth_kind="api_key"))
         self.assertIs(result["ok"], True)
         self.assertIsInstance(result["data"], list)
+
+    def test_jwt_auth_claim_cannot_skip_tool_claim(self):
+        """鉴权种类只认 ASGI 写入的带外信号。
+
+        如果从 JWT claim 反推，签发方（或透传自定义 claims 的网关）只要带上
+        "auth": "api_key" 就能跳过 tool claim 的按工具授权边界。
+        """
+        ctx = fake_ctx(self.alice, "get_mcp_health", auth_kind="jwt")
+        ctx.request_context.request.state.mcp_jwt = {"auth": "api_key"}
+        self.assertFailure(search_projects(ctx), "TOOL_NOT_ALLOWED")
 
     def test_tool_call_logs_arguments(self):
         ctx = fake_ctx(self.alice, "search_projects")
@@ -480,6 +511,28 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         self.assertIsNone(blank["value"])  # 以前是 "N/A"
         self.assertIsNone(blank["unit"])
 
+    def test_formula_hidden_newer_version_is_reported(self):
+        """省略 version 只保证取到"可见范围内"最新版，更高版本被隔离时必须说清。"""
+        data = get_formula_detail(fake_ctx(self.alice, "get_formula_detail"), code="FC-001")
+        self.assertEqual(data["version"], 1)
+        self.assertTrue(data["warnings"])
+        self.assertIn("v2", data["warnings"][0])
+
+        # 明确指定版本时不用提醒（调用人要的就是这一版）
+        v1 = get_formula_detail(
+            fake_ctx(self.alice, "get_formula_detail"), code="FC-001", version=1,
+        )
+        self.assertNotIn("warnings", v1)
+
+        # 没有更高版本时不提醒
+        own = get_formula_detail(fake_ctx(self.alice, "get_formula_detail"), code="FA-001")
+        self.assertNotIn("warnings", own)
+
+        # bob 能看到 v2，也不提醒
+        bob = get_formula_detail(fake_ctx(self.bob, "get_formula_detail"), code="FC-001")
+        self.assertEqual(bob["version"], 2)
+        self.assertNotIn("warnings", bob)
+
     def test_project_without_repository_keeps_fields_as_null(self):
         data = get_project_details(
             fake_ctx(self.alice, "get_project_details"), project_id=self.p_norepo.id,
@@ -533,6 +586,72 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         self.assertIsNone(data["associated_files"])
         self.assertTrue(data["warnings"])
 
+    def test_attachment_warning_does_not_leak_between_list_items(self):
+        """many=True 复用同一个 child serializer，warnings 必须逐项重置。"""
+        from app_mcp_server.serializers import base as mcp_base
+
+        real_attachments_for = mcp_base.attachments_for
+
+        def only_alice_fails(obj):
+            if obj.pk == self.mat_alice.pk:
+                raise RuntimeError("boom")
+            return real_attachments_for(obj)
+
+        with patch(
+            "app_mcp_server.serializers.material.attachments_for",
+            side_effect=only_alice_fails,
+        ):
+            result = search_material_library(
+                fake_ctx(self.alice, "search_material_library"),
+            )
+
+        by_grade = {item["grade_name"]: item for item in result["data"]}
+        self.assertEqual(set(by_grade), {"PA66-A", "PA66-A2"})
+        self.assertIsNone(by_grade["PA66-A"]["files"])
+        self.assertTrue(by_grade["PA66-A"]["warnings"])
+        self.assertEqual(by_grade["PA66-A2"]["files"], [])
+        self.assertNotIn("warnings", by_grade["PA66-A2"], "warning 串到下一条了")
+
+    def test_project_name_match_reports_other_candidates(self):
+        """按名称查命中多个时必须说清楚，且结果要确定（以前是无排序的 .first()）。"""
+        data = get_project_details(
+            fake_ctx(self.alice, "get_project_details"), project_name="项目",
+        )
+        self.assertEqual(data["id"], self.p_alice.id)  # id 最小者
+        self.assertTrue(data["warnings"])
+        self.assertIn("project_id", data["warnings"][0])
+        self.assertIn("其他匹配", data["warnings"][0])
+        self.assertIn("有 4 个项目匹配", data["warnings"][0])  # 报出真实命中数
+
+        again = get_project_details(
+            fake_ctx(self.alice, "get_project_details"), project_name="项目",
+        )
+        self.assertEqual(again["id"], data["id"], "同一请求两次结果不一致")
+
+    def test_project_name_no_match_is_not_found(self):
+        self.assertFailure(
+            get_project_details(
+                fake_ctx(self.alice, "get_project_details"), project_name="绝无此项目名",
+            ),
+            "NOT_FOUND",
+        )
+
+    def test_project_name_hidden_match_is_no_permission(self):
+        """名称命中存在但在别人部门的项目 → NO_PERMISSION，不是 NOT_FOUND。"""
+        self.assertFailure(
+            get_project_details(
+                fake_ctx(self.alice, "get_project_details"), project_name="Bob",
+            ),
+            "NO_PERMISSION",
+        )
+
+    def test_project_name_single_match_has_no_warning(self):
+        data = get_project_details(
+            fake_ctx(self.alice, "get_project_details"), project_name="协同",
+        )
+        self.assertEqual(data["name"], "协同项目")
+        self.assertNotIn("warnings", data)
+
     # ---------- 配方被隐藏时给出计数而不是只有一句话 ----------
 
     def test_hidden_formulas_carry_structured_counts(self):
@@ -544,8 +663,9 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         data = get_material_and_formulas(
             fake_ctx(self.alice, "get_material_and_formulas"), grade_name="PA66-B",
         )
-        self.assertEqual(data["associated_formulas_total"], 2)  # FB-001 v1 + v2
-        self.assertEqual(data["associated_formulas_hidden"], 2)
+        # mat_bob 上有 FB-001 v1/v2 和 FC-001 v2，alice 一条都看不到
+        self.assertEqual(data["associated_formulas_total"], 3)
+        self.assertEqual(data["associated_formulas_hidden"], 3)
         self.assertEqual(data["associated_formulas_history"], [])
         self.assertTrue(data["associated_formulas_note"])
 
@@ -599,3 +719,36 @@ class McpWireShapeTests(McpToolFixtureMixin, TransactionTestCase):
         self.assertIs(payload["ok"], True)
         self.assertEqual(payload["total"], 0)
         self.assertTrue(payload["hint"])
+
+    def test_every_tool_output_matches_its_published_schema(self):
+        """把每个工具的输出送进 SDK 的 convert_result。
+
+        直调工具函数会绕过返回注解的校验，而生产上校验失败会变成 INTERNAL 信封
+        （数据全丢、agent 只看到"服务内部错误"）。所以必须在真实路径上逐个验：
+        TypedDict 声明的键/类型一旦与 serializer 实际产出的对不上，这里就红。
+        """
+        cases = (
+            ("search_projects", fake_ctx(self.alice, "search_projects"), {}),
+            ("get_project_details", fake_ctx(self.alice, "get_project_details"),
+             {"project_id": self.p_alice.id}),
+            ("get_project_details", fake_ctx(self.alice, "get_project_details"),
+             {"project_id": self.p_repo_no_files.id}),   # 有档案、无附件
+            ("get_project_details", fake_ctx(self.alice, "get_project_details"),
+             {"project_id": self.p_norepo.id}),          # 无档案
+            ("search_formulas", fake_ctx(self.alice, "search_formulas"), {}),
+            ("get_formula_detail", fake_ctx(self.alice, "get_formula_detail"), {"code": "FA-001"}),
+            ("search_material_library", fake_ctx(self.alice, "search_material_library"), {}),
+            ("get_material_and_formulas",
+             fake_ctx(self.alice, "get_material_and_formulas"), {"grade_name": "PA66-A"}),
+            ("get_mcp_health", fake_ctx(self.alice, "get_mcp_health"), {}),
+        )
+        for name, ctx, args in cases:
+            with self.subTest(tool=name, args=args):
+                result = asyncio.run(mcp.call_tool(name, args, ctx))
+                self.assertIs(result.is_error, False)
+                payload = result.structured_content["result"]
+                # 出现 error_code 就说明工具失败了，或返回形状没通过 schema 校验
+                self.assertNotIn(
+                    "error_code", payload,
+                    f"{name} 的返回形状没通过 published schema 校验：{payload}",
+                )

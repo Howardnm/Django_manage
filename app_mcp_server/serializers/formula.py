@@ -3,6 +3,7 @@ from rest_framework import serializers
 from app_formula.models import FormulaBOM, FormulaTestResult, LabFormula
 
 from .base import FloatDecimalField, NADateField, as_plain, blank_to_none
+from .types import FormulaOut
 
 
 class FormulaBOMSerializer(serializers.ModelSerializer):
@@ -86,6 +87,6 @@ class FormulaSerializer(serializers.ModelSerializer):
         return FormulaTestResultSerializer(results, many=True).data
 
 
-def serialize_formula(formula):
+def serialize_formula(formula) -> FormulaOut:
     """Full Formula Serialization including BOM and detailed Test Results."""
     return as_plain(FormulaSerializer(formula).data)

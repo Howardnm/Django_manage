@@ -13,6 +13,7 @@ from .base import (
     blank_to_none,
     json_number,
 )
+from .types import MaterialOut
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +82,20 @@ class MaterialSerializer(WarningMixin, serializers.ModelSerializer):
         for group in self.get_grouped_properties(obj):
             for item in group.get("items", []):
                 key = f"{item['name']} ({item['standard']})"
+                if key in flattened:
+                    # 键只由"名称 (标准)"构成，不同分类下的同名同标准物性会撞车。
+                    # 静默覆盖等于丢数据，所以出声；完整数据在 grouped_properties 里没丢。
+                    self.add_warning(
+                        f"物性摘要的键「{key}」重复出现，只保留了最后一条；"
+                        "完整数据请读 grouped_properties。",
+                    )
                 value = item.get("value")
-                if value is None and not item.get("unit"):
+                if value is None:
+                    # 没有值就是没有值。带上单位（"MPa"）会让 agent 当成真实测量值。
                     flattened[key] = None
                     continue
-                parts = [str(part) for part in (value, item.get("unit")) if part is not None]
-                flattened[key] = " ".join(parts).strip() or None
+                unit = item.get("unit")
+                flattened[key] = f"{value} {unit}".strip() if unit else str(value)
         return flattened
 
     def get_files(self, obj):
@@ -104,6 +113,6 @@ class MaterialSerializer(WarningMixin, serializers.ModelSerializer):
             return None
 
 
-def serialize_material(material):
+def serialize_material(material) -> MaterialOut:
     """Serialize material base info, performance data and associated files."""
     return as_plain(MaterialSerializer(material).data)

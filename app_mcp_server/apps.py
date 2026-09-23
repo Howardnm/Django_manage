@@ -22,6 +22,8 @@ class AppMcpServerConfig(AppConfig):
         两条发现路径的失败都**记录而不中断启动**：工具缺一个不影响其余工具，
         而启动失败会让 agent 连工具列表都拿不到。失败由 get_mcp_health 报给 agent。
         """
+        # registry 是模块级状态，先清空让 ready() 可重复执行（否则重跑会重复计数）
+        registry.reset()
         self._load_tool_modules()
         self._discover_mcp_tools()
 

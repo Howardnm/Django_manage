@@ -1,11 +1,12 @@
 from django.db.models import Q
 from mcp.server.mcpserver.context import Context
 
-from app_mcp_server.access import gated_get, gated_qs, require_tool
+from app_mcp_server.access import gated_get, gated_qs, raise_empty, require_tool
 from app_mcp_server.core.server import READ_ONLY, mcp
 from app_mcp_server.responses import (
     ToolErrorOut,
     ToolFailure,
+    append_warning,
     safe_tool,
     search_ok,
     validate_limit,
@@ -78,6 +79,7 @@ def get_project_details(
 ) -> ProjectDetailOut | ToolErrorOut:
     """Get complete project info, including progress timeline, business archive (Customer/OEM), and associated files.
 
+    Prefer project_id. project_name does a case-insensitive substring match and may hit several projects — then the lowest id wins and a `warnings` entry lists the other candidates.
     On failure returns {"ok": false, "error_code": ..., "message": ..., "hint": ...} instead of raising. error_code tells you whether the project does not exist (NOT_FOUND) or exists but is outside your data scope (NO_PERMISSION).
     """
     require_tool(ctx, "get_project_details")
@@ -89,9 +91,28 @@ def get_project_details(
         project = gated_get(
             ctx, "get_project_details", qs, ProjectAccessMixin, _PERM, id=project_id,
         )
-    else:
-        project = gated_get(
-            ctx, "get_project_details", qs, ProjectAccessMixin, _PERM,
-            name__icontains=project_name,
+        return serialize_project_full(project)
+
+    # 按名称查可能命中多个（icontains）：以前是无排序的 .first()，静默取一个，
+    # 同一句话两次调用可能返回不同项目。现在排序固定，并把其他候选告诉 agent。
+    filters = {"name__icontains": project_name}
+    matches = gated_qs(
+        ctx, "get_project_details", qs, ProjectAccessMixin, _PERM,
+    ).filter(**filters).order_by("id")
+    project = matches.first()
+    if not project:
+        raise_empty(ctx, "get_project_details", qs, filters)
+
+    data = serialize_project_full(project)
+    other_names = list(matches.values_list("name", flat=True)[1:6])
+    if other_names:
+        matched_total = matches.count()
+        note = (
+            f"有 {matched_total} 个项目匹配「{project_name}」，已返回 id 最小的一个；"
+            f"其他匹配：{'、'.join(other_names)}"
         )
-    return serialize_project_full(project)
+        if matched_total - 1 > len(other_names):
+            # 列表是截断的，别让 agent 当成完整清单
+            note += f"（仅列出前 {len(other_names)} 个）"
+        append_warning(data, note + "。需要精确指定时请改用 project_id。")
+    return data

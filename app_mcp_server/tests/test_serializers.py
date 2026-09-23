@@ -79,6 +79,14 @@ class PropertiesSummaryTests(SimpleTestCase):
         }])
         self.assertIsNone(summary["阻燃测试 (UL94)"])
 
+    def test_unit_without_value_is_not_a_measurement(self):
+        """只有单位没有数值时不能渲染成 "MPa"——agent 会当成真实测量值。"""
+        summary = self._summary([{
+            "name": "拉伸强度", "standard": "ISO 527",
+            "value": None, "unit": "MPa",
+        }])
+        self.assertIsNone(summary["拉伸强度 (ISO 527)"])
+
     def test_text_value_without_unit(self):
         summary = self._summary([{
             "name": "阻燃等级", "standard": "UL94",
@@ -92,3 +100,15 @@ class PropertiesSummaryTests(SimpleTestCase):
             "value": 0, "unit": "%",
         }])
         self.assertEqual(summary["收缩率 (ISO 294)"], "0 %")
+
+    def test_duplicate_key_is_reported_not_silently_lost(self):
+        """键只由"名称 (标准)"构成，跨分类撞车时静默覆盖会丢数据。"""
+        serializer = MaterialSerializer()
+        summary = serializer.get_properties_summary(self._material_stub([
+            {"name": "拉伸强度", "standard": "ISO 527", "value": 75.5, "unit": "MPa"},
+            {"name": "拉伸强度", "standard": "ISO 527", "value": 80.0, "unit": "MPa"},
+        ]))
+        self.assertEqual(summary["拉伸强度 (ISO 527)"], "80.0 MPa")
+        self.assertTrue(serializer._mcp_warnings)
+        self.assertIn("拉伸强度 (ISO 527)", serializer._mcp_warnings[0])
+        self.assertIn("grouped_properties", serializer._mcp_warnings[0])

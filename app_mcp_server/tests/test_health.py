@@ -9,6 +9,7 @@ from app_mcp_server.core import registry
 from app_mcp_server.core.server import mcp
 from app_mcp_server.tests.test_tool_access import McpToolFixtureMixin, empty_ctx, fake_ctx
 from app_mcp_server.tools.health import _MODULES, get_mcp_health
+from app_mcp_server.tools.projects import search_projects
 from app_user.models import ModuleAccessConfig
 from app_user.services.identity_service import IdentityService
 
@@ -49,6 +50,43 @@ class McpHealthTests(McpToolFixtureMixin, TestCase):
                 self.assertIsNone(entry["reason"])
                 # 准入过了不等于看得到全部数据，这一点必须说清
                 self.assertIn("部门", entry["note"])
+
+    def test_superuser_note_does_not_claim_isolation(self):
+        """apply_isolation() 对超管直接 return qs，所以 note 不能说"数据仍会被隔离"。"""
+        data = get_mcp_health(fake_ctx(self.admin, "get_mcp_health"))
+        for entry in data["module_access"]:
+            with self.subTest(module=entry["module"]):
+                self.assertIs(entry["allowed"], True)
+                self.assertIn("超管", entry["note"])
+                self.assertNotIn("会被", entry["note"])  # 不能声称还会被隔离
+
+    def test_bypass_level_is_reflected_in_note(self):
+        """等级达到 l4_bypass_min_level 时不隔离，note 要跟着变。"""
+        cfg = ModuleAccessConfig.objects.get(module_code="project")
+        cfg.l4_bypass_min_level = 1  # alice 的等级就是 1
+        cfg.save(update_fields=["l4_bypass_min_level"])
+        IdentityService.invalidate_cache()
+
+        entry = _by_module(get_mcp_health(fake_ctx(self.alice, "get_mcp_health")))["project"]
+        self.assertIn("跳过门槛", entry["note"])
+
+    def test_disabled_role_is_reported_as_denied(self):
+        """has_permission() 拒停用角色，user_can() 不拒——健康检查必须自己补上。
+
+        不补的话 health 报 allowed=true，而真去调工具必然 NO_MODULE_ACCESS，
+        agent 就会依据它告诉用户"你有权限"。
+        """
+        self.engineer.is_active = False
+        self.engineer.save(update_fields=["is_active"])
+        IdentityService.invalidate_cache()
+
+        entry = _by_module(get_mcp_health(fake_ctx(self.alice, "get_mcp_health")))["project"]
+        self.assertIs(entry["allowed"], False)
+        self.assertIn("停用", entry["reason"])
+        # 与真实工具的行为一致
+        self.assertFailure(
+            search_projects(fake_ctx(self.alice, "search_projects")), "NO_MODULE_ACCESS",
+        )
 
     def test_l1_role_denied_is_attributed(self):
         data = get_mcp_health(fake_ctx(self.dave, "get_mcp_health"))

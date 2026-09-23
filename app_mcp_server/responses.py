@@ -9,9 +9,21 @@
 """
 import functools
 import logging
-from typing import Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, TypedDict, overload
 
 from mcp.server.mcpserver.exceptions import ToolError
+
+if TYPE_CHECKING:
+    # 只在类型检查期引入业务形状。运行时不 import serializers，
+    # 免得 access 层（鉴权相邻）被拖去加载 DRF + ORM models。
+    from app_mcp_server.serializers.types import (
+        FormulaOut,
+        FormulaSearchOut,
+        MaterialOut,
+        MaterialSearchOut,
+        ProjectListOut,
+        ProjectSearchOut,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +57,10 @@ _CODES: dict[str, tuple[str, str]] = {
     ),
     "NO_PERMISSION": (
         "无权访问该记录",
-        "该记录存在，但不在你的可见范围内（部门或工作组隔离）。这是权限问题，不是参数问题；"
-        "请不要用其他编号反复试探，改为请管理员调整你的数据权限。",
+        # 不写死原因：记录没负责人（owner 为 NULL）时 L4 的关联过滤同样会把它藏起来，
+        # 而那不属于"调用人的可见范围"问题。只说结论，原因交给 get_mcp_health 的自检。
+        "该记录存在，但不在你的可见范围内。这是权限问题，不是参数问题；"
+        "请不要用其他编号反复试探，可先调 get_mcp_health 看自己的模块准入情况。",
     ),
     "NOT_FOUND": (
         "未找到该记录",
@@ -88,7 +102,22 @@ def error_out(error_code: str, message: str = "", hint: str = "") -> ToolErrorOu
     }
 
 
-def search_ok(data: list, empty_hint: str = "", total=None, has_more: bool = False) -> dict:
+@overload
+def search_ok(
+    data: "list[ProjectListOut]", empty_hint: str = "",
+    total: int | None = None, has_more: bool = False,
+) -> "ProjectSearchOut": ...
+@overload
+def search_ok(
+    data: "list[FormulaOut]", empty_hint: str = "",
+    total: int | None = None, has_more: bool = False,
+) -> "FormulaSearchOut": ...
+@overload
+def search_ok(
+    data: "list[MaterialOut]", empty_hint: str = "",
+    total: int | None = None, has_more: bool = False,
+) -> "MaterialSearchOut": ...
+def search_ok(data: list, empty_hint: str = "", total=None, has_more: bool = False) -> Any:
     """列表 / 搜索类工具的成功信封。
 
     total 是**匹配总数**（不只是返回条数），让 agent 能区分三种情况：
@@ -96,19 +125,25 @@ def search_ok(data: list, empty_hint: str = "", total=None, has_more: bool = Fal
 
     limit=None 时不做额外 COUNT，total 就等于 len(data)、has_more 恒为 False，
     与加 limit 之前的行为完全一致。
+
+    上面三个 `@overload` 让每个工具的 `return search_ok(...)` 拿到**具体的**
+    信封 TypedDict（而不是裸 dict），否则静态检查会报"dict 不能赋给 TypedDict"。
+    注解加引号是为了不把 serializers 拖进运行时 import；实现签名返回 Any 是
+    overload 的常规写法（调用方看到的是 overload）。
     """
     returned = len(data)
+    resolved_total = returned if total is None else total
     result = {
         "ok": True,
         "data": data,
-        "total": returned if total is None else total,
+        "total": resolved_total,
         "returned": returned,
         "has_more": has_more,
     }
     if not data and empty_hint:
         result["hint"] = empty_hint
     elif has_more:
-        result["hint"] = more_hint(result["total"], returned)
+        result["hint"] = more_hint(resolved_total, returned)
     return result
 
 
@@ -117,6 +152,16 @@ def more_hint(total: int, returned: int) -> str:
         f"共匹配 {total} 条，本次只返回前 {returned} 条。"
         "请用更精确的 keyword 缩小范围，或调大 limit。"
     )
+
+
+def append_warning(data: Any, message: str) -> None:
+    """往成功信封里追加一条 `warnings`。
+
+    `warnings` 是 NotRequired，不能假定已存在。参数声明为 Any 是刻意的：
+    TypedDict 既不能赋给 `dict[str, Any]`（可变化不安全），也不能在联合类型上
+    调 `setdefault`，而这里要同时接受 TypedDict 和普通 dict。
+    """
+    data.setdefault("warnings", []).append(message)
 
 
 def validate_limit(limit):

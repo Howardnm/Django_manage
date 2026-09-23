@@ -305,6 +305,7 @@ class JwtHttpGateTests(TestCase):
         self.assertEqual(user.pk, self.user.pk)
         self.assertEqual(request.state.mcp_user_id, self.user.pk)
         self.assertEqual(request.state.mcp_jwt["tool"], "search_projects")
+        self.assertEqual(request.state.mcp_auth_kind, "jwt")
 
     def test_empty_public_key_http_401(self):
         with override_settings(MCP_JWT_PUBLIC_KEY="", MCP_JWT_PUBLIC_KEY_PATH=""):
@@ -339,6 +340,8 @@ class McpApiKeyHttpGateTests(TestCase):
         self.assertEqual(user.pk, self.user.pk)
         self.assertEqual(request.state.mcp_user_id, self.user.pk)
         self.assertEqual(request.state.mcp_jwt["auth"], "api_key")
+        # require_tool 认的是这个带外信号，不是上面的 claim
+        self.assertEqual(request.state.mcp_auth_kind, "api_key")
 
     def test_unknown_api_key_401(self):
         status, _, body = _asgi_call(

@@ -138,6 +138,8 @@ class FormulaOut(TypedDict):
     test_results: list[FormulaTestOut]
     description: str | None
     created_at: str | None
+    # 局部提醒（例如存在被隔离的更高版本），有才出现
+    warnings: NotRequired[list[str]]
 
 
 class FormulaSearchOut(TypedDict):

@@ -75,12 +75,16 @@ def get_mcp_user(ctx):
 
 
 def require_tool(ctx, tool_name: str):
-    """JWT 要求 `tool` claim 等于函数名；个人 API Key 跳过 claim，仍走 L1~L5。"""
+    """JWT 要求 `tool` claim 等于函数名；个人 API Key 跳过 claim，仍走 L1~L5。
+
+    "是不是 API Key" 读 `request.state.mcp_auth_kind`（ASGI 鉴权时写入的带外信号），
+    不读 JWT claim —— claim 由签发方决定，用它当鉴权分支等于把越权边界交给签发方。
+    """
     user = get_mcp_user(ctx)
     state = _request_state(ctx)
-    payload = getattr(state, "mcp_jwt", None) or {}
-    if payload.get("auth") == "api_key":
+    if getattr(state, "mcp_auth_kind", None) == "api_key":
         return user
+    payload = getattr(state, "mcp_jwt", None) or {}
     actual = payload.get("tool")
     if actual != tool_name:
         logger.warning(

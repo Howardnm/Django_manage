@@ -198,6 +198,9 @@ def authenticate_http(request):
     user = resolve_user(payload)
     request.state.mcp_jwt = payload
     request.state.mcp_user_id = user.pk
+    # 鉴权种类用带外信号表达，不要从 JWT claim 反推：claim 由签发方决定，
+    # 若网关透传调用人自定义 claims，一个 "auth": "api_key" 就能跳过 tool claim 校验。
+    request.state.mcp_auth_kind = "jwt"
     logger.info(
         "MCP JWT authenticated user_id=%s username=%s client=%s claims=%s",
         user.pk, user.username, _client_ip(request), claims_json(payload),
@@ -216,6 +219,7 @@ def _authenticate_api_key(request, token: str):
         payload = {"auth": "api_key"}
         request.state.mcp_jwt = payload
         request.state.mcp_user_id = user.pk
+        request.state.mcp_auth_kind = "api_key"
         logger.info(
             "MCP API key authenticated user_id=%s username=%s prefix=%s expires=%s client=%s",
             user.pk, user.username, user.mcp_api_key_prefix,

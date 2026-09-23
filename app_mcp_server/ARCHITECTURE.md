@@ -55,10 +55,11 @@ JWT：resolve_user（email → employee_no → username）
 API Key：已绑定 User
         │  映射失败 / 未开通 / 过期 → 401
         ▼
-request.state.mcp_jwt + mcp_user_id
+request.state.mcp_jwt + mcp_user_id + mcp_auth_kind
         │
         ├─ initialize / tools/list：不查 tool
         └─ tools/call：JWT 校验 tool claim；API Key 跳过 claim
+           （按 mcp_auth_kind 判断，不看 claims）
            → gated_qs(AccessMixin) 仍走 L1~L5
               INFO 记 user / tool / args / claims
 ```
@@ -66,6 +67,10 @@ request.state.mcp_jwt + mcp_user_id
 身份只信 ASGI 验签后的 `request.state`。`ctx.headers` 是客户端输入，不能当身份。同步工具跑在 `anyio.to_thread` 里，**不要用 ContextVar**。
 
 `tool` claim 必须等于工具函数名。握手可以用任意有效用户 JWT。
+
+**"是不是个人 API Key" 只认 `request.state.mcp_auth_kind`**（`authenticate_http` 写入），不要
+从 JWT claim 反推。claim 由签发方决定，若网关透传调用人自定义 claims，一个 `"auth": "api_key"`
+就能跳过 `tool` claim 的按工具授权边界。
 
 用户映射：`email`（strip + iexact）优先；缺失再用 `employeeNo` 查 `User.employee_no`；再否则 `sub` 先工号再 `username`。不创建用户，不按 JWT `departmentName` / `employeeName` 改资料。
 
@@ -130,6 +135,15 @@ request.state.mcp_jwt + mcp_user_id
 
 `get_mcp_health` 同时做**调用人权限自检**：每个业务模块能否准入、卡在 L1/L2/L3 哪一层。
 只报调用人自己的权限，不泄露业务记录；模块表从工具模块导入 mixin 与权限码，避免漂移。
+
+两个容易说错的地方，改的时候注意：
+
+- `user_can()` **没有**"角色被停用"的检查，而真正管准入的 `has_permission()` 有。所以
+  `_module_access` 必须先用 `_role_disabled()` 自己补一道，否则会报 `allowed=true` 而实际调用
+  必然 `NO_MODULE_ACCESS`——健康检查说反话比不报更糟。
+- 措辞要区分两类工具：记录级 `get_*` 对不可见记录返回 `NO_PERMISSION`；**搜索类工具的 `total`
+  只统计可见记录**，被隔离的既不计数也不报错。说成后者也报 NO_PERMISSION 会让 agent 对
+  "只有 N 条"这种结论过度自信。
 
 ## 新增工具
 

@@ -7,6 +7,7 @@ from app_mcp_server.access import gated_qs, raise_empty
 from app_mcp_server.core.server import READ_ONLY, mcp
 from app_mcp_server.responses import (
     ToolErrorOut,
+    append_warning,
     safe_tool,
     search_ok,
     validate_limit,
@@ -69,7 +70,7 @@ def search_formulas(
 def get_formula_detail(
     ctx: Context, code: str, version: int | None = None,
 ) -> FormulaOut | ToolErrorOut:
-    """Get a lab formula by experiment code. Same code may have multiple versions; omit version to get the latest.
+    """Get a lab formula by experiment code. Same code may have multiple versions; omit version to get the latest one you can see — a `warnings` entry tells you when a newer version exists but is outside your data scope.
 
     On failure returns {"ok": false, "error_code": ..., "message": ..., "hint": ...} instead of raising. error_code tells you whether the code/version does not exist (NOT_FOUND) or exists but is outside your data scope (NO_PERMISSION).
     """
@@ -84,4 +85,19 @@ def get_formula_detail(
         filters = {"code": code}
     if not formula:
         raise_empty(ctx, "get_formula_detail", base_qs, filters)
-    return serialize_formula(formula)
+
+    data = serialize_formula(formula)
+    if version is None:
+        # "省略 version 取最新" 只能保证取到**可见范围内**最新的那个；更高版本可能
+        # 被 L4/L5 隔离掉了。不说清楚，agent 会把旧版本的 BOM / 成本当成现状回答。
+        hidden_higher = base_qs.filter(version__gt=formula.version).order_by(
+            "-version",
+        ).values_list("version", flat=True).first()
+        if hidden_higher is not None:
+            append_warning(
+                data,
+                f"存在更高的版本 v{hidden_higher}，但不在你的可见范围内，"
+                f"本次返回的是你可见的最新版本 v{formula.version}。"
+                "这不代表系统中没有更新的配方。",
+            )
+    return data

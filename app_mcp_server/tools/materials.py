@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from django.db.models import Q
 from mcp.server.mcpserver.context import Context
@@ -21,6 +22,7 @@ from app_mcp_server.serializers.types import (
     MaterialSearchOut,
     MaterialWithFormulasOut,
 )
+from app_mcp_server.tools.formulas import _prime_costs
 
 logger = logging.getLogger(__name__)
 
@@ -47,9 +49,13 @@ def _formulas_hidden_note(total, hidden):
 
 
 def _material_qs():
-    return MaterialLibrary.objects.select_related("category").prefetch_related(
-        "properties__test_config__category",
-    )
+    """注意：不要 prefetch properties__test_config__category。
+
+    `MaterialSerializer.get_grouped_properties` 走的是模型上的
+    `MaterialLibrary.get_grouped_properties()`，它自己发
+    `self.properties.select_related(...)`，绕过 prefetch 缓存——prefetch 纯属白跑一次查询。
+    """
+    return MaterialLibrary.objects.select_related("category")
 
 
 @mcp.tool(annotations=READ_ONLY)
@@ -103,7 +109,9 @@ def get_material_and_formulas(
         "test_results__test_config",
     )
 
-    data = serialize_material(material)
+    # serialize_material 给出的只是 MaterialOut（基础字段）；本工具会在此基础上
+    # 补齐关联配方相关的字段，所以在这里把它定型成 MaterialWithFormulasOut。
+    data = cast("MaterialWithFormulasOut", serialize_material(material))
     try:
         isolated = gated_qs(
             ctx, "get_material_and_formulas", formula_qs, FormulaAccessMixin, _FORMULA_PERM,
@@ -121,7 +129,8 @@ def get_material_and_formulas(
         return data
 
     # L4/L5 隔离是静默过滤、不抛异常，所以要靠计数才能发现"被挡住了"
-    formulas = list(isolated)
+    # 预热成本计算器，否则每个配方各自装载一次价格（N+1）
+    formulas = _prime_costs(list(isolated))
     data["associated_formulas_history"] = [serialize_formula(f) for f in formulas]
 
     total = formula_qs.count()
