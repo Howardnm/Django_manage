@@ -84,7 +84,7 @@ JWT claims：
 
 查询结果走与 Web 端相同的 L1~L5（含项目协同成员 / 销售成员穿透）。JWT 里的 `departmentName` **不**用于隔离。
 
-Stdio（`run_mcp_server`）没有 JWT：工具会报「此通道未启用身份认证」，**不会**返回全表。
+Stdio（`run_mcp_server`）没有 JWT：工具会返回 `NO_IDENTITY`（此通道未启用身份认证），**不会**返回全表。
 
 ```http
 Authorization: Bearer <JWT>
@@ -92,27 +92,89 @@ Authorization: Bearer <JWT>
 
 缺少或错误的 token 返回 `401`，并带 `WWW-Authenticate: Bearer`。
 
+## 返回值约定
+
+工具失败**不**靠异常表达——异常会被 SDK 压成 `isError: true` 的纯文本，agent 读不到结构。
+所有工具改为返回结构化信封，`isError` 恒为 `false`，agent 用 `ok` 判别：
+
+| 场景 | structuredContent |
+| :--- | :--- |
+| 单对象工具成功 | `{"result": {对象}}`，可能带 `warnings` |
+| 搜索类工具成功 | `{"result": {"ok": true, "data": [...], "total": N, "returned": N, "has_more": bool}}` |
+| 任何工具失败 | `{"result": {"ok": false, "error_code": ..., "message": ..., "hint": ...}}` |
+
+`hint` 是给 agent 的操作建议（例如「该记录存在但不在你的可见范围内，请不要用其他编号反复试探」）。
+错误码：`NO_IDENTITY`、`ACCOUNT_UNAVAILABLE`、`TOOL_NOT_ALLOWED`、`NO_MODULE_ACCESS`、
+`NO_PERMISSION`、`NOT_FOUND`、`INVALID_ARGUMENT`、`INTERNAL`。
+
+「不存在」与「无权」**分开返回**：无权时直接告知是权限问题，避免调用人靠试编号探测记录是否存在。
+模块级准入（角色 / 等级 / 权限码）仍在任何查询之前拦下，所以没有模块权限的人探测不到任何记录。
+
+几条约定：
+
+- **结果上限**：搜索工具都有 `limit` 参数，**不传就是不限**（取全部匹配）。传了会额外算真实
+  `total` 并给 `has_more`，被截断时 hint 会指引缩小范围
+- **空属性一律是 `null`**，不是 `"N/A"` / `"Unknown"` / `""`。字段不会因为没值而消失
+  （例如项目没有业务档案时 `business_info` 是 `null`，而不是被删掉）
+- **部分数据读不到时给 `null` + `warnings`**，而不是塌成 `[]`——`files: []` 才表示"确实没有附件"
+
+## 出问题时先调 get_mcp_health
+
+`get_mcp_health` 是只读的自检工具，agent 在以下情况应该先调它：
+
+- 其它工具失败或返回 `error_code` 看不懂时
+- 工具列表里缺了预期存在的工具
+- 准备告诉用户"你看不到这些数据"之前
+
+它报出：工具模块加载失败清单、被丢弃的重名工具、未受保护（漏套 `@safe_tool` 或无 output schema）
+的工具、以及**当前调用人**在每个业务模块的准入结果与卡住的层级（L1 角色 / L2 等级 / L3 权限码）。
+只报调用人自己的权限，不泄露任何业务记录。
+
 ## 新增工具
 
 在 `app_mcp_server/tools/` 新建 `.py`：
 
 ```python
 from mcp.server.mcpserver.context import Context
-from mcp.server.mcpserver.exceptions import ToolError
-from app_mcp_server.access import gated_qs
+from app_mcp_server.access import gated_get, gated_qs
 from app_mcp_server.core.server import mcp, READ_ONLY
+from app_mcp_server.responses import ToolErrorOut, ToolFailure, safe_tool, search_ok
 
 @mcp.tool(annotations=READ_ONLY)
-def get_data(ctx: Context, id: int) -> dict:
-    """描述何时调用此工具。"""
-    qs = gated_qs(ctx, "get_data", Model.objects.all(), SomeAccessMixin, "app.view_model")
-    obj = qs.filter(pk=id).first()
-    if not obj:
-        raise ToolError("未找到或无权访问")
-    return ...
+@safe_tool                                            # 必须在 mcp.tool 下面
+def get_data(ctx: Context, id: int) -> ModelOut | ToolErrorOut:
+    """描述何时调用此工具，并写明失败信封怎么读。
+
+    On failure returns {"ok": false, "error_code": ..., "message": ..., "hint": ...} instead of raising.
+    """
+    obj = gated_get(ctx, "get_data", Model.objects.all(), SomeAccessMixin, "app.view_model", pk=id)
+    return serialize_model(obj)
+
+@mcp.tool(annotations=READ_ONLY)
+@safe_tool
+def search_data(
+    ctx: Context, keyword: str = "", limit: int | None = None,
+) -> SearchOut | ToolErrorOut:
+    """描述何时调用此工具。Omit limit to get all matches."""
+    limit = validate_limit(limit)
+    qs = gated_qs(ctx, "search_data", Model.objects.all(), SomeAccessMixin, "app.view_model")
+    total = qs.count() if limit is not None else None
+    if limit is not None:
+        qs = qs[:limit]
+    data = [serialize_model(o) for o in qs]
+    return search_ok(
+        data, empty_hint="放宽 keyword 后重试。",
+        total=total, has_more=total > len(data) if total is not None else False,
+    )
 ```
 
+参数不合法时 `raise ToolFailure("INVALID_ARGUMENT", "……")`。查不到 / 无权不用自己判断，
+`gated_get` 会区分并抛出对应错误码。serializer 里空值用 `base.blank_to_none`，不要造字符串哨兵；
+部分数据读不到时用 `WarningMixin.add_warning`。
+
 重启 Django 后自动注册。其它 app 可提供 `mcp_tools.py`，同样 `from app_mcp_server.core.server import mcp`。
+**注意**：`mcp_tools.py` 加载失败以前会让 Django 起不来，现在改为记录进 `get_mcp_health`（缺一个工具
+不该拖垮整个服务）。
 
 ## 可用指令示例
 

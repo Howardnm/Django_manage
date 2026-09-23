@@ -3,22 +3,21 @@
 身份只读 ASGI 验签后写入的 request.state（mcp_user_id / mcp_jwt）。
 不要读 ctx.headers：SDK 标明那是客户端输入。
 同步工具跑在 anyio.to_thread 里，不要用 ContextVar。
+
+失败一律抛 ToolFailure（带 error_code），由 safe_tool 转成结构化信封交给 agent，
+不返回空值、不让异常逃到协议层。
 """
 import json
 import logging
 from types import SimpleNamespace
+from typing import NoReturn
 
 from django.contrib.auth import get_user_model
-from mcp.server.mcpserver.exceptions import ToolError
 
 from app_mcp_server.auth import claims_json
+from app_mcp_server.responses import ToolFailure
 
 logger = logging.getLogger(__name__)
-
-_STDIO_DENIED = "此通道未启用身份认证"
-_TOOL_DENIED = "无权调用该工具"
-_ACCESS_DENIED = "无权访问"
-_NOT_FOUND = "未找到或无权访问"
 
 
 def _request_state(ctx):
@@ -55,13 +54,13 @@ def _tool_arguments_json(ctx) -> str:
 def get_mcp_user(ctx):
     """从 request.state.mcp_user_id 再取一次 User（确认仍 is_active）。
 
-    Stdio 或缺失 state → ToolError，不返回全表。
+    Stdio 或缺失 state → NO_IDENTITY，不返回全表。
     """
     state = _request_state(ctx)
     user_id = getattr(state, "mcp_user_id", None) if state is not None else None
     if not user_id:
         logger.warning("MCP access denied: stdio or missing identity state")
-        raise ToolError(_STDIO_DENIED)
+        raise ToolFailure("NO_IDENTITY")
 
     User = get_user_model()
     user = (
@@ -71,7 +70,7 @@ def get_mcp_user(ctx):
     )
     if not user:
         logger.warning("MCP access denied: user gone or inactive mcp_user_id=%s", user_id)
-        raise ToolError(_ACCESS_DENIED)
+        raise ToolFailure("ACCOUNT_UNAVAILABLE")
     return user
 
 
@@ -88,7 +87,7 @@ def require_tool(ctx, tool_name: str):
             "MCP access denied: tool claim mismatch expected=%s actual=%s user=%s args=%s claims=%s",
             tool_name, actual or "", user.username, _tool_arguments_json(ctx), claims_json(payload),
         )
-        raise ToolError(_TOOL_DENIED)
+        raise ToolFailure("TOOL_NOT_ALLOWED")
     return user
 
 
@@ -107,7 +106,7 @@ def gated_qs(ctx, tool_name, qs, mixin_cls, perm):
             user.username, mixin_cls.__name__, perm, tool_name,
             _tool_arguments_json(ctx), claims_json(payload),
         )
-        raise ToolError(_ACCESS_DENIED)
+        raise ToolFailure("NO_MODULE_ACCESS")
     state = _request_state(ctx)
     payload = getattr(state, "mcp_jwt", None) if state is not None else None
     logger.info(
@@ -118,17 +117,32 @@ def gated_qs(ctx, tool_name, qs, mixin_cls, perm):
     return mixin.get_queryset()
 
 
+def raise_empty(ctx, tool_name, base_qs, filters) -> NoReturn:
+    """隔离后为空：区分「记录存在但不可见」与「确实不存在」。
+
+    base_qs 是**未**做 L4/L5 隔离的原始 queryset。按调用人要求如实告知无权，
+    好过一句含糊的「未找到或无权访问」让 agent 换编号反复试探。
+    注意：调用人层面的准入（L1~L3）在 gated_qs 里、任何查询之前就已经拦下，
+    所以无模块权限的人走不到这里，探测不到任何记录。
+    """
+    state = _request_state(ctx)
+    user_id = getattr(state, "mcp_user_id", None) if state is not None else None
+    payload = getattr(state, "mcp_jwt", None) if state is not None else None
+    exists = base_qs.filter(**filters).exists()
+    logger.info(
+        "MCP record %s tool=%s user_id=%s filters=%s args=%s claims=%s",
+        "hidden" if exists else "absent",
+        tool_name, user_id, filters, _tool_arguments_json(ctx), claims_json(payload),
+    )
+    if exists:
+        raise ToolFailure("NO_PERMISSION")
+    raise ToolFailure("NOT_FOUND")
+
+
 def gated_get(ctx, tool_name, qs, mixin_cls, perm, **filters):
-    """隔离后再 filter。不存在与无权用同一句，避免泄露存在性。"""
+    """隔离后再 filter。查不到时区分「无权」与「不存在」。"""
     isolated = gated_qs(ctx, tool_name, qs, mixin_cls, perm)
     obj = isolated.filter(**filters).first()
     if not obj:
-        state = _request_state(ctx)
-        user_id = getattr(state, "mcp_user_id", None) if state is not None else None
-        payload = getattr(state, "mcp_jwt", None) if state is not None else None
-        logger.debug(
-            "MCP gated_get empty tool=%s user_id=%s filters=%s args=%s claims=%s",
-            tool_name, user_id, filters, _tool_arguments_json(ctx), claims_json(payload),
-        )
-        raise ToolError(_NOT_FOUND)
+        raise_empty(ctx, tool_name, qs, filters)
     return obj

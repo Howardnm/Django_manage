@@ -1,15 +1,31 @@
+import logging
+
 from rest_framework import serializers
 
 from app_material.models import MaterialLibrary
 
-from .base import AttachmentBriefSerializer, NADateField, as_plain, attachments_for, json_number
+from .base import (
+    AttachmentBriefSerializer,
+    NADateField,
+    WarningMixin,
+    as_plain,
+    attachments_for,
+    blank_to_none,
+    json_number,
+)
+
+logger = logging.getLogger(__name__)
+
+# grouped_properties 里模型方法给的这些键是 blank=True 的字符列，空串 → null。
+# 只在 serializer 这一层映射，不动 app_material 的模型方法（Web 端共用）。
+_BLANKABLE_ITEM_KEYS = ("name_en", "unit", "condition", "min_value_text", "max_value_text")
 
 
-class MaterialSerializer(serializers.ModelSerializer):
-    manufacturer = serializers.CharField(default="Unknown", allow_blank=True, read_only=True)
-    category = serializers.CharField(source="category.name", default="General", read_only=True)
-    flammability = serializers.CharField(default="N/A", allow_blank=True, read_only=True)
-    description = serializers.CharField(default="", allow_blank=True, read_only=True)
+class MaterialSerializer(WarningMixin, serializers.ModelSerializer):
+    manufacturer = serializers.CharField(read_only=True)
+    category = serializers.CharField(source="category.name", read_only=True)
+    flammability = serializers.CharField(read_only=True)
+    description = serializers.CharField(read_only=True)
     properties_summary = serializers.SerializerMethodField()
     grouped_properties = serializers.SerializerMethodField()
     files = serializers.SerializerMethodField()
@@ -24,11 +40,11 @@ class MaterialSerializer(serializers.ModelSerializer):
         )
 
     def to_representation(self, instance):
+        self.reset_warnings()
         data = super().to_representation(instance)
-        data["manufacturer"] = data.get("manufacturer") or "Unknown"
-        data["flammability"] = data.get("flammability") or "N/A"
-        data["description"] = data.get("description") or ""
-        return data
+        for key in ("manufacturer", "flammability", "description"):
+            data[key] = blank_to_none(data.get(key))
+        return self.attach_warnings(data)
 
     def get_grouped_properties(self, obj):
         cached = getattr(obj, "_mcp_grouped_properties", None)
@@ -39,12 +55,16 @@ class MaterialSerializer(serializers.ModelSerializer):
                     items = []
                     for item in group.get("items", []):
                         raw = item.get("value")
-                        items.append({
+                        normalised = {
                             **item,
-                            "value": raw if isinstance(raw, str) else json_number(raw),
+                            # TEXT/SELECT 类的空字符串同样是"没有值"
+                            "value": blank_to_none(raw) if isinstance(raw, str) else json_number(raw),
                             "min_value": json_number(item.get("min_value")),
                             "max_value": json_number(item.get("max_value")),
-                        })
+                        }
+                        for key in _BLANKABLE_ITEM_KEYS:
+                            normalised[key] = blank_to_none(normalised.get(key))
+                        items.append(normalised)
                     cached.append({"category_name": group["category_name"], "items": items})
             else:
                 cached = []
@@ -52,19 +72,36 @@ class MaterialSerializer(serializers.ModelSerializer):
         return cached
 
     def get_properties_summary(self, obj):
+        """"物性名 (标准)" → "值 单位"，无值时给 None。
+
+        以前是 f"{value} {unit}".strip()，value 为 None 时会写出字符串 "None"，
+        agent 会当成真实测量值。
+        """
         flattened = {}
         for group in self.get_grouped_properties(obj):
             for item in group.get("items", []):
                 key = f"{item['name']} ({item['standard']})"
-                val = f"{item['value']} {item['unit']}".strip()
-                flattened[key] = val
+                value = item.get("value")
+                if value is None and not item.get("unit"):
+                    flattened[key] = None
+                    continue
+                parts = [str(part) for part in (value, item.get("unit")) if part is not None]
+                flattened[key] = " ".join(parts).strip() or None
         return flattened
 
     def get_files(self, obj):
+        """读取失败返回 None + warning，与"确实没有附件"（[]）区分开。"""
         try:
             return AttachmentBriefSerializer(attachments_for(obj), many=True).data
-        except Exception:
-            return []
+        except Exception as exc:
+            logger.warning(
+                "MCP attachment serialization failed material=%s: %s", obj.pk, exc,
+                exc_info=True,
+            )
+            self.add_warning(
+                f"附件列表读取失败（{type(exc).__name__}），files 为 null 不代表该牌号没有附件。",
+            )
+            return None
 
 
 def serialize_material(material):
