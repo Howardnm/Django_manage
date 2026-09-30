@@ -1,0 +1,77 @@
+{% extends "printing/base_print.html" %}
+{% load static %}
+
+{% block print_title %}产品报价需求单{% endblock %}
+
+{% block extra_css %}
+.print-label-bg { background: #f1f5f9; font-weight: 600; }
+.print-info-table { width: 100%; table-layout: fixed; font-size: 11px; border-collapse: collapse; }
+.print-info-table td { border: 1px solid #d0d5dd; padding: 5px 6px; overflow-wrap: anywhere; }
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/apps/app_quotation/info_table.css' %}">
+{% endblock %}
+
+{% block print_content %}
+<div class="print-page">
+    <h4 class="text-center mb-3">产品报价需求单</h4>
+
+    {% include 'apps/app_quotation/card/_info_table.html' %}
+
+    <h6 class="mt-4 mb-2">候选配方与成本</h6>
+    <table class="print-sheet-table table table-bordered mb-3">
+        <thead>
+            <tr><th>实验单号</th><th>配方名称</th><th>成本(含税)</th><th>选定</th></tr>
+        </thead>
+        <tbody>
+            {% for row in bom_rows %}
+            <tr>
+                <td>{{ row.bom.formula.code }}</td>
+                <td>{{ row.bom.formula.name }}</td>
+                <td>{% if row.cost is not None %}{{ row.cost|floatformat:2 }}{% else %}-{% endif %}</td>
+                <td>{% if row.bom.is_selected %}✔{% endif %}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">暂无</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h6 class="mt-4 mb-2">原材料行情价明细</h6>
+    <table class="print-sheet-table table table-bordered mb-3">
+        <thead>
+            <tr><th>原材料</th><th>SAP编码</th><th>含税行情价</th><th>税率</th></tr>
+        </thead>
+        <tbody>
+            {% for mp in material_prices %}
+            <tr>
+                <td>{{ mp.raw_material.name }}{% if mp.raw_material.model_name %} {{ mp.raw_material.model_name }}{% endif %}</td>
+                <td>{{ mp.raw_material.warehouse_code }}</td>
+                <td>{{ mp.price_tax_included }}</td>
+                <td>{{ mp.tax_rate }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="4" class="text-center">暂无</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <h6 class="mt-4 mb-2">成本与报价</h6>
+    <table class="print-info-table mb-4">
+        <tr>
+            <td class="print-label-bg" style="width:18%;">边际成本</td><td style="width:32%;">{{ quotation.marginal_cost|default:"-" }}</td>
+            <td class="print-label-bg" style="width:18%;">边际贡献率</td><td style="width:32%;">{{ quotation.contribution_rate|default:"-" }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg">客户含税报价</td><td colspan="3">{{ quotation.customer_price|default:"-" }}</td>
+        </tr>
+    </table>
+
+    <div class="d-flex justify-content-between mt-5">
+        <div style="width:32%;">发起人签字：<span class="sig-space"></span></div>
+        <div style="width:32%;">审批签字：<span class="sig-space"></span></div>
+        <div style="width:32%;">日期：<span class="sig-space"></span></div>
+    </div>
+</div>
+{% endblock %}

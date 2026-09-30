@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}发起报价{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_quotation/info_table.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle">产品报价</div>
+                <h2 class="page-title">发起报价需求单</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-xl mt-3">
+    <form method="post" class="card">
+        {% csrf_token %}
+        <div class="card-header">
+            <h3 class="card-title">基本信息</h3>
+        </div>
+        <div class="card-body">
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            {# 传统表格：8 列，一行 4 字段（灰底标题 + 内容） #}
+            <table class="quotation-info-table">
+                <colgroup>
+                    <col style="width:13%"><col style="width:12%"><col style="width:13%"><col style="width:12%">
+                    <col style="width:13%"><col style="width:12%"><col style="width:13%"><col style="width:12%">
+                </colgroup>
+                <tbody>
+                    {% for section in form_sections %}
+                    {% if section.name %}<tr><td class="info-section" colspan="8">{{ section.name }}</td></tr>{% endif %}
+                    {% for row in section.rows %}
+                    <tr>
+                        {% for field in row %}
+                            {% if field %}
+                            <td class="info-label">
+                                {{ field.label }}{% if field.field.required %}<span class="text-danger">*</span>{% endif %}
+                            </td>
+                            <td class="info-cell">
+                                {{ field }}
+                                {% if field.errors %}
+                                <div class="invalid-feedback d-block">{{ field.errors.0 }}</div>
+                                {% endif %}
+                            </td>
+                            {% else %}
+                            <td class="info-label"></td>
+                            <td class="info-cell"></td>
+                            {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer text-end">
+            <a href="{% url 'quotation_list' %}" class="btn btn-link">取消</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="ti ti-send me-1"></i>发起报价
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/apps/app_quotation/create.js' %}"></script>
+{% endblock %}

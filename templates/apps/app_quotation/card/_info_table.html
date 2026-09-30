@@ -1,0 +1,29 @@
+{% comment %}
+信息卡片只读表格局部 — 详情页 / 打印页共用。
+依赖 context 变量 info_sections（由 QuotationRequest.get_info_sections() 提供）。
+8 列布局：每个字段 = 灰底标题单元格 + 内容单元格，一行 4 个字段。
+{% endcomment %}
+<table class="quotation-info-table">
+    <colgroup>
+        <col style="width:13%"><col style="width:12%"><col style="width:13%"><col style="width:12%">
+        <col style="width:13%"><col style="width:12%"><col style="width:13%"><col style="width:12%">
+    </colgroup>
+    <tbody>
+        {% for section in info_sections %}
+        {% if section.name %}<tr><td class="info-section" colspan="8">{{ section.name }}</td></tr>{% endif %}
+        {% for row in section.rows %}
+        <tr>
+            {% for cell in row %}
+                {% if cell %}
+                <td class="info-label">{{ cell.label }}</td>
+                <td class="info-cell">{{ cell.display|default:"-" }}</td>
+                {% else %}
+                <td class="info-label"></td>
+                <td class="info-cell"></td>
+                {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>

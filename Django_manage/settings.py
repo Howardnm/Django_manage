@@ -79,6 +79,7 @@ INSTALLED_APPS = [
     'app_color_center.apps.AppColorCenterConfig',  # 配色中心
     'app_material_testing.apps.AppMaterialTestingConfig',  # 材料测试中心
     'app_mold_injection.apps.AppMoldInjectionConfig',  # 模具注塑中心
+    'app_quotation.apps.AppQuotationConfig',  # 产品报价
     "debug_toolbar",                                    # 这是debug_toolbar的配置
     'app_mcp_server.apps.AppMcpServerConfig',           # AI MCP server
     'app_sap_services.apps.AppSapServicesConfig',     # SAP RFC 服务

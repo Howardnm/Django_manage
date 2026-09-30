@@ -49,5 +49,8 @@ urlpatterns = [
     # 附件管理模块（统一上传/下载/删除）
     path('attachment/', include('app_attachment.urls')),
 
+    # 产品报价模块
+    path('quotation/', include('app_quotation.urls')),
+
     path('permission-denied/', permission_denied_view, name='permission_denied'),
 ] + debug_toolbar_urls()

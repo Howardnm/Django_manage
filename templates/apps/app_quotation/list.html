@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}产品报价需求单{% endblock %}
+
+{% block content %}
+{% include 'apps/list_modules/header.html' with title="产品报价需求单" create_url="quotation_create" %}
+
+<div class="card mt-3">
+    {% include 'apps/list_modules/tools_search_filter.html' %}
+    <div class="table-responsive">
+        <table class="table card-table table-vcenter table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>需求单号</th>
+                    <th>成品材料</th>
+                    <th>客户</th>
+                    <th>业务组别</th>
+                    <th>分基地</th>
+                    <th>发起人</th>
+                    <th>状态</th>
+                    <th>创建时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for obj in quotations %}
+                <tr>
+                    <td>
+                        <a href="{% url 'quotation_detail' obj.pk %}" class="fw-bold text-reset">{{ obj.code }}</a>
+                    </td>
+                    <td>
+                        <span class="text-reset">{{ obj.finished_material.grade_name }}</span>
+                        <div class="text-muted small">SAP: {{ obj.finished_material.sap_material_code }}</div>
+                    </td>
+                    <td>{{ obj.customer.short_name|default:obj.customer.company_name }}</td>
+                    <td>{{ obj.business_group.name }}</td>
+                    <td>{{ obj.subsidiary.name }}</td>
+                    <td>{{ obj.creator.username }}</td>
+                    <td><span class="badge {{ obj.status_badge_class }}">{{ obj.get_status_display }}</span></td>
+                    <td class="text-muted">{{ obj.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5">
+                        <div class="empty">
+                            <div class="empty-icon"><i class="ti ti-file-description fs-1 opacity-25"></i></div>
+                            <p class="empty-title">暂无报价需求单</p>
+                            <p class="empty-subtitle text-muted">点击右上角「新建」发起核价需求</p>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% include 'apps/list_modules/paginator.html' with page_obj=page_obj %}
+</div>
+{% endblock %}

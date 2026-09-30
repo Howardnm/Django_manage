@@ -138,11 +138,21 @@
 
             <!-- 配方价格走势 -->
             {% if has_trend or plant_costs %}
-            <div class="card">
+            <div class="card mb-3">
                 <div class="card-header bg-green-lt">
                     <h3 class="card-title text-green mb-0"><i class="ti ti-chart-line me-2"></i>配方价格走势</h3>
                 </div>
                 <div id="formula-price-trend-chart" style="height: 400px; width: 100%;"></div>
+            </div>
+            {% endif %}
+
+            <!-- 原材料行情价格走势 -->
+            {% if has_market_trend %}
+            <div class="card">
+                <div class="card-header bg-azure-lt">
+                    <h3 class="card-title text-azure mb-0"><i class="ti ti-chart-line me-2"></i>原材料行情价格走势</h3>
+                </div>
+                <div id="market-price-trend-chart" style="height: 400px; width: 100%;"></div>
             </div>
             {% endif %}
         </div>
@@ -369,6 +379,33 @@
 
 {% block extra_js %}
 {% load static %}
+{% if has_market_trend %}
+<script src="{% static 'highcharts/core-12.5.0/highcharts.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    var marketTrend = {{ market_trend_json|safe }};
+    if (marketTrend.length > 0) {
+        Highcharts.chart('market-price-trend-chart', {
+            title: { text: null },
+            xAxis: { type: 'datetime' },
+            yAxis: { title: { text: '含税行情价 (元/kg)' } },
+            legend: { enabled: true, align: 'right', verticalAlign: 'top', layout: 'vertical' },
+            plotOptions: {
+                spline: {
+                    marker: { enabled: true, radius: 3 }
+                }
+            },
+            series: marketTrend.map(function (s) {
+                return {
+                    name: s.name, data: s.data, type: 'spline',
+                    tooltip: { valueDecimals: 2, pointFormat: '<b>¥{point.y:.2f}/kg</b>' }
+                };
+            })
+        });
+    }
+});
+</script>
+{% endif %}
 {% if has_trend or plant_costs %}
 <script src="{% static 'highcharts/core-12.5.0/highstock.js' %}"></script>
 <script>

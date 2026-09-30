@@ -1,5 +1,7 @@
 import uuid
+from decimal import Decimal
 
+from django.conf import settings
 from django.db import models
 
 from app_material.models import MaterialType, TestConfig
@@ -386,3 +388,56 @@ class RawMaterialStockSnapshot(models.Model):
         plant_str = f" [{self.plant.code}]" if self.plant_id else ""
         loc_str = f" / {self.storage_location}" if self.storage_location else ""
         return f"{self.raw_material}{plant_str}{loc_str} - CLABS={self.unrestricted_stock}"
+
+
+# 8. 原材料行情价历史（只增不改，防篡改）
+class RawMaterialMarketPrice(models.Model):
+    """原材料行情价历史 — 只增不改（防篡改）。
+
+    由报价需求单采购录入时写入：每次录入新增一条不可变记录，累积历史行情价，
+    供后续需求单预填最新行情价、以及配方页行情价走势卡片使用。
+    与 RawMaterialPriceRecord（库存均价口径）完全隔离，两者互不影响。
+    """
+
+    raw_material = models.ForeignKey(
+        RawMaterial, on_delete=models.PROTECT,
+        related_name='market_prices', verbose_name="原材料"
+    )
+    price_tax_included = models.DecimalField("含税行情价", max_digits=12, decimal_places=2)
+    tax_rate = models.DecimalField("税率", max_digits=5, decimal_places=4, default=Decimal('0.13'))
+    price_tax_excluded = models.DecimalField("不含税行情价", max_digits=12, decimal_places=2)
+    price_date = models.DateField("价格日期")
+    entered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        verbose_name="录入人"
+    )
+    entered_by_name = models.CharField("录入人姓名", max_length=150, blank=True)
+    entered_at = models.DateTimeField("录入时间", auto_now_add=True)
+    source_request_no = models.CharField("来源需求单号", max_length=50, blank=True)
+    source_request_id = models.PositiveIntegerField("来源需求单ID", null=True, blank=True)
+    remark = models.CharField("备注", max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = "原材料行情价历史"
+        verbose_name_plural = "原材料行情价历史"
+        ordering = ['-entered_at']
+        indexes = [
+            models.Index(fields=['raw_material', '-entered_at']),
+        ]
+
+    def save(self, *args, **kwargs):
+        """只允许插入（防篡改）：已有记录禁止修改。"""
+        if self.pk is not None:
+            raise RuntimeError("原材料行情价历史记录不可修改")
+        if self.price_tax_excluded is None:
+            self.price_tax_excluded = (
+                self.price_tax_included / (1 + self.tax_rate)
+            ).quantize(Decimal('0.01'))
+        super().save(*args, **kwargs)
+
+    def delete(self, *args, **kwargs):
+        """禁止删除（防篡改）。"""
+        raise RuntimeError("原材料行情价历史记录不可删除")
+
+    def __str__(self):
+        return f"{self.raw_material} - ¥{self.price_tax_included} ({self.price_date})"

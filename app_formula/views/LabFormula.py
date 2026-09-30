@@ -320,6 +320,32 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
             })
         context['plant_costs'] = plant_costs
 
+        # 行情价格走势（原材料含税行情价历史，来自报价需求单累积的 RawMaterialMarketPrice）
+        import calendar
+        from app_raw_material.models import RawMaterialMarketPrice
+        market_series = []
+        for line in formula.bom_lines.all():
+            records = list(
+                RawMaterialMarketPrice.objects
+                .filter(raw_material_id=line.raw_material_id)
+                .order_by('entered_at')
+            )
+            if len(records) < 2:
+                continue
+            name = line.raw_material.name
+            if line.raw_material.model_name:
+                name += f' {line.raw_material.model_name}'
+            market_series.append({
+                'name': name,
+                'data': [
+                    [calendar.timegm(r.entered_at.timetuple()) * 1000,
+                     float(r.price_tax_included)]
+                    for r in records
+                ],
+            })
+        context['has_market_trend'] = len(market_series) > 0
+        context['market_trend_json'] = json.dumps(market_series)
+
         return context
 
 

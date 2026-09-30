@@ -33,6 +33,7 @@ MODULE_METHODS = [
     MenuModule.get_raw_material,
     MenuModule.get_form_management,
     MenuModule.get_workflow,
+    MenuModule.get_quotation,
     MenuModule.get_admin,
 ]
 

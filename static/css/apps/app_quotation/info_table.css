@@ -1,0 +1,48 @@
+/* ==========================================
+   信息卡片传统表格 — 发起页 / 详情页 / 打印页共用
+   8 列布局：每个字段 = 灰底标题单元格 + 内容单元格，一行 4 个字段
+   依赖: Tabler 1.4.0（.form-select/.form-control/.ts-wrapper）
+   ========================================== */
+
+.quotation-info-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.quotation-info-table td {
+    border: 1px solid #d0d5dd;
+    padding: 6px 8px;
+    vertical-align: middle;
+    font-size: 0.8125rem;
+}
+
+/* 字段标题单元格：灰色底 */
+.quotation-info-table .info-label {
+    background: #f1f5f9;
+    font-weight: 600;
+    color: #1e293b;
+    overflow-wrap: anywhere;
+}
+
+/* 分区标题行：更深的灰底 */
+.quotation-info-table .info-section {
+    background: #e2e8f0;
+    font-weight: 700;
+    padding: 5px 8px;
+}
+
+.quotation-info-table .info-cell {
+    text-align: left;
+}
+
+/* 表格内控件 / TomSelect 占满单元格宽度，下拉面板不被裁切（不套 table-responsive） */
+.quotation-info-table .info-cell .ts-wrapper,
+.quotation-info-table .info-cell .form-select,
+.quotation-info-table .info-cell .form-control {
+    width: 100%;
+}
+
+.quotation-info-table .form-hint {
+    margin-top: 2px;
+}

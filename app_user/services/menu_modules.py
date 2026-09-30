@@ -130,6 +130,19 @@ class MenuModule:
         }
 
     @staticmethod
+    def get_quotation():
+        return {
+            "code": "quotation",
+            "name": "产品报价",
+            "icon": "report-money",
+            "url_name": "quotation_list",
+            "module_access_code": "quotation",
+            "sub_items": [
+                {"name": "报价需求单", "url_name": "quotation_list"},
+            ],
+        }
+
+    @staticmethod
     def get_trial_production():
         return {
             "code": "trial_production",

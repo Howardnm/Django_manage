@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Plant, PriceAvgConfig, RawMaterialType, Supplier, RawMaterial, RawMaterialProperty, RawMaterialPriceRecord, RawMaterialStockSnapshot
+from .models import Plant, PriceAvgConfig, RawMaterialType, Supplier, RawMaterial, RawMaterialProperty, RawMaterialPriceRecord, RawMaterialStockSnapshot, RawMaterialMarketPrice
 
 @admin.register(RawMaterialType)
 class RawMaterialTypeAdmin(admin.ModelAdmin):
@@ -80,3 +80,25 @@ class RawMaterialStockSnapshotAdmin(admin.ModelAdmin):
     list_filter = ('plant', 'storage_location', 'synced_at')
     autocomplete_fields = ['raw_material', 'plant']
     readonly_fields = ('sync_batch_id', 'synced_at')
+
+
+@admin.register(RawMaterialMarketPrice)
+class RawMaterialMarketPriceAdmin(admin.ModelAdmin):
+    """行情价历史只读：只增不改，禁止在 admin 增删改。"""
+    list_display = ('raw_material', 'price_tax_included', 'tax_rate', 'price_tax_excluded',
+                    'price_date', 'entered_by_name', 'source_request_no', 'entered_at')
+    search_fields = ('raw_material__name', 'raw_material__model_name',
+                     'source_request_no', 'entered_by_name')
+    list_filter = ('price_date', 'raw_material__category')
+    readonly_fields = ('raw_material', 'price_tax_included', 'tax_rate', 'price_tax_excluded',
+                       'price_date', 'entered_by', 'entered_by_name', 'entered_at',
+                       'source_request_no', 'source_request_id', 'remark')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

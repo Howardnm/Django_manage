@@ -51,11 +51,21 @@ class MenuService:
 
         # 从 DB 读取启用的菜单模块
         try:
-            from app_user.models import SidebarModule
+            from django.db.models import Prefetch
+            from app_user.models import SidebarModule, SidebarSubItem, RoleGroup
             raw_modules = list(
                 SidebarModule.objects.filter(is_active=True)
                 .select_related('module_access')
-                .prefetch_related('sub_items')
+                .prefetch_related(
+                    Prefetch(
+                        'sub_items',
+                        # 显式 order_by('sort_order') 覆盖 Meta.ordering=['module','sort_order']，
+                        # 避免按 FK 联表 sidebarmodule 产生无谓 JOIN；子项已按模块分组无需跨模块排序。
+                        queryset=SidebarSubItem.objects.order_by('sort_order').prefetch_related(
+                            Prefetch('role_groups', queryset=RoleGroup.objects.filter(is_active=True))
+                        ),
+                    )
+                )
                 .order_by('sort_order')
             )
         except Exception:
@@ -90,7 +100,7 @@ class MenuService:
             return True
 
         # L1: 子项声明了 role_groups 则用自身（任一命中即放行）；否则继承父模块
-        sub_groups = list(sub_item.role_groups.filter(is_active=True))
+        sub_groups = list(sub_item.role_groups.all())  # 已预取，仅含活跃分组
         if sub_groups:
             from app_user.services.identity_service import IdentityService
             allowed = any(
@@ -118,7 +128,9 @@ class MenuService:
 
             subs = []
             is_any_child_active = False
-            for sub in mod.sub_items.filter(is_active=True).order_by('sort_order'):
+            for sub in mod.sub_items.all():  # 走预取缓存，避免逐模块重查
+                if not sub.is_active:
+                    continue
                 if not cls._check_sub_item_visibility(sub, parent_role_codes, user):
                     continue
 

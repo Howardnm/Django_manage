@@ -1,0 +1,53 @@
+{% load project_extras %}
+{% comment %}
+多BOM对比矩阵局部 — 步骤②可编辑 / 其他步骤只读 共用。
+依赖 context：bom_columns / bom_rows / selected_formula_ids。
+editable=True 时额外渲染复选行（name=formula_ids），否则仅展示原材料+比例。
+{% endcomment %}
+<div class="table-responsive">
+    <table class="table table-vcenter table-bordered card-table text-center table-sm" style="font-size:13px; table-layout:auto;">
+        <thead>
+            <tr class="bg-light">
+                <th class="text-start align-middle" style="min-width:160px;">原材料</th>
+                {% for col in columns %}
+                <th class="align-middle" style="min-width:120px;">
+                    <div class="fw-bold text-primary text-wrap">{{ col.formula.name }}</div>
+                    <div class="small text-muted">{{ col.formula.code }}</div>
+                </th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% if editable %}
+            {# 复选行：每个配方列一个 checkbox #}
+            <tr>
+                <td class="text-start bg-light fw-bold">选择</td>
+                {% for col in columns %}
+                <td>
+                    <input type="checkbox" class="form-check-input" name="formula_ids" value="{{ col.formula.pk }}"
+                        {% if col.formula.pk in selected_formula_ids %}checked{% endif %}>
+                </td>
+                {% endfor %}
+            </tr>
+            {% endif %}
+            {# 原材料行 + 比例列 #}
+            {% for row in rows %}
+            <tr>
+                <td class="text-start">
+                    <div class="fw-bold text-truncate" title="{{ row.raw_material.name }}{% if row.raw_material.model_name %} {{ row.raw_material.model_name }}{% endif %}">
+                        {{ row.raw_material.name }}{% if row.raw_material.model_name %} <span class="text-muted small">{{ row.raw_material.model_name }}</span>{% endif %}
+                    </div>
+                </td>
+                {% for cell in row.values %}
+                <td class="align-middle">
+                    {% if cell.percentage is None %}<span class="text-muted text-opacity-25">-</span>
+                    {% else %}<span class="fw-bold text-dark">{{ cell.percentage|smart_decimal }}</span>{% endif %}
+                </td>
+                {% endfor %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="{{ columns|length|add:1 }}" class="text-center py-4 text-muted">该成品暂无关联配方</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

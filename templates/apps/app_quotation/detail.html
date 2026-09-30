@@ -1,0 +1,389 @@
+{% extends "base.html" %}
+{% load static %}
+{% load attachment_tags %}
+{% load project_extras %}
+
+{% block title %}{{ quotation.code }} - 产品报价需求单{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{% static 'css/apps/app_quotation/info_table.css' %}">
+{% if quotation.workflow_instance %}
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/diagram-js.css' %}">
+<link rel="stylesheet" href="{% static 'bpmn-js/core-18.15.0/dist/assets/bpmn-font/css/bpmn.css' %}">
+<link rel="stylesheet" href="{% static 'css/apps/app_workflow/instance_detail.css' %}">
+{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="page-header d-print-none">
+    <div class="container-xl">
+        <div class="row align-items-center">
+            <div class="col">
+                <div class="page-pretitle"><a href="{% url 'quotation_list' %}">产品报价</a></div>
+                <h2 class="page-title">{{ quotation.code }}</h2>
+                <div class="text-muted mt-1">
+                    <span class="badge {{ quotation.status_badge_class }}">{{ quotation.get_status_display }}</span>
+                    <span class="ms-2">{{ quotation.finished_material.grade_name }} · {{ quotation.customer.short_name|default:quotation.customer.company_name }}</span>
+                </div>
+            </div>
+            <div class="col-auto ms-auto d-print-none">
+                <div class="btn-list">
+                    {% if quotation.workflow_instance %}
+                    <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modal-flow">
+                        <i class="ti ti-git-branch me-1"></i>查看审批流程
+                    </button>
+                    {% endif %}
+                    <a href="{% url 'quotation_print' quotation.pk %}" class="btn btn-outline-primary" target="_blank">
+                        <i class="ti ti-printer me-1"></i>打印
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container-xl mt-3 mb-6">
+    {# 退回修订横幅（仅发起者可见） #}
+    {% if needs_revision and is_creator %}
+    <div class="alert alert-warning d-print-none">
+        <i class="ti ti-alert-triangle me-1"></i>
+        该需求单已被退回，请重新填写基本信息后提交。
+        <a href="{% url 'quotation_edit' quotation.pk %}" class="btn btn-sm btn-warning ms-2">重新填写</a>
+    </div>
+    {% endif %}
+
+    {# 步骤进度 #}
+    <div class="card mb-3">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap gap-2">
+                {% for s in steps %}
+                <span class="badge {% if s.status == 'completed' %}bg-green-lt{% elif s.status == 'current' %}bg-azure-lt{% else %}bg-secondary-lt{% endif %}">
+                    {{ s.label }}
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8">
+            {# 基本信息（只读，传统表格） #}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">基本信息</h3></div>
+                <div class="card-body">
+                    {% include 'apps/app_quotation/card/_info_table.html' %}
+                </div>
+            </div>
+
+            {# 已选BOM矩阵（只读，仅展示步骤②已复选的配方；选BOM审批人/成本中心审批人始终可见） #}
+            {% if show_bom_matrix and not edit_bom_matrix and selected_bom_columns %}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">已选BOM</h3></div>
+                <div class="card-body">
+                    {% include 'apps/app_quotation/card/_bom_matrix.html' with editable=False columns=selected_bom_columns rows=selected_bom_rows %}
+                </div>
+            </div>
+            {% endif %}
+
+            {# 步骤可编辑卡片 #}
+            {% if can_act %}
+            <form id="step-form" method="post" action="{% url 'quotation_step_action' quotation.pk %}">
+                {% csrf_token %}
+                <input type="hidden" name="action" id="step-action" value="APPROVE">
+                <input type="hidden" name="remark" id="step-remark" value="">
+
+                {% if current_task_id == 'Task_select_bom' %}
+                <div class="card mb-3">
+                    <div class="card-header bg-info-lt"><h3 class="card-title">② 选择多BOM（配方）</h3></div>
+                    <div class="card-body">
+                        <p class="text-muted small">对比各配方原材料与比例，勾选配方列下的复选框后提交。可点下方「移交」交给研发工程师。</p>
+                        {% include 'apps/app_quotation/card/_bom_matrix.html' with editable=True columns=bom_columns rows=bom_rows %}
+                    </div>
+                </div>
+
+                {% elif current_task_id == 'Task_purchase_price' %}
+                <div class="card mb-3">
+                    <div class="card-header bg-info-lt"><h3 class="card-title">③ 填写含税行情价</h3></div>
+                    <div class="card-body">
+                        <p class="text-muted small">仅显示原材料名称/SAP编码，不显示比例。提交后自动计算每个 BOM 的成本。</p>
+                        <div class="table-responsive">
+                            <table class="table card-table table-vcenter mb-0">
+                                <thead><tr><th>原材料</th><th>SAP编码</th><th>最新行情价(预填)</th><th>本次含税行情价</th></tr></thead>
+                                <tbody>
+                                    {% for line in material_lines %}
+                                    <tr>
+                                        <td>{{ line.name }}{% if line.model_name %} <span class="text-muted small">{{ line.model_name }}</span>{% endif %}</td>
+                                        <td><code>{{ line.warehouse_code }}</code></td>
+                                        <td class="text-muted">{{ line.latest_price|default:"-" }}</td>
+                                        <td>
+                                            <input type="number" step="0.01" class="form-control" name="price_{{ line.raw_material.pk }}"
+                                                value="{{ line.existing_price|default:line.latest_price }}">
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center py-4 text-muted">暂无原材料（请先完成步骤②选BOM）</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {% elif current_task_id == 'Task_cost' %}
+                <div class="card mb-3">
+                    <div class="card-header bg-info-lt"><h3 class="card-title">④ 边际成本 / 边际贡献率</h3></div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label required">边际成本</label>
+                                <input type="number" step="0.01" class="form-control" name="marginal_cost" value="{{ quotation.marginal_cost|default:'' }}">
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">边际贡献率</label>
+                                <input type="number" step="0.0001" class="form-control" name="contribution_rate" value="{{ quotation.contribution_rate|default:'' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% elif current_task_id == 'Task_rd_select' %}
+                <div class="card mb-3">
+                    <div class="card-header bg-info-lt"><h3 class="card-title">⑤ 选定一个合理 BOM</h3></div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table card-table table-vcenter mb-0">
+                                <thead><tr><th style="width:40px;"></th><th>实验单号</th><th>配方名称</th><th>成本(含税)</th></tr></thead>
+                                <tbody>
+                                    {% for row in bom_rows %}
+                                    <tr>
+                                        <td><input type="radio" class="form-check-input" name="selected_bom" value="{{ row.bom.pk }}" {% if row.bom.is_selected %}checked{% endif %}></td>
+                                        <td><code>{{ row.bom.formula.code }}</code></td>
+                                        <td>{{ row.bom.formula.name }}</td>
+                                        <td>{% if row.cost is not None %}{{ row.cost|floatformat:2 }}{% else %}<span class="text-muted">缺价</span>{% endif %}</td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr><td colspan="4" class="text-center py-4 text-muted">暂无候选配方</td></tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {% elif current_task_id == 'Task_customer_price' %}
+                <div class="card mb-3">
+                    <div class="card-header bg-info-lt"><h3 class="card-title">⑦ 填写客户含税报价</h3></div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label required">客户含税报价</label>
+                                <input type="number" step="0.01" class="form-control" name="customer_price" value="{{ quotation.customer_price|default:'' }}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {% else %}
+                <div class="card mb-3">
+                    <div class="card-body text-muted">当前步骤：{{ current_task.display_name }}，请审批后提交。</div>
+                </div>
+                {% endif %}
+            </form>
+            {% endif %}
+
+            {# 已填行情价（只读，步骤③） #}
+            {% if material_prices %}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">原材料行情价明细</h3></div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter mb-0">
+                        <thead><tr><th>原材料</th><th>含税行情价</th><th>税率</th><th>录入人</th></tr></thead>
+                        <tbody>
+                            {% for mp in material_prices %}
+                            <tr>
+                                <td>{{ mp.raw_material.name }}{% if mp.raw_material.model_name %} <span class="text-muted small">{{ mp.raw_material.model_name }}</span>{% endif %}</td>
+                                <td>{{ mp.price_tax_included }}</td>
+                                <td>{{ mp.tax_rate }}</td>
+                                <td>{{ mp.entered_by.username|default:"-" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+
+            {# 成本与客户报价（只读，步骤④） #}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">成本与报价</h3></div>
+                <div class="card-body">
+                    <div class="datagrid">
+                        <div class="datagrid-item"><div class="datagrid-title">边际成本</div><div class="datagrid-content">{{ quotation.marginal_cost|default:"-" }}</div></div>
+                        <div class="datagrid-item"><div class="datagrid-title">边际贡献率</div><div class="datagrid-content">{{ quotation.contribution_rate|default:"-" }}</div></div>
+                        <div class="datagrid-item"><div class="datagrid-title">客户含税报价</div><div class="datagrid-content">{{ quotation.customer_price|default:"-" }}</div></div>
+                    </div>
+                </div>
+            </div>
+
+            {# 候选配方与成本（只读，步骤⑤ 选定结果） #}
+            {% if bom_rows %}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">候选配方与成本</h3></div>
+                <div class="table-responsive">
+                    <table class="table card-table table-vcenter mb-0">
+                        <thead><tr><th>实验单号</th><th>配方名称</th><th>成本(含税)</th><th>选定</th></tr></thead>
+                        <tbody>
+                            {% for row in bom_rows %}
+                            <tr>
+                                <td><code>{{ row.bom.formula.code }}</code></td>
+                                <td>{{ row.bom.formula.name }}</td>
+                                <td>{% if row.cost is not None %}{{ row.cost|floatformat:2 }}{% else %}<span class="text-muted">缺价</span>{% endif %}</td>
+                                <td>{% if row.bom.is_selected %}<span class="badge bg-green-lt">已选定</span>{% else %}-{% endif %}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="col-lg-4">
+            {# 审批意见 #}
+            <div class="card mb-3">
+                <div class="card-header"><h3 class="card-title">审批意见</h3></div>
+                <div class="card-body">
+                    {% for item in history %}
+                    <div class="d-flex mb-3">
+                        <span class="avatar avatar-xs bg-purple-lt rounded me-2">{{ item.approver.username|first|upper }}</span>
+                        <div>
+                            <div>
+                                <strong>{{ item.approver.username }}</strong>
+                                {% if item.action == 'APPROVE' %}<span class="badge bg-green-lt ms-1">通过</span>
+                                {% elif item.action == 'REJECT' %}<span class="badge bg-red-lt ms-1">驳回</span>
+                                {% elif item.action == 'START' %}<span class="badge bg-azure-lt ms-1">发起</span>
+                                {% elif item.action == 'RETURN' %}<span class="badge bg-yellow-lt ms-1">退回</span>
+                                {% elif item.action == 'CANCEL' %}<span class="badge bg-secondary-lt ms-1">取消</span>{% endif %}
+                                <span class="text-muted small ms-1">{{ item.timestamp|date:"m-d H:i" }}</span>
+                            </div>
+                            {% if item.task %}<div class="text-muted small">{{ item.task.display_name }}</div>{% endif %}
+                            {% if item.remark %}<div class="text-muted small">{{ item.remark }}</div>{% endif %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-muted small">暂无审批意见</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {# 合同附件 #}
+            <div class="card">
+                <div class="card-header"><h3 class="card-title">合同附件</h3></div>
+                <div class="card-body">
+                    {% attachment_panel quotation %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# 审批栏 #}
+{% if can_act %}
+<div class="position-sticky bottom-0 bg-body border-top py-2 mt-3 d-print-none" style="z-index:1000;">
+    <div class="container-xl">
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted small text-nowrap">待处理: {{ current_task.display_name }}</span>
+            <textarea id="remark-input" class="form-control" placeholder="请输入审批意见..." rows="1" style="max-width:400px;"></textarea>
+            <div class="ms-auto btn-list">
+                <button type="button" class="btn btn-success" onclick="submitStep('APPROVE')">
+                    <i class="ti ti-check me-1"></i>通过
+                </button>
+                <button type="button" class="btn btn-danger" onclick="submitStep('REJECT')">
+                    <i class="ti ti-x me-1"></i>驳回
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="openTransfer()">
+                    <i class="ti ti-transfer me-1"></i>移交
+                </button>
+                <button type="button" class="btn btn-outline-warning" data-bs-toggle="modal" data-bs-target="#modal-return">
+                    <i class="ti ti-arrow-back me-1"></i>退回
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# 退回弹窗 #}
+<div class="modal modal-blur fade" id="modal-return" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="post" action="{% url 'quotation_return' quotation.pk %}">
+                {% csrf_token %}
+                <div class="modal-header"><h5 class="modal-title">退回重审</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <label class="form-label">退回到</label>
+                    <select name="target_pk" class="form-select mb-3">
+                        {% for t in returnable_targets %}
+                        <option value="{% if t.is_initiator %}initiator{% else %}{{ t.pk }}{% endif %}">{{ t.display_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <label class="form-label">退回原因</label>
+                    <textarea name="remark" class="form-control" rows="2" required placeholder="请输入退回原因..."></textarea>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-link" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-warning">确认退回</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# 移交表单 #}
+<form id="reassign-form" method="post" action="{% url 'quotation_reassign' quotation.pk %}">
+    {% csrf_token %}
+    <input type="hidden" name="to_user_id" id="reassign-user-id">
+</form>
+
+{# 查看审批流程弹窗 #}
+{% if quotation.workflow_instance %}
+<div class="modal modal-blur fade" id="modal-flow" tabindex="-1">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">审批流程</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-0">
+                <div id="bpmn-viewer-canvas" style="width:100%;height:60vh;position:relative;"></div>
+                <div id="bpmn-loading" class="bpmn-loading">
+                    <div class="text-center">
+                        <div class="spinner-border text-primary mb-2"></div>
+                        <div class="small">正在加载流程图...</div>
+                    </div>
+                </div>
+                <div id="bpmn-error" class="bpmn-error">
+                    <div class="text-center">
+                        <i class="ti ti-alert-triangle mb-2" style="font-size:24px;"></i>
+                        <div class="small">流程图加载失败，请检查流程定义。</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script id="bpmn-xml-data" type="text/plain">{{ bpmn_xml|safe }}</script>
+{{ status_map|json_script:"status-map-data" }}
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+{% if quotation.workflow_instance %}
+<script src="{% static 'bpmn-js/core-18.15.0/dist/bpmn-navigated-viewer.development.js' %}"></script>
+<script src="{% static 'js/common/bpmn_status_viewer.js' %}"></script>
+{% endif %}
+<script src="{% static 'js/apps/app_quotation/detail.js' %}"></script>
+{% endblock %}
