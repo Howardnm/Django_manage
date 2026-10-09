@@ -13,6 +13,9 @@
                     </ol>
                 </nav>
                 <h2 class="page-title">{{ customer.short_name|default:customer.company_name }}</h2>
+                {% if customer.customer_code %}
+                <div class="text-secondary">客户编码 {{ customer.customer_code }}</div>
+                {% endif %}
             </div>
             <div class="col-auto ms-auto">
                 <div class="btn-list">
@@ -31,33 +34,63 @@
 
             <!-- 1. 基础信息卡片 -->
             <div class="col-lg-4">
-                <div class="card h-100">
+                <div class="card">
+                    <div class="card-header"><h3 class="card-title">公司档案</h3></div>
                     <div class="card-body">
-                        <div class="subheader mb-3">公司档案</div>
-                        <div class="datagrid">
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">公司全称</div>
-                                <div class="datagrid-content fw-bold">{{ customer.company_name }}</div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">办公地址</div>
-                                <div class="datagrid-content small">{{ customer.address|default:"-" }}</div>
-                            </div>
-                            <div class="datagrid-item">
-                                <div class="datagrid-title">社会信用代码</div>
-                                <div class="datagrid-content"><code>{{ customer.business_license_code|default:"-" }}</code></div>
-                            </div>
-                        </div>
+                        <div class="subheader mb-2" style="color:#000;font-weight:700;">身份</div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">客户编码</div><div>{% if customer.customer_code %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.customer_code }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">公司全称</div><div>{% if customer.company_name %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.company_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">客户名称2</div><div>{% if customer.company_name_2 %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.company_name_2 }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">搜索词 1</div><div>{% if customer.short_name %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.short_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">搜索词 2</div><div>{% if customer.search_term_2 %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.search_term_2 }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">客户账户组</div><div>{% if customer.account_group or customer.account_group_name %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.account_group }} {{ customer.account_group_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">客户系</div><div>{% if customer.customer_series %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.customer_series }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">行业</div><div>{% if customer.industry %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.industry }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">贸易伙伴</div><div>{% if customer.trade_partner %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.trade_partner }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">供应商编码</div><div>{% if customer.vendor_code %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.vendor_code }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">内部地址号</div><div>{% if customer.address_number %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.address_number }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">社会信用代码</div><div>{% if customer.business_license_code %}<span class="badge rounded-pill bg-blue-lt text-wrap text-start">{{ customer.business_license_code }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+
+                        <div class="subheader mb-2 mt-4" style="color:#000;font-weight:700;">地址与联系</div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">国家</div><div>{% if customer.country_code or customer.country_name %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.country_code }} {{ customer.country_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">地区</div><div>{% if customer.region_code or customer.region_name %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.region_code }} {{ customer.region_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">城市</div><div>{% if customer.city %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.city }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">街道/门牌号</div><div>{% if customer.street %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.street }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">门牌号</div><div>{% if customer.house_number %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.house_number }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">邮政编码</div><div>{% if customer.postal_code %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.postal_code }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">办公地址</div><div>{% if customer.address %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.address }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">电话号1</div><div>{% if customer.phone %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.phone }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">电话号2</div><div>{% if customer.phone_2 %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.phone_2 }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">电子邮件</div><div>{% if customer.email %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.email }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">客户来源</div><div>{% if customer.customer_source %}<span class="badge rounded-pill bg-azure-lt text-wrap text-start">{{ customer.customer_source }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+
+                        <div class="subheader mb-2 mt-4" style="color:#000;font-weight:700;">销售归属</div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">区域</div><div>{% if customer.sales_region %}<span class="badge rounded-pill bg-green-lt text-wrap text-start">{{ customer.sales_region }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">销售主管</div><div>{% if customer.sales_manager_name %}<span class="badge rounded-pill bg-green-lt text-wrap text-start">{{ customer.sales_manager_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">销售人员</div><div>{% if customer.sales_person_name %}<span class="badge rounded-pill bg-green-lt text-wrap text-start">{{ customer.sales_person_name }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+
+                        <div class="subheader mb-2 mt-4" style="color:#000;font-weight:700;">状态</div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">全部记账冻结</div><div>{% if customer.posting_blocked %}<span class="badge rounded-pill bg-red-lt">是</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">否</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">全部销售区域冻结</div><div>{% if customer.sales_area_blocked %}<span class="badge rounded-pill bg-red-lt">是</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">否</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">集团级删除</div><div>{% if customer.group_deleted %}<span class="badge rounded-pill bg-red-lt">是</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">否</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">销售订单冻结</div><div>{% if customer.sales_order_block %}<span class="badge rounded-pill bg-yellow-lt">{{ customer.sales_order_block }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">交货冻结</div><div>{% if customer.delivery_block %}<span class="badge rounded-pill bg-yellow-lt">{{ customer.delivery_block }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">出具发票冻结</div><div>{% if customer.billing_block %}<span class="badge rounded-pill bg-yellow-lt">{{ customer.billing_block }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">集团级创建者</div><div>{% if customer.sap_created_by %}<span class="badge rounded-pill bg-purple-lt">{{ customer.sap_created_by }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+                        <div class="d-flex gap-3 align-items-start py-2 border-bottom"><div class="text-secondary flex-shrink-0" style="width: 8.5rem;">集团级创建日期</div><div>{% if customer.sap_created_on %}<span class="badge rounded-pill bg-purple-lt">{{ customer.sap_created_on|date:"Y-m-d" }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">-</span>{% endif %}</div></div>
+
                         <div class="mt-4">
-                            <div class="subheader mb-2">客户简介</div>
-                            <p class="text-secondary small">{{ customer.description|default:"暂无描述" }}</p>
+                            <div class="subheader mb-2" style="color:#000;font-weight:700;">客户简介</div>
+                            {% if customer.description %}<span class="badge rounded-pill bg-cyan-lt text-wrap text-start">{{ customer.description }}</span>{% else %}<span class="badge rounded-pill bg-secondary-lt">暂无描述</span>{% endif %}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 2. 关联系统账号 (核心重构：联系人展示) -->
             <div class="col-lg-8">
+            <div class="row row-cards">
+            <!-- 2. 关联系统账号 -->
+            <div class="col-12">
                 <div class="card h-100">
                     <div class="card-header"><h3 class="card-title">系统关联账号 ({{ contacts.count }})</h3></div>
                     <div class="table-responsive">
@@ -164,6 +197,8 @@
                     <div class="card-footer">{% include 'apps/list_modules/paginator.html' %}</div>
                     {% endif %}
                 </div>
+            </div>
+            </div>
             </div>
         </div>
     </div>

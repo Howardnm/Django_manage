@@ -81,6 +81,11 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
 # ==========================================
 class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
     q = django_filters.CharFilter(method='filter_search', label='搜索')
+    account_group = django_filters.ChoiceFilter(field_name='account_group', label='客户账户组', choices=[], empty_label='客户账户组')
+    customer_series = django_filters.ChoiceFilter(field_name='customer_series', label='客户系', choices=[], empty_label='客户系')
+    industry = django_filters.ChoiceFilter(field_name='industry', label='行业', choices=[], empty_label='行业')
+    country_name = django_filters.ChoiceFilter(field_name='country_name', label='国家名称', choices=[], empty_label='国家名称')
+    sales_region = django_filters.ChoiceFilter(field_name='sales_region', label='区域', choices=[], empty_label='区域')
 
     sort = django_filters.OrderingFilter(
         fields=(
@@ -92,13 +97,41 @@ class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
 
     class Meta:
         model = Customer
-        fields = ['q']
+        fields = ['q', 'account_group', 'customer_series', 'industry', 'country_name', 'sales_region']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form.fields['q'].widget.attrs['placeholder'] = '检索客户编码 / 公司名称 / 搜索词'
+        self.form.fields['account_group'].choices = self._account_group_choices()
+        for field_name in ('customer_series', 'industry', 'country_name', 'sales_region'):
+            self.form.fields[field_name].choices = self._value_choices(field_name)
+
+    @staticmethod
+    def _value_choices(field_name):
+        values = (
+            Customer.objects.exclude(**{field_name: ''})
+            .values_list(field_name, flat=True)
+            .distinct()
+            .order_by(field_name)
+        )
+        return [(value, value) for value in values]
+
+    @staticmethod
+    def _account_group_choices():
+        pairs = (
+            Customer.objects.exclude(account_group='')
+            .values_list('account_group', 'account_group_name')
+            .distinct()
+            .order_by('account_group')
+        )
+        return [(code, f'{code} {name}'.strip()) for code, name in pairs]
 
     def filter_search(self, queryset, name, value):
         """
         增强搜索：支持搜索公司名，以及关联的系统账号姓名。
         """
         return queryset.filter(
+            Q(customer_code__icontains=value) |
             Q(company_name__icontains=value) |
             Q(short_name__icontains=value) |
             Q(members__first_name__icontains=value) | # 搜索关联人的姓名

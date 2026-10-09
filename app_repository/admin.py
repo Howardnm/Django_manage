@@ -58,8 +58,8 @@ class OEMAdmin(admin.ModelAdmin):
 # ==========================================
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('company_name', 'short_name', 'contact_count', 'created_at')
-    search_fields = ('company_name', 'short_name')
+    list_display = ('customer_code', 'company_name', 'short_name', 'contact_count', 'created_at')
+    search_fields = ('customer_code', 'company_name', 'short_name')
     inlines = [CustomerUserInline]
 
     def contact_count(self, obj):

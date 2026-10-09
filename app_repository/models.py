@@ -53,19 +53,58 @@ class OEM(models.Model):
 # ==========================================
 class Customer(models.Model):
     """
-    直接客户公司档案 (如：延锋、马瑞利、华阳)
+    直接客户公司档案 (如：延锋、马瑞利、华阳)。
+    客户编码是 SAP 主数据唯一键；公司全称允许重名。
     """
-    company_name = models.CharField("公司全称", max_length=100, unique=True)
-    short_name = models.CharField("公司简称", max_length=20, blank=True)
-    logo = models.ImageField("公司Logo", upload_to='customer/logos/', blank=True, null=True)
-    
-    address = models.CharField("公司办公地址", max_length=200, blank=True)
+    customer_code = models.CharField("客户编码", max_length=20, unique=True, null=True, blank=True)
+    company_name = models.CharField("公司全称", max_length=100)
+    company_name_2 = models.CharField("客户名称2", max_length=80, blank=True)
+    short_name = models.CharField("搜索词 1", max_length=40, blank=True)
+    search_term_2 = models.CharField("搜索词 2", max_length=40, blank=True)
+    account_group = models.CharField("客户账户组", max_length=10, blank=True)
+    account_group_name = models.CharField("账户组描述", max_length=20, blank=True)
+    customer_series = models.CharField("客户系", max_length=20, blank=True)
+    industry = models.CharField("行业", max_length=50, blank=True)
+    trade_partner = models.CharField("贸易伙伴", max_length=10, blank=True)
+    vendor_code = models.CharField("供应商编码", max_length=20, blank=True)
+    address_number = models.CharField("内部地址号", max_length=20, blank=True)
     business_license_code = models.CharField("统一社会信用代码", max_length=50, blank=True)
+
+    country_code = models.CharField("国家", max_length=4, blank=True)
+    country_name = models.CharField("国家名称", max_length=40, blank=True)
+    region_code = models.CharField("地区", max_length=10, blank=True)
+    region_name = models.CharField("地区名称", max_length=40, blank=True)
+    city = models.CharField("城市", max_length=60, blank=True)
+    street = models.CharField("街道/门牌号", max_length=80, blank=True)
+    house_number = models.CharField("门牌号", max_length=20, blank=True)
+    postal_code = models.CharField("邮政编码", max_length=10, blank=True)
+    address = models.CharField("公司办公地址", max_length=200, blank=True)
+    phone = models.CharField("电话号1", max_length=30, blank=True)
+    phone_2 = models.CharField("电话号2", max_length=30, blank=True)
+    email = models.CharField("电子邮件地址", max_length=100, blank=True)
+    customer_source = models.CharField("客户来源", max_length=50, blank=True)
+
+    sales_region = models.CharField("区域", max_length=20, blank=True)
+    sales_manager_name = models.CharField("销售主管", max_length=30, blank=True)
+    sales_person_name = models.CharField("销售人员", max_length=30, blank=True)
+
+    posting_blocked = models.BooleanField("全部记账冻结", default=False, blank=True)
+    sales_area_blocked = models.BooleanField("全部销售区域冻结", default=False, blank=True)
+    group_deleted = models.BooleanField("集团级删除", default=False, blank=True)
+    sales_order_block = models.CharField("销售订单冻结", max_length=4, blank=True)
+    delivery_block = models.CharField("交货冻结", max_length=4, blank=True)
+    billing_block = models.CharField("出具发票冻结", max_length=4, blank=True)
+    sap_created_by = models.CharField("集团级创建者", max_length=20, blank=True)
+    sap_created_on = models.DateField("集团级创建日期", null=True, blank=True)
+
+    logo = models.ImageField("公司Logo", upload_to='customer/logos/', blank=True, null=True)
     description = models.TextField("客户简介", blank=True)
-    
     created_at = models.DateTimeField("录入时间", auto_now_add=True)
-    
-    def __str__(self): return self.short_name or self.company_name
+
+    def __str__(self):
+        label = self.short_name or self.company_name
+        return f"{self.customer_code} {label}" if self.customer_code else label
+
     class Meta:
         verbose_name = "客户公司"
         verbose_name_plural = "2. 客户名录"

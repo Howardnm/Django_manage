@@ -24,11 +24,26 @@ class GradeFactorForm(TablerFormMixin, forms.ModelForm):
 class CustomerForm(TablerFormMixin, forms.ModelForm):
     class Meta:
         model = Customer
-        # 核心修正：移除模型中不存在的 is_active 字段
-        fields = ['company_name', 'short_name', 'logo', 'address', 'business_license_code', 'description']
+        fields = [
+            'customer_code', 'company_name', 'company_name_2', 'short_name', 'search_term_2',
+            'account_group', 'account_group_name', 'customer_series', 'industry',
+            'trade_partner', 'vendor_code', 'address_number', 'business_license_code',
+            'country_code', 'country_name', 'region_code', 'region_name', 'city',
+            'street', 'house_number', 'postal_code', 'address',
+            'phone', 'phone_2', 'email', 'customer_source',
+            'sales_region', 'sales_manager_name', 'sales_person_name',
+            'posting_blocked', 'sales_area_blocked', 'group_deleted',
+            'sales_order_block', 'delivery_block', 'billing_block',
+            'sap_created_by', 'sap_created_on',
+            'logo', 'description',
+        ]
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3, 'placeholder': '请输入客户公司简介...'}),
             'address': forms.Textarea(attrs={'rows': 2, 'placeholder': '公司注册或办公地址'}),
+            'sap_created_on': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'posting_blocked': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'sales_area_blocked': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'group_deleted': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 
