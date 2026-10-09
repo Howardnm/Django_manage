@@ -152,7 +152,11 @@
             const ids = Array.from(checkboxes).map(cb => cb.value);
             fetch("{% url 'material_bulk_publish' %}", {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 body: JSON.stringify({ ids: ids, action: action })
             })
             .then(response => response.json())

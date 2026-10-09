@@ -1,7 +1,7 @@
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.db.models import Q, Subquery, OuterRef, DecimalField
+from django.db.models import Q, Subquery, OuterRef, DecimalField, Prefetch
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
 from django.views import View
@@ -14,7 +14,10 @@ from app_material.models.material import MaterialLibrary, MaterialDataPoint
 from app_material.utils.filters import MaterialFilter
 from app_material.utils.search_picker_config import for_material_import
 from app_formula.models import FormulaTestResult, LabFormula
-from app_material.mixins import MaterialAccessMixin, MaterialFormErrorMixin
+from app_material.mixins import (
+    MaterialAccessMixin, MaterialFormErrorMixin, MaterialManagementAccessMixin,
+)
+from app_user.models import WorkGroup
 from app_material.services.material_cache import MaterialCache
 from common_utils.constants import STD_TABS
 
@@ -435,7 +438,7 @@ class MaterialDetailView(MaterialAccessMixin, DetailView):
 
 
 class MaterialBulkPublishView(MaterialAccessMixin, View):
-    """批量发布：需具备编辑权限。"""
+    """批量发布/下架：创建人、同工作组、管理层身份或超管。"""
     permission_required = 'app_material.change_materiallibrary'
     model = MaterialLibrary
 
@@ -448,15 +451,38 @@ class MaterialBulkPublishView(MaterialAccessMixin, View):
 
             is_published = (action == 'publish')
             qs = self.get_queryset()
-            objs = list(qs.filter(pk__in=ids))
-            # 仅创建人或超管可发布/下架归属材料
+            objs = list(
+                qs.filter(pk__in=ids).select_related('creator').prefetch_related(
+                    Prefetch(
+                        'creator__work_groups',
+                        queryset=WorkGroup.objects.filter(is_active=True),
+                    )
+                )
+            )
+            user_wg_ids = set(
+                request.user.work_groups.filter(is_active=True).values_list('pk', flat=True)
+            )
+            # 身份来自 material.management 的角色组，不在代码里写死
+            privileged = MaterialManagementAccessMixin.user_has_access(request.user)
+            denied = []
             for obj in objs:
-                self.check_edit_permission(obj)
+                try:
+                    self.check_publish_permission(
+                        obj, user_wg_ids=user_wg_ids, privileged=privileged,
+                    )
+                except PermissionDenied:
+                    denied.append(obj.grade_name)
+            if denied:
+                raise PermissionDenied(f"无权发布/下架：{'、'.join(denied)}")
+
             with transaction.atomic():
                 updated_count = qs.filter(pk__in=ids).update(is_published=is_published)
                 # .update() 不触发 post_save，需手动刷新对外数据缓存
                 MaterialCache.invalidate(trigger='MaterialBulkPublishView')
 
-            return JsonResponse({'status': 'success', 'message': f'成功{"发布" if is_published else "下架"} {updated_count} 个牌号'})
+            verb = '发布' if is_published else '下架'
+            return JsonResponse({'status': 'success', 'message': f'成功{verb} {updated_count} 个牌号'})
+        except PermissionDenied:
+            raise
         except Exception as e:
             return JsonResponse({'status': 'error', 'message': str(e)}, status=500)

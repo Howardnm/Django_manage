@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.utils.safestring import mark_safe
 
 from app_user.mixins import UnifiedAccessMixin
@@ -13,6 +14,41 @@ class MaterialAccessMixin(UnifiedAccessMixin):
     module_name = '材料成品库'
     module_description = '材料成品库。按创建人(creator)隔离。'
     user_link_fields = ['creator']
+
+    def check_publish_permission(self, obj, *, user_wg_ids, privileged):
+        """发布/下架的对象级权限。不替代 check_edit_permission。
+
+        放行：超管、管理层身份（privileged）、创建人、与创建人有启用工作组交集的人。
+        创建人为空，或双方没有启用中的工作组交集时，工作组这一条不成立。
+        user_wg_ids 由调用方按当前用户算一次；obj 的创建人工作组应预取为启用组。
+
+        Raises: PermissionDenied
+        """
+        user = self.request.user
+        if user.is_superuser or privileged:
+            return
+
+        owner = self._resolve_owner(obj)
+        if owner and owner == user:
+            return
+        if owner and user_wg_ids:
+            owner_wg_ids = {wg.pk for wg in owner.work_groups.all() if wg.is_active}
+            if user_wg_ids.intersection(owner_wg_ids):
+                return
+
+        raise PermissionDenied("仅创建人、同工作组成员或管理层可发布/下架此材料。")
+
+
+class MaterialManagementAccessMixin(MaterialAccessMixin):
+    """管理层身份标识。不被视图继承。
+
+    Admin 把允许跨归属发布/下架的角色组配到 module_code='material.management'。
+    角色组留空时 fail-closed，仅超管被 user_has_access 判为真。
+    """
+
+    module_code = 'material.management'
+    module_name = '材料成品库-管理层'
+    module_description = '管理层身份标识（仅识别可跨归属发布/下架，不被视图继承）。'
 
 
 class MaterialFormErrorMixin:
