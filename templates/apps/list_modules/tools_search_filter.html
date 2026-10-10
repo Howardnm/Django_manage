@@ -15,7 +15,7 @@
                 {{ field }}
 
             {# ── 2. 搜索框：input-icon + search 图标 ──── #}
-            {% elif field.name == 'q' %}
+            {% elif field.name == 'q' or 'js-filter-keyword' in field.field.widget.attrs.class %}
                 <div class="col-auto">
                     <div class="input-icon" style="width: 180px;">
                         <span class="input-icon-addon">

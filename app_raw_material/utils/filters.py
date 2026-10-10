@@ -23,13 +23,27 @@ class SupplierFilter(TablerFilterMixin, django_filters.FilterSet):
 
 # 2. 原材料过滤器
 class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
-    
+    q = django_filters.CharFilter(
+        method='filter_search',
+        label='搜索',
+        widget=forms.TextInput(attrs={'placeholder': '名称 / 编码'}),
+    )
+
+    model_q = django_filters.CharFilter(
+        field_name='model_name',
+        lookup_expr='icontains',
+        label='型号',
+        widget=forms.TextInput(attrs={
+            'placeholder': '原材料型号',
+            'class': 'form-control js-filter-keyword',
+        }),
+    )
+
     category = django_filters.ModelChoiceFilter(
         queryset=RawMaterialType.objects.all(),
         label='类型',
         empty_label="所有类型",
-        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '材料类型'})
+        widget=forms.Select(attrs={'class': 'form-select', 'placeholder': '原材料类型'})
     )
 
     supplier = django_filters.ModelChoiceFilter(
@@ -39,20 +53,20 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
         widget=forms.Select(attrs={
             'class': 'form-select remote-search',
             'data-model': 'supplier',
-            'data-placeholder': '输入供应商名称搜索...'
+            'placeholder': '供应商名称',
         })
     )
-    
-    # 【新增】适用体系筛选 (多选)
+
+    # 适用体系筛选 (多选)
     suitable_materials = django_filters.ModelMultipleChoiceFilter(
         queryset=MaterialType.objects.all(),
         field_name='suitable_materials', # 多对多筛选
         label='适用体系',
         widget=forms.SelectMultiple(attrs={
             'class': 'form-select form-select-search',
-            'data-placeholder': '选择适用的材料体系...'
+            'placeholder': '适用体系',
         }),
-        conjoined=False 
+        conjoined=False
     )
 
     # 【新增】性能范围筛选
@@ -130,12 +144,11 @@ class RawMaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
     class Meta:
         model = RawMaterial
         # start_date, end_date 来自 DateRangeFilterMixin，默认筛选 created_at
-        fields = ['q', 'category', 'supplier', 'suitable_materials', 'start_date', 'end_date']
+        fields = ['q', 'model_q', 'category', 'supplier', 'suitable_materials', 'start_date', 'end_date']
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(model_name__icontains=value) |
             Q(warehouse_code__icontains=value)
         )
 
