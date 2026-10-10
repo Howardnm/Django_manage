@@ -364,3 +364,147 @@ class MeanWritebackTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(self._manual_value(self.tc_manual), '合格',
                          '被拒时不得删除任何记录')
+
+
+class OrgLeaderProjectAccessTests(TestCase):
+    """组/部门/子公司组织负责人只读穿透，不放开编辑。"""
+
+    @classmethod
+    def setUpTestData(cls):
+        from app_user.models import (
+            Department, ModuleAccessConfig, OrgRole, OrgRoleAssignment,
+            Subsidiary, WorkGroup,
+        )
+        from app_user.services.identity_service import IdentityService
+
+        cls.dept_a = Department.objects.create(name='组织穿透-部门A')
+        cls.dept_b = Department.objects.create(name='组织穿透-部门B')
+        cls.dept_other = Department.objects.create(name='组织穿透-部门C')
+        cls.sub_a = Subsidiary.objects.create(name='组织穿透-公司A')
+        cls.sub_b = Subsidiary.objects.create(name='组织穿透-公司B')
+        cls.wg_a = WorkGroup.objects.create(name='组A', department=cls.dept_a, is_active=True)
+        cls.wg_a2 = WorkGroup.objects.create(name='组A2', department=cls.dept_a, is_active=True)
+        cls.wg_b = WorkGroup.objects.create(name='组B', department=cls.dept_b, is_active=True)
+        cls.wg_decoy = WorkGroup.objects.create(name='无关组', department=cls.dept_other, is_active=True)
+        cls.wg_off = WorkGroup.objects.create(name='停用组', department=cls.dept_a, is_active=False)
+
+        ModuleAccessConfig.objects.create(
+            module_code='project',
+            module_name='项目',
+            enforce_dept_isolation=True,
+            enforce_group_isolation=True,
+        )
+        IdentityService.invalidate_cache('org-leader-access-test')
+
+        def make(username, department, subsidiary=None):
+            return User.objects.create_user(
+                username=username,
+                email=f'{username}@org-leader.test',
+                password='x',
+                department=department,
+                subsidiary=subsidiary,
+            )
+
+        cls.manager_a = make('ol_mgr_a', cls.dept_a, cls.sub_a)
+        cls.manager_a2 = make('ol_mgr_a2', cls.dept_a, cls.sub_a)
+        cls.manager_b = make('ol_mgr_b', cls.dept_b, cls.sub_b)
+        cls.manager_nosub = make('ol_mgr_nosub', cls.dept_b, None)
+        cls.manager_off = make('ol_mgr_off', cls.dept_a, cls.sub_a)
+        cls.wg_a.members.add(cls.manager_a)
+        cls.wg_a2.members.add(cls.manager_a2)
+        cls.wg_b.members.add(cls.manager_b)
+        cls.wg_off.members.add(cls.manager_off)
+
+        # 负责人本人不在所辖组里，且人在第三个部门，L4/L5 本来看不见 A/B
+        cls.wg_leader = make('ol_wg_leader', cls.dept_other)
+        cls.dept_leader = make('ol_dept_leader', cls.dept_other)
+        cls.sub_leader = make('ol_sub_leader', cls.dept_other)
+        cls.wrong_scope = make('ol_wrong_scope', cls.dept_other)
+        for leader in (cls.wg_leader, cls.dept_leader, cls.sub_leader, cls.wrong_scope):
+            cls.wg_decoy.members.add(leader)
+
+        role_wg = OrgRole.objects.create(code='ol_group_leader', name='组长', scope='workgroup')
+        role_dept = OrgRole.objects.create(code='ol_dept_manager', name='部门经理', scope='department')
+        role_sub = OrgRole.objects.create(code='ol_subsidiary_gm', name='子公司负责人', scope='subsidiary')
+
+        OrgRoleAssignment.objects.create(
+            role=role_wg, user=cls.wg_leader, workgroup=cls.wg_a, is_primary=False,
+        )
+        OrgRoleAssignment.objects.create(
+            role=role_wg, user=cls.wg_leader, workgroup=cls.wg_off, is_primary=False,
+        )
+        OrgRoleAssignment.objects.create(
+            role=role_dept, user=cls.dept_leader, department=cls.dept_a,
+        )
+        OrgRoleAssignment.objects.create(
+            role=role_sub, user=cls.sub_leader, subsidiary=cls.sub_a,
+        )
+        # 部门角色即便填了子公司，也不能据此看全公司
+        OrgRoleAssignment.objects.create(
+            role=role_dept, user=cls.wrong_scope, department=cls.dept_b, subsidiary=cls.sub_a,
+        )
+
+        cls.p_a = Project.objects.create(code='OL-A', name='公司A组A项目', manager=cls.manager_a)
+        cls.p_a2 = Project.objects.create(code='OL-A2', name='公司A另一组项目', manager=cls.manager_a2)
+        cls.p_b = Project.objects.create(code='OL-B', name='公司B项目', manager=cls.manager_b)
+        cls.p_nosub = Project.objects.create(code='OL-N', name='无子公司项目', manager=cls.manager_nosub)
+        cls.p_off = Project.objects.create(code='OL-OFF', name='停用组项目', manager=cls.manager_off)
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        from app_user.services.identity_service import IdentityService
+        IdentityService.invalidate_cache('org-leader-access-test-teardown')
+
+    def _view(self, user):
+        from django.test import RequestFactory
+        from app_project.mixins import ProjectAccessMixin
+
+        view = ProjectAccessMixin()
+        view.queryset = Project.objects.all()
+        view.request = RequestFactory().get('/')
+        view.request.user = user
+        return view
+
+    def _visible_ids(self, user):
+        return set(self._view(user).get_queryset().values_list('pk', flat=True))
+
+    def test_workgroup_leader_sees_only_that_group(self):
+        ids = self._visible_ids(self.wg_leader)
+        self.assertIn(self.p_a.pk, ids)
+        self.assertNotIn(self.p_a2.pk, ids)
+        self.assertNotIn(self.p_b.pk, ids)
+        self.assertNotIn(self.p_off.pk, ids)
+        self._view(self.wg_leader).check_object_permission(self.p_a)
+
+    def test_department_leader_sees_other_groups_in_department(self):
+        ids = self._visible_ids(self.dept_leader)
+        self.assertIn(self.p_a.pk, ids)
+        self.assertIn(self.p_a2.pk, ids)
+        self.assertNotIn(self.p_b.pk, ids)
+        self._view(self.dept_leader).check_object_permission(self.p_a2)
+
+    def test_subsidiary_leader_sees_company_projects_only(self):
+        from django.core.exceptions import PermissionDenied
+
+        ids = self._visible_ids(self.sub_leader)
+        self.assertIn(self.p_a.pk, ids)
+        self.assertIn(self.p_a2.pk, ids)
+        self.assertNotIn(self.p_b.pk, ids)
+        self.assertNotIn(self.p_nosub.pk, ids)
+        view = self._view(self.sub_leader)
+        view.check_object_permission(self.p_a)
+        with self.assertRaises(PermissionDenied):
+            view.check_object_permission(self.p_nosub)
+
+    def test_department_role_does_not_inherit_subsidiary_field(self):
+        ids = self._visible_ids(self.wrong_scope)
+        self.assertNotIn(self.p_a.pk, ids)
+        self.assertIn(self.p_b.pk, ids)
+
+    def test_leaders_still_cannot_edit(self):
+        from django.core.exceptions import PermissionDenied as Denied
+
+        for user in (self.wg_leader, self.dept_leader, self.sub_leader):
+            with self.assertRaises(Denied):
+                self._view(user).check_edit_permission(self.p_a)
