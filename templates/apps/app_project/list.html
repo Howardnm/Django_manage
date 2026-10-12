@@ -88,19 +88,20 @@
                             {% endif %}
                         </td>
 
-                        {# 等级与得分合并列 #}
+                        {# 等级与得分合并列；研/业为档案上的高可落地性标记 #}
                         <td class="text-center">
                             <div class="d-flex flex-column align-items-center gap-1">
                                 {% if project.grade %}
-                                    <span class="badge bg-purple text-purple-fg" title="加权因子: {{ project.grade.factor }}" style="min-width: 35px;">
-                                        {{ project.grade.name }}
+                                    <span class="badge bg-purple text-purple-fg" title="加权因子: {{ project.grade.factor }}" style="min-width: 55px;">
+                                        {{ project.grade.name }}/{{ project.quality_score|floatformat:0 }}
                                     </span>
                                 {% else %}
-                                    <span class="badge bg-secondary-lt" style="min-width: 35px;">-级</span>
+                                    <span class="badge bg-secondary-lt" style="min-width: 55px;">-级/{{ project.quality_score|floatformat:0 }}</span>
                                 {% endif %}
-                                <span class="badge bg-yellow text-yellow-fg fw-bold px-2" title="当前质量得分" style="min-width: 35px;">
-                                    {{ project.quality_score|floatformat:0 }}
-                                </span>
+                                <div class="d-flex gap-1">
+                                    <span class="badge {% if project.repository.rd_high_feasibility %}bg-green text-green-fg{% else %}bg-secondary-lt{% endif %}" title="研发高可落地性项目">研</span>
+                                    <span class="badge {% if project.repository.biz_high_feasibility %}bg-yellow text-yellow-fg{% else %}bg-secondary-lt{% endif %}" title="业务高可落地性项目">业</span>
+                                </div>
                             </div>
                         </td>
                         

@@ -125,6 +125,10 @@ class AbstractProjectRepositoryFields(models.Model):
 
     product_name = models.CharField("客户产品名称", max_length=100, blank=True)
     product_code = models.CharField("产品代码/零件号", max_length=100, blank=True)
+    part_usage = models.CharField("制件用途", max_length=100, blank=True)
+    part_color = models.CharField("制件颜色", max_length=50, blank=True)
+    rd_high_feasibility = models.BooleanField("研发高可落地性项目", default=False)
+    biz_high_feasibility = models.BooleanField("业务高可落地性项目", default=False)
 
     target_cost = models.DecimalField("目标成本 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)
     competitor_price = models.DecimalField("竞品售价 (元/kg)", max_digits=10, decimal_places=2, null=True, blank=True)

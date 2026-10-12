@@ -90,6 +90,8 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
             'first_trial_cycle_days': forms.NumberInput(attrs={'placeholder': '如：30'}),
             'pilot_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'mass_production_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'rd_high_feasibility': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'biz_high_feasibility': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def clean_salesperson(self):

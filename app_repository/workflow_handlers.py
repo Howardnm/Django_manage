@@ -38,6 +38,10 @@ def handle_repo_change_callback(instance: WorkflowInstance, target_status: str, 
             repo.salesperson = change.salesperson
             repo.product_name = change.product_name
             repo.product_code = change.product_code
+            repo.part_usage = change.part_usage
+            repo.part_color = change.part_color
+            repo.rd_high_feasibility = change.rd_high_feasibility
+            repo.biz_high_feasibility = change.biz_high_feasibility
             repo.target_cost = change.target_cost
             repo.competitor_price = change.competitor_price
             repo.estimated_order_volume = change.estimated_order_volume

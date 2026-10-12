@@ -67,6 +67,24 @@
                                 <label class="form-label">产品代码 / 零件号</label>
                                 {{ form.product_code }}
                             </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">制件用途</label>
+                                {{ form.part_usage }}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">制件颜色</label>
+                                {{ form.part_color }}
+                            </div>
+                        </div>
+                        <div class="d-flex flex-wrap gap-4 mb-3">
+                            <label class="form-check form-switch m-0">
+                                {{ form.rd_high_feasibility }}
+                                <span class="form-check-label">研发高可落地性项目</span>
+                            </label>
+                            <label class="form-check form-switch m-0">
+                                {{ form.biz_high_feasibility }}
+                                <span class="form-check-label">业务高可落地性项目</span>
+                            </label>
                         </div>
                         <div class="bg-light-lt p-3 rounded border border-yellow">
                             <label class="form-label mb-2 fw-bold text-yellow">销售指标</label>

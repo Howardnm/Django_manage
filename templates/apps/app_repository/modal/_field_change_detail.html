@@ -59,6 +59,22 @@
                     <td>{{ change.product_code|default:"—" }}</td>
                 </tr>
                 <tr>
+                    <td class="text-muted small">制件用途</td>
+                    <td>{{ change.part_usage|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">制件颜色</td>
+                    <td>{{ change.part_color|default:"—" }}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">研发高可落地性项目</td>
+                    <td>{% if change.rd_high_feasibility %}是{% else %}否{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="text-muted small">业务高可落地性项目</td>
+                    <td>{% if change.biz_high_feasibility %}是{% else %}否{% endif %}</td>
+                </tr>
+                <tr>
                     <td class="text-muted small">目标成本</td>
                     <td>{% if change.target_cost %}¥{{ change.target_cost }}/kg{% else %}—{% endif %}</td>
                 </tr>

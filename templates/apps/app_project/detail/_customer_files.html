@@ -43,6 +43,38 @@
                             <div class="fw-bold text-blue">{{ repo.product_code|default:"—" }}</div>
                         </div>
                     </div>
+                    <div class="col-6">
+                        <div class="p-2 border rounded h-100">
+                            <div class="small fw-bold mb-1">制件用途</div>
+                            <div class="fw-bold text-blue text-truncate">{{ repo.part_usage|default:"—" }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 border rounded h-100">
+                            <div class="small fw-bold mb-1">制件颜色</div>
+                            <div class="fw-bold text-blue">{{ repo.part_color|default:"—" }}</div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 border rounded h-100 d-flex justify-content-between align-items-center">
+                            <div class="small fw-bold">研发高可落地性项目</div>
+                            {% if repo.rd_high_feasibility %}
+                                <span class="badge bg-green-lt">是</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">否</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 border rounded h-100 d-flex justify-content-between align-items-center">
+                            <div class="small fw-bold">业务高可落地性项目</div>
+                            {% if repo.biz_high_feasibility %}
+                                <span class="badge bg-green-lt">是</span>
+                            {% else %}
+                                <span class="badge bg-secondary-lt">否</span>
+                            {% endif %}
+                        </div>
+                    </div>
 
                     <!-- 第一行：客户与OEM -->
                     <div class="col-6">
