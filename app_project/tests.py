@@ -136,6 +136,7 @@ from django.urls import reverse
 
 from app_formula.models import FormulaTestResult, LabFormula
 from app_material.models import MaterialType, MetricCategory, TestConfig
+from app_material_testing.models import TestingTask
 from app_trial_production.models import (
     ProductionOrder, ProductionOrderFormulaDetail)
 
@@ -508,3 +509,125 @@ class OrgLeaderProjectAccessTests(TestCase):
         for user in (self.wg_leader, self.dept_leader, self.sub_leader):
             with self.assertRaises(Denied):
                 self._view(user).check_edit_permission(self.p_a)
+
+
+class FormulaTestReturnTests(TestCase):
+    """配方过程页「测试退回」：仅项目负责人可把工单最新测试任务退回测试中。"""
+
+    def setUp(self):
+        from django.contrib.auth.models import Permission
+
+        from app_user.models import ModuleAccessConfig, RoleGroup, UserRole
+        from app_user.services.identity_service import IdentityService
+
+        role = UserRole.objects.create(code='RD_TEST_RETURN', name='研发工程师')
+        group = RoleGroup.objects.create(code='RND_TEST_RETURN', name='研发组')
+        group.roles.add(role)
+        cfg, _ = ModuleAccessConfig.objects.get_or_create(
+            module_code='project',
+            defaults={'module_name': '项目', 'min_level': 1},
+        )
+        cfg.role_groups.add(group)
+        IdentityService.invalidate_cache('formula-test-return')
+
+        def make(username, *, superuser=False):
+            if superuser:
+                user = User.objects.create_superuser(
+                    username=username, email=f'{username}@test.local', password='x')
+            else:
+                user = User.objects.create_user(
+                    username=username, email=f'{username}@test.local', password='x')
+                user.user_type = role
+                user.user_level = cfg.min_level
+                user.save()
+                user.user_permissions.add(Permission.objects.get(
+                    codename='view_project', content_type__app_label='app_project'))
+            return user
+
+        self.manager = make('return_mgr')
+        self.member = make('return_member')
+        self.project = Project.objects.create(name='退回项目', manager=self.manager)
+        self.project.members.create(user=self.member)
+        self.node = self.project.nodes.get(stage='RND')
+        self.mt = MaterialType.objects.create(name='PA66-RET')
+        self.formula = LabFormula.objects.create(
+            code='T-RET', name='配方', material_type=self.mt,
+            project=self.project, project_node=self.node,
+            creator=self.manager, version=1)
+        category = MetricCategory.objects.create(name='力学', order=1)
+        self.tc = TestConfig.objects.create(
+            category=category, name='拉伸强度', standard='ISO 527',
+            data_type='NUMBER', unit='MPa', order=1)
+        self.order = ProductionOrder.objects.create(
+            code='PO-RET', trial_code=self.formula.code, creator=self.manager,
+            project=self.project, status=ProductionOrder.Status.COMPLETED)
+        ProductionOrderFormulaDetail.objects.create(
+            production_order=self.order, formula=self.formula, planned_quantity=10)
+        FormulaTestResult.objects.create(
+            formula=self.formula, test_config=self.tc,
+            production_order=self.order, value=Decimal('50.000'))
+        self.older = TestingTask.objects.create(
+            production_order=self.order, status=TestingTask.Status.RESULTS_WRITTEN_BACK)
+        self.task = TestingTask.objects.create(
+            production_order=self.order, status=TestingTask.Status.RESULTS_WRITTEN_BACK)
+        self.other_order = ProductionOrder.objects.create(
+            code='PO-OTHER', trial_code=self.formula.code, creator=self.manager,
+            project=self.project, status=ProductionOrder.Status.COMPLETED)
+        self.other_task = TestingTask.objects.create(
+            production_order=self.other_order,
+            status=TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+    def tearDown(self):
+        from app_user.services.identity_service import IdentityService
+        IdentityService.invalidate_cache('formula-test-return-teardown')
+
+    def _url(self, order=None):
+        order = order or self.order
+        return reverse('project_formula_test_return', kwargs={
+            'pk': self.project.pk,
+            'formula_pk': self.formula.pk,
+            'order_pk': order.pk,
+        })
+
+    def _post(self, order=None):
+        return self.client.post(
+            self._url(order),
+            HTTP_X_REQUESTED_WITH='XMLHttpRequest',
+        )
+
+    def test_manager_returns_latest_task_only(self):
+        self.client.force_login(self.manager)
+        resp = self._post()
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(resp.json()['status'], 'success')
+        self.task.refresh_from_db()
+        self.older.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.IN_PROGRESS)
+        self.assertEqual(self.older.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+        self.assertTrue(FormulaTestResult.objects.filter(
+            formula=self.formula, production_order=self.order, value=Decimal('50.000'),
+        ).exists())
+
+    def test_member_cannot_return(self):
+        self.client.force_login(self.member)
+        resp = self._post()
+        self.assertEqual(resp.status_code, 403)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+    def test_order_without_written_results_is_rejected(self):
+        self.client.force_login(self.manager)
+        resp = self._post(self.other_order)
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()['status'], 'error')
+        self.other_task.refresh_from_db()
+        self.assertEqual(self.other_task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+    def test_process_page_renders_return_button_for_order_tab(self):
+        self.client.force_login(self.manager)
+        resp = self.client.get(reverse(
+            'project_formula_process', kwargs={'pk': self.project.pk}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '测试退回')
+        self.assertContains(resp, self._url())
+        self.assertContains(resp, 'data-can-return="1"')

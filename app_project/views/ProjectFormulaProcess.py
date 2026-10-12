@@ -2,10 +2,12 @@ from collections import OrderedDict
 from itertools import groupby
 import logging
 from django.views.generic import DetailView, View
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.db import transaction
 from django.urls import reverse
+from common_utils.state_machine import InvalidStateTransition
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import Project, ProjectStage, ProjectNode
 from app_formula.models import LabFormula, FormulaTestResult
@@ -13,6 +15,23 @@ from app_material.models import TestConfig
 from app_trial_production.models.production_order import ProductionOrderFormulaDetail
 
 logger = logging.getLogger(__name__)
+
+_RETURNABLE_TASK_STATUS = ('COMPLETED', 'RESULTS_WRITTEN_BACK')
+
+
+def _latest_testing_tasks(order_ids):
+    """每个工单最新一条测试任务。一次查询，按创建时间与主键倒序取第一条。"""
+    if not order_ids:
+        return {}
+    from app_material_testing.models import TestingTask
+
+    latest = {}
+    tasks = TestingTask.objects.filter(
+        production_order_id__in=order_ids,
+    ).order_by('production_order_id', '-created_at', '-pk')
+    for task in tasks:
+        latest.setdefault(task.production_order_id, task)
+    return latest
 
 
 class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
@@ -114,13 +133,24 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             r.test_config.category.order,
             r.test_config.order,
         ))
-        for order, items in groupby(order_results, key=lambda r: r.production_order):
+        order_groups = [
+            (order, list(items))
+            for order, items in groupby(order_results, key=lambda r: r.production_order)
+        ]
+        latest_task = _latest_testing_tasks([order.pk for order, _ in order_groups])
+        for order, items in order_groups:
+            task = latest_task.get(order.pk)
+            can_return = bool(task and task.status in _RETURNABLE_TASK_STATUS)
             tabs.append({
                 'label': order.code,
                 'tab_id': f'{tab_id_prefix}-order-{order.pk}',
-                'results': list(items),
+                'results': items,
                 'type': 'order',
                 'order': order,
+                'order_id': order.pk,
+                'task_status': task.status if task else '',
+                'task_status_label': task.get_status_display() if task else '无测试任务',
+                'can_return': can_return,
             })
 
         return tabs, any(t['results'] for t in tabs)
@@ -688,3 +718,48 @@ class FormulaMeanWritebackView(ProjectAccessMixin, View):
         if formula.is_competitor:
             return f'{base}?stage=COMPETITOR&formula_id={formula.pk}'
         return f'{base}?formula_id={formula.pk}'
+
+
+class FormulaTestReturnView(ProjectAccessMixin, View):
+    """把配方过程页当前工单 tab 的测试任务退回测试中。"""
+
+    permission_required = 'app_project.view_project'
+
+    def post(self, request, pk, formula_pk, order_pk):
+        FormulaMeanWritebackView._get_formula(self, pk, formula_pk)
+
+        def finish(level, text, ok):
+            getattr(messages, level)(request, text)
+            return JsonResponse(
+                {'status': 'success' if ok else 'error', 'message': text},
+                status=200 if ok else 400,
+            )
+
+        has_written = FormulaTestResult.objects.filter(
+            formula_id=formula_pk, production_order_id=order_pk,
+        ).exists()
+        if not has_written:
+            return finish('error', '该工单在当前配方上没有已回写的测试结果，不能退回', False)
+
+        from app_material_testing.models import TestingTask
+        from app_material_testing.services import TestingTaskService
+
+        task = TestingTask.objects.filter(
+            production_order_id=order_pk,
+        ).select_related('production_order').order_by('-created_at', '-pk').first()
+        if task is None:
+            return finish('error', '该工单没有测试任务', False)
+
+        try:
+            TestingTaskService.return_to_in_progress(task, request.user)
+        except ValueError as exc:
+            return finish('warning', str(exc), False)
+        except InvalidStateTransition:
+            logger.exception(f"Test return failed for task {task.pk}")
+            return finish('error', '测试任务状态已变化，请刷新后重试', False)
+
+        return finish(
+            'success',
+            f'工单 {task.production_order.code} 的测试任务已退回测试中，材料测试中心可以重新填写',
+            True,
+        )

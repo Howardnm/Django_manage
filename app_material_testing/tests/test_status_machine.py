@@ -85,6 +85,10 @@ class TestingTaskStatusMachineTests(TestCase):
         self.assertIn(TestingTask.Status.IN_PROGRESS, allowed)
         self.assertIn(TestingTask.Status.RESULTS_WRITTEN_BACK, allowed)
 
+        self.task.status = TestingTask.Status.RESULTS_WRITTEN_BACK
+        allowed = StateMachine.get_allowed_transitions(self.task)
+        self.assertEqual(allowed, [TestingTask.Status.IN_PROGRESS])
+
     # ── 完整性判定 ──
 
     def test_is_complete_empty_matrix(self):
@@ -204,6 +208,70 @@ class TestingTaskStatusMachineTests(TestCase):
         self.assertEqual(written, 0)
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+    # ── 测试退回 ──
+
+    def test_return_rejects_pending_and_in_progress(self):
+        with self.assertRaises(ValueError):
+            TestingTaskService.return_to_in_progress(self.task, self.user)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.PENDING)
+
+        TestingTaskService.fill_results(self.task, [
+            self._mat(self.tc1, self.f1, '10.5'),
+        ], self.user)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.IN_PROGRESS)
+        with self.assertRaises(ValueError):
+            TestingTaskService.return_to_in_progress(self.task, self.user)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.IN_PROGRESS)
+
+    def test_return_from_written_back_keeps_data_and_allows_refill(self):
+        TestingTaskService.fill_results(self.task, self._full_matrix(), self.user)
+        TestingTaskService.write_back_results(self.task)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+        self.assertIsNotNone(self.task.completed_at)
+
+        trial = TrialTestResult.objects.get(
+            testing_task=self.task, test_config=self.tc1, formula=self.f1)
+        self.assertTrue(trial.is_written_back)
+        formula_result = FormulaTestResult.objects.get(
+            formula=self.f1, test_config=self.tc1, production_order=self.order)
+        self.assertEqual(formula_result.value, Decimal('10.500'))
+
+        self.order.status = ProductionOrder.Status.COMPLETED
+        self.order.save(update_fields=['status'])
+
+        TestingTaskService.return_to_in_progress(self.task, self.user)
+        self.task.refresh_from_db()
+        trial.refresh_from_db()
+        formula_result.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.IN_PROGRESS)
+        self.assertIsNone(self.task.completed_at)
+        self.assertFalse(trial.is_written_back)
+        self.assertEqual(trial.value, Decimal('10.500'))
+        self.assertEqual(formula_result.value, Decimal('10.500'))
+
+        revised = self._full_matrix()
+        revised[0] = self._mat(self.tc1, self.f1, '99.0')
+        TestingTaskService.fill_results(self.task, revised, self.user)
+        self.task.refresh_from_db()
+        trial.refresh_from_db()
+        formula_result.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.COMPLETED)
+        self.assertEqual(trial.value, Decimal('99.000'))
+        self.assertEqual(formula_result.value, Decimal('10.500'))
+
+        written = TestingTaskService.write_back_results(self.task)
+        self.assertEqual(written, 4)
+        self.task.refresh_from_db()
+        self.order.refresh_from_db()
+        formula_result.refresh_from_db()
+        self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+        self.assertEqual(self.order.status, ProductionOrder.Status.COMPLETED)
+        self.assertEqual(formula_result.value, Decimal('99.000'))
 
     # ── 辅助 ──
 

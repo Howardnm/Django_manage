@@ -203,3 +203,25 @@ class TestingTaskService:
 
         logger.info(f"TestingTask {task.pk} force completed, wrote back {written} results")
         return written
+
+    @staticmethod
+    @transaction.atomic
+    def return_to_in_progress(task, user=None):
+        """把已完成或已回写的测试任务退回测试中，供测试中心重新填写。
+
+        保留 TrialTestResult 的数值，只清完成时间并把「已回写」标记复位。
+        不删除配方上的 FormulaTestResult，不回滚工单，不恢复已消耗样条。
+        """
+        returnable = (
+            TestingTask.Status.COMPLETED,
+            TestingTask.Status.RESULTS_WRITTEN_BACK,
+        )
+        if task.status not in returnable:
+            raise ValueError(f'当前状态为{task.get_status_display()}，不能退回测试中')
+
+        StateMachine.transition(task, TestingTask.Status.IN_PROGRESS, user)
+        TestingTask.objects.filter(pk=task.pk).update(completed_at=None)
+        task.completed_at = None
+        task.test_results.update(is_written_back=False)
+        logger.info(f"TestingTask {task.pk} returned to IN_PROGRESS")
+        return task

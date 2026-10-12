@@ -18,7 +18,7 @@ class AppMaterialTestingConfig(AppConfig):
             'PENDING': ['IN_PROGRESS'],
             'IN_PROGRESS': ['COMPLETED'],
             'COMPLETED': ['IN_PROGRESS', 'RESULTS_WRITTEN_BACK'],
-            'RESULTS_WRITTEN_BACK': [],
+            'RESULTS_WRITTEN_BACK': ['IN_PROGRESS'],
         })
 
     def _register_attachments(self):
