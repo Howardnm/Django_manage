@@ -114,8 +114,8 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
     """
     组织架构人员树 API（仅限内部用户 + 超管访问）。
 
-    返回三级树形 JSON：Department → WorkGroup → User + ReviewGroup + 未分配用户。
-    供前端 user_picker_modal.js 调用。
+    返回树形 JSON：Department → WorkGroup → User，部门直属用户与工作组平级，
+    另加 ReviewGroup 与未分配用户。供前端 user_picker_modal.js 调用。
 
     URL: /common/api/user-tree/?q=<search>
 
@@ -143,7 +143,11 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
 
         nodes = []
 
-        # 1. Department → WorkGroup → User（单次查询 + Prefetch）
+        # 1. Department → WorkGroup → User，以及无工作组的部门直属用户
+        # 直属：有部门、无工作组、无审核组，挂在部门节点下，与工作组平级
+        direct_user_qs = base_user_qs.filter(
+            work_groups__isnull=True, review_groups__isnull=True,
+        ).distinct()
         depts = Department.objects.prefetch_related(
             Prefetch(
                 'workgroup_set',
@@ -151,18 +155,13 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
                     Prefetch('members', queryset=base_user_qs, to_attr='_active_members')
                 ),
                 to_attr='_active_workgroups',
-            )
+            ),
+            Prefetch('user_set', queryset=direct_user_qs, to_attr='_direct_members'),
         )
         for dept in depts:
             wg_children = []
             for wg in dept._active_workgroups:
-                users = wg._active_members
-                if search:
-                    users = [
-                        u for u in users
-                        if search.lower() in u.username.lower()
-                        or search.lower() in (u.first_name or '').lower()
-                    ]
+                users = [u for u in wg._active_members if self._matches_search(u, search)]
                 if not users:
                     continue
                 wg_children.append({
@@ -171,12 +170,16 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
                     'type': 'workgroup',
                     'children': [self._format_user(u) for u in users]
                 })
-            if wg_children:
+            direct_users = [
+                u for u in dept._direct_members if self._matches_search(u, search)
+            ]
+            children = wg_children + [self._format_user(u) for u in direct_users]
+            if children:
                 nodes.append({
                     'id': f'dept_{dept.pk}',
                     'label': dept.name,
                     'type': 'department',
-                    'children': wg_children,
+                    'children': children,
                     'collapsed': True,
                 })
 
@@ -184,13 +187,7 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
         for rg in ReviewGroup.objects.filter(is_active=True).prefetch_related(
             Prefetch('members', queryset=base_user_qs, to_attr='_active_members')
         ):
-            users = rg._active_members
-            if search:
-                users = [
-                    u for u in users
-                    if search.lower() in u.username.lower()
-                    or search.lower() in (u.first_name or '').lower()
-                ]
+            users = [u for u in rg._active_members if self._matches_search(u, search)]
             if not users:
                 continue
             nodes.append({
@@ -201,9 +198,10 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
                 'collapsed': True,
             })
 
-        # 3. Unassigned users（单次查询）
+        # 3. 无部门、无工作组、无审核组的用户（单次查询）
         unassigned = User.objects.filter(
-            is_active=True, work_groups__isnull=True, review_groups__isnull=True
+            is_active=True, department__isnull=True,
+            work_groups__isnull=True, review_groups__isnull=True,
         ).only('pk', 'username', 'first_name').distinct()
         if search:
             unassigned = unassigned.filter(
@@ -222,6 +220,13 @@ class UserTreeAPIView(InternalUserRequiredMixin, View):
             _user_tree_cache['data'] = data
             _user_tree_cache['expires_at'] = time.time() + _USER_TREE_TTL
         return JsonResponse(data)
+
+    @staticmethod
+    def _matches_search(user, search):
+        if not search:
+            return True
+        needle = search.lower()
+        return needle in user.username.lower() or needle in (user.first_name or '').lower()
 
     @staticmethod
     def _format_user(u):
