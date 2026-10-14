@@ -324,10 +324,10 @@ class User(AbstractUser):
     phone = models.CharField("个人电话", max_length=20, blank=True)
     employee_no = models.CharField(
         "工号", max_length=32, unique=True, null=True, blank=True,
-        help_text="IT / HR 工号，对应 JWT employeeNo。未填则 MCP 无法用工号映射。",
+        help_text="IT / HR 工号，管理系统登录账号，对应 JWT employeeNo。未填则无法登录管理系统，MCP 也无法用工号映射。",
     )
     email = models.EmailField("电子邮箱", unique=True,
-                              help_text="登录账号，必填且唯一。历史缺失/重复邮箱已由迁移自动补齐。")
+                              help_text="必填且唯一。用于注册、找回密码和外部接口认证。历史缺失/重复邮箱已由迁移自动补齐。")
     address = models.CharField("联系地址", max_length=255, blank=True)
     description = models.TextField("个人备注", blank=True)
 

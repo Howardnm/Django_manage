@@ -172,15 +172,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 AUTHENTICATION_BACKENDS = [
     'axes.backends.AxesStandaloneBackend', # django-axes 认证后端
-    'app_user.backends.EmailBackend',      # 仅邮箱登录（不再支持用户名登录）
+    'app_user.backends.EmployeeNoBackend', # 管理系统工号登录
+    'app_user.backends.EmailBackend',      # 外部接口邮箱登录
 ]
 
 # 注册页面邀请码（留空则关闭注册入口）
 REGISTER_INVITE_CODE = os.environ.get('REGISTER_INVITE_CODE', '888888')
-
-# 登录页邮箱后缀快捷选择（逗号分隔，可从环境变量 EMAIL_DOMAINS 配置）
-# 用户只需填写邮箱前缀，再选一个后缀即可；同时提供"自定义域名"选项。
-EMAIL_DOMAINS = [d.strip() for d in os.environ.get('EMAIL_DOMAINS', 'sunwill.com.cn').split(',') if d.strip()]
 
 # ==============================================================================
 # 国际化 & 时区
@@ -245,6 +242,8 @@ AXES_FAILURE_LIMIT = int(os.environ.get('AXES_FAILURE_LIMIT', '5'))
 AXES_COOLOFF_TIME = float(os.environ.get('AXES_COOLOFF_TIME', '0.0833'))
 AXES_RESET_ON_SUCCESS = os.environ.get('AXES_RESET_ON_SUCCESS', 'True').lower() in ('true', '1', 'yes')
 AXES_LOCKOUT_URL = '/user/login/?locked=1' # 锁定后重定向的URL (带参数)
+# 登录表单字段名是工号，不是 Django 默认的 username
+AXES_USERNAME_FORM_FIELD = 'employee_no'
 
 
 # ==============================================================================
