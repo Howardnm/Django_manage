@@ -25,6 +25,17 @@ class ProjectStage(models.TextChoices):
     def progress_codes(cls):
         return [c for c, _ in cls.choices if c not in cls.non_progress_codes()]
 
+    @classmethod
+    def codes_after(cls, stage):
+        """枚举顺序中位于 stage 之后的阶段，不含 stage 本身。"""
+        codes = [c for c, _ in cls.choices]
+        return codes[codes.index(stage) + 1:]
+
+    @classmethod
+    def mature_formula_codes(cls):
+        """客户小试之后可标记成熟配方。客户意见可插在任意位置，不纳入。"""
+        return [c for c in cls.codes_after(cls.PILOT) if c != cls.FEEDBACK]
+
 
 # 2. 项目基本信息共享字段 — 抽象基类
 class AbstractProjectFields(models.Model):
@@ -339,8 +350,8 @@ class ProjectNode(models.Model):
     def has_been_updated(self):
         return self.status != 'PENDING'
 
-    FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
-    MATURE_FORMULA_STAGES = [ProjectStage.MASS_PROD, ProjectStage.MASS_TRACK]
+    FORMULA_STAGES = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'ORDER', 'MASS_TRACK']
+    MATURE_FORMULA_STAGES = ProjectStage.mature_formula_codes()
 
     @property
     def can_be_mature(self):
@@ -348,17 +359,18 @@ class ProjectNode(models.Model):
 
     @property
     def can_add_formula(self):
-        return self.can_update_status and self.stage in self.FORMULA_STAGES
-
-    @property
-    def formula_button_label(self):
-        if self.stage in self.MATURE_FORMULA_STAGES:
-            return '新增成熟配方'
-        return '新增配方'
+        """当前节点可新增配方。立项不显示；其余阶段在待审批时仍允许。"""
+        project_current_node = self.project.current_active_node
+        is_current_node = (project_current_node and project_current_node.pk == self.pk)
+        return (
+            is_current_node
+            and self.stage in self.FORMULA_STAGES
+            and self.status not in ['DONE', 'TERMINATED', 'FAILED', 'FEEDBACK']
+        )
 
     @property
     def formula_name(self):
-        if self.stage in self.MATURE_FORMULA_STAGES:
+        if self.stage in (ProjectStage.MASS_PROD, ProjectStage.MASS_TRACK):
             return f'{self.project.name} — 量产成熟配方'
         return f'{self.project.name} — {self.get_stage_display()} 第{self.round}轮'
 

@@ -79,7 +79,58 @@ class ProjectStagePipelineTests(TestCase):
         self.assertTrue(track.can_add_formula)
         self.assertTrue(track.can_manage_content)
         self.assertTrue(track.can_be_mature)
-        self.assertEqual(track.formula_button_label, '新增成熟配方')
+        self.assertEqual(ProjectNode.MATURE_FORMULA_STAGES, [
+            ProjectStage.MID_TEST, ProjectStage.MASS_PROD,
+            ProjectStage.ORDER, ProjectStage.MASS_TRACK,
+        ])
+        self.assertFalse(project.nodes.get(stage=ProjectStage.PILOT).can_be_mature)
+        self.assertTrue(project.nodes.get(stage=ProjectStage.MID_TEST).can_be_mature)
+        self.assertTrue(project.nodes.get(stage=ProjectStage.ORDER).can_be_mature)
+
+    def test_init_node_cannot_add_formula_even_when_awaiting_approval(self):
+        manager = _make_user('init_mgr')
+        project = Project.objects.create(name='立项项目', manager=manager)
+        init = project.nodes.get(stage=ProjectStage.INIT)
+        self.assertEqual(project.current_active_node.pk, init.pk)
+        self.assertFalse(init.can_add_formula)
+
+        init.status = 'AWAITING_APPROVAL'
+        init.save()
+        project = Project.objects.get(pk=project.pk)
+        init = project.nodes.get(stage=ProjectStage.INIT)
+        self.assertEqual(project.current_active_node.pk, init.pk)
+        self.assertFalse(init.can_add_formula)
+
+    def test_current_node_can_add_formula_while_awaiting_approval(self):
+        manager = _make_user('appr_mgr')
+        project = Project.objects.create(name='审批项目', manager=manager)
+        init = project.nodes.get(stage=ProjectStage.INIT)
+        init.status = 'DONE'
+        init.save()
+        rnd = project.nodes.get(stage=ProjectStage.RND)
+        rnd.status = 'AWAITING_APPROVAL'
+        rnd.save()
+
+        project = Project.objects.get(pk=project.pk)
+        rnd = project.nodes.get(stage=ProjectStage.RND)
+        self.assertEqual(project.current_active_node.pk, rnd.pk)
+        self.assertTrue(rnd.can_add_formula)
+        self.assertFalse(rnd.can_update_status)
+
+    def test_order_stage_can_add_formula_when_current(self):
+        manager = _make_user('order_mgr')
+        project = Project.objects.create(name='周期完成项目', manager=manager)
+        for node in project.nodes.filter(stage__in=[
+            ProjectStage.INIT, ProjectStage.RND, ProjectStage.PILOT,
+            ProjectStage.MID_TEST, ProjectStage.MASS_PROD,
+        ]):
+            node.status = 'DONE'
+            node.save()
+
+        project = Project.objects.get(pk=project.pk)
+        order = project.nodes.get(stage=ProjectStage.ORDER)
+        self.assertEqual(project.current_active_node.pk, order.pk)
+        self.assertTrue(order.can_add_formula)
 
     def test_mass_track_rejects_done_status(self):
         manager = _make_user('form_mgr')
