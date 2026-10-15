@@ -31,6 +31,8 @@
         this.placeholder = raw.placeholder || '输入关键词搜索...';
         this.confirmText = raw.confirmText || '确认选择';
         this.initialSearch = !!raw.initialSearch;
+        // 缺省提交，与材料导入 / 配方导入一致；显式 false 时只回填字段
+        this.submitOnConfirm = raw.submitOnConfirm !== false;
 
         // ── 表格列定义 ──
         this.tableColumns = raw.tableColumns || [];
@@ -411,10 +413,12 @@
 
         results.forEach(function (r) {
             var val = r[config.valueField];
+            var text = r[config.textField] || val;
             var isActive = String(val) === String(selectedValue);
             var rowClass = isActive ? ' table-active' : '';
 
-            html += '<tr class="search-result-row' + rowClass + '" data-value="' + escapeAttr(val) + '">';
+            html += '<tr class="search-result-row' + rowClass + '" data-value="' + escapeAttr(val) + '"' +
+                ' data-text="' + escapeAttr(text) + '">';
 
             columns.forEach(function (col, idx) {
                 var cellVal = r[col.key];
@@ -680,8 +684,11 @@
             self._onClose();
         });
 
-        // 键盘导航
+        // 键盘导航。Enter 一律阻止默认，避免弹窗嵌在业务表单里时提交外层表单。
         this.modal.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter') {
                 self._handleKeydown(e);
             }
@@ -777,11 +784,30 @@
 
     SearchPicker.prototype._confirm = function () {
         var form = this.modal.closest('form');
-        if (form && this.selectedValue) {
-            var valueInput = form.querySelector('.search-picker-value');
-            if (valueInput) valueInput.value = this.selectedValue;
-            form.submit();
+        if (!form || !this.selectedValue) return;
+
+        var valueInput = form.querySelector('.search-picker-value');
+        if (valueInput) valueInput.value = this.selectedValue;
+
+        if (this.config.submitOnConfirm === false) {
+            var label = form.querySelector('.search-picker-label');
+            var row = this.renderer.container.querySelector(
+                '[data-value="' + escapeAttr(this.selectedValue) + '"]'
+            );
+            if (label && row) label.value = row.getAttribute('data-text') || '';
+            // Tabler 把 Bootstrap 挂在 window.tabler 上，没有 window.bootstrap
+            var ModalApi = (window.tabler && window.tabler.Modal)
+                || (window.bootstrap && window.bootstrap.Modal);
+            if (ModalApi) {
+                ModalApi.getOrCreateInstance(this.modal).hide();
+            } else {
+                var dismiss = this.modal.querySelector('[data-bs-dismiss="modal"]');
+                if (dismiss) dismiss.click();
+            }
+            return;
         }
+
+        form.submit();
     };
 
     // ── 生命周期 ──

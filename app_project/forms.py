@@ -26,20 +26,13 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
             'code': forms.TextInput(attrs={'placeholder': '请输入项目编码，留空则自动生成'}),
             'name': forms.TextInput(attrs={'placeholder': '请输入项目名称，格式：【客户 - 材料 - 制件（VAVE/T0/其他）】'}),
             'grade': forms.Select(attrs={'class': 'form-select'}),
-            'material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'material'}),
+            'material': forms.HiddenInput(attrs={'class': 'search-picker-value'}),
             'business_segment': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'rows': 5, 'placeholder': '请输入项目背景、目标等详细描述...'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        from app_material.models.material import MaterialLibrary
-        if not self.data:
-            instance = kwargs.get('instance')
-            if instance and instance.material_id:
-                self.fields['material'].queryset = MaterialLibrary.objects.filter(pk=instance.material_id)
-            else:
-                self.fields['material'].queryset = MaterialLibrary.objects.none()
 
         # 编辑已有项目 + 配置了审批流程 → submission_comment 必填
         instance = kwargs.get('instance')
@@ -47,6 +40,22 @@ class ProjectForm(TablerFormMixin, forms.ModelForm):
             from .models import ProjectConfig
             if ProjectConfig.get().default_project_edit_approval_workflow_id:
                 self.fields['submission_comment'].required = True
+
+    def selected_material_label(self):
+        """当前选中成品材料的展示文案，含校验失败后回显 POST 值。"""
+        from app_material.models.material import MaterialLibrary
+        from app_material.utils.search_picker_config import format_material_choice_label
+        pk = self['material'].value()
+        if not pk:
+            return ''
+        material = (
+            MaterialLibrary.objects.filter(pk=pk)
+            .only('grade_name', 'sap_material_code')
+            .first()
+        )
+        if not material:
+            return ''
+        return format_material_choice_label(material.grade_name, material.sap_material_code)
 
 
 # 确保 ProjectNodeUpdateForm 也继承 TablerFormMixin

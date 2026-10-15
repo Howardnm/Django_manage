@@ -63,6 +63,9 @@ class SearchPickerConfig:
     show_detail_button: bool = False
     confirm_text: str = '确认选择'
     initial_search: bool = False
+    # False：确认后只把选中值写入所在表单的 .search-picker-value 并关闭弹窗，不提交。
+    # 默认 True，材料导入 / 配方导入仍是选中即提交。
+    submit_on_confirm: bool = True
     search_model: str = ''                 # 传递给 API 的 model 参数
     table_columns: list = field(default_factory=list)
     # search_fields 子项结构：
@@ -97,6 +100,7 @@ class SearchPickerConfig:
             'showDetailButton': self.show_detail_button,
             'confirmText': self.confirm_text,
             'initialSearch': self.initial_search,
+            'submitOnConfirm': self.submit_on_confirm,
             'tableColumns': self.table_columns,
             'searchFields': self.search_fields,
         }

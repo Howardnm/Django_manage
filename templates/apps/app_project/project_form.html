@@ -91,6 +91,16 @@
                 <div class="mb-3">
                     <label class="form-label">选用成品材料</label>
                     {{ form.material }}
+                    <div class="input-group">
+                        <input type="text" class="form-control search-picker-label" readonly
+                               value="{{ form.selected_material_label }}"
+                               placeholder="尚未选择">
+                        <button type="button" class="btn btn-primary" data-bs-toggle="modal"
+                                data-bs-target="#modal-project-material">
+                            <i class="ti ti-search me-1"></i>选择
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary search-picker-clear">清除</button>
+                    </div>
                     <small class="form-hint">搜索并选择项目目标成品材料，研发阶段新增配方前必须填写。</small>
                     {% if form.material.errors %}
                         <div class="invalid-feedback d-block">{{ form.material.errors.0 }}</div>
@@ -140,6 +150,7 @@
                     {% endif %}
                 </button>
             </div>
+            {% include 'includes/search_picker_modal.html' %}
         </form>
     </div>
 </div>
@@ -148,7 +159,16 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    initRemoteTomSelectAll(document, {apiUrl: "{% url 'material_api_search' %}"});
+    var clearBtn = document.querySelector('.search-picker-clear');
+    if (!clearBtn) return;
+    clearBtn.addEventListener('click', function () {
+        var form = this.closest('form');
+        if (!form) return;
+        var valueInput = form.querySelector('.search-picker-value');
+        var label = form.querySelector('.search-picker-label');
+        if (valueInput) valueInput.value = '';
+        if (label) label.value = '';
+    });
 });
 </script>
 {% endblock %}

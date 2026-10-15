@@ -14,7 +14,7 @@ class AppMaterialConfig(AppConfig):
         from app_material.mixins import MaterialAccessMixin
         from app_material.models.material import (MaterialLibrary, ApplicationScenario, TestConfig,
                                                   MaterialCharacteristic, MaterialType)
-        from django.db.models import Q
+        from django.db.models import Prefetch, Q
 
         register_autocomplete('material',
             lambda q: MaterialLibrary.objects.only('pk', 'grade_name', 'manufacturer').filter(
@@ -75,6 +75,69 @@ class AppMaterialConfig(AppConfig):
             'material_detail',
             access_filter=make_autocomplete_access_filter(MaterialAccessMixin),
             filter_fn=_filter_material_import,
+        )
+
+        def _filter_material_project(qs, params):
+            """项目表单成品材料选择器的具名筛选（SAP / 牌号 / 材料类型，AND）。"""
+            sap_material_code = params.get('sap_material_code', '').strip()
+            if sap_material_code:
+                qs = qs.filter(sap_material_code__icontains=sap_material_code)
+            grade_name = params.get('grade_name', '').strip()
+            if grade_name:
+                qs = qs.filter(grade_name__icontains=grade_name)
+            category_id = params.get('category_id', '').strip()
+            if category_id.isdigit():
+                qs = qs.filter(category_id=category_id)
+            return qs
+
+        def _join_all_names(manager):
+            return '、'.join(obj.name for obj in manager.all())
+
+        def _format_material_project(m):
+            from app_material.utils.search_picker_config import format_material_choice_label
+            return {
+                'value': m.pk,
+                'text': format_material_choice_label(m.grade_name, m.sap_material_code),
+                'grade_name': m.grade_name,
+                'manufacturer': m.manufacturer or '-',
+                'sap_material_code': m.sap_material_code,
+                'category_name': m.category.name,
+                'flammability': m.flammability or '-',
+                'material_color_name': m.material_color_name or '-',
+                'pantone_code': m.pantone_code or '-',
+                'rgb_value': m.rgb_value or '-',
+                'characteristics': _join_all_names(m.characteristics) or '-',
+                'scenarios': _join_all_names(m.scenarios) or '-',
+                'is_published': '已发布' if m.is_published else '未发布',
+                'creator_name': m.creator.username if m.creator_id else '-',
+            }
+
+        def _build_material_project(q):
+            """多字段模式不传 q，空关键词不再拼 LIKE '%%'，避免全表扫描。
+
+            select_related 带出类型名和创建人；M2M 用 prefetch，一页固定 2 条，
+            不随行数增长。only 丢掉特性描述和用户表里用不到的列。
+            """
+            qs = MaterialLibrary.objects.select_related('category', 'creator').prefetch_related(
+                Prefetch('characteristics', queryset=MaterialCharacteristic.objects.only('id', 'name')),
+                Prefetch('scenarios', queryset=ApplicationScenario.objects.only('id', 'name')),
+            ).only(
+                'grade_name', 'manufacturer', 'sap_material_code', 'flammability',
+                'material_color_name', 'pantone_code', 'rgb_value', 'is_published',
+                'category__name', 'creator__username',
+            )
+            q = (q or '').strip()
+            if q:
+                qs = qs.filter(Q(grade_name__icontains=q) | Q(sap_material_code__icontains=q))
+            return qs
+
+        # 项目表单选用成品材料。单独注册，避免改 material / material_import 的契约。
+        register_autocomplete('material_project',
+            _build_material_project,
+            _format_material_project,
+            'material_detail',
+            access_filter=make_autocomplete_access_filter(MaterialAccessMixin),
+            filter_fn=_filter_material_project,
         )
 
         # 材料类型：供搜索选择器的 remote-select 筛选字段使用

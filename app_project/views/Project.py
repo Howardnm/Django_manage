@@ -10,6 +10,7 @@ from django.urls import reverse
 from django.views import View
 from django.views.generic import CreateView, UpdateView, DetailView
 
+from app_material.utils.search_picker_config import for_project_material
 from app_project.forms import ProjectForm
 from app_project.mixins import ProjectAccessMixin
 from django.db.models import Prefetch
@@ -71,6 +72,11 @@ class ProjectCreateView(ProjectAccessMixin, CreateView):
     model = Project
     form_class = ProjectForm
     template_name = 'apps/app_project/project_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['search_picker'] = for_project_material()
+        return context
 
     def _generate_project_code(self):
         """自动生成项目编码：PRJ-YYYYMMDD-NNN（当天最大流水号 + 1）"""
@@ -136,6 +142,7 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
         context['project_edit_workflow_configured'] = bool(
             config.default_project_edit_approval_workflow_id
         )
+        context['search_picker'] = for_project_material()
         return context
 
     def form_valid(self, form):
