@@ -1,8 +1,7 @@
-<!-- 4. 底部：预警项目详情列表 -->
-<!-- 只有当有停滞项目时才显示 -->
-{% if stats.stagnant_30d or stats.stagnant_14d or stats.multi_round_pilot %}
+<!-- 4. 底部：预警项目详情列表。后端给全量，翻页只在卡片内做 -->
+{% if warning_rows %}
     <div class="col-12">
-        <div class="card">
+        <div class="card" id="warn-card" data-page-size="8">
             <div class="card-header">
                 <h3 class="card-title text-red">⚠️ 风险预警项目</h3>
             </div>
@@ -18,45 +17,103 @@
                         <th>操作</th>
                     </tr>
                     </thead>
-                    <tbody>
-                    <!-- 【优先显示】多轮小试 -->
-                    {% for item in stats.multi_round_pilot %}
-                        <tr>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="text-reset fw-bold">{{ item.p.name }}</a></td>
+                    <tbody id="warn-rows">
+                    {% for item in warning_rows %}
+                        <tr class="warn-row">
+                            <td>
+                                <a href="{% url 'project_detail' item.p.id %}" class="text-reset {% if item.kind != 'stagnant_14' %}fw-bold{% endif %}">
+                                    {{ item.p.name }}
+                                </a>
+                            </td>
                             <td>{{ item.p.manager.username }}</td>
-                            <td>{{ item.p.get_current_stage_display }}</td>
-                            <td><span class="badge bg-purple text-white">第 {{ item.round }} 轮小试</span></td>
-                            <td>-</td>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
-                        </tr>
-                    {% endfor %}
-
-                    <!-- 30天停滞 -->
-                    {% for item in stats.stagnant_30d %}
-                        <tr>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="text-reset fw-bold">{{ item.p.name }}</a></td>
-                            <td>{{ item.p.manager.username }}</td>
-                            <td>{{ item.node.get_stage_display }}</td>
-                            <td><span class="badge bg-red text-white">停滞 {{ item.days }} 天</span></td>
-                            <td>{{ item.node.updated_at|date:"Y-m-d" }}</td>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
-                        </tr>
-                    {% endfor %}
-
-                    <!-- 14天停滞 -->
-                    {% for item in stats.stagnant_14d %}
-                        <tr>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="text-reset">{{ item.p.name }}</a></td>
-                            <td>{{ item.p.manager.username }}</td>
-                            <td>{{ item.node.get_stage_display }}</td>
-                            <td><span class="badge bg-yellow text-white">停滞 {{ item.days }} 天</span></td>
-                            <td>{{ item.node.updated_at|date:"Y-m-d" }}</td>
-                            <td><a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a></td>
+                            <td>
+                                {% if item.kind == 'pilot' %}
+                                    {{ item.p.get_current_stage_display }}
+                                {% else %}
+                                    {{ item.node.get_stage_display }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.kind == 'pilot' %}
+                                    <span class="badge bg-purple text-white">第 {{ item.round }} 轮小试</span>
+                                {% elif item.kind == 'stagnant_30' %}
+                                    <span class="badge bg-red text-white">停滞 {{ item.days }} 天</span>
+                                {% else %}
+                                    <span class="badge bg-yellow text-white">停滞 {{ item.days }} 天</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if item.kind == 'pilot' %}
+                                    -
+                                {% else %}
+                                    {{ item.node.updated_at|date:"Y-m-d" }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'project_detail' item.p.id %}" class="btn btn-sm btn-outline-secondary">查看</a>
+                            </td>
                         </tr>
                     {% endfor %}
                     </tbody>
                 </table>
             </div>
+            <div class="card-footer d-flex align-items-center d-none" id="warn-pager">
+                <p class="m-0 text-muted">
+                    显示 <span id="warn-start">1</span> 到 <span id="warn-end">8</span> 条，
+                    共 <span id="warn-total">{{ warning_rows|length }}</span> 条
+                </p>
+                <ul class="pagination m-0 ms-auto" id="warn-pages"></ul>
+            </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var card = document.getElementById('warn-card');
+            var rows = Array.prototype.slice.call(document.querySelectorAll('#warn-rows .warn-row'));
+            var pager = document.getElementById('warn-pager');
+            var pageSize = parseInt(card.getAttribute('data-page-size'), 10) || 8;
+            var page = 0;
+
+            function show(next) {
+                var pages = Math.ceil(rows.length / pageSize);
+                page = Math.max(0, Math.min(next, pages - 1));
+                rows.forEach(function (row, index) {
+                    var visible = index >= page * pageSize && index < (page + 1) * pageSize;
+                    row.classList.toggle('d-none', !visible);
+                });
+                document.getElementById('warn-start').textContent = rows.length ? page * pageSize + 1 : 0;
+                document.getElementById('warn-end').textContent = Math.min(rows.length, (page + 1) * pageSize);
+                var list = document.getElementById('warn-pages');
+                list.innerHTML = '';
+                function add(label, target, disabled, active) {
+                    var li = document.createElement('li');
+                    li.className = 'page-item' + (disabled ? ' disabled' : '') + (active ? ' active' : '');
+                    var el = document.createElement(disabled || active ? 'span' : 'a');
+                    el.className = 'page-link';
+                    if (!disabled && !active) {
+                        el.href = '#warn-card';
+                        el.addEventListener('click', function (event) {
+                            event.preventDefault();
+                            show(target);
+                        });
+                    }
+                    el.textContent = label;
+                    li.appendChild(el);
+                    list.appendChild(li);
+                }
+                add('上一页', page - 1, page === 0, false);
+                for (var i = 0; i < pages; i++) {
+                    if (i > page - 3 && i < page + 3) {
+                        add(String(i + 1), i, false, i === page);
+                    }
+                }
+                add('下一页', page + 1, page === pages - 1, false);
+            }
+
+            if (rows.length > pageSize) {
+                pager.classList.remove('d-none');
+                show(0);
+            }
+        });
+    </script>
 {% endif %}

@@ -27,7 +27,7 @@
                 <div class="ms-auto fw-bold">{{ stats.multi_round_pilot|length }}</div>
             </div>
             <div class="progress progress-sm">
-                <div class="progress-bar bg-yellow" style="width: {% widthratio stats.multi_round_pilot|length stats.total_active 100 %}%"></div>
+                <div class="progress-bar bg-yellow" style="width: {% widthratio stats.multi_round_pilot|length stats.total_unfinished 100 %}%"></div>
             </div>
         </div>
     </div>

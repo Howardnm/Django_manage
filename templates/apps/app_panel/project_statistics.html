@@ -6,7 +6,7 @@
     <div class="container-xl">
         <div class="row g-2 align-items-center">
             <div class="col">
-                <h2 class="page-title">项目数据统计中心</h2>
+                <h2 class="page-title">项目统计看板</h2>
                 <div class="text-muted small mt-1">立项维度全局效率分析</div>
             </div>
         </div>
@@ -166,7 +166,7 @@
                         y: -35, // Center vertically
                         borderWidth: 0,
                         useHTML: true,
-                        format: '<div style="text-align:center"><span style="font-size:2.5rem;font-weight:bold;color:'+color+'">{y}%</span></div>'
+                        format: '<div style="text-align:center"><span style="font-size:2.5rem;font-weight:bold;color:'+color+'">{y:.2f}%</span></div>'
                     },
                     linecap: 'round',
                     stickyTracking: false,

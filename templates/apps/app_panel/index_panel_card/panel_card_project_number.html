@@ -1,4 +1,4 @@
-<!-- 1. 全局概览卡片 (项目数量：进行中、已完成、已终止) -->
+<!-- 1. 全局概览卡片 (项目数量：进行中、暂停、已完成、已终止) -->
 
 <div class="card">
     <div class="card-body">
@@ -35,7 +35,18 @@
             </div>
         </div>
 
-        <!-- 2. 已完成 (Completed) - 绿色 -->
+        <!-- 2. 暂停 (Paused) - 黄色。已从进行中拆出，四项合计等于总数 -->
+        <div class="mb-2">
+            <div class="d-flex mb-1">
+                <div class="text-muted">暂停</div>
+                <div class="ms-auto fw-bold">{{ stats.total_paused }}</div>
+            </div>
+            <div class="progress progress-sm">
+                <div class="progress-bar bg-warning" style="width: {% widthratio stats.total_paused stats.total_all 100 %}%"></div>
+            </div>
+        </div>
+
+        <!-- 3. 已完成 (Completed) - 绿色 -->
         <div class="mb-2">
             <div class="d-flex mb-1">
                 <div class="text-muted">已完成</div>
@@ -46,7 +57,7 @@
             </div>
         </div>
 
-        <!-- 3. 已终止 (Terminated) - 红色 -->
+        <!-- 4. 已终止 (Terminated) - 红色 -->
         <div class="mb-0">
             <div class="d-flex mb-1">
                 <div class="text-muted">已终止</div>

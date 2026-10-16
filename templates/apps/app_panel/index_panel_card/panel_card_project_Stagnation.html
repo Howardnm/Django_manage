@@ -34,7 +34,7 @@
             </div>
             <div class="progress progress-sm">
                 <!-- 分母使用 total_active，展示占活跃项目的比例，更有意义 -->
-                <div class="progress-bar bg-red" style="width: {% widthratio stats.stagnant_30d|length stats.total_active 100 %}%"></div>
+                <div class="progress-bar bg-red" style="width: {% widthratio stats.stagnant_30d|length stats.total_unfinished 100 %}%"></div>
             </div>
         </div>
 
@@ -45,7 +45,7 @@
                 <div class="ms-auto fw-bold">{{ stats.stagnant_14d|length }}</div>
             </div>
             <div class="progress progress-sm">
-                <div class="progress-bar bg-yellow" style="width: {% widthratio stats.stagnant_14d|length stats.total_active 100 %}%"></div>
+                <div class="progress-bar bg-yellow" style="width: {% widthratio stats.stagnant_14d|length stats.total_unfinished 100 %}%"></div>
             </div>
         </div>
 

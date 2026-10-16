@@ -8,8 +8,21 @@ from common_utils.forms import UserPickerWidget
 class PanelFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """
     全景面板过滤器
-    包含日期范围筛选 (created_at)、子公司基地筛选 和 工作组筛选
+    包含日期范围筛选 (created_at 的日期)、子公司基地筛选 和 工作组筛选。
+
+    不直接用 mixin 的 lte/gte：date 对 DateTimeField 做 lte 会收成当天 00:00，
+    结束日当天创建的项目会被滤掉。这里按日期比较，开始日和结束日都包含。
     """
+    start_date = django_filters.DateFilter(
+        label='开始日期',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        method='filter_created_on',
+    )
+    end_date = django_filters.DateFilter(
+        label='结束日期',
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+        method='filter_created_on',
+    )
     subsidiary = django_filters.ModelChoiceFilter(
         queryset=Subsidiary.objects.all(),
         field_name='manager__subsidiary',
@@ -28,6 +41,12 @@ class PanelFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filter
     class Meta:
         model = Project
         fields = ['start_date', 'end_date', 'subsidiary', 'workgroup']
+
+    def filter_created_on(self, queryset, name, value):
+        if not value:
+            return queryset
+        lookup = 'gte' if name == 'start_date' else 'lte'
+        return queryset.filter(**{f'created_at__date__{lookup}': value})
 
 
 class ProjectStatisticsFilter(TablerFilterMixin, django_filters.FilterSet):
