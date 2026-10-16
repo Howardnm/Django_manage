@@ -7,7 +7,11 @@ from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 
 
 class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
+    q = django_filters.CharFilter(
+        method='filter_search',
+        label='搜索',
+        widget=forms.TextInput(attrs={'placeholder': '牌号 / SAP'}),
+    )
 
     scenarios = django_filters.ModelMultipleChoiceFilter(
         queryset=ApplicationScenario.objects.all(),
@@ -60,7 +64,7 @@ class MaterialFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fil
 
     def filter_search(self, queryset, name, value):
         return queryset.filter(
-            Q(grade_name__icontains=value) | Q(manufacturer__icontains=value)
+            Q(grade_name__icontains=value) | Q(sap_material_code__icontains=value)
         )
 
     def filter_metric(self, queryset, name, value):

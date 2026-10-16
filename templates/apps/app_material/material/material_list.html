@@ -73,7 +73,13 @@
                         <td><input class="form-check-input m-0 align-middle compare-checkbox" type="checkbox" value="{{ mat.pk }}" data-type="material"></td>
                         <td>
                             <a href="{% url 'material_detail' mat.pk %}" class="fw-bold text-primary text-reset">{{ mat.grade_name }}</a>
-                            <div class="small text-muted">{{ mat.manufacturer }}</div>
+                            {% if mat.sap_material_code or mat.manufacturer %}
+                                <div class="small text-muted">
+                                    {% if mat.sap_material_code %}<span class="font-monospace">{{ mat.sap_material_code }}</span>{% endif %}
+                                    {% if mat.sap_material_code and mat.manufacturer %} | {% endif %}
+                                    {{ mat.manufacturer }}
+                                </div>
+                            {% endif %}
                         </td>
                         <td>
                             {% if mat.rgb_value %}
