@@ -112,10 +112,23 @@
         }
     }
 
+    // Bootstrap Modal 的 FocusTrap 在 document 上监听 focusin（冒泡）。
+    // 人员选择器挂在 body 上，落在已打开的模态框之外，焦点会被立刻抢回
+    // 模态框内第一个可聚焦元素，搜索框因此点了无法输入。
+    // 在 overlay 上截住 focusin，不让它冒到 document。
+    function shieldFocusFromModalTrap(overlay) {
+        if (!overlay || overlay.dataset.focusShield === '1') return;
+        overlay.dataset.focusShield = '1';
+        overlay.addEventListener('focusin', function (e) {
+            e.stopPropagation();
+        });
+    }
+
     // ── 绑定事件到指定实例的 DOM ──
     function bindEvents(id) {
         var overlay = document.getElementById('pickerOverlay_' + id);
         if (!overlay) return;
+        shieldFocusFromModalTrap(overlay);
 
         // 关闭按钮
         var closeBtn = overlay.querySelector('.user-picker-close');
@@ -330,7 +343,10 @@
         if (overlay) overlay.classList.add('show');
 
         var searchInput = document.getElementById('pickerSearch_' + id);
-        if (searchInput) searchInput.value = '';
+        if (searchInput) {
+            searchInput.value = '';
+            searchInput.focus();
+        }
 
         var confirmBtn = document.getElementById('pickerConfirm_' + id);
         if (confirmBtn) confirmBtn.disabled = true;
