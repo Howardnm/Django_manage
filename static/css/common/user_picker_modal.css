@@ -18,6 +18,15 @@
 
 .user-picker-overlay.show {
     display: flex;
+    /* 高于 Bootstrap modal(1055) / backdrop(1050)，避免被外层模态框盖住 */
+    z-index: 20000;
+    pointer-events: auto;
+}
+
+/* 人员选择器打开时，外层模态框不再拦截点击（全屏透明层会挡住搜索框） */
+body.user-picker-open .modal.show,
+body.user-picker-open .modal-backdrop.show {
+    pointer-events: none !important;
 }
 
 .user-picker-dialog {

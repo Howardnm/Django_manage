@@ -112,16 +112,86 @@
         }
     }
 
-    // Bootstrap Modal 的 FocusTrap 在 document 上监听 focusin（冒泡）。
-    // 人员选择器挂在 body 上，落在已打开的模态框之外，焦点会被立刻抢回
-    // 模态框内第一个可聚焦元素，搜索框因此点了无法输入。
-    // 在 overlay 上截住 focusin，不让它冒到 document。
+    // 外层 Bootstrap 模态框是 position:fixed 的全屏层（.modal-blur 还有 backdrop-filter）。
+    // 人员选择器挂在 body 上时，这层会挡住搜索框的点击，FocusTrap 还会把焦点抢回去。
+    function getModalConstructor() {
+        if (window.tabler && window.tabler.Modal) return window.tabler.Modal;
+        if (window.bootstrap && window.bootstrap.Modal) return window.bootstrap.Modal;
+        return null;
+    }
+
     function shieldFocusFromModalTrap(overlay) {
         if (!overlay || overlay.dataset.focusShield === '1') return;
         overlay.dataset.focusShield = '1';
         overlay.addEventListener('focusin', function (e) {
             e.stopPropagation();
         });
+        // Escape 不要冒泡到外层模态框，否则会把协同成员弹窗一起关掉
+        overlay.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') e.stopPropagation();
+        });
+    }
+
+    // 捕获阶段先于 Bootstrap 的 document focusin，避免焦点被抢回外层模态框
+    document.addEventListener('focusin', function (e) {
+        if (e.target && e.target.closest && e.target.closest('.user-picker-overlay.show')) {
+            e.stopImmediatePropagation();
+        }
+    }, true);
+
+    function suspendOpenModals(inst) {
+        if (inst._modalHold) return;
+        var Modal = getModalConstructor();
+        var holds = [];
+        document.querySelectorAll('.modal.show, .modal-backdrop.show').forEach(function (el) {
+            var hold = {
+                el: el,
+                pointerEvents: el.style.pointerEvents,
+                priority: el.style.getPropertyPriority('pointer-events')
+            };
+            el.style.setProperty('pointer-events', 'none', 'important');
+            if (Modal && el.classList.contains('modal')) {
+                var modalInst = Modal.getInstance(el);
+                if (modalInst && modalInst._focustrap && modalInst._focustrap._isActive) {
+                    modalInst._focustrap.deactivate();
+                    hold.modalInst = modalInst;
+                }
+            }
+            holds.push(hold);
+        });
+        inst._modalHold = holds;
+        document.body.classList.add('user-picker-open');
+    }
+
+    function resumeOpenModals(inst) {
+        if (!inst || !inst._modalHold) return;
+        inst._modalHold.forEach(function (hold) {
+            if (hold.pointerEvents) {
+                hold.el.style.setProperty('pointer-events', hold.pointerEvents, hold.priority || '');
+            } else {
+                hold.el.style.removeProperty('pointer-events');
+            }
+            if (hold.modalInst && hold.modalInst._isShown && hold.modalInst._config.focus && hold.modalInst._focustrap) {
+                hold.modalInst._focustrap.activate();
+            }
+        });
+        inst._modalHold = null;
+        var stillHeld = false;
+        Object.keys(instances).forEach(function (key) {
+            if (instances[key] && instances[key]._modalHold) stillHeld = true;
+        });
+        if (!stillHeld) document.body.classList.remove('user-picker-open');
+    }
+
+    function raiseOverlay(overlay) {
+        if (!overlay) return;
+        if (overlay.parentElement !== document.body) {
+            document.body.appendChild(overlay);
+        } else {
+            document.body.appendChild(overlay);
+        }
+        overlay.style.zIndex = '20000';
+        overlay.style.pointerEvents = 'auto';
     }
 
     // ── 绑定事件到指定实例的 DOM ──
@@ -340,6 +410,9 @@
         }
 
         overlay = document.getElementById('pickerOverlay_' + id);
+        raiseOverlay(overlay);
+        // 先放开外层模态框的点击和焦点陷阱，再显示、再聚焦，否则搜索框点不进去
+        suspendOpenModals(inst);
         if (overlay) overlay.classList.add('show');
 
         var searchInput = document.getElementById('pickerSearch_' + id);
@@ -359,6 +432,7 @@
     window.closeUserPicker = function (id) {
         var overlay = document.getElementById('pickerOverlay_' + id);
         if (overlay) overlay.classList.remove('show');
+        resumeOpenModals(getInstance(id));
     };
 
     window.confirmUserPicker = function (id) {
