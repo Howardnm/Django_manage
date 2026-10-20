@@ -87,7 +87,7 @@ DESCRIPTION_PARTS = (
 )
 EXPORT_HEADERS = (
     '项目编号', '项目名称', '项目等级', '业务板块', '研发负责人', '项目描述',
-    '立项时间', '当前阶段', '进度百分比', '是否终止',
+    '立项时间', '当前阶段', '当前节点备注', '进度百分比', '是否终止',
     '客户编码', '客户公司全称', '终端主机厂', '业务负责人',
     '制件名称', '产品代码/零件号', '制件用途', '制件颜色',
     '研发高可落地性项目', '业务高可落地性项目',
@@ -186,6 +186,20 @@ def _date_text(value):
     if value is None:
         return ''
     return value.isoformat()
+
+
+def _current_node(project):
+    """与当前阶段同一口径：终止节点优先，否则取第一个未结束节点。"""
+    nodes = sorted(project.nodes.all(), key=lambda node: (node.order, node.pk))
+    if not nodes:
+        return None
+    terminated = [node for node in nodes if node.status == 'TERMINATED']
+    if terminated:
+        return terminated[-1]
+    for node in nodes:
+        if node.status not in {'DONE', 'FAILED', 'FEEDBACK'}:
+            return node
+    return nodes[-1]
 
 
 def _user_keys(user):
@@ -823,6 +837,7 @@ class Command(BaseCommand):
         created = timezone.localtime(project.created_at).strftime('%Y-%m-%d %H:%M:%S')
         updated = timezone.localtime(repo.updated_at).strftime('%Y-%m-%d %H:%M:%S') if repo else ''
         nodes = project.nodes.all()
+        current = _current_node(project)
         node_text = '\n'.join(
             f'{node.get_stage_display()} 第{node.round}轮 {node.get_status_display()}'
             for node in nodes
@@ -836,6 +851,7 @@ class Command(BaseCommand):
             project.description,
             created,
             project.get_current_stage_display(),
+            (current.remark or '') if current else '',
             project.progress_percent,
             '是' if project.is_terminated else '否',
             customer.customer_code if customer else '',

@@ -297,6 +297,10 @@ class ImportProjectsTests(TestCase):
     def test_export_includes_project_nodes(self):
         _write(self.path, [_base_row()])
         self._run()
+        project = Project.objects.get(code='26B02001001')
+        current = project.nodes.get(stage=ProjectStage.PILOT, round=1)
+        current.remark = '当前送样备注'
+        current.save(update_fields=['remark'])
         export_path = os.path.join(self.tmp, 'export.xlsx')
         call_command('import_projects', export=export_path, stdout=StringIO())
         workbook = openpyxl.load_workbook(export_path, data_only=True)
@@ -305,11 +309,13 @@ class ImportProjectsTests(TestCase):
         self.assertIn('进度节点', headers)
         codes = [worksheet.cell(row, 1).value for row in range(2, worksheet.max_row + 1)]
         self.assertIn('26B02001001', codes)
-        node_col = headers.index('进度节点') + 1
-        node_text = worksheet.cell(codes.index('26B02001001') + 2, node_col).value
+        row = codes.index('26B02001001') + 2
+        node_text = worksheet.cell(row, headers.index('进度节点') + 1).value
+        remark = worksheet.cell(row, headers.index('当前节点备注') + 1).value
         workbook.close()
         self.assertIn('已完成', node_text)
         self.assertIn('进行中', node_text)
+        self.assertEqual(remark, '当前送样备注')
 
     def test_export_includes_archive_fields_customer_name_and_members(self):
         _write(self.path, [_base_row()])
