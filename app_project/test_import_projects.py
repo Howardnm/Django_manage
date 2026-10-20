@@ -2,7 +2,8 @@ import os
 import re
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from io import StringIO
 
 import openpyxl
@@ -14,8 +15,10 @@ from django.utils import timezone
 from app_material.models import MaterialLibrary, MaterialType
 from app_notification.models import Notification
 from app_project.management.commands.import_projects import GRADE_PREFIX, HEADERS
-from app_project.models import BusinessSegment, Project, ProjectNode, ProjectStage
-from app_repository.models import Customer, GradeFactor
+from app_project.models import (
+    BusinessSegment, Project, ProjectMember, ProjectNode, ProjectSalesMember, ProjectStage,
+)
+from app_repository.models import Customer, GradeFactor, OEM
 
 User = get_user_model()
 
@@ -307,6 +310,63 @@ class ImportProjectsTests(TestCase):
         workbook.close()
         self.assertIn('已完成', node_text)
         self.assertIn('进行中', node_text)
+
+    def test_export_includes_archive_fields_customer_name_and_members(self):
+        _write(self.path, [_base_row()])
+        self._run()
+        project = Project.objects.get(code='26B02001001')
+        oem = OEM.objects.create(name='吉利汽车有限公司', short_name='吉利')
+        repo = project.repository
+        repo.oem = oem
+        repo.product_code = 'PN-001'
+        repo.target_cost = Decimal('12.50')
+        repo.competitor_price = Decimal('11.00')
+        repo.estimated_order_volume = Decimal('80.00')
+        repo.first_sample_date = date(2026, 2, 1)
+        repo.first_trial_date = date(2026, 3, 1)
+        repo.first_trial_cycle_days = 28
+        repo.pilot_date = date(2026, 4, 1)
+        repo.mass_production_date = date(2026, 6, 1)
+        repo.save()
+        repo.refresh_from_db()
+        mate = _user('mate_li', '李协同')
+        sales_mate = _user('sales_wang', '王销售')
+        ProjectMember.objects.create(project=project, user=mate, role='RND')
+        ProjectMember.objects.create(project=project, user=self.rd, role='LEAD')
+        ProjectSalesMember.objects.create(project=project, user=sales_mate, workload_share='100')
+
+        export_path = os.path.join(self.tmp, 'export.xlsx')
+        call_command('import_projects', export=export_path, stdout=StringIO())
+        workbook = openpyxl.load_workbook(export_path, data_only=True)
+        worksheet = workbook.active
+        headers = [worksheet.cell(1, col).value for col in range(1, worksheet.max_column + 1)]
+        values = {
+            headers[col - 1]: worksheet.cell(2, col).value
+            for col in range(1, worksheet.max_column + 1)
+        }
+        workbook.close()
+
+        self.assertEqual(values['客户编码'], '10200209')
+        self.assertEqual(values['客户公司全称'], '测试客户')
+        self.assertEqual(values['终端主机厂'], '吉利汽车有限公司')
+        self.assertEqual(values['产品代码/零件号'], 'PN-001')
+        self.assertEqual(values['目标成本 (元/kg)'], '12.50')
+        self.assertEqual(values['竞品售价 (元/kg)'], '11.00')
+        self.assertEqual(values['预估市场订单用量 (吨/年)'], '80.00')
+        self.assertEqual(values['第一次客户送样时间'], '2026-02-01')
+        self.assertEqual(values['第一次客户小试时间'], '2026-03-01')
+        self.assertEqual(values['第一次小试完成周期 (天)'], 28)
+        self.assertEqual(values['中试进行时间'], '2026-04-01')
+        self.assertEqual(values['量产进行时间'], '2026-06-01')
+        self.assertEqual(
+            values['档案最后更新'],
+            timezone.localtime(repo.updated_at).strftime('%Y-%m-%d %H:%M:%S'),
+        )
+        self.assertEqual(values['项目协同成员'], '李协同、彭万')
+        self.assertEqual(values['销售协同成员'], '王销售')
+        self.assertEqual(values['制件名称'], '风叶')
+        self.assertEqual(values['研发高可落地性项目'], '是')
+        self.assertEqual(values['业务高可落地性项目'], '否')
 
     def test_import_does_not_leave_node_notifications_disconnected(self):
         _write(self.path, [_base_row()])

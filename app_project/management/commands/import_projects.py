@@ -88,8 +88,13 @@ DESCRIPTION_PARTS = (
 EXPORT_HEADERS = (
     '项目编号', '项目名称', '项目等级', '业务板块', '研发负责人', '项目描述',
     '立项时间', '当前阶段', '进度百分比', '是否终止',
-    '客户编码', '业务负责人', '制件名称', '制件用途', '制件颜色',
+    '客户编码', '客户公司全称', '终端主机厂', '业务负责人',
+    '制件名称', '产品代码/零件号', '制件用途', '制件颜色',
     '研发高可落地性项目', '业务高可落地性项目',
+    '目标成本 (元/kg)', '竞品售价 (元/kg)', '预估市场订单用量 (吨/年)',
+    '第一次客户送样时间', '第一次客户小试时间', '第一次小试完成周期 (天)',
+    '中试进行时间', '量产进行时间', '档案最后更新',
+    '项目协同成员', '销售协同成员',
     '成品SAP码', '材料牌号', '材料类型', '进度节点',
 )
 SYNC_CELL_LIMIT = 500
@@ -164,6 +169,23 @@ def _person_label(user):
         return ''
     full = (user.get_full_name() or '').strip()
     return full or user.username
+
+
+def _member_names(members):
+    ordered = sorted(members, key=lambda member: member.pk)
+    return '、'.join(label for label in (_person_label(member.user) for member in ordered) if label)
+
+
+def _decimal_text(value):
+    if value is None:
+        return ''
+    return format(value, 'f')
+
+
+def _date_text(value):
+    if value is None:
+        return ''
+    return value.isoformat()
 
 
 def _user_keys(user):
@@ -783,8 +805,8 @@ class Command(BaseCommand):
         worksheet.append(EXPORT_HEADERS)
         projects = Project.objects.select_related(
             'manager', 'grade', 'business_segment', 'material', 'material__category',
-            'repository', 'repository__customer', 'repository__salesperson',
-        ).prefetch_related('nodes').order_by('code')
+            'repository', 'repository__customer', 'repository__salesperson', 'repository__oem',
+        ).prefetch_related('nodes', 'members__user', 'sales_members__user').order_by('code')
         count = 0
         for project in projects:
             worksheet.append(self._export_row(project))
@@ -796,7 +818,10 @@ class Command(BaseCommand):
     def _export_row(self, project):
         repo = getattr(project, 'repository', None)
         material = project.material
+        customer = repo.customer if repo and repo.customer_id else None
+        oem = repo.oem if repo and repo.oem_id else None
         created = timezone.localtime(project.created_at).strftime('%Y-%m-%d %H:%M:%S')
+        updated = timezone.localtime(repo.updated_at).strftime('%Y-%m-%d %H:%M:%S') if repo else ''
         nodes = project.nodes.all()
         node_text = '\n'.join(
             f'{node.get_stage_display()} 第{node.round}轮 {node.get_status_display()}'
@@ -813,13 +838,27 @@ class Command(BaseCommand):
             project.get_current_stage_display(),
             project.progress_percent,
             '是' if project.is_terminated else '否',
-            repo.customer.customer_code if repo and repo.customer_id else '',
+            customer.customer_code if customer else '',
+            customer.company_name if customer else '',
+            oem.name if oem else '',
             _person_label(repo.salesperson) if repo else '',
             repo.product_name if repo else '',
+            repo.product_code if repo else '',
             repo.part_usage if repo else '',
             repo.part_color if repo else '',
             '是' if repo and repo.rd_high_feasibility else '否',
             '是' if repo and repo.biz_high_feasibility else '否',
+            _decimal_text(repo.target_cost) if repo else '',
+            _decimal_text(repo.competitor_price) if repo else '',
+            _decimal_text(repo.estimated_order_volume) if repo else '',
+            _date_text(repo.first_sample_date) if repo else '',
+            _date_text(repo.first_trial_date) if repo else '',
+            repo.first_trial_cycle_days if repo and repo.first_trial_cycle_days is not None else '',
+            _date_text(repo.pilot_date) if repo else '',
+            _date_text(repo.mass_production_date) if repo else '',
+            updated,
+            _member_names(project.members.all()),
+            _member_names(project.sales_members.all()),
             material.sap_material_code if material else '',
             material.grade_name if material else '',
             material.category.name if material else '',
