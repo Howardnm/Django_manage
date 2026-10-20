@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.paginator import Paginator
 from django.db.models import Max, Count, Q, Sum, F, ExpressionWrapper, DecimalField
 from django.db.models.functions import Coalesce
@@ -115,7 +117,12 @@ class CustomerDetailView(RepositoryAccessMixin, DetailView):
         
         latest_node_map = {item['project_id']: item['max_updated_at'] for item in latest_updates}
         for repo in page_obj:
-            repo.project.latest_node_update = latest_node_map.get(repo.project.id)
+            project = repo.project
+            project.latest_node_update = latest_node_map.get(project.id)
+            # 与排行榜同一口径：等级因子 × 研发质量分 / 100。未定级按 1.00。
+            factor = project.grade.factor if project.grade_id else Decimal('1.00')
+            quality = project.quality_score or Decimal('0')
+            repo.customer_score = factor * quality / Decimal('100')
 
         context.update({
             'page_obj': page_obj,
@@ -132,26 +139,33 @@ class CustomerRankingView(RepositoryAccessMixin, ListView):
     """
     客户评分排行榜：
     评分逻辑 = SUM(项目等级因子 * (项目质量分 / 100)) / SUM(项目等级因子)
+    项目分先除 100，结果是 0–1 的加权平均。
     """
     permission_required = 'app_repository.view_customer'
     model = Customer
     template_name = 'apps/app_repository/customer/customer_ranking.html'
     context_object_name = 'rankings'
+    paginate_by = 10
 
     def get_queryset(self):
         """
         核心加权平均评分逻辑：
-        1. 关联 ProjectRepository -> Project -> GradeFactor
-        2. 计算加权得分和：SUM(Coalesce(Factor, 1.0) * (Quality Score / 100.0))
-        3. 计算权重因子和：SUM(Coalesce(Factor, 1.0))
-        4. 结果 = 分子 / 分母
+        1. 先按 CustomerFilter 筛客户。关键字会 join 联系人，必须在聚合前收成主键，
+           否则 Sum 会被联系人行乘大。
+        2. 关联 ProjectRepository -> Project -> GradeFactor
+        3. 计算加权得分和：SUM(Coalesce(Factor, 1.0) * (Quality Score / 100))
+        4. 计算权重因子和：SUM(Coalesce(Factor, 1.0))
+        5. 结果 = 分子 / 分母（0–1），固定按加权分降序（忽略筛选器里的 sort）
         """
-        return Customer.objects.annotate(
+        self.filterset = CustomerFilter(self.request.GET, queryset=Customer.objects.all())
+        return Customer.objects.filter(
+            pk__in=self.filterset.qs.order_by().values('pk')
+        ).annotate(
             # 分子：加权得分总和 (处理 null 等级默认为 1.0 因子)
             weighted_points_sum=Coalesce(
                 Sum(
                     ExpressionWrapper(
-                        Coalesce(F('repo_records__project__grade__factor'), 1.0, output_field=DecimalField()) * 
+                        Coalesce(F('repo_records__project__grade__factor'), 1.0, output_field=DecimalField()) *
                         F('repo_records__project__quality_score') / 100.0,
                         output_field=DecimalField()
                     )
@@ -178,5 +192,6 @@ class CustomerRankingView(RepositoryAccessMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
         context['page_title'] = '客户合作质量排行榜'
         return context

@@ -148,6 +148,7 @@
                                     <th>项目名称</th>
                                     <th>等级</th>
                                     <th style="width: 20%;">进度轨迹</th>
+                                    <th>客户分</th>
                                     <th>终端 (OEM)</th>
                                     <th>业务负责人</th>
                                     <th>进度更新</th>
@@ -183,12 +184,17 @@
                                             <div class="progress-bar bg-primary" style="width: {{ repo.project.progress_percent }}%"></div>
                                         </div>
                                     </td>
+                                    <td>
+                                        <span class="fw-bold text-primary" title="等级因子 × 研发质量分 / 100">
+                                            {{ repo.customer_score|floatformat:2 }}
+                                        </span>
+                                    </td>
                                     <td>{% if repo.oem %}{{ repo.oem.short_name }}{% else %}-{% endif %}</td>
                                     <td>{% if repo.salesperson %}{{ repo.salesperson.get_full_name|default:repo.salesperson.username }}{% else %}-{% endif %}</td>
                                     <td>{{ repo.project.latest_node_update|date:"Y-m-d H:i"|default:"-" }}</td>
                                 </tr>
                                 {% empty %}
-                                <tr><td colspan="6" class="text-center py-5">暂无关联项目数据</td></tr>
+                                <tr><td colspan="7" class="text-center py-5">暂无关联项目数据</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>

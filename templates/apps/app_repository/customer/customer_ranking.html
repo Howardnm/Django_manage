@@ -21,6 +21,7 @@
             <!-- 排行榜卡片 -->
             <div class="col-12">
                 <div class="card">
+                    {% include 'apps/list_modules/tools_search_filter.html' with q_width='280px' %}
                     <div class="table-responsive">
                         <table class="table table-vcenter table-mobile-md card-table">
                             <thead>
@@ -33,14 +34,15 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for ranking in rankings %}
+                                {% for ranking in page_obj %}
+                                {% with rank=page_obj.start_index|add:forloop.counter0 %}
                                 <tr>
                                     <td>
-                                        <span class="avatar avatar-sm rounded {{ forloop.counter|ranking_medal_color }}">
-                                            {% if forloop.counter <= 3 %}
+                                        <span class="avatar avatar-sm rounded {{ rank|ranking_medal_color }}">
+                                            {% if rank <= 3 %}
                                                 <i class="ti ti-trophy fs-2"></i>
                                             {% else %}
-                                                {{ forloop.counter }}
+                                                {{ rank }}
                                             {% endif %}
                                         </span>
                                     </td>
@@ -71,6 +73,7 @@
                                         </div>
                                     </td>
                                 </tr>
+                                {% endwith %}
                                 {% empty %}
                                 <tr>
                                     <td colspan="5" class="text-center py-4 text-muted">
@@ -81,6 +84,7 @@
                             </tbody>
                         </table>
                     </div>
+                    {% include 'apps/list_modules/paginator.html' %}
                 </div>
             </div>
 
@@ -93,19 +97,19 @@
                             <div class="col-md-7">
                                 <div class="p-3 bg-white rounded border">
                                     <div class="subheader mb-2">核心加权公式</div>
-                                    <div class="h2 mb-0 fw-bold text-center py-3">
-                                        Score = <span class="text-blue">Σ (Factor<sub>i</sub> × Completion<sub>i</sub>)</span> / <span class="text-secondary">Σ Factor<sub>i</sub></span>
+                                    <div class="h3 mb-0 fw-bold text-center py-3">
+                                        质量贡献总分 = <span class="text-blue">Σ（项目分 / 100 × 等级因子）</span> / <span class="text-secondary">Σ 等级因子</span>
                                     </div>
                                     <div class="text-muted small mt-2">
-                                        * 其中 <code>Factor<sub>i</sub></code> 为第 i 个项目的等级因子，<code>Completion<sub>i</sub></code> 为项目的得分完成度（0-1.0）。
+                                        * 对应该客户下的每一个项目求和。项目分先除以 100。未定级的项目，等级因子按 1 计。结果是 0–1 的加权平均，不是各项目分数相加。
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-5">
                                 <ul class="list-unstyled space-y-2 text-secondary small pt-2">
-                                    <li><i class="ti ti-check text-success me-2"></i><strong>等级因子：</strong> 由项目等级（如 A级、B级）决定，代表该客户项目的战略重要性或复杂度。</li>
-                                    <li><i class="ti ti-check text-success me-2"></i><strong>得分完成度：</strong> 项目当前累计的工作量绩效得分（0-100分）映射到 0.0-1.0 的区间。</li>
-                                    <li><i class="ti ti-check text-success me-2"></i><strong>加权逻辑：</strong> 采用加权平均法，旨在体现客户合作的“平均质量水平”，防止仅靠项目数量堆叠而产生的评分偏见。</li>
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>项目分：</strong> 该项目当前的研发质量分，范围 0–100。还没有出结果的项目按 0 计。</li>
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>等级因子：</strong> 由项目等级（如 A级、B级）决定，未定级按 1 计。等级越高，这个项目在分子里的权重越大。</li>
+                                    <li><i class="ti ti-check text-success me-2"></i><strong>质量贡献总分：</strong> 各项目「项目分 / 100 × 等级因子」之和，再除以等级因子之和。项目分为 0 的项目仍把它的等级因子计入分母，项目数量多不会自动把分抬高。满分 1。</li>
                                 </ul>
                             </div>
                         </div>

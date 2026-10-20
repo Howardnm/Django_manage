@@ -80,12 +80,31 @@ class ProjectRepositoryFilter(TablerFilterMixin, django_filters.FilterSet):
 # 2. 客户公司过滤器
 # ==========================================
 class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
-    account_group = django_filters.ChoiceFilter(field_name='account_group', label='客户账户组', choices=[], empty_label='客户账户组')
-    customer_series = django_filters.ChoiceFilter(field_name='customer_series', label='客户系', choices=[], empty_label='客户系')
-    industry = django_filters.ChoiceFilter(field_name='industry', label='行业', choices=[], empty_label='行业')
-    country_name = django_filters.ChoiceFilter(field_name='country_name', label='国家名称', choices=[], empty_label='国家名称')
-    sales_region = django_filters.ChoiceFilter(field_name='sales_region', label='区域', choices=[], empty_label='区域')
+    q = django_filters.CharFilter(
+        method='filter_search',
+        label='搜索',
+        widget=forms.TextInput(attrs={'placeholder': '客户编码 / 公司名称 / 搜索词 / 联系人'}),
+    )
+    account_group = django_filters.ChoiceFilter(
+        field_name='account_group', label='客户账户组', choices=[], empty_label='客户账户组',
+        widget=forms.Select(attrs={'placeholder': '客户账户组'}),
+    )
+    customer_series = django_filters.ChoiceFilter(
+        field_name='customer_series', label='客户系', choices=[], empty_label='客户系',
+        widget=forms.Select(attrs={'placeholder': '客户系'}),
+    )
+    industry = django_filters.ChoiceFilter(
+        field_name='industry', label='行业', choices=[], empty_label='行业',
+        widget=forms.Select(attrs={'placeholder': '行业'}),
+    )
+    country_name = django_filters.ChoiceFilter(
+        field_name='country_name', label='国家名称', choices=[], empty_label='国家名称',
+        widget=forms.Select(attrs={'placeholder': '国家名称'}),
+    )
+    sales_region = django_filters.ChoiceFilter(
+        field_name='sales_region', label='区域', choices=[], empty_label='区域',
+        widget=forms.Select(attrs={'placeholder': '区域'}),
+    )
 
     sort = django_filters.OrderingFilter(
         fields=(
@@ -101,7 +120,6 @@ class CustomerFilter(TablerFilterMixin, django_filters.FilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.form.fields['q'].widget.attrs['placeholder'] = '检索客户编码 / 公司名称 / 搜索词'
         self.form.fields['account_group'].choices = self._account_group_choices()
         for field_name in ('customer_series', 'industry', 'country_name', 'sales_region'):
             self.form.fields[field_name].choices = self._value_choices(field_name)
