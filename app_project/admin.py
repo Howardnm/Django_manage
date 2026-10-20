@@ -1,7 +1,10 @@
 from django.contrib import admin
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
-from .models import Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectConfig, ProjectFieldChange
+from .models import (
+    Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectConfig,
+    ProjectFieldChange, MemberScoreSnapshot,
+)
 
 class ProjectNodeInline(admin.TabularInline):
     model = ProjectNode
@@ -115,3 +118,28 @@ class ProjectFieldChangeAdmin(admin.ModelAdmin):
     def submission_comment_preview(self, obj):
         return obj.submission_comment[:50] + '…' if len(obj.submission_comment) > 50 else obj.submission_comment
     submission_comment_preview.short_description = '提交意见'
+
+
+@admin.register(MemberScoreSnapshot)
+class MemberScoreSnapshotAdmin(admin.ModelAdmin):
+    """成员成绩快照由计分信号写入。后台可批量删除以便重建，不能手改分数。"""
+
+    list_display = [
+        'project', 'user', 'track', 'effective_score', 'workload_score',
+        'quality_score', 'workload_share', 'grade_factor', 'snapshot_at',
+    ]
+    list_filter = ['track', 'snapshot_at']
+    search_fields = ['project__name', 'user__username']
+    ordering = ['-snapshot_at', '-pk']
+    readonly_fields = [
+        'project', 'user', 'track', 'snapshot_at',
+        'effective_score', 'workload_score',
+        'quality_score', 'workload_share', 'grade_factor',
+    ]
+    actions = ['delete_selected']
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

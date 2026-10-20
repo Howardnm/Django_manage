@@ -442,12 +442,12 @@ class MemberScoreSnapshot(models.Model):
 
     snapshot_at = models.DateTimeField("快照时间", db_index=True, help_text="本次成绩自何时起生效")
 
-    effective_score = models.DecimalField("有效贡献分", max_digits=9, decimal_places=2, default=0.00, help_text="含等级因子加权")
-    workload_score = models.DecimalField("基础工作量分", max_digits=9, decimal_places=2, default=0.00, help_text="不含等级因子")
+    effective_score = models.DecimalField("有效贡献分", max_digits=9, decimal_places=2, default=0.00, help_text="含等级因子。质量分按满分 1（÷100）后再乘占比比例")
+    workload_score = models.DecimalField("基础工作量分", max_digits=9, decimal_places=2, default=0.00, help_text="不含等级因子。质量分按满分 1（÷100）后再乘占比比例")
 
     # 审计冗余 — 回溯本次成绩所用的底层因子
     quality_score = models.DecimalField("项目质量分", max_digits=5, decimal_places=2, default=0.00)
-    workload_share = models.DecimalField("工作量占比", max_digits=5, decimal_places=2, default=0.00, help_text="百分比 0-100")
+    workload_share = models.DecimalField("工作量占比", max_digits=5, decimal_places=2, default=0.00, help_text="比例 0-1。表单填 70 表示 70%，此处存 0.70")
     grade_factor = models.DecimalField("等级因子", max_digits=5, decimal_places=2, default=1.00)
 
     class Meta:

@@ -682,3 +682,26 @@ class FormulaTestReturnTests(TestCase):
         self.assertContains(resp, '测试退回')
         self.assertContains(resp, self._url())
         self.assertContains(resp, 'data-can-return="1"')
+
+
+class MemberShareRatioSnapshotTests(TestCase):
+    """表单填百分数，快照存比例：70 → 0.70。绩效分按质量分 ÷100 的满分 1。"""
+
+    def test_form_percentage_is_stored_as_ratio(self):
+        from decimal import Decimal
+
+        from django.utils import timezone
+
+        from app_project.utils.signals import _record_member_snapshot
+
+        manager = _make_user('share_70')
+        project = Project.objects.create(name='占比70', manager=manager)
+        snap = _record_member_snapshot(
+            project, manager.pk, 'RD',
+            Decimal('80'), Decimal('70'), Decimal('1.50'),
+            timezone.now(),
+        )
+        self.assertEqual(snap.workload_share, Decimal('0.70'))
+        self.assertEqual(snap.quality_score, Decimal('80'))
+        self.assertEqual(snap.workload_score, Decimal('0.56'))
+        self.assertEqual(snap.effective_score, Decimal('0.84'))

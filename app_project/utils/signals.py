@@ -234,12 +234,17 @@ def _snapshot_factor_for(project):
 
 
 def _record_member_snapshot(project, user_id, track, quality_score, workload_share, grade_factor, snapshot_at):
-    """计算并写入单条快照（幂等：与最新一条值相同时跳过）。"""
-    if workload_share is None:
-        workload_share = Decimal('0.00')
-    factor = grade_factor if grade_factor is not None else Decimal('1.00')
+    """计算并写入单条快照（幂等：与最新一条值相同时跳过）。
 
-    workload = (quality_score * workload_share / Decimal('100.0')).quantize(Decimal('0.01'))
+    成员表单填的是百分数（70 表示 70%）。快照里的占比一律存比例：70 → 0.70。
+    项目质量分是 0–100。有效贡献和基础工作量按满分 1：先把质量分 ÷100，再乘占比比例。
+    增量是这两个分在两个时点的差，不再另除。
+    """
+    workload_share = (Decimal(workload_share or 0) / Decimal('100')).quantize(Decimal('0.01'))
+    factor = grade_factor if grade_factor is not None else Decimal('1.00')
+    quality_unit = Decimal(quality_score or 0) / Decimal('100')
+
+    workload = (quality_unit * workload_share).quantize(Decimal('0.01'))
     effective = (workload * factor).quantize(Decimal('0.01'))
 
     latest = (
@@ -247,7 +252,12 @@ def _record_member_snapshot(project, user_id, track, quality_score, workload_sha
         .order_by('-snapshot_at', '-pk')
         .first()
     )
-    if latest and latest.effective_score == effective and latest.workload_score == workload:
+    if (
+        latest
+        and latest.effective_score == effective
+        and latest.workload_score == workload
+        and latest.workload_share == workload_share
+    ):
         return None
 
     return MemberScoreSnapshot.objects.create(
