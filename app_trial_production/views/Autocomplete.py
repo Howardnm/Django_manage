@@ -87,7 +87,7 @@ class TrialAutocompleteView(TrialProductionAccessMixin, View):
             qs = Customer.objects.filter(
                 Q(company_name__icontains=query) | Q(short_name__icontains=query)
             ).values('id', 'company_name', 'short_name')[:20]
-            results = [{'id': obj['id'], 'text': obj['short_name'] or obj['company_name']} for obj in qs]
+            results = [{'id': obj['id'], 'text': obj['company_name'] or obj['short_name']} for obj in qs]
 
         elif model_name == 'sample_pellet':
             # 待打样颗粒列表（供注塑取料 autocomplete）

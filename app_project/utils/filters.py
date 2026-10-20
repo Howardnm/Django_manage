@@ -16,7 +16,7 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
         label='搜索',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': '搜名称/负责人/描述...'
+            'placeholder': '搜名称/编号/客户/产品'
         })
     )
 
@@ -91,6 +91,8 @@ class ProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Filt
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
-            Q(manager__username__icontains=value) |
-            Q(description__icontains=value)
+            Q(code__icontains=value) |
+            Q(repository__customer__company_name__icontains=value) |
+            Q(repository__customer__short_name__icontains=value) |
+            Q(repository__product_name__icontains=value)
         )

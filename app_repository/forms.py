@@ -118,6 +118,8 @@ class ProjectRepositoryForm(TablerFormMixin, forms.ModelForm):
             else:
                 self.fields['oem'].queryset = OEM.objects.none()
 
+        # 已关联客户的 <option> 文本来自 label_from_instance，缺省走 Customer.__str__（优先简称）
+        self.fields['customer'].label_from_instance = lambda obj: obj.company_name or obj.short_name
         self.fields['oem'].label_from_instance = lambda obj: f"{obj.name} ({obj.short_name})" if obj.short_name else obj.name
 
         # 项目计划时间节点：已录入的字段禁用编辑，仅允许首次录入
