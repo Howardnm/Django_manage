@@ -1,6 +1,7 @@
 """成品 BOM 本地接口：树、工厂、发布入参。不连接 SAP。"""
 
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
@@ -64,6 +65,7 @@ class FinishedBomApiTests(TestCase):
         for url in (
             reverse("finished-bom-list"),
             reverse("finished-bom-plants"),
+            reverse("finished-bom-packaging"),
             reverse("finished-bom-publish"),
         ):
             response = self.client.get(url)
@@ -175,6 +177,91 @@ class FinishedBomApiTests(TestCase):
             content_type="application/json",
         )
         self.assertEqual(response.status_code, 404)
+
+    def test_packaging_search_filters_code_name_and_plant(self):
+        shanghai = Plant.objects.get(code="3011")
+        stopped = Plant.objects.get(code="3099")
+        bag = RawMaterial.objects.create(
+            name="PE袋", warehouse_code="K090150001", category=self.raw_type,
+        )
+        bag.plants.add(shanghai, stopped)
+        other = RawMaterial.objects.create(
+            name="纸箱", warehouse_code="K090150002", category=self.raw_type,
+        )
+        other.plants.add(stopped)
+        RawMaterial.objects.create(
+            name="不是袋子", warehouse_code="A090150001", category=self.raw_type,
+        )
+
+        by_name = self.client.get(reverse("finished-bom-packaging"), {"q": "pe"})
+        self.assertEqual(by_name.status_code, 200)
+        body = by_name.json()
+        self.assertEqual(body["count"], 1)
+        self.assertEqual(body["results"][0]["warehouse_code"], "K090150001")
+        self.assertEqual(body["results"][0]["name"], "PE袋")
+        self.assertEqual(body["results"][0]["plants"], ["3011", "3099"])
+
+        by_plant = self.client.get(reverse("finished-bom-packaging"), {"werks": "3011"})
+        self.assertEqual(
+            [row["warehouse_code"] for row in by_plant.json()["results"]],
+            ["K090150001"],
+        )
+        self.assertEqual(by_plant.json()["results"][0]["plants"], ["3011", "3099"])
+
+        listed = self.client.get(reverse("finished-bom-packaging"))
+        codes = [row["warehouse_code"] for row in listed.json()["results"]]
+        self.assertIn("K090150001", codes)
+        self.assertIn("K090150002", codes)
+        self.assertNotIn("A090150001", codes)
+
+    def test_publish_writes_the_packaging_line(self):
+        RawMaterial.objects.create(
+            name="PE袋", warehouse_code="K090150011", category=self.raw_type,
+        )
+        with patch("app_material.services.finished_bom_publish.create_bom") as create:
+            create.return_value = [{"type": "S", "text": "成功"}]
+            response = self.client.post(
+                reverse("finished-bom-publish"),
+                data={
+                    "formula_id": self.version.pk,
+                    "werks": "3011",
+                    "stlan": "1",
+                    "stlal": "01",
+                    "bmeng": "1000",
+                    "datuv": "2026-10-26",
+                    "mode": "create",
+                    "packaging_code": "K090150011",
+                    "packaging_qty": "2",
+                },
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 201)
+        line = create.call_args.kwargs["lines"][-1]
+        self.assertEqual(line["postp"], "L")
+        self.assertEqual(line["meins"], "PC")
+        self.assertEqual(line["idnrk"], "K090150011")
+        self.assertEqual(line["menge"], "2.000")
+
+    def test_unknown_packaging_is_rejected_before_sap(self):
+        with patch("app_material.services.finished_bom_publish.create_bom") as create:
+            response = self.client.post(
+                reverse("finished-bom-publish"),
+                data={
+                    "formula_id": self.version.pk,
+                    "werks": "3011",
+                    "stlan": "1",
+                    "stlal": "01",
+                    "bmeng": "1000",
+                    "datuv": "2026-10-26",
+                    "mode": "create",
+                    "packaging_code": "K090159999",
+                    "packaging_qty": "1",
+                },
+                content_type="application/json",
+            )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["code"], "validation_error")
+        create.assert_not_called()
 
     def test_page_requires_login(self):
         self.client.logout()

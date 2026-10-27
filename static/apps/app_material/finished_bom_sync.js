@@ -2,7 +2,7 @@
 
    本地签名：SAP 编码 → 份数占合计的百分比。缺编码的主 BOM 行使该版本不能标已同步；
    色粉缺编码只让「主 BOM + 色粉」这个签名作废，仅主 BOM 仍可对比。
-   SAP 侧先折成千克：KG 原样，G 除以 1000。其它单位整张不参与匹配。
+   SAP 侧先折成千克：KG 原样，G 除以 1000。单位 PC 的行忽略。其它单位整张不参与匹配。
    同一编码先加总。占比差 ≤ 0.1 个百分点视为相同。
 
    例：60 份 + 40 份，对上 600000 G + 400000 G，也对上 600 KG + 400 KG。
@@ -47,9 +47,32 @@ function sapKg(item) {
     return null
 }
 
+function packQty(value) {
+    const number = Number(value)
+    if (!Number.isFinite(number)) return ""
+    return round3(number).toFixed(3).replace(/0+$/, "").replace(/\.$/, "")
+}
+
+function byStlal(left, right) {
+    return String(left.stlal).localeCompare(String(right.stlal), undefined, { numeric: true })
+}
+
+function packagingBags(items) {
+    const bags = []
+    for (const item of items || []) {
+        if (String(item.meins || "").trim().toUpperCase() !== "PC") continue
+        const code = String(item.idnrk || "").trim()
+        if (!code) continue
+        bags.push({ code, qty: packQty(item.menge) })
+    }
+    return bags
+}
+
 function sapSignature(items) {
     const pairs = []
     for (const item of items) {
+        const unit = String(item.meins || "").trim().toUpperCase()
+        if (unit === "PC") continue
         const qty = sapKg(item)
         if (qty === null) return { unsupported: true, shares: null }
         pairs.push([String(item.idnrk || "").trim(), qty])
@@ -109,6 +132,7 @@ function previewLines(main, color, merge, bmeng) {
         name: row.name,
         model_name: row.modelName || "",
         menge: format3(row.percentage / 100 * base * 1000),
+        meins: "G",
     }))
 }
 
@@ -219,7 +243,14 @@ createApp({
             stktx: "",
             ztext: "",
             mergeColor: false,
+            packagingCode: "",
+            packagingName: "",
+            packagingQty: null,
         })
+        const packagingOpen = ref(false)
+        const packagingQuery = reactive({ q: "", werks: "" })
+        const packagingRows = ref([])
+        const packagingLoading = ref(false)
         const checkResult = ref(null)
         const checking = ref(false)
         const saving = ref(false)
@@ -239,18 +270,39 @@ createApp({
             if (!current.value) return []
             return missingNames(current.value.main_lines, current.value.color_lines, form.mergeColor)
         })
+        const packagingLabel = computed(() => {
+            if (!form.packagingCode) return ""
+            return form.packagingName
+                ? `${form.packagingCode} ${form.packagingName}`
+                : form.packagingCode
+        })
         const preview = computed(() => {
             if (!current.value) return []
-            return previewLines(
+            const rows = previewLines(
                 current.value.main_lines,
                 current.value.color_lines,
                 form.mergeColor,
                 form.bmeng,
             )
+            const code = (form.packagingCode || "").trim()
+            const qty = form.packagingQty
+            if (!code || qty === null || qty === undefined || qty === "") return rows
+            return rows.concat([{
+                posnr: String((rows.length + 1) * 10).padStart(4, "0"),
+                idnrk: code,
+                name: form.packagingName || "",
+                model_name: "",
+                menge: format3(Number(qty)),
+                meins: "PC",
+            }])
         })
 
         function plantLabel(plant) {
             return plant.name ? `${plant.code} ${plant.name}` : plant.code
+        }
+
+        function packagingTitle(bags) {
+            return (bags || []).map(bag => bag.qty ? `${bag.code} × ${bag.qty}` : bag.code).join("、")
         }
 
         function rowClass({ row }) {
@@ -284,7 +336,7 @@ createApp({
                                 synced: hits.length > 0,
                                 mature: version.is_mature,
                                 missingCode,
-                                children: hits.map(hit => ({
+                                children: hits.slice().sort(byStlal).map(hit => ({
                                     id: `s-${version.id}-${hit.key}`,
                                     type: "sync",
                                     werks: hit.werks,
@@ -292,6 +344,7 @@ createApp({
                                     stlal: hit.stlal,
                                     matchKind: hit.kind,
                                     matchLabel: hit.kind === "merged" ? "主BOM+色粉" : "仅主BOM",
+                                    packaging: hit.packaging,
                                     sapKey: hit.key,
                                 })),
                             }
@@ -311,13 +364,14 @@ createApp({
                     id: `use-${plant.werks}-${usage.stlan}`,
                     kind: "usage",
                     label: `用途 ${usage.stlan}`,
-                    children: usage.alts.map(alt => ({
+                    children: usage.alts.slice().sort(byStlal).map(alt => ({
                         id: alt.key,
                         label: `可选 ${alt.stlal}`,
                         type: "alt",
                         synced: matches.has(alt.key),
                         unsupported: alt.unsupported,
                         error: alt.error,
+                        packaging: packagingBags(alt.items),
                         detail: alt,
                     })),
                 })),
@@ -403,6 +457,7 @@ createApp({
                         stlan: detail.stlan,
                         stlal: detail.stlal,
                         kind,
+                        packaging: packagingBags(detail.items),
                     })
                     sapHits.add(detail.key)
                 })
@@ -572,8 +627,46 @@ createApp({
             form.stktx = ""
             form.ztext = ""
             form.mergeColor = false
+            form.packagingCode = ""
+            form.packagingName = ""
+            form.packagingQty = null
             checkResult.value = null
             localOpen.value = true
+        }
+
+        function openPackaging() {
+            packagingQuery.q = ""
+            packagingQuery.werks = form.werks || ""
+            packagingRows.value = []
+            packagingOpen.value = true
+            searchPackaging()
+        }
+
+        function clearPackaging() {
+            form.packagingCode = ""
+            form.packagingName = ""
+        }
+
+        async function searchPackaging() {
+            packagingLoading.value = true
+            try {
+                const params = new URLSearchParams()
+                const text = packagingQuery.q.trim()
+                if (text) params.set("q", text)
+                if (packagingQuery.werks) params.set("werks", packagingQuery.werks)
+                const data = await api(`/api/material/finished-boms/packaging/?${params}`)
+                packagingRows.value = data.results || []
+            } catch (error) {
+                ElementPlus.ElMessage.error(error.message)
+            } finally {
+                packagingLoading.value = false
+            }
+        }
+
+        function pickPackaging(row) {
+            form.packagingCode = row.warehouse_code
+            form.packagingName = row.name || ""
+            packagingOpen.value = false
         }
 
         async function onSapClick(data) {
@@ -636,6 +729,18 @@ createApp({
 
         async function submit(mode) {
             if (!formReady() || missingNamesOfForm.value.length) return
+            const packagingCode = (form.packagingCode || "").trim()
+            const packagingQty = form.packagingQty
+            const hasPackaging = !!packagingCode
+            const hasPackagingQty = packagingQty !== null && packagingQty !== undefined && packagingQty !== ""
+            if (hasPackaging !== hasPackagingQty) {
+                ElementPlus.ElMessage.warning("包装袋和数量必须同时填写")
+                return
+            }
+            if (hasPackagingQty && !(Number(packagingQty) > 0)) {
+                ElementPlus.ElMessage.warning("包装袋数量必须大于 0")
+                return
+            }
             if (mode === "update") {
                 try {
                     await ElementPlus.ElMessageBox.confirm(
@@ -649,22 +754,27 @@ createApp({
             }
             saving.value = true
             try {
+                const body = {
+                    formula_id: current.value.id,
+                    werks: form.werks,
+                    stlan: form.stlan,
+                    stlal: form.stlal,
+                    bmeng: form.bmeng,
+                    datuv: form.datuv,
+                    ausch: form.ausch,
+                    stlst: form.stlst,
+                    stktx: form.stktx,
+                    ztext: form.ztext,
+                    merge_color: form.mergeColor,
+                    mode,
+                }
+                if (hasPackaging) {
+                    body.packaging_code = packagingCode
+                    body.packaging_qty = packagingQty
+                }
                 await api("/api/material/finished-boms/publish/", {
                     method: "POST",
-                    body: JSON.stringify({
-                        formula_id: current.value.id,
-                        werks: form.werks,
-                        stlan: form.stlan,
-                        stlal: form.stlal,
-                        bmeng: form.bmeng,
-                        datuv: form.datuv,
-                        ausch: form.ausch,
-                        stlst: form.stlst,
-                        stktx: form.stktx,
-                        ztext: form.ztext,
-                        merge_color: form.mergeColor,
-                        mode,
-                    }),
+                    body: JSON.stringify(body),
                 })
                 ElementPlus.ElMessage.success(mode === "create" ? "已发布" : "已修改")
                 const published = {
@@ -714,8 +824,10 @@ createApp({
             localTree, sapTree, treeKey, hitKey, sapTreeRef,
             localOpen, current, form, checkResult, checking, saving,
             sapOpen, sapCurrent, deleting,
+            packagingOpen, packagingQuery, packagingRows, packagingLoading, packagingLabel,
             missingNames: missingNamesOfForm, preview,
-            plantLabel, rowClass, loadAll, onLocalClick, onSapClick, runCheck, submit, removeSap,
+            plantLabel, packagingTitle, rowClass, loadAll, onLocalClick, onSapClick, runCheck, submit, removeSap,
+            openPackaging, clearPackaging, searchPackaging, pickPackaging,
         }
     },
 }).use(ElementPlus, { locale: ElementPlusLocaleZhCn }).mount("#app")

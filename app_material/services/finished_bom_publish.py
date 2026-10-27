@@ -4,12 +4,14 @@
 组件数量 ``menge = 份数 / 100 × 基准数量(kg) × 1000``，单位固定 ``G``。
 色粉与主配方量纲相同，勾选合并时接在主 BOM 后面，不重新归一。
 同一 SAP 编码的多行先把份数加总，再换算一次。
+包装袋是可选的额外一行：单位 ``PC``，项目类别与原材料行相同，数量按件数原样写入，不换算、不合并。
 损耗率 ``AUSCH`` 默认 ``1``，不写小数。BOM 状态 ``STLST`` 默认 ``1``。
 """
 
 from decimal import Decimal, ROUND_HALF_UP
 
 from app_formula.models import ColorPowderBOM, LabFormula
+from app_raw_material.models import RawMaterial
 from app_sap_services.services.bom import create_bom, update_bom
 
 _QTY = Decimal("0.001")
@@ -18,6 +20,8 @@ _HUNDRED = Decimal("100")
 _GRAMS_PER_KG = Decimal("1000")
 _ITEM_CATEGORY = "L"
 _UNIT = "G"
+_PACKAGING_PREFIX = "K09"
+_PACKAGING_UNIT = "PC"
 _DEFAULT_STATUS = "1"
 _DEFAULT_SCRAP = Decimal("1")
 
@@ -43,6 +47,8 @@ def publish_finished_bom(
     ztext: str = "",
     ausch: Decimal = _DEFAULT_SCRAP,
     merge_color: bool = False,
+    packaging_code: str = "",
+    packaging_qty: Decimal | None = None,
     mode: str,
 ) -> dict:
     """``mode`` 为 ``create`` 或 ``update``。物料号取配方所挂成品，不信请求体。
@@ -65,6 +71,8 @@ def publish_finished_bom(
         ztext=ztext or "",
         ausch=ausch,
         merge_color=merge_color,
+        packaging_code=packaging_code,
+        packaging_qty=packaging_qty,
     )
     writer = create_bom if mode == "create" else update_bom
     messages = writer(
@@ -94,6 +102,8 @@ def build_sap_lines(
     ztext: str,
     merge_color: bool,
     ausch: Decimal = _DEFAULT_SCRAP,
+    packaging_code: str = "",
+    packaging_qty: Decimal | None = None,
 ) -> list[dict]:
     """本地行 → ``create_bom`` / ``update_bom`` 的 ``lines``。"""
     entries = _ordered(formula.bom_lines.all())
@@ -127,7 +137,46 @@ def build_sap_lines(
             "ztext": ztext,
             "ausch": _scrap(ausch),
         })
+    _append_packaging(
+        rows,
+        code=packaging_code,
+        qty=packaging_qty,
+        base=base,
+        datuv=datuv,
+        stlst=stlst,
+        stktx=stktx,
+        ztext=ztext,
+        ausch=_scrap(ausch),
+    )
     return rows
+
+
+def _append_packaging(rows, *, code, qty, base, datuv, stlst, stktx, ztext, ausch):
+    """配方行之后追加一只包装袋。两个都空则不加。"""
+    code = (code or "").strip()
+    if not code and qty is None:
+        return
+    if not code or qty is None:
+        raise FinishedBomPublishError("包装袋和数量必须同时填写")
+    if qty <= 0:
+        raise FinishedBomPublishError("包装袋数量必须大于 0")
+    if not code.startswith(_PACKAGING_PREFIX):
+        raise FinishedBomPublishError("包装袋编码必须以 K09 开头")
+    if not RawMaterial.objects.filter(warehouse_code=code).exists():
+        raise FinishedBomPublishError("包装袋不存在")
+    rows.append({
+        "posnr": f"{(len(rows) + 1) * 10:04d}",
+        "postp": _ITEM_CATEGORY,
+        "idnrk": code,
+        "menge": _qty(qty),
+        "meins": _PACKAGING_UNIT,
+        "bmeng": base,
+        "datuv": datuv,
+        "stlst": stlst,
+        "stktx": stktx,
+        "ztext": ztext,
+        "ausch": ausch,
+    })
 
 
 def _load_formula(formula_id: int) -> LabFormula:

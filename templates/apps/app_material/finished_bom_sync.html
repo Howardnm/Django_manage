@@ -40,7 +40,13 @@
             color: #e6a23c;
             border: 1px solid #f5dab1;
         }
+        .pill-pack {
+            background: #f5f0ff;
+            color: #7c3aed;
+            border: 1px solid #d8b4fe;
+        }
         .sync-mark { color: #67c23a; font-weight: 700; }
+        .pack-mark { width: 14px; height: 14px; color: #303133; flex: none; }
         .node-hit { background: #ecf5ff; border-radius: 4px; }
         .dialog-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; }
         .section-title { margin: 12px 0 8px; font-size: 14px; color: #606266; }
@@ -77,7 +83,7 @@
             <el-progress :percentage="loadPercent" :stroke-width="8"></el-progress>
             <p class="hint">{{ loadText }}</p>
         </div>
-        <p class="hint" v-if="material">{{ material.grade_name }} · {{ material.sap_material_code }}。✓ 表示组件占比一致（容差 0.1 个百分点）。单位不是 KG 或 G 的 SAP BOM 不参与对比。</p>
+        <p class="hint" v-if="material">{{ material.grade_name }} · {{ material.sap_material_code }}。✓ 表示组件占比一致（容差 0.1 个百分点）。单位 PC 的行不参与对比。其它不是 KG 或 G 的单位，整张 BOM 不参与对比。</p>
     </el-card>
 
     <div class="columns" v-loading="loading">
@@ -102,6 +108,7 @@
                         <template v-else-if="data.type === 'sync'">
                             <span class="pill pill-loc">{{ data.werks }} / 用途 {{ data.stlan }} / 可选 {{ data.stlal }}</span>
                             <span class="pill" :class="data.matchKind === 'merged' ? 'pill-merged' : 'pill-main'">{{ data.matchLabel }}</span>
+                            <span v-for="(bag, index) in data.packaging" :key="bag.code + index" class="pill pill-pack">包装袋 {{ bag.code }}<template v-if="bag.qty"> × {{ bag.qty }}</template></span>
                         </template>
                         <template v-else>{{ data.label }}</template>
                         <span v-if="data.synced" class="sync-mark">✓</span>
@@ -128,6 +135,10 @@
                         <span v-if="data.kind === 'plant'" class="node-strong">{{ data.label }}</span>
                         <template v-else>{{ data.label }}</template>
                         <span v-if="data.synced" class="sync-mark">✓</span>
+                        <svg v-if="data.packaging && data.packaging.length" class="pack-mark" :title="'包装袋 ' + packagingTitle(data.packaging)" viewBox="0 0 16 16" aria-hidden="true">
+                            <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round" d="M3.6 6.2h8.8l-.8 7.4H4.4L3.6 6.2z"></path>
+                            <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M6.1 6.1V4.7a1.9 1.9 0 0 1 3.8 0v1.4"></path>
+                        </svg>
                         <el-tag v-if="data.unsupported" size="small" type="info">单位无法对比</el-tag>
                         <el-tag v-if="data.error" size="small" type="danger">{{ data.error }}</el-tag>
                         <el-tag v-if="data.plantError" size="small" type="danger">{{ data.plantError }}</el-tag>
@@ -158,13 +169,14 @@
                         <el-table-column prop="percentage" label="份数" width="120"></el-table-column>
                     </el-table>
                 </template>
-                <div class="section-title">将提交（基准 {{ form.bmeng || "—" }} kg，组件单位 G）</div>
+                <div class="section-title">将提交（基准 {{ form.bmeng || "—" }} kg）</div>
                 <el-table :data="preview" size="small" border>
                     <el-table-column prop="posnr" label="行号" width="80"></el-table-column>
                     <el-table-column prop="idnrk" label="组件" width="140"></el-table-column>
                     <el-table-column prop="name" label="原材料名称"></el-table-column>
                     <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
-                    <el-table-column prop="menge" label="数量 (G)" width="120"></el-table-column>
+                    <el-table-column prop="menge" label="数量" width="120"></el-table-column>
+                    <el-table-column prop="meins" label="单位" width="80"></el-table-column>
                 </el-table>
             </div>
             <div>
@@ -213,6 +225,24 @@
                     <el-form-item label="合并色粉">
                         <el-checkbox v-model="form.mergeColor" :disabled="!current.has_color_bom">一并写入色粉 BOM</el-checkbox>
                     </el-form-item>
+                    <el-form-item label="包装袋">
+                        <el-input :model-value="packagingLabel" readonly placeholder="不选则这次不写">
+                            <template #append>
+                                <el-button @click="openPackaging">选择</el-button>
+                            </template>
+                        </el-input>
+                        <div class="hint">单位 PC，按件数写入。不选则这次不写。</div>
+                        <el-button v-if="form.packagingCode" link type="danger" @click="clearPackaging">清除</el-button>
+                    </el-form-item>
+                    <el-form-item label="包装数量">
+                        <el-input-number
+                            v-model="form.packagingQty"
+                            :precision="3"
+                            :step="1"
+                            :value-on-clear="null"
+                            style="width: 100%"
+                        ></el-input-number>
+                    </el-form-item>
                     <el-form-item>
                         <el-button :loading="checking" @click="runCheck">检查</el-button>
                         <el-button
@@ -234,6 +264,29 @@
                 <p class="hint" v-if="checkResult === 'update'">修改会用当前配方整表覆盖该 SAP BOM，没包含的行不会保留。</p>
             </div>
         </div>
+    </el-dialog>
+
+    <el-dialog v-model="packagingOpen" title="选择包装袋" width="720px" append-to-body>
+        <el-form inline @submit.prevent="searchPackaging">
+            <el-form-item label="关键词">
+                <el-input v-model="packagingQuery.q" placeholder="编码或名称" clearable style="width: 200px"></el-input>
+            </el-form-item>
+            <el-form-item label="工厂">
+                <el-select v-model="packagingQuery.werks" clearable placeholder="不限" style="width: 200px">
+                    <el-option v-for="plant in plants" :key="plant.code" :label="plantLabel(plant)" :value="plant.code"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" :loading="packagingLoading" @click="searchPackaging">搜索</el-button>
+            </el-form-item>
+        </el-form>
+        <el-table :data="packagingRows" size="small" border v-loading="packagingLoading" @row-click="pickPackaging">
+            <el-table-column prop="warehouse_code" label="编码" width="160"></el-table-column>
+            <el-table-column prop="name" label="名称"></el-table-column>
+            <el-table-column label="工厂">
+                <template #default="{ row }">{{ (row.plants || []).join("、") }}</template>
+            </el-table-column>
+        </el-table>
     </el-dialog>
 
     <el-dialog v-model="sapOpen" title="SAP BOM" width="1280px">
@@ -259,6 +312,6 @@
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/locale/zh-cn.js' %}"></script>
 <script>window.__FINISHED_BOM_SAP_CODE__ = "{{ initial_sap_code|escapejs }}";</script>
-<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=19"></script>
+<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=24"></script>
 </body>
 </html>

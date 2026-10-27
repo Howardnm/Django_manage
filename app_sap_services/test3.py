@@ -64,6 +64,20 @@ msgs = sap.rfc(MaterialBomMaintain).filter(
         "MEINS": "G",
         "AUSCH": "1",
         "DATUV": "2026-10-26",
+    },{
+        "MATNR": "A02006000027",
+        "WERKS": "3011",
+        "STLAN": "1",
+        "STLAL": "05",
+        "BMENG": "1000",
+        "STLST": "1",
+        "POSNR": "0040",
+        "POSTP": "K",
+        "IDNRK": "K09015000060",
+        "MENGE": "40.800",
+        "MEINS": "K",
+        "AUSCH": "1",
+        "DATUV": "2026-10-26",
     }],
 ).call()
 for msg in msgs:

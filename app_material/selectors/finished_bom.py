@@ -2,13 +2,13 @@
 
 from collections import defaultdict
 
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 
 from common_utils.formatting import exact_decimal
 
 from app_formula.models import ColorPowderBOM, ColorPowderBOMEntry, FormulaBOM, LabFormula
 from app_material.models import MaterialLibrary
-from app_raw_material.models import Plant
+from app_raw_material.models import Plant, RawMaterial
 
 _LINE_ORDER = (
     "feeding_port",
@@ -17,6 +17,32 @@ _LINE_ORDER = (
     "raw_material__name",
     "pk",
 )
+
+
+def search_packaging_materials(*, q: str, werks: str) -> list[dict]:
+    """本地 K09 包装袋。工厂列是该料挂的全部工厂，不是只返回筛中的那一个。"""
+    materials = RawMaterial.objects.filter(warehouse_code__startswith="K09")
+    text = (q or "").strip()
+    if text:
+        materials = materials.filter(
+            Q(warehouse_code__icontains=text) | Q(name__icontains=text),
+        )
+    plant = (werks or "").strip()
+    if plant:
+        materials = materials.filter(plants__code=plant)
+    materials = (
+        materials.distinct()
+        .prefetch_related("plants")
+        .order_by("warehouse_code")[:50]
+    )
+    return [
+        {
+            "warehouse_code": raw.warehouse_code,
+            "name": raw.name,
+            "plants": sorted(item.code for item in raw.plants.all()),
+        }
+        for raw in materials
+    ]
 
 
 def list_active_plants() -> list[dict]:

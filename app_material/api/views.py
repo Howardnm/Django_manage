@@ -6,6 +6,7 @@ Views:
     FinishedBomAPIView     — 会话登录。未登录 403
     FinishedBomListView    — 左树
     FinishedBomPlantListView — 页头的工厂多选
+    FinishedBomPackagingListView — K09 包装袋搜索
     FinishedBomPublishView — 新建或整表覆盖
 """
 
@@ -17,8 +18,16 @@ from rest_framework.views import APIView
 
 from app_formula.models import LabFormula
 from app_material.api.exceptions import finished_bom_exception_handler
-from app_material.api.serializers import FinishedBomPublishSerializer, FinishedBomQuerySerializer
-from app_material.selectors.finished_bom import get_finished_bom_tree, list_active_plants
+from app_material.api.serializers import (
+    FinishedBomPackagingQuerySerializer,
+    FinishedBomPublishSerializer,
+    FinishedBomQuerySerializer,
+)
+from app_material.selectors.finished_bom import (
+    get_finished_bom_tree,
+    list_active_plants,
+    search_packaging_materials,
+)
 from app_material.services.finished_bom_publish import publish_finished_bom
 
 
@@ -51,6 +60,15 @@ class FinishedBomPlantListView(FinishedBomAPIView):
         return Response({"count": len(plants), "results": plants})
 
 
+class FinishedBomPackagingListView(FinishedBomAPIView):
+    """``GET /api/material/finished-boms/packaging/``。只查本地 K09 包装袋。"""
+
+    def get(self, request):
+        query = _valid(FinishedBomPackagingQuerySerializer, request.query_params)
+        results = search_packaging_materials(q=query["q"], werks=query["werks"])
+        return Response({"count": len(results), "results": results})
+
+
 class FinishedBomPublishView(FinishedBomAPIView):
     """``POST /api/material/finished-boms/publish/``。
 
@@ -73,6 +91,8 @@ class FinishedBomPublishView(FinishedBomAPIView):
                 ztext=body["ztext"],
                 ausch=body["ausch"],
                 merge_color=body["merge_color"],
+                packaging_code=body["packaging_code"],
+                packaging_qty=body["packaging_qty"],
                 mode=body["mode"],
             )
         except LabFormula.DoesNotExist:

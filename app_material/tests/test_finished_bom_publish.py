@@ -194,3 +194,115 @@ class PublishMappingTests(TestCase):
                 formula, bmeng=Decimal("1000"), datuv="2026-10-26",
                 stlst="", stktx="", ztext="", merge_color=False,
             )
+
+    def _bag(self, code="K090150001", name="PE袋"):
+        return self._raw(name, code, self.filler)
+
+    def test_packaging_row_is_pieces_and_does_not_scale(self):
+        formula = self._formula("L-BAG")
+        self._line(formula, self._raw("树脂", "A-RESIN-BAG", self.resin), "100")
+        self._bag()
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("500"), datuv="2026-10-26",
+            stlst="1", stktx="可选", ztext="抬头", merge_color=False,
+            packaging_code="K090150001", packaging_qty=Decimal("2.5"),
+        )
+
+        self.assertEqual([row["idnrk"] for row in lines], ["A-RESIN-BAG", "K090150001"])
+        bag = lines[1]
+        self.assertEqual(bag["posnr"], "0020")
+        self.assertEqual(bag["postp"], "L")
+        self.assertEqual(bag["menge"], "2.500")
+        self.assertEqual(bag["meins"], "PC")
+        self.assertEqual(bag["bmeng"], "500")
+        self.assertEqual(bag["ausch"], "1")
+        self.assertEqual(bag["datuv"], "2026-10-26")
+        self.assertEqual(lines[0]["postp"], "L")
+        self.assertEqual(lines[0]["meins"], "G")
+
+    def test_same_code_stays_a_separate_packaging_row(self):
+        formula = self._formula("L-SAME")
+        self._line(formula, self._bag("K090150009"), "100")
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="", stktx="", ztext="", merge_color=False,
+            packaging_code="K090150009", packaging_qty=Decimal("3"),
+        )
+
+        self.assertEqual(len(lines), 2)
+        self.assertEqual(lines[0]["meins"], "G")
+        self.assertEqual(lines[0]["postp"], "L")
+        self.assertEqual(lines[1]["meins"], "PC")
+        self.assertEqual(lines[1]["postp"], "L")
+        self.assertEqual(lines[1]["menge"], "3.000")
+        self.assertEqual(lines[1]["posnr"], "0020")
+
+    def test_packaging_comes_after_merged_color(self):
+        formula = self._formula("L-BAG-COLOR")
+        self._line(formula, self._raw("树脂", "A-RESIN-BC", self.resin), "100")
+        color = ColorPowderBOM.objects.create(formula=formula, filled_by=self.user)
+        ColorPowderBOMEntry.objects.create(
+            color_powder_bom=color,
+            raw_material=self._raw("色粉", "A-COLOR-BC", self.filler),
+            percentage=Decimal("2"),
+        )
+        self._bag("K090150003")
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="", stktx="", ztext="", merge_color=True,
+            packaging_code="K090150003", packaging_qty=Decimal("1"),
+        )
+
+        self.assertEqual(
+            [row["idnrk"] for row in lines],
+            ["A-RESIN-BC", "A-COLOR-BC", "K090150003"],
+        )
+        self.assertEqual(lines[2]["posnr"], "0030")
+        self.assertEqual(lines[2]["meins"], "PC")
+
+    def test_blank_packaging_adds_no_row(self):
+        formula = self._formula("L-NOBAG")
+        self._line(formula, self._raw("树脂", "A-RESIN-NB", self.resin), "100")
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="", stktx="", ztext="", merge_color=False,
+        )
+
+        self.assertEqual(len(lines), 1)
+        self.assertEqual(lines[0]["meins"], "G")
+
+    def test_packaging_must_be_complete_and_known(self):
+        formula = self._formula("L-BADBAG")
+        self._line(formula, self._raw("树脂", "A-RESIN-BB", self.resin), "100")
+        common = dict(
+            bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="", stktx="", ztext="", merge_color=False,
+        )
+        cases = (
+            ("K090150001", None, "包装袋和数量必须同时填写"),
+            ("", Decimal("1"), "包装袋和数量必须同时填写"),
+            ("K090150001", Decimal("0"), "包装袋数量必须大于 0"),
+            ("K090150001", Decimal("-1"), "包装袋数量必须大于 0"),
+            ("A-NOT-BAG", Decimal("1"), "包装袋编码必须以 K09 开头"),
+            ("K090159999", Decimal("1"), "包装袋不存在"),
+        )
+        for code, qty, message in cases:
+            with self.subTest(code=code, qty=qty):
+                with self.assertRaisesMessage(FinishedBomPublishError, message):
+                    build_sap_lines(
+                        formula, packaging_code=code, packaging_qty=qty, **common,
+                    )
+
+    def test_empty_formula_with_a_bag_is_still_rejected(self):
+        formula = self._formula("L-EMPTY-BAG")
+        self._bag("K090150008")
+        with self.assertRaisesMessage(FinishedBomPublishError, "至少一行"):
+            build_sap_lines(
+                formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+                stlst="", stktx="", ztext="", merge_color=False,
+                packaging_code="K090150008", packaging_qty=Decimal("1"),
+            )

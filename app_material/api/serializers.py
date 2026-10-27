@@ -23,9 +23,20 @@ class FinishedBomPublishSerializer(serializers.Serializer):
         max_digits=5, decimal_places=2, required=False, default=Decimal("1"),
     )
     merge_color = serializers.BooleanField(required=False, default=False)
+    packaging_code = serializers.CharField(
+        required=False, allow_blank=True, default="", max_length=50,
+    )
+    packaging_qty = serializers.DecimalField(
+        max_digits=13, decimal_places=3, required=False, allow_null=True, default=None,
+    )
     mode = serializers.ChoiceField(choices=["create", "update"])
 
     def validate_ausch(self, value):
         if value < 0:
             raise serializers.ValidationError("不能小于 0")
         return value
+
+
+class FinishedBomPackagingQuerySerializer(serializers.Serializer):
+    q = serializers.CharField(required=False, allow_blank=True, default="")
+    werks = serializers.CharField(required=False, allow_blank=True, default="", max_length=20)
