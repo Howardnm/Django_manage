@@ -20,9 +20,8 @@
         <table class="table table-hover table-vcenter card-table mb-0">
             <thead>
                 <tr>
-                    <th>工单号</th>
-                    <th>实验单号</th>
-                    <th>关联项目</th>
+                    <th>工单号 / 实验单号</th>
+                    <th class="text-nowrap">关联项目</th>
                     <th>配方数量</th>
                     <th class="text-end">计划产量</th>
                     <th>工艺方案</th>
@@ -37,11 +36,11 @@
                     <td>
                         <i class="ti ti-grip-vertical text-muted me-1 pending-drag-handle"></i>
                         <a href="{% url 'trial_order_detail' order.pk %}" class="fw-bold">{{ order.code }}</a>
+                        <div class="text-muted small">{{ order.trial_code|default:"-" }}</div>
                     </td>
-                    <td class="text-muted">{{ order.trial_code|default:"" }}</td>
-                    <td>
+                    <td class="text-nowrap">
                         {% if order.project %}
-                            <span class="text-muted">{{ order.project.name|truncatechars:20 }}</span>
+                            <span class="fw-bold">{{ order.project.name }}</span>
                         {% else %}
                             <span class="text-muted">-</span>
                         {% endif %}
@@ -77,7 +76,7 @@
                 </tr>
                 {% empty %}
                 <tr id="pending-empty">
-                    <td colspan="8" class="text-center py-4 text-muted">
+                    <td colspan="7" class="text-center py-4 text-muted">
                         <i class="ti ti-check fs-1 d-block mb-2"></i>暂无待排产工单
                     </td>
                 </tr>
