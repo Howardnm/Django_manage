@@ -22,6 +22,7 @@ logger = logging.getLogger('sap.connection')
 
 _bootstrap_lock = threading.Lock()
 _pyrfc_bootstrapped = False
+_sdk_lib_path = ""
 
 # libsapnwrfc.so 的依赖。必须先载入，dlopen 才找得到同目录里的库。
 # libicudecnumber.so 只在这份 SDK 里有，没有就跳过。
@@ -62,6 +63,23 @@ def _drop_broken_pyrfc():
             del sys.modules[name]
 
 
+def _pyrfc_import_message(exc: Exception) -> str:
+    """扩展按短名字找 libsapnwrfc.so。这份库没有 SONAME，提前 dlopen 绝对路径不会登记这个名字。"""
+    text = f"pyrfc 扩展加载失败: {exc}"
+    if "cannot open shared object file" not in str(exc):
+        return text
+    path = _sdk_lib_path or "SDK 的 lib 目录"
+    return (
+        f"{text}\n"
+        f"动态链接器不读 SAP_LIB_PATH。libsapnwrfc.so 没有 SONAME，"
+        f"进程里提前加载绝对路径也登记不上这个短名字。\n"
+        f"在系统里登记后重启网站进程:\n"
+        f"  echo {path} > /etc/ld.so.conf.d/nwrfcsdk.conf && ldconfig\n"
+        f"或在宝塔 Python 项目的环境变量（不是 .env）里设置 LD_LIBRARY_PATH={path}。"
+        f"这个变量必须在 Python 启动前就存在。"
+    )
+
+
 def _import_pyrfc():
     """延迟导入 pyrfc，必须在引导之后。
 
@@ -80,7 +98,7 @@ def _import_pyrfc():
         try:
             from pyrfc._cyrfc import Connection
         except Exception as exc:
-            raise ImportError(f"pyrfc 扩展加载失败: {exc}") from exc
+            raise ImportError(_pyrfc_import_message(exc)) from exc
     finally:
         if previous_flags is not None:
             sys.setdlopenflags(previous_flags)
@@ -92,10 +110,12 @@ def _bootstrap_pyrfc(sap_lib_path: str):
     pyrfc DLL 引导 —— 必须在 import pyrfc 之前执行。
 
     Windows 用 os.add_dll_directory()，再把 lib 加进 PATH。
-    Linux 上进程启动后改 LD_LIBRARY_PATH 不会影响当前进程的 dlopen，
-    所以按绝对路径预加载 .so。环境变量只留给以后拉起的子进程。
+    Linux 上进程启动后改 LD_LIBRARY_PATH 不会影响当前进程的 dlopen。
+    libsapnwrfc.so 没有 SONAME，按绝对路径预加载也满足不了扩展对短名字的查找，
+    短名字要靠 ldconfig 或进程启动前的 LD_LIBRARY_PATH。
     """
-    global _pyrfc_bootstrapped
+    global _pyrfc_bootstrapped, _sdk_lib_path
+    _sdk_lib_path = sap_lib_path
     if _pyrfc_bootstrapped:
         return
 
