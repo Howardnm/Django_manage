@@ -307,16 +307,13 @@
             <div class="card mt-3" id="mold-matrix-card"
                  data-formula-count="{{ trial_formulas|length }}"
                  data-formula-pks="[{% for f in trial_formulas %}{{ f.pk }}{% if not forloop.last %},{% endif %}{% endfor %}]">
-                <div class="card-header bg-purple-lt d-flex justify-content-between align-items-center">
+                <div class="card-header bg-purple-lt">
                     <h3 class="card-title text-purple"><i class="ti ti-mold me-2"></i>注塑需求（模具 × 配方矩阵）</h3>
-                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-mold-row">
-                        <i class="ti ti-plus me-1"></i>新增模具
-                    </button>
                 </div>
 
                 {{ mold_formset.management_form }}
 
-                <div>
+                <div class="formula-table-scroll">
                     <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix" id="mold-matrix-table" style="font-size: 13px; table-layout: auto;">
                         <thead>
                             <tr>
@@ -361,7 +358,10 @@
                     </table>
                 </div>
                 <div class="card-footer">
-                    <div class="rounded bg-warning-lt text-warning mb-0 p-2 d-flex align-items-center gap-2">
+                    <button type="button" class="btn btn-ghost-purple" id="add-mold-row">
+                        <i class="ti ti-plus me-1"></i>新增模具
+                    </button>
+                    <div class="rounded bg-warning-lt text-warning mb-0 mt-2 p-2 d-flex align-items-center gap-2">
                         <i class="ti ti-info-circle fs-4"></i>
                         <span>填写每个配方版本的<strong>样条数量需求</strong>。数量为 0 则该配方版本不创建注塑需求</span>
                     </div>
@@ -452,6 +452,7 @@
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/common/card_table_scroll.js' %}"></script>
 <script src="{% static 'js/apps/app_trial_production/common/mold_matrix_formset.js' %}"></script>
 <script src="{% static 'js/apps/app_trial_production/order/create.js' %}"></script>
 {% endblock %}

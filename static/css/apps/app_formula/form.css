@@ -15,6 +15,18 @@
     padding-left: 2.5rem !important;
 }
 
+/* 表格宽于卡片时在卡片内横滚，不把页面撑出横向滚动条。
+   不用 .table-responsive：那会裁切 TomSelect。下拉改由 card_table_scroll.js 挂到 body。 */
+.formula-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* 库默认 min-width: 7rem，分秤列只有 100px，聚焦会把列撑宽并带动横滚 */
+.formula-table-scroll .ts-control > input {
+    min-width: 0;
+}
+
 /* ── 配方表单表格紧凑样式 ── */
 #bom-formset .form-control,
 #bom-formset .form-select,

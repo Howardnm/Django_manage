@@ -189,7 +189,7 @@
                     <div class="card-header bg-orange-lt">
                         <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
                     </div>
-                    <div>
+                    <div class="formula-table-scroll">
                         <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
@@ -308,7 +308,7 @@
                     <div class="card-header bg-purple-lt">
                         <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
                     </div>
-                    <div>
+                    <div class="formula-table-scroll">
                         <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
                             <tr>
@@ -461,5 +461,6 @@
 
 {% block extra_js %}
 <script src="{% static 'js/common/rgb_color_input.js' %}"></script>
+<script src="{% static 'js/common/card_table_scroll.js' %}"></script>
 <script src="{% static 'js/apps/app_formula/form.js' %}"></script>
 {% endblock %}

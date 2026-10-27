@@ -1,4 +1,15 @@
 /* color/fill.html — 色粉配比BOM页面样式 */
+
+/* 与配方编辑页共用：表宽于卡片时在卡片内横滚。下拉由 card_table_scroll.js 挂到 body。 */
+.formula-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+/* 库默认 min-width: 7rem，分秤列只有 70px，聚焦会把列撑宽并带动横滚 */
+.formula-table-scroll .ts-control > input {
+    min-width: 0;
+}
 .formula-group-toggle:not(.collapsed) .ti-chevron-down {
     transform: rotate(180deg);
 }

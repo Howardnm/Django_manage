@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block content %}
     <form method="post" enctype="multipart/form-data">
@@ -113,12 +114,20 @@
                                 padding: 4px 6px;
                                 white-space: nowrap;
                             }
+                            /* 宽表横滚，下拉由 card_table_scroll.js 挂到 body */
+                            .formula-table-scroll {
+                                max-width: 100%;
+                                overflow-x: auto;
+                            }
+                            .formula-table-scroll .ts-control > input {
+                                min-width: 0;
+                            }
                         </style>
                         <div class="card mb-3">
                             <div class="card-header bg-purple-lt">
                                 <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>性能指标录入</h3>
                             </div>
-                            <div>
+                            <div class="formula-table-scroll">
                                 <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="property-table" style="font-size: 13px; table-layout: auto;">
                                     <thead>
                                     <tr>
@@ -315,6 +324,9 @@
                 initLocalTomSelectAll(tbody.lastElementChild, {
                     onChange: function() { toggleValueInput(this.input); }
                 });
+                if (window.bindFormulaTableDropdowns) {
+                    bindFormulaTableDropdowns(tbody.lastElementChild);
+                }
             });
 
             // 删除行按钮
@@ -351,4 +363,13 @@
             }, 100);
         });
     </script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/common/card_table_scroll.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        bindFormulaTableDropdowns(document);
+    });
+</script>
 {% endblock %}

@@ -192,6 +192,9 @@
 
                     // 【关键】给新行里的下拉框应用 Tom Select（复用全局通用函数）
                     initLocalTomSelectAll(newRow);
+                    if (window.bindFormulaTableDropdowns) {
+                        bindFormulaTableDropdowns(newRow);
+                    }
                 });
             }
 
@@ -208,4 +211,13 @@
     </script>
 
 <script src="{% static 'js/common/rgb_color_input.js' %}"></script>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/common/card_table_scroll.js' %}"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        bindFormulaTableDropdowns(document);
+    });
+</script>
 {% endblock %}

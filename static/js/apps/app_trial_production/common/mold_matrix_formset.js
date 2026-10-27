@@ -71,6 +71,9 @@ function initFormsetMode(totalForms) {
     if (window.TomSelect && typeof initLocalTomSelectAll === 'function') {
         setTimeout(function () {
             initLocalTomSelectAll(tbody);
+            if (window.bindFormulaTableDropdowns) {
+                bindFormulaTableDropdowns(tbody);
+            }
         }, 50);
     }
 
@@ -100,6 +103,9 @@ function initFormsetMode(totalForms) {
             if (newRow) {
                 setTimeout(function () {
                     initLocalTomSelectAll(newRow);
+                    if (window.bindFormulaTableDropdowns) {
+                        bindFormulaTableDropdowns(newRow);
+                    }
                 }, 50);
             }
         }

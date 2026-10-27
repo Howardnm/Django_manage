@@ -6,6 +6,11 @@ function initColorBom() {
     /* 初始化远程搜索控件 — 复用通用函数 tomselect_remote.js（base.html 已加载） */
     initRemoteTomSelectAll(document, {apiUrl: BOM_TS_API_URL});
 
+    /* 本地搜索已由 base.html 的 initLocalTomSelectAll 建好，这里一并绑 */
+    if (window.bindFormulaTableDropdowns) {
+        bindFormulaTableDropdowns(document);
+    }
+
     /* 原材料选择后自动更新原材料类型列 */
     attachCategoryUpdate();
 
@@ -26,6 +31,9 @@ function initColorBom() {
 
                 var newRowEl = container.lastElementChild;
                 initRemoteTomSelectAll(newRowEl, {apiUrl: BOM_TS_API_URL});
+                if (window.bindFormulaTableDropdowns) {
+                    bindFormulaTableDropdowns(newRowEl);
+                }
                 attachCategoryUpdate();
             });
         }
@@ -61,11 +69,18 @@ function escapeHtml(str) {
     return div.innerHTML;
 }
 
-/* 脚本在 extra_js 块加载时 DOM 已就绪，直接执行；否则等待事件 */
-if (document.readyState !== 'loading') {
-    initColorBom();
-} else {
+/* 脚本在 extra_js 块加载时 DOM 已就绪，直接执行；否则等待事件。
+   本地 TomSelect 在 base.html 的 DOMContentLoaded 里创建，且注册更早。
+   若本脚本赶在那之前执行，等 DOMContentLoaded 再绑一次分秤/喂料口。 */
+if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initColorBom);
+} else {
+    initColorBom();
+    if (document.readyState === 'interactive' && window.bindFormulaTableDropdowns) {
+        document.addEventListener('DOMContentLoaded', function () {
+            bindFormulaTableDropdowns(document);
+        });
+    }
 }
 
 /* ---- 删除行（事件委托，来自 _color_bom_form.html） ---- */

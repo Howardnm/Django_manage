@@ -106,6 +106,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             initRemoteTomSelect(el, {apiUrl: apiUrl});
         });
+        // 本地搜索已由 base.html 的 initLocalTomSelectAll 建好，这里一并绑
+        bindFormulaTableDropdowns(document);
     }
 
     /* ── 多列变体管理 ── */
@@ -397,6 +399,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     initRemoteTomSelect(el, {apiUrl: apiUrl});
                 });
+                bindFormulaTableDropdowns(newRowElement);
             }
             updateBomSums();
         });

@@ -43,6 +43,15 @@
     vertical-align: middle;
 }
 
+/* 宽表横滚，下拉由 card_table_scroll.js 挂到 body */
+.formula-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+.formula-table-scroll .ts-control > input {
+    min-width: 0;
+}
+
 /* 移除 is-invalid 的交叉图标，避免遮挡填写框 */
 .mold-matrix .form-control.is-invalid,
 .mold-matrix .form-select.is-invalid {
