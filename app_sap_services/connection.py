@@ -9,6 +9,7 @@ SAP RFC 连接管理器 —— 线程安全 + DLL 引导 + 自动重连。
     result = mgr.call_rfc('ZRFC_MATERIAL_MESN', MAT_RANGE=[...])
 """
 
+import ctypes
 import os
 import time
 import threading
@@ -21,6 +22,32 @@ logger = logging.getLogger('sap.connection')
 
 _bootstrap_lock = threading.Lock()
 _pyrfc_bootstrapped = False
+
+# libsapnwrfc.so 的依赖。必须先载入，dlopen 才找得到同目录里的库。
+# libicudecnumber.so 只在这份 SDK 里有，没有就跳过。
+_SDK_LIBS = (
+    "libicudata.so.50",
+    "libicuuc.so.50",
+    "libicui18n.so.50",
+    "libsapucum.so",
+    "libsapnwrfc.so",
+)
+_SDK_OPTIONAL_LIB = "libicudecnumber.so"
+
+
+def _preload_sdk_libs(sap_lib_path: str):
+    """把 SDK 的 .so 载入当前进程。缺库时直接说明是哪一个。"""
+    names = list(_SDK_LIBS)
+    if os.path.isfile(os.path.join(sap_lib_path, _SDK_OPTIONAL_LIB)):
+        names.insert(names.index("libsapucum.so"), _SDK_OPTIONAL_LIB)
+    for name in names:
+        path = os.path.join(sap_lib_path, name)
+        if not os.path.isfile(path):
+            raise SAPConnectionError(f"SAP NW RFC SDK 缺少 {name}: {sap_lib_path}")
+        try:
+            ctypes.CDLL(path, mode=ctypes.RTLD_GLOBAL)
+        except OSError as exc:
+            raise SAPConnectionError(f"无法加载 SAP NW RFC SDK 库 {path}: {exc}") from exc
 
 
 def _import_pyrfc():
@@ -38,8 +65,9 @@ def _bootstrap_pyrfc(sap_lib_path: str):
     """
     pyrfc DLL 引导 —— 必须在 import pyrfc 之前执行。
 
-    1. os.add_dll_directory() 解决 Python 3.8+ 找不到主 DLL 的问题
-    2. PATH 环境变量追加 lib 路径，解决 SAP ICU(多语言) 依赖问题
+    Windows 用 os.add_dll_directory()，再把 lib 加进 PATH。
+    Linux 上进程启动后改 LD_LIBRARY_PATH 不会影响当前进程的 dlopen，
+    所以按绝对路径预加载 .so。环境变量只留给以后拉起的子进程。
     """
     global _pyrfc_bootstrapped
     if _pyrfc_bootstrapped:
@@ -59,6 +87,9 @@ def _bootstrap_pyrfc(sap_lib_path: str):
             os.add_dll_directory(sap_lib_path)
             os.environ['PATH'] = sap_lib_path + os.pathsep + os.environ.get('PATH', '')
         else:
+            # 进程启动之后再改 LD_LIBRARY_PATH，当前进程的 dlopen 不会用。
+            # 先按绝对路径载入，环境变量只留给以后拉起的子进程。
+            _preload_sdk_libs(sap_lib_path)
             os.environ['LD_LIBRARY_PATH'] = (
                 sap_lib_path + os.pathsep + os.environ.get('LD_LIBRARY_PATH', '')
             )
