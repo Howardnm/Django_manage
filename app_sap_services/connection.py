@@ -50,14 +50,40 @@ def _preload_sdk_libs(sap_lib_path: str):
             raise SAPConnectionError(f"无法加载 SAP NW RFC SDK 库 {path}: {exc}") from exc
 
 
-def _import_pyrfc():
-    """
-    延迟导入 pyrfc（必须在 _bootstrap_pyrfc() 之后调用）。
+def _drop_broken_pyrfc():
+    """pyrfc 加载失败时仍会留在 sys.modules 里，而且没有 Connection。清掉才能重试。"""
+    import sys
 
-    返回 pyrfc.Connection 类，不依赖模块级全局变量。
-    Python import 缓存确保多次调用无副作用。
+    loaded = sys.modules.get("pyrfc")
+    if loaded is None or hasattr(loaded, "Connection"):
+        return
+    for name in list(sys.modules):
+        if name == "pyrfc" or name.startswith("pyrfc."):
+            del sys.modules[name]
+
+
+def _import_pyrfc():
+    """延迟导入 pyrfc，必须在引导之后。
+
+    ``pyrfc/__init__.py`` 在扩展加载失败时把异常 print 掉，模块里就没有
+    Connection。``from pyrfc import Connection`` 只会报「没有这个名字」，
+    真正的原因（缺 .so、符号对不上）被盖住。这里直接导入扩展，失败时把原文抛出。
     """
-    from pyrfc import Connection
+    import sys
+
+    _drop_broken_pyrfc()
+    previous_flags = None
+    if os.name != "nt":
+        previous_flags = sys.getdlopenflags()
+        sys.setdlopenflags(ctypes.RTLD_GLOBAL | os.RTLD_NOW)
+    try:
+        try:
+            from pyrfc._cyrfc import Connection
+        except Exception as exc:
+            raise ImportError(f"pyrfc 扩展加载失败: {exc}") from exc
+    finally:
+        if previous_flags is not None:
+            sys.setdlopenflags(previous_flags)
     return Connection
 
 
