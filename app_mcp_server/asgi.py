@@ -3,9 +3,11 @@
 必须在 Django `get_asgi_application()` 之后再 import 本模块
 （tools 在 AppConfig.ready 里注册，session_manager 在此创建）。
 """
+import logging
 from contextlib import asynccontextmanager
 
 from asgiref.sync import sync_to_async
+from django.db import OperationalError
 from mcp.server.transport_security import TransportSecuritySettings
 from starlette.applications import Starlette
 from starlette.datastructures import MutableHeaders
@@ -15,6 +17,8 @@ from starlette.types import Receive, Scope, Send
 
 from app_mcp_server.auth import JwtAuthError, authenticate_http
 from app_mcp_server.core.server import mcp
+
+logger = logging.getLogger(__name__)
 
 # Creates session_manager. Nested lifespan is not used; the host app runs it.
 mcp.streamable_http_app(
@@ -59,6 +63,19 @@ class MCPASGIApp:
                 {"error": "invalid_token", "error_description": "Authentication Required"},
                 status_code=401,
                 headers={**MCP_CORS_HEADERS, "WWW-Authenticate": _WWW_AUTHENTICATE},
+            )
+            await response(scope, receive, send)
+            return
+        except OperationalError:
+            # 回收后仍失败（例如 MySQL 正在重启）。不要让它变成未处理的 ASGI 异常。
+            logger.exception("MCP auth database connection failed")
+            response = JSONResponse(
+                {
+                    "error": "temporarily_unavailable",
+                    "error_description": "Database unavailable",
+                },
+                status_code=503,
+                headers=MCP_CORS_HEADERS,
             )
             await response(scope, receive, send)
             return

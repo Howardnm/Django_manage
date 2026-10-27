@@ -184,16 +184,24 @@ def safe_tool(fn):
     """
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
+        # 局部 import：本模块保持不在 import 期加载 Django。
+        # 工具跑在 anyio.to_thread 里，不进 Django 请求周期，线程上的连接要自己关。
+        from app_mcp_server.db import recycle_db_connections
+
+        recycle_db_connections()
         try:
-            return fn(*args, **kwargs)
-        except ToolFailure as exc:
-            logger.info(
-                "MCP tool problem tool=%s code=%s message=%s",
-                fn.__name__, exc.error_code, exc.message,
-            )
-            return error_out(exc.error_code, exc.message, exc.hint)
-        except Exception:
-            logger.exception("MCP tool crashed tool=%s", fn.__name__)
-            return error_out("INTERNAL")
+            try:
+                return fn(*args, **kwargs)
+            except ToolFailure as exc:
+                logger.info(
+                    "MCP tool problem tool=%s code=%s message=%s",
+                    fn.__name__, exc.error_code, exc.message,
+                )
+                return error_out(exc.error_code, exc.message, exc.hint)
+            except Exception:
+                logger.exception("MCP tool crashed tool=%s", fn.__name__)
+                return error_out("INTERNAL")
+        finally:
+            recycle_db_connections()
 
     return wrapper

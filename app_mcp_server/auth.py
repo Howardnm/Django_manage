@@ -14,6 +14,8 @@ import jwt
 from django.conf import settings
 from django.contrib.auth import get_user_model
 
+from app_mcp_server.db import recycle_db_connections
+
 logger = logging.getLogger(__name__)
 
 _REQUIRED_CLAIMS = ["exp", "iat", "sub"]
@@ -181,7 +183,18 @@ def authenticate_http(request):
 
     Returns: User
     Raises: JwtAuthError
+
+    /mcp 不走 Django 请求周期，这条线程上的连接不会被 request_finished 关掉。
+    进来先丢掉空闲被 MySQL 断开的旧连接，离开时再关掉本次打开的，避免挂在 SSE 上直到 4031。
     """
+    recycle_db_connections()
+    try:
+        return _authenticate_http(request)
+    finally:
+        recycle_db_connections()
+
+
+def _authenticate_http(request):
     authorization = request.headers.get("authorization")
     token = _bearer_token(authorization)
     if not token:
