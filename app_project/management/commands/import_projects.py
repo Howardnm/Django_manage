@@ -432,9 +432,6 @@ def _material_issues(project, row, context):
             issues.append(f'成品 {sap} 未关联')
         return issues
 
-    match_count = MaterialLibrary.objects.filter(sap_material_code=sap).count()
-    if match_count > 1:
-        issues.append(f'SAP「{sap}」对应 {match_count} 条成品，已选用「{material.grade_name}」')
     if not type_name:
         issues.append(f'材料类型为空，已挂接成品「{material.grade_name}」')
     elif material.category_id and material.category.name != type_name:
@@ -761,13 +758,14 @@ class Command(BaseCommand):
         if not sap:
             return None
         type_name = row['*材料类型']
-        matches = list(
-            MaterialLibrary.objects.filter(sap_material_code=sap).select_related('category').order_by('pk')
+        material = (
+            MaterialLibrary.objects.filter(sap_material_code=sap)
+            .select_related('category')
+            .first()
         )
-        if matches:
-            chosen = next((item for item in matches if type_name and item.category.name == type_name), matches[0])
-            if project.material_id != chosen.pk:
-                project.material = chosen
+        if material is not None:
+            if project.material_id != material.pk:
+                project.material = material
                 project.save(update_fields=['material'])
             return None
 

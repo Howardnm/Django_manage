@@ -89,6 +89,7 @@ class RawMaterial(models.Model):
     suitable_materials = models.ManyToManyField(MaterialType, blank=True, verbose_name="适用材料体系", related_name="raw_materials")
     
     supplier = models.ForeignKey(Supplier, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="供应商")
+    plants = models.ManyToManyField("Plant", blank=True, verbose_name="工厂", related_name="raw_materials", help_text="SAP 物料主数据 ZMARC 的工厂 (WERKS)。同一料号可以挂多个工厂")
     
     usage_method = models.TextField("使用方法/描述", blank=True, help_text="如：需烘干，建议添加量...")
     

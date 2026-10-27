@@ -38,7 +38,7 @@ class RawMaterialAdmin(admin.ModelAdmin):
     list_display = ('name', 'model_name', 'warehouse_code', 'category', 'supplier', 'latest_price', 'created_at')
     search_fields = ('name', 'model_name', 'warehouse_code')
     list_filter = ('category', 'supplier', 'created_at')
-    filter_horizontal = ('suitable_materials',)
+    filter_horizontal = ('suitable_materials', 'plants')
     inlines = [RawMaterialPropertyInline, RawMaterialPriceRecordInline, RawMaterialStockSnapshotInline]
     autocomplete_fields = ['category', 'supplier']
 

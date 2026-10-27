@@ -20,6 +20,7 @@ from django.urls import reverse
 from app_user.models import Department, ModuleAccessConfig, RoleGroup, UserRole
 from app_user.services.identity_service import IdentityService
 
+from app_color_center.forms import ColorPowderBOMEntryForm
 from app_color_center.models import ColorMatchingTask
 from app_color_center.views import _first_unfilled_formula, _fill_redirect_params
 from app_formula.models import LabFormula, ColorPowderBOM, ColorPowderBOMEntry
@@ -132,7 +133,7 @@ class BOMSaveBase(TestCase):
             f'entries-{idx}-feeding_port': '1_MAIN',
             f'entries-{idx}-weighing_scale': 'D',
             f'entries-{idx}-raw_material': str(raw_pk),
-            f'entries-{idx}-percentage': '0.500',
+            f'entries-{idx}-percentage': '125',
             f'entries-{idx}-is_pre_mix': '',
             f'entries-{idx}-pre_mix_order': '0',
             f'entries-{idx}-pre_mix_time': '0',
@@ -222,6 +223,83 @@ class BOMEmptyTableValidationTests(BOMSaveBase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, ColorMatchingTask.Status.COMPLETED)
         self.assertEqual(self.task.operator, self.writer)
+
+        edit = self.client.get(self._project_url(), {
+            'stage': 'RND', 'round': '1',
+            'formula_id': self.formula.pk, 'edit': '1',
+        })
+        self.assertContains(edit, 'value="125')
+
+    def test_one_gram_stores_as_four_thousandths(self):
+        """1 克 = 0.004 份。"""
+        fields = self._entry_fields(0, self.raw.pk)
+        fields['entries-0-percentage'] = '1'
+        resp = self._post_bom(total_forms=1, entry_fields=fields)
+        self.assertEqual(resp.status_code, 302)
+        entry = ColorPowderBOM.objects.get(formula=self.formula).entries.get()
+        self.assertEqual(entry.percentage, Decimal('0.004'))
+
+    def test_sub_gram_keeps_six_decimal_places(self):
+        """0.001 克以前会被 3 位小数收成 0，现在存成 0.000004。"""
+        fields = self._entry_fields(0, self.raw.pk)
+        fields['entries-0-percentage'] = '0.001'
+        resp = self._post_bom(total_forms=1, entry_fields=fields)
+        self.assertEqual(resp.status_code, 302)
+        entry = ColorPowderBOM.objects.get(formula=self.formula).entries.get()
+        self.assertEqual(entry.percentage, Decimal('0.000004'))
+
+    def test_three_decimal_grams_round_trip(self):
+        """3 位小数的克数入库后再打开，输入框和只读卡片都还是原值。"""
+        fields = self._entry_fields(0, self.raw.pk)
+        fields['entries-0-percentage'] = '1.234'
+        resp = self._post_bom(total_forms=1, entry_fields=fields)
+        self.assertEqual(resp.status_code, 302)
+        entry = ColorPowderBOM.objects.get(formula=self.formula).entries.get()
+        self.assertEqual(entry.percentage, Decimal('0.004936'))
+
+        self.client.force_login(self.writer)
+        edit = self.client.get(self._project_url(), {
+            'stage': 'RND', 'round': '1',
+            'formula_id': self.formula.pk, 'edit': '1',
+        })
+        self.assertContains(edit, 'value="1.234"')
+
+        readonly = self.client.get(self._project_url(), {
+            'stage': 'RND', 'round': '1',
+            'formula_id': self.formula.pk,
+        })
+        self.assertContains(readonly, '1.234')
+
+    def test_four_decimal_grams_rejected(self):
+        """超过 3 位小数的克数不入库。"""
+        fields = self._entry_fields(0, self.raw.pk)
+        fields['entries-0-percentage'] = '1.2345'
+        resp = self._post_bom(total_forms=1, entry_fields=fields)
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(ColorPowderBOM.objects.filter(formula=self.formula).exists())
+
+    def test_raw_material_choices_stay_on_the_selected_row(self):
+        """下拉只带当前行的原材料，不能把整张原材料表渲染进每个 select。"""
+        other = RawMaterial.objects.create(
+            name='不应出现的原料', model_name='NO-SHOW', category=self.raw.category)
+        self._post_bom(total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        entry = ColorPowderBOM.objects.get(formula=self.formula).entries.get()
+
+        form = ColorPowderBOMEntryForm(instance=entry)
+        self.assertEqual(
+            list(form.fields['raw_material'].queryset.values_list('pk', flat=True)),
+            [self.raw.pk],
+        )
+        empty = ColorPowderBOMEntryForm()
+        self.assertEqual(list(empty.fields['raw_material'].queryset), [])
+
+        self.client.force_login(self.writer)
+        edit = self.client.get(self._project_url(), {
+            'stage': 'RND', 'round': '1',
+            'formula_id': self.formula.pk, 'edit': '1',
+        })
+        self.assertContains(edit, self.raw.name)
+        self.assertNotContains(edit, other.name)
 
 
 class BOMFillButtonAndRedirectTests(BOMSaveBase):

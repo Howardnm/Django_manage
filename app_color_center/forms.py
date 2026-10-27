@@ -1,8 +1,16 @@
 from django import forms
+from django.core.validators import DecimalValidator
 from django.forms.models import BaseInlineFormSet
 from common_utils.filters import TablerFormMixin
 from app_formula.models import ColorPowderBOM, ColorPowderBOMEntry
 from app_raw_material.models import RawMaterial
+
+from app_color_center.units import (
+    GRAM_DECIMAL_PLACES,
+    GRAM_MAX_DIGITS,
+    grams_to_percentage,
+    percentage_to_grams,
+)
 
 
 # ---- 色粉 BOM ----
@@ -32,7 +40,7 @@ class ColorPowderBOMEntryForm(TablerFormMixin, forms.ModelForm):
                 'data-model': 'raw_material',
             }),
             'percentage': forms.NumberInput(attrs={
-                'class': 'form-control', 'step': '0.001',
+                'class': 'form-control', 'step': 'any',
             }),
             'feeding_port': forms.Select(attrs={
                 'class': 'form-select form-select-search',
@@ -53,31 +61,59 @@ class ColorPowderBOMEntryForm(TablerFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # 模型是 6 位小数的份数。这里收的是克，最多 3 位，除以 250 后仍能原样存回。
+        field = self.fields['percentage']
+        field.label = 'G/25KG'
+        field.max_digits = GRAM_MAX_DIGITS
+        field.decimal_places = GRAM_DECIMAL_PLACES
+        field.validators = [
+            v for v in field.validators if not isinstance(v, DecimalValidator)
+        ]
+        field.validators.append(DecimalValidator(GRAM_MAX_DIGITS, GRAM_DECIMAL_PLACES))
+        if (
+            not self.is_bound
+            and self.instance.pk
+            and self.instance.percentage is not None
+        ):
+            self.initial['percentage'] = percentage_to_grams(self.instance.percentage)
         self.fields['weighing_scale'].initial = 'D'
         self.fields['is_pre_mix'].initial = True
-        if self.instance and self.instance.pk:
-            self.fields['raw_material'].queryset = RawMaterial.objects.filter(
-                pk=self.instance.raw_material_id
-            )
+        # remote-search 只渲染当前选中项；不收窄的话每个下拉都会遍历整张原材料表。
+        selected = RawMaterial.objects.select_related('category')
+        if self.instance and self.instance.pk and self.instance.raw_material_id:
+            qs = selected.filter(pk=self.instance.raw_material_id)
             if self.data:
                 raw_id = self.data.get(self.add_prefix('raw_material'))
                 if raw_id and str(raw_id) != str(self.instance.raw_material_id):
-                    self.fields['raw_material'].queryset = (
-                        self.fields['raw_material'].queryset |
-                        RawMaterial.objects.filter(pk=raw_id)
-                    )
+                    qs = qs | selected.filter(pk=raw_id)
+            self.fields['raw_material'].queryset = qs
         elif self.data:
             raw_id = self.data.get(self.add_prefix('raw_material'))
             if raw_id:
-                self.fields['raw_material'].queryset = RawMaterial.objects.filter(pk=raw_id)
+                self.fields['raw_material'].queryset = selected.filter(pk=raw_id)
             else:
                 self.fields['raw_material'].queryset = RawMaterial.objects.none()
         else:
             self.fields['raw_material'].queryset = RawMaterial.objects.none()
 
+    def clean_percentage(self):
+        """页面填的是每 25 kg 的克数，库存仍是份数。"""
+        grams = self.cleaned_data.get('percentage')
+        if grams in (None, ''):
+            return grams
+        return grams_to_percentage(grams)
+
 
 class BaseColorPowderBOMEntryFormSet(BaseInlineFormSet):
     """色粉配比明细 formset — 校验至少填写一行有效明细（以 raw_material 为准）。"""
+
+    def get_queryset(self):
+        if not hasattr(self, '_queryset'):
+            self._queryset = (
+                super().get_queryset()
+                .select_related('raw_material__category')
+            )
+        return self._queryset
 
     def _is_form_deleted(self, form):
         """判断 form 是否被标记为删除"""

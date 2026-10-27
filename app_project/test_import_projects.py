@@ -464,9 +464,6 @@ class ImportProjectsTests(TestCase):
             grade_name='已有牌号', sap_material_code='A02009000090', category=other,
         )
         MaterialLibrary.objects.create(
-            grade_name='另一条', sap_material_code='A02009000090', category=other,
-        )
-        MaterialLibrary.objects.create(
             grade_name='占用牌号', sap_material_code='A02009000091', category=other,
         )
         _write(self.path, [
@@ -477,10 +474,10 @@ class ImportProjectsTests(TestCase):
 
         linked = Project.objects.get(code='MISMATCH01')
         self.assertEqual(linked.material_id, existing.pk)
-        self.assertEqual(_cell(self.path, 2, 1), '已同步-' + '；'.join([
-            'SAP「A02009000090」对应 2 条成品，已选用「已有牌号」',
-            '材料类型「PP」无法关联：成品现有类型为「ABS」，已挂接但不修改',
-        ]))
+        self.assertEqual(
+            _cell(self.path, 2, 1),
+            '已同步-材料类型「PP」无法关联：成品现有类型为「ABS」，已挂接但不修改',
+        )
 
         occupied = Project.objects.get(code='OCCUPIED01')
         self.assertIsNone(occupied.material_id)

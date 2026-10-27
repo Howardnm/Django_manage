@@ -109,7 +109,7 @@ class RawMaterialDetailView(RawMaterialAccessMixin, DetailView):
 
     def get_queryset(self):
         return super().get_queryset().select_related('category', 'supplier').prefetch_related(
-            'properties__test_config', 'price_records__plant', 'stock_snapshots__plant'
+            'plants', 'properties__test_config', 'price_records__plant', 'stock_snapshots__plant'
         )
 
     def get_object(self, queryset=None):

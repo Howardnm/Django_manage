@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>成品 BOM 发布 / 下架</title>
+    {% load static %}
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="stylesheet" href="{% static 'element-plus-2.13.7/dist/index.css' %}">
+    <style>
+        body { margin: 0; background: #f5f7fa; color: #303133; font-family: "Segoe UI", "PingFang SC", sans-serif; }
+        #app { padding: 16px 20px 32px; }
+        .page-title { margin: 0 0 12px; font-size: 20px; font-weight: 600; }
+        .hint { margin: 8px 0 0; color: #909399; font-size: 13px; }
+        .load-progress { margin-top: 12px; max-width: 640px; }
+        .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 16px; }
+        .tree-card { min-height: 480px; }
+        .tree-node { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+        .node-strong { font-weight: 700; }
+        .ver-pill, .pill {
+            display: inline-block;
+            padding: 0 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            line-height: 20px;
+            font-weight: 600;
+        }
+        .ver-pill, .pill-loc {
+            background: #ecf5ff;
+            color: #409eff;
+            border: 1px solid #b3d8ff;
+        }
+        .pill-main {
+            background: #f0f9eb;
+            color: #67c23a;
+            border: 1px solid #c2e7b0;
+        }
+        .pill-merged {
+            background: #fdf6ec;
+            color: #e6a23c;
+            border: 1px solid #f5dab1;
+        }
+        .sync-mark { color: #67c23a; font-weight: 700; }
+        .node-hit { background: #ecf5ff; border-radius: 4px; }
+        .dialog-grid { display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; }
+        .section-title { margin: 12px 0 8px; font-size: 14px; color: #606266; }
+        .row-missing td { background: #fdf6ec !important; }
+        .sap-bom-table .sap-name-col .cell { white-space: nowrap; word-break: keep-all; }
+        @media (max-width: 1100px) {
+            .columns, .dialog-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+{% csrf_token %}
+<div id="app">
+{% verbatim %}
+    <h1 class="page-title">成品 BOM 发布 / 下架</h1>
+    <el-card shadow="never">
+        <el-form inline @submit.prevent="loadAll">
+            <el-form-item label="成品编码">
+                <el-input v-model="sapCode" placeholder="SAP 物料号" clearable style="width: 220px"></el-input>
+            </el-form-item>
+            <el-form-item label="工厂">
+                <el-select v-model="selectedPlants" multiple collapse-tags placeholder="选择工厂" style="width: 280px">
+                    <el-option v-for="plant in plants" :key="plant.code" :label="plantLabel(plant)" :value="plant.code"></el-option>
+                </el-select>
+            </el-form-item>
+            <el-form-item label="生效日期">
+                <el-date-picker v-model="headerDate" type="date" value-format="YYYY-MM-DD" placeholder="明细与对比用"></el-date-picker>
+            </el-form-item>
+            <el-form-item>
+                <el-button type="primary" :loading="loading" @click="loadAll">查询</el-button>
+            </el-form-item>
+        </el-form>
+        <div class="load-progress" v-if="loading">
+            <el-progress :percentage="loadPercent" :stroke-width="8"></el-progress>
+            <p class="hint">{{ loadText }}</p>
+        </div>
+        <p class="hint" v-if="material">{{ material.grade_name }} · {{ material.sap_material_code }}。✓ 表示组件占比一致（容差 0.1 个百分点）。单位不是 KG 或 G 的 SAP BOM 不参与对比。</p>
+    </el-card>
+
+    <div class="columns" v-loading="loading">
+        <el-card class="tree-card" shadow="never" header="成品配方">
+            <el-empty v-if="!localTree.length" description="输入成品编码后查询"></el-empty>
+            <el-tree
+                v-else
+                :key="treeKey"
+                :data="localTree"
+                node-key="id"
+                default-expand-all
+                @node-click="onLocalClick"
+            >
+                <template #default="{ data }">
+                    <span class="tree-node">
+                        <span v-if="data.kind === 'project'" class="node-strong">【{{ data.code }}】<template v-if="data.name"> {{ data.name }}</template></span>
+                        <template v-else-if="data.kind === 'formula'">
+                            <span>【{{ data.code }}】</span>
+                            <span v-if="data.name">{{ data.name }}</span>
+                        </template>
+                        <span v-else-if="data.kind === 'version'" class="ver-pill">v{{ data.versionNo }}</span>
+                        <template v-else-if="data.type === 'sync'">
+                            <span class="pill pill-loc">{{ data.werks }} / 用途 {{ data.stlan }} / 可选 {{ data.stlal }}</span>
+                            <span class="pill" :class="data.matchKind === 'merged' ? 'pill-merged' : 'pill-main'">{{ data.matchLabel }}</span>
+                        </template>
+                        <template v-else>{{ data.label }}</template>
+                        <span v-if="data.synced" class="sync-mark">✓</span>
+                        <el-tag v-if="data.mature" size="small" type="success">成熟</el-tag>
+                        <el-tag v-if="data.missingCode" size="small" type="warning">缺编码</el-tag>
+                    </span>
+                </template>
+            </el-tree>
+        </el-card>
+        <el-card class="tree-card" shadow="never" header="SAP BOM">
+            <el-empty v-if="!sapTree.length" description="选择工厂后查询"></el-empty>
+            <el-tree
+                v-else
+                ref="sapTreeRef"
+                :key="'sap-' + treeKey"
+                :data="sapTree"
+                node-key="id"
+                default-expand-all
+                highlight-current
+                @node-click="onSapClick"
+            >
+                <template #default="{ data }">
+                    <span class="tree-node" :class="{ 'node-hit': data.id === hitKey }">
+                        <span v-if="data.kind === 'plant'" class="node-strong">{{ data.label }}</span>
+                        <template v-else>{{ data.label }}</template>
+                        <span v-if="data.synced" class="sync-mark">✓</span>
+                        <el-tag v-if="data.unsupported" size="small" type="info">单位无法对比</el-tag>
+                        <el-tag v-if="data.error" size="small" type="danger">{{ data.error }}</el-tag>
+                        <el-tag v-if="data.plantError" size="small" type="danger">{{ data.plantError }}</el-tag>
+                    </span>
+                </template>
+            </el-tree>
+        </el-card>
+    </div>
+
+    <el-dialog v-model="localOpen" title="成品 BOM" width="1100px" destroy-on-close>
+        <div class="dialog-grid" v-if="current">
+            <div>
+                <div class="section-title">主 BOM</div>
+                <el-table :data="current.main_lines" size="small" border :row-class-name="rowClass">
+                    <el-table-column prop="category_name" label="原材料类型" width="120"></el-table-column>
+                    <el-table-column prop="name" label="原材料名称"></el-table-column>
+                    <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
+                    <el-table-column prop="warehouse_code" label="SAP 编码" width="140"></el-table-column>
+                    <el-table-column prop="percentage" label="份数" width="90"></el-table-column>
+                </el-table>
+                <template v-if="current.has_color_bom">
+                    <div class="section-title">色粉 BOM</div>
+                    <el-table :data="current.color_lines" size="small" border :row-class-name="rowClass">
+                        <el-table-column prop="category_name" label="原材料类型" width="120"></el-table-column>
+                        <el-table-column prop="name" label="原材料名称"></el-table-column>
+                        <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
+                        <el-table-column prop="warehouse_code" label="SAP 编码" width="140"></el-table-column>
+                        <el-table-column prop="percentage" label="份数" width="120"></el-table-column>
+                    </el-table>
+                </template>
+                <div class="section-title">将提交（基准 {{ form.bmeng || "—" }} kg，组件单位 G）</div>
+                <el-table :data="preview" size="small" border>
+                    <el-table-column prop="posnr" label="行号" width="80"></el-table-column>
+                    <el-table-column prop="idnrk" label="组件" width="140"></el-table-column>
+                    <el-table-column prop="name" label="原材料名称"></el-table-column>
+                    <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
+                    <el-table-column prop="menge" label="数量 (G)" width="120"></el-table-column>
+                </el-table>
+            </div>
+            <div>
+                <el-alert
+                    v-if="missingNames.length"
+                    type="warning"
+                    :closable="false"
+                    :title="'这些原材料没有 SAP 编码：' + missingNames.join('、')"
+                    style="margin-bottom: 12px"
+                ></el-alert>
+                <el-form label-width="96px">
+                    <el-form-item label="工厂">
+                        <el-select v-model="form.werks" placeholder="工厂" style="width: 100%">
+                            <el-option v-for="plant in plants" :key="plant.code" :label="plantLabel(plant)" :value="plant.code"></el-option>
+                        </el-select>
+                    </el-form-item>
+                    <el-form-item label="BOM 用途">
+                        <el-input v-model="form.stlan" maxlength="1"></el-input>
+                    </el-form-item>
+                    <el-form-item label="可选 BOM">
+                        <el-input v-model="form.stlal" maxlength="2"></el-input>
+                    </el-form-item>
+                    <el-form-item label="基准数量">
+                        <el-input-number v-model="form.bmeng" :min="1" :precision="0" :step="1" style="width: 100%"></el-input-number>
+                        <div class="hint">单位是 kg，只能填整数。1000 表示 1000 kg。</div>
+                    </el-form-item>
+                    <el-form-item label="组件单位">
+                        <el-input model-value="G" disabled></el-input>
+                    </el-form-item>
+                    <el-form-item label="生效日期">
+                        <el-date-picker v-model="form.datuv" type="date" value-format="YYYY-MM-DD" style="width: 100%"></el-date-picker>
+                    </el-form-item>
+                    <el-form-item label="损耗率%">
+                        <el-input-number v-model="form.ausch" :min="0" :precision="2" :step="1" style="width: 100%"></el-input-number>
+                    </el-form-item>
+                    <el-form-item label="BOM 状态">
+                        <el-input v-model="form.stlst" maxlength="2"></el-input>
+                        <div class="hint">写入 STLST。默认 1，表示这张 BOM 可用。</div>
+                    </el-form-item>
+                    <el-form-item label="抬头文本">
+                        <el-input v-model="form.ztext"></el-input>
+                    </el-form-item>
+                    <el-form-item label="可选文本">
+                        <el-input v-model="form.stktx"></el-input>
+                    </el-form-item>
+                    <el-form-item label="合并色粉">
+                        <el-checkbox v-model="form.mergeColor" :disabled="!current.has_color_bom">一并写入色粉 BOM</el-checkbox>
+                    </el-form-item>
+                    <el-form-item>
+                        <el-button :loading="checking" @click="runCheck">检查</el-button>
+                        <el-button
+                            v-if="checkResult === 'create'"
+                            type="primary"
+                            :disabled="missingNames.length > 0"
+                            :loading="saving"
+                            @click="submit('create')"
+                        >发布</el-button>
+                        <el-button
+                            v-if="checkResult === 'update'"
+                            type="warning"
+                            :disabled="missingNames.length > 0"
+                            :loading="saving"
+                            @click="submit('update')"
+                        >修改</el-button>
+                    </el-form-item>
+                </el-form>
+                <p class="hint" v-if="checkResult === 'update'">修改会用当前配方整表覆盖该 SAP BOM，没包含的行不会保留。</p>
+            </div>
+        </div>
+    </el-dialog>
+
+    <el-dialog v-model="sapOpen" title="SAP BOM" width="1280px">
+        <template v-if="sapCurrent">
+            <p class="hint">{{ sapCurrent.werks }} / 用途 {{ sapCurrent.stlan }} / 可选 {{ sapCurrent.stlal }}</p>
+            <el-table class="sap-bom-table" :data="sapCurrent.items" size="small" border>
+                <el-table-column prop="posnr" label="行号" width="80"></el-table-column>
+                <el-table-column prop="idnrk" label="组件" width="150"></el-table-column>
+                <el-table-column prop="maktx" label="物料名称" min-width="520" class-name="sap-name-col"></el-table-column>
+                <el-table-column prop="menge" label="数量" width="120"></el-table-column>
+                <el-table-column prop="meins" label="单位" width="80"></el-table-column>
+                <el-table-column prop="postp" label="类别" width="80"></el-table-column>
+                <el-table-column prop="potx1" label="文本" min-width="160"></el-table-column>
+            </el-table>
+            <div style="margin-top: 12px">
+                <el-button type="danger" :loading="deleting" @click="removeSap">删除该 BOM</el-button>
+            </div>
+        </template>
+    </el-dialog>
+{% endverbatim %}
+</div>
+<script src="{% static 'vue-3.5.33/dist/vue.global.js' %}"></script>
+<script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
+<script src="{% static 'element-plus-2.13.7/dist/locale/zh-cn.js' %}"></script>
+<script>window.__FINISHED_BOM_SAP_CODE__ = "{{ initial_sap_code|escapejs }}";</script>
+<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=19"></script>
+</body>
+</html>

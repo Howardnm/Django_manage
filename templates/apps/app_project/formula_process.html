@@ -24,6 +24,9 @@
                         <i class="ti ti-columns me-1"></i> 全局配方对比
                     </a>
                 {% endif %}
+                <a href="{% url 'finished_bom_sync' %}{% if project.material.sap_material_code %}?sap_code={{ project.material.sap_material_code|urlencode }}{% endif %}" class="btn btn-white" target="_blank" rel="noopener">
+                    <i class="ti ti-cloud-upload me-1"></i> BOM 发布
+                </a>
             </div>
         </div>
     </div>
@@ -387,7 +390,7 @@
                                 </a>
                                 <span class="text-muted small">({{ entry.raw_material.model_name }})</span>
                             </td>
-                            <td class="fs-3">{{ entry.percentage|smart_decimal }}</td>
+                            <td class="fs-3">{{ entry.percentage|exact_decimal }}</td>
                             <td>
                                 {% if entry.is_pre_mix %}
                                     <span class="badge bg-purple-lt">{{ entry.pre_mix_order }}. 共混({{ entry.pre_mix_time }}s)</span>

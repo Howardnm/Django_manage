@@ -34,6 +34,12 @@ urlpatterns = [
     # 对外数据接口：由 app_external_api 管控
     path('api/external/', include('app_external_api.urls')),
 
+    # SAP BOM。会话登录，不走对外令牌。
+    path('api/sap/', include('app_sap_services.api.urls')),
+
+    # 成品 BOM 发布页的本地数据。SAP 读写仍走上面的接口。
+    path('api/material/', include('app_material.api.urls')),
+
     # 试验排产模块
     path('trial-production/', include('app_trial_production.urls')),
 

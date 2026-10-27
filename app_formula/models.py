@@ -227,7 +227,9 @@ class AbstractBOMEntry(models.Model):
     feeding_port = models.CharField("喂料口", max_length=20, choices=FEEDING_CHOICES, default='1_MAIN')
     weighing_scale = models.CharField("分秤", max_length=5, choices=WEIGHING_CHOICES, default='A', help_text="用于生产投料区分")
     raw_material = models.ForeignKey(RawMaterial, on_delete=models.PROTECT, verbose_name="原材料")
-    percentage = models.DecimalField("比例/份数", max_digits=8, decimal_places=3, help_text="百分比/份数")
+    # 色粉页填到 3 位小数的克。克 ÷250 之后 6 位小数就能原样存下。
+    percentage = models.DecimalField(
+        "比例/份数", max_digits=18, decimal_places=6, help_text="百分比/份数")
     is_pre_mix = models.BooleanField("是否共混", default=False, help_text="是否需要在挤出前进行预混合")
     pre_mix_order = models.PositiveIntegerField("共混顺序", default=0, help_text="数字越小越先加入")
     pre_mix_time = models.PositiveIntegerField("共混时间 (秒)", default=0, help_text="该步骤的混合时长")

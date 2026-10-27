@@ -7,8 +7,9 @@
 后续配色中心）。value 对象预留 meta 字段（feeding_port/is_pre_mix 等），
 供配色中心扩展。
 
-样式约定：数值统一 smart_decimal() 格式化为字符串（与模板 filter 同一实现）；
-空值 empty=True，由前端渲染淡色 '-'.
+样式约定：数值统一 smart_decimal() 格式化为字符串（与模板 filter 同一实现）。
+色粉 BOM 行用 exact_decimal()，避免 6 位小数的份数被收成 3 位。
+空值 empty=True，由前端渲染淡色 '-'。
 
 本模块**不含任何价格/成本算术** —— 那些口径的唯一实现在
 app_raw_material/services/price_service.py（价格聚合）与
@@ -21,7 +22,7 @@ from django.urls import reverse
 from rest_framework import serializers
 from rest_framework.utils.serializer_helpers import ReturnDict, ReturnList
 
-from common_utils.formatting import smart_decimal as _fmt
+from common_utils.formatting import exact_decimal, smart_decimal as _fmt
 
 
 # ==========================================
@@ -328,7 +329,7 @@ def serialize_compare(columns, matrices, avg_months, project=None, cost_calc=Non
     cpbom_rows = []
     for row in cpbom_matrix:
         rm = row['item']
-        values = [_val(_fmt(cell['val']) if not cell['is_empty'] else '-',
+        values = [_val(exact_decimal(cell['val']) if not cell['is_empty'] else '-',
                        empty=cell['is_empty']) for cell in row['values']]
         name2 = f"{rm.name} {rm.model_name}".strip() if getattr(rm, 'model_name', None) else rm.name
         price = prices.latest(rm.pk)

@@ -39,3 +39,21 @@ def smart_decimal(value):
             return '{:.3f}'.format(d)
     # 不足3位，直接按2位显示
     return '{:.2f}'.format(d)
+
+
+def exact_decimal(value):
+    """按最多 6 位小数原样展示，去掉尾零。
+
+    色粉份数是克数 ÷250，3 位小数的克要 6 位才存得下。
+    ``smart_decimal`` 收到 3 位会把 0.004936 收成 0.005，0.000004 收成 0.00。
+    """
+    if value is None or value == '':
+        return '-'
+    try:
+        quantized = Decimal(str(value)).quantize(Decimal('0.000001'))
+    except Exception:
+        return str(value)
+    text = format(quantized, 'f')
+    if '.' in text:
+        text = text.rstrip('0').rstrip('.')
+    return text or '0'

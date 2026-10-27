@@ -20,6 +20,15 @@
             <dt class="col-5 text-muted">内部编码</dt>
             <dd class="col-7">{{ material.warehouse_code|default:"-" }}</dd>
 
+            <dt class="col-5 text-muted">工厂</dt>
+            <dd class="col-7">
+                {% for plant in material.plants.all %}
+                    <span class="badge bg-azure-lt mb-1">{{ plant }}</span>
+                {% empty %}
+                    <span class="text-muted">-</span>
+                {% endfor %}
+            </dd>
+
             <dt class="col-5 text-muted">购入日期</dt>
             <dd class="col-7">{{ material.purchase_date|date:"Y-m-d"|default:"-" }}</dd>
 

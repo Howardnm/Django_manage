@@ -1,4 +1,5 @@
 from django.urls import path
+from .views.FinishedBomSync import FinishedBomSyncView
 from .views.Material import *
 from .views.MaterialTds import *
 from .views.MaterialType import *
@@ -9,6 +10,9 @@ from .views.MetricCategory import *
 from common_utils.views import MaterialAutocompleteView
 
 urlpatterns = [
+
+    # 成品 BOM 发布 / 下架。独立页面，不进材料库列表。
+    path('finished-bom-sync/', FinishedBomSyncView.as_view(), name='finished_bom_sync'),
 
     # 1. 材料库 (Material)
     path('materials/', MaterialListView.as_view(), name='material_list'),

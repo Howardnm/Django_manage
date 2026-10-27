@@ -32,10 +32,11 @@ def sort_toggle(field_name, current_sort):
 
 
 # smart_decimal 的唯一实现在 common_utils/formatting.py（与对比表序列化层共用）
-from common_utils.formatting import smart_decimal
+from common_utils.formatting import exact_decimal, smart_decimal
 
 # 保留同名 filter，模板侧零改动
 register.filter(smart_decimal)
+register.filter(exact_decimal)
 
 
 @register.filter

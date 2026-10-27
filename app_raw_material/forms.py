@@ -33,7 +33,8 @@ class RawMaterialForm(TablerFormMixin, forms.ModelForm):
 
     class Meta:
         model = RawMaterial
-        exclude = ['updated_at']
+        # plants 只由 SAP 同步写入。放进表单的话，文员保存时没勾选会把已同步的工厂清掉。
+        exclude = ['updated_at', 'plants']
         widgets = {
             'usage_method': forms.Textarea(attrs={'rows': 3}),
             'purchase_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),

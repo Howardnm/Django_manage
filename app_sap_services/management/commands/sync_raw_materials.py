@@ -26,14 +26,14 @@ from django.db import transaction
 
 from app_sap_services import sap, sap_health_check
 from app_sap_services.definitions.material import MaterialQuery
-from app_raw_material.models import RawMaterial, RawMaterialType
+from app_raw_material.models import Plant, RawMaterial, RawMaterialType
 
 
 DEFAULT_CATEGORY_NAME = "未分类"
 CHUNK_SIZE = 500
 
 # 同步的物料编号匹配模式，每段单独下发到 SAP 服务端筛选
-SYNC_PATTERNS = ("A01*", "A03*", "1001*", "1002*")
+SYNC_PATTERNS = ("A01*", "A03*", "1001*", "1002*", "K09015*")
 
 
 class Command(BaseCommand):
@@ -160,28 +160,30 @@ class Command(BaseCommand):
         for row in df.iter_rows(named=True):
             matnr = row["MATNR"]
             maktx = row.get("MAKTX", "")
+            werks = (row.get("WERKS") or "").strip()
             if not matnr:
                 continue
 
+            plant_text = f" 工厂 {werks}" if werks else ""
             current = rm_map.get(matnr)
             if current is not None:
                 cur_cat_id, cur_name = current
                 if cur_cat_id != default_category.pk:
                     will_skip += 1
                     self.stdout.write(
-                        f"   [~] 将跳过(已清洗): {maktx} ({matnr}) "
-                        f"(当前: {cur_name})"
+                        f"   [~] 将跳过名称(已清洗): {maktx} ({matnr}) "
+                        f"(当前: {cur_name}){plant_text}"
                     )
                 else:
                     will_update += 1
                     self.stdout.write(
                         f"   [~] 将更新: {maktx} ({matnr}) "
-                        f"(当前: {cur_name})"
+                        f"(当前: {cur_name}){plant_text}"
                     )
             else:
                 will_create += 1
                 self.stdout.write(
-                    f"   [+] 将创建: {maktx} ({matnr})"
+                    f"   [+] 将创建: {maktx} ({matnr}){plant_text}"
                 )
 
         self.stdout.write("")
@@ -260,12 +262,57 @@ class Command(BaseCommand):
                 f"(新建 {created}, 更新 {updated}, 跳过已清洗 {skipped_cleaned})"
             )
 
+        linked = self._assign_plants(df)
         self.stdout.write("")
         self.stdout.write(
             self.style.SUCCESS(
                 f"[OK] 同步完成！总计 {processed} 条, "
                 f"新建 {created} 个, 更新 {updated} 个, "
-                f"跳过已清洗 {skipped_cleaned} 个, 错误 {errors} 个"
+                f"跳过已清洗 {skipped_cleaned} 个, 错误 {errors} 个, "
+                f"写入工厂 {linked} 个料号"
             )
         )
+
+    def _assign_plants(self, df: pl.DataFrame) -> int:
+        """按料号把 ZMARC 的工厂整组写上。
+
+        查询不按工厂过滤，本次返回的 WERKS 就是该料号的全部工厂。
+        用 set 覆盖，SAP 里已经没有的工厂会卸掉。没返回的料号不动。
+        工厂代码本地没有时只建代码，不改已有工厂的名称。
+        已清洗的料号也写工厂，名称和分类仍由上面的循环跳过。
+        """
+        by_code: dict[str, set[str]] = {}
+        for row in df.iter_rows(named=True):
+            matnr = (row.get("MATNR") or "").strip()
+            werks = (row.get("WERKS") or "").strip()
+            if matnr and werks:
+                by_code.setdefault(matnr, set()).add(werks)
+        if not by_code:
+            return 0
+
+        plant_codes = {code for group in by_code.values() for code in group}
+        plants = {
+            plant.code: plant
+            for plant in Plant.objects.filter(code__in=plant_codes)
+        }
+        missing = sorted(plant_codes - plants.keys())
+        if missing:
+            Plant.objects.bulk_create([Plant(code=code) for code in missing])
+            plants.update({
+                plant.code: plant
+                for plant in Plant.objects.filter(code__in=missing)
+            })
+
+        materials = {
+            material.warehouse_code: material
+            for material in RawMaterial.objects.filter(warehouse_code__in=by_code)
+        }
+        linked = 0
+        for matnr, codes in by_code.items():
+            material = materials.get(matnr)
+            if material is None:
+                continue
+            material.plants.set([plants[code] for code in sorted(codes)])
+            linked += 1
+        return linked
 
