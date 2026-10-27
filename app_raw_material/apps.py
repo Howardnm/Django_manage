@@ -19,7 +19,9 @@ class AppRawMaterialConfig(AppConfig):
             warehouse_code 已经在候选项文案里展示，必须一并参与匹配 ——
             原先只搜 name 与 model_name，导致「输编码搜不到」。
             """
-            return RawMaterial.objects.select_related('category').only(
+            return RawMaterial.objects.select_related('category').prefetch_related(
+                'plants'
+            ).only(
                 'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
             ).filter(
                 Q(name__icontains=query)
@@ -42,6 +44,11 @@ class AppRawMaterialConfig(AppConfig):
                 text += f' ({m.category.name})'
                 if m.warehouse_code:
                     text += f' ({m.warehouse_code})'
+                # 只展示工厂代码。多个工厂合成一对括号，按代码排序、顿号分隔；
+                # 未挂工厂则不加空括号。价格仍是跨工厂均价，不按工厂拆开。
+                plant_codes = sorted(p.code for p in m.plants.all() if p.code)
+                if plant_codes:
+                    text += f' ({"、".join(plant_codes)})'
                 price = prices.latest(m)
                 # latest() 的契约：None = 无报价，Decimal('0.00') 是有效价格
                 if price is not None:

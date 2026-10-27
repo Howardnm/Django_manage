@@ -72,6 +72,7 @@ class RawMaterialAutocompleteTests(TestCase):
 
     def test_option_text_includes_price(self):
         """候选文案要带最新单价，且与其它附加信息一样用括号包裹。"""
+        self.material.plants.add(self.plant)
         results = self._search('PA66')
         self.assertEqual(len(results), 1)
         text = results[0]['text']
@@ -79,7 +80,23 @@ class RawMaterialAutocompleteTests(TestCase):
         self.assertIn('2600', text)
         self.assertIn('(树脂)', text)
         self.assertIn('(RM-000123)', text)
+        self.assertIn('(3011)', text)
+        self.assertNotIn('上海工厂', text)
         self.assertIn('(¥12.50)', text)
+        # 工厂插在编码之后、价格之前
+        self.assertLess(text.index('(3011)'), text.index('(¥12.50)'))
+        self.assertLess(text.index('(RM-000123)'), text.index('(3011)'))
+
+    def test_option_text_joins_plant_codes(self):
+        """多个工厂合成一对括号，只显示代码，顿号分隔，按代码排序。"""
+        other = Plant.objects.create(code='2010', name='昆山工厂')
+        self.material.plants.add(self.plant, other)
+        text = self._search('PA66')[0]['text']
+        self.assertIn('(2010、3011)', text)
+        self.assertNotIn('(2010)', text)
+        self.assertNotIn('(3011)', text)
+        self.assertNotIn('昆山工厂', text)
+        self.assertNotIn('上海工厂', text)
 
     def test_material_without_price_still_listed(self):
         """没有报价的原材料也要能搜到，只是文案里不带价格。"""
@@ -87,6 +104,7 @@ class RawMaterialAutocompleteTests(TestCase):
         self.assertEqual(len(results), 1)
         self.assertIn('玻璃纤维', results[0]['text'])
         self.assertNotIn('¥', results[0]['text'])
+        self.assertNotIn('3011', results[0]['text'])
 
     def test_detail_url_is_injected(self):
         results = self._search('PA66')
