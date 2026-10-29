@@ -3,13 +3,11 @@
    本地签名：SAP 编码 → 份数占合计的百分比。缺编码的主 BOM 行使该版本不能标已同步；
    色粉缺编码只让「主 BOM + 色粉」这个签名作废，仅主 BOM 仍可对比。
    SAP 侧先折成千克：KG 原样，G 除以 1000。单位 PC 的行忽略。其它单位整张不参与匹配。
-   同一编码先加总。占比差 ≤ 0.1 个百分点视为相同。
+   同一编码先加总。占比收到 6 位小数后必须相同。
 
    例：60 份 + 40 份，对上 600000 G + 400000 G，也对上 600 KG + 400 KG。
    单位是 TO 的整张 BOM 不标已同步。
 */
-const SHARE_TOLERANCE = 0.1
-
 function shareMap(pairs) {
     const totals = new Map()
     let sum = 0
@@ -28,7 +26,7 @@ function sameShares(left, right) {
     if (!left || !right || left.size !== right.size || left.size === 0) return false
     for (const [code, share] of left) {
         if (!right.has(code)) return false
-        if (Math.abs(share - right.get(code)) > SHARE_TOLERANCE) return false
+        if (round6(share) !== round6(right.get(code))) return false
     }
     return true
 }
@@ -100,6 +98,12 @@ function classify(version, sapShares) {
 function round3(value) {
     const negative = value < 0
     const rounded = Math.round(Math.abs(value) * 1000) / 1000
+    return negative ? -rounded : rounded
+}
+
+function round6(value) {
+    const negative = value < 0
+    const rounded = Math.round(Math.abs(value) * 1000000) / 1000000
     return negative ? -rounded : rounded
 }
 
