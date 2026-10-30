@@ -25,6 +25,14 @@
         <!-- 3. 右侧：工具图标区 -->
         <div class="navbar-nav flex-row order-md-last">
             
+            <!-- PMS — 新标签打开 -->
+            <div class="nav-item me-2">
+                <a href="https://pms.sunwill.com.cn/" class="nav-link px-2" target="_blank" rel="noopener noreferrer"
+                   aria-label="打开 PMS">
+                    <i class="ti ti-automation icon me-1"></i><span class="fw-bold">工艺系统</span>
+                </a>
+            </div>
+
             <!-- 配方对比购物车 — RND_ONLY 准入（判断已前置到 User.can_use_compare_cart） -->
             {% if can_use_compare_cart %}
             {% include 'apps/app_formula/include/header_compare_cart.html' %}
