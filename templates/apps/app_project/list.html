@@ -24,7 +24,7 @@
                 {% for project in page_obj %}
                     <tr>
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="text-reset fw-bold d-block text-truncate" style="max-width: 280px;" title="{{ project.name }}">
+                            <a href="{% url 'project_detail' project.pk %}" target="_blank" rel="noopener" class="text-reset fw-bold d-block text-truncate" style="max-width: 280px;" title="{{ project.name }}">
                                 {{ project.name }}
                             </a>
                             <div class="text-muted small mt-1">
@@ -131,7 +131,7 @@
                         </td>
                         
                         <td>
-                            <a href="{% url 'project_detail' project.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="管理项目">
+                            <a href="{% url 'project_detail' project.pk %}" target="_blank" rel="noopener" class="btn btn-sm btn-icon btn-ghost-primary" title="管理项目">
                                 <i class="ti ti-settings"></i>
                             </a>
                         </td>
