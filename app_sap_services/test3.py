@@ -23,59 +23,17 @@ from app_sap_services.definitions.bom import MaterialBomMaintain
 msgs = sap.rfc(MaterialBomMaintain).filter(
     i_type="M",
     t_main=[{
-        "MATNR": "A02006000027",
-        "WERKS": "3011",
-        "STLAN": "1",
-        "STLAL": "05",
-        "BMENG": "1000",
+        "MATNR": "A02006000027",   # 物料编号
+        "WERKS": "3011",   # 工厂
+        "STLAN": "1",   # BOM 用途
+        "STLAL": "05",   # 可选的 BOM
+        "BMENG": "1000",   # 基准数量(BTCI)
         "STLST": "1",
-        "POSNR": "0010",
-        "POSTP": "L",
-        "IDNRK": "A01005000044",
-        "MENGE": "88.800",
-        "MEINS": "G",
-        "AUSCH": "1",
-        "DATUV": "2026-10-26",
-    },{
-        "MATNR": "A02006000027",
-        "WERKS": "3011",
-        "STLAN": "1",
-        "STLAL": "05",
-        "BMENG": "1000",
-        "STLST": "1",
-        "POSNR": "0020",
-        "POSTP": "L",
-        "IDNRK": "A01005000039",
-        "MENGE": "55.800",
-        "MEINS": "G",
-        "AUSCH": "1",
-        "DATUV": "2026-10-26",
-    },{
-        "MATNR": "A02006000027",
-        "WERKS": "3011",
-        "STLAN": "1",
-        "STLAL": "05",
-        "BMENG": "1000",
-        "STLST": "1",
-        "POSNR": "0030",
-        "POSTP": "L",
-        "IDNRK": "A01005000039",
-        "MENGE": "40.800",
-        "MEINS": "G",
-        "AUSCH": "1",
-        "DATUV": "2026-10-26",
-    },{
-        "MATNR": "A02006000027",
-        "WERKS": "3011",
-        "STLAN": "1",
-        "STLAL": "05",
-        "BMENG": "1000",
-        "STLST": "1",
-        "POSNR": "0040",
-        "POSTP": "K",
-        "IDNRK": "K09015000060",
-        "MENGE": "40.800",
-        "MEINS": "K",
+        "POSNR": "0010",   # BOM 项目号
+        "POSTP": "L",   # 项目类别（物料单）
+        "IDNRK": "A01005000044",   # 带有转换MATN2的组件(BTCI)
+        "MENGE": "88.800",   # 组件数量 (BTCI)
+        "MEINS": "G",   # 组件计量单位
         "AUSCH": "1",
         "DATUV": "2026-10-26",
     }],

@@ -60,7 +60,7 @@ class MaterialBomQuery(RfcSchema):
             i_emeng=Decimal("1000"),
         ).call()
         for row in rows:
-            print(row.STLAL, row.POSNR, row.IDNRK, row.MENGE, row.MEINS)
+            print(row.STLAL, row.POSNR, row.IDNRK, row.ALPGR, row.MENGE, row.MEINS)
     """
 
     function_name = "ZRFC_GET_MATERIAL_BOM"
