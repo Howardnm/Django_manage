@@ -73,11 +73,19 @@ function updateBomSums() {
         var selector = c === 0
             ? '#bom-formset input[name$="-percentage"]'
             : '#bom-formset input[name$="-percentage_col' + c + '"]';
+        var seenGroup = {};
         document.querySelectorAll(selector).forEach(function (input) {
             var row = input.closest('tr.bom-form');
             if (row && row.style.display !== 'none') {
                 var val = parseFloat(input.value);
-                if (!isNaN(val)) sum += val;
+                if (isNaN(val)) return;
+                var groupInput = row.querySelector('input[name$="-alt_group"]');
+                var group = groupInput ? groupInput.value.trim().toUpperCase() : '';
+                if (group) {
+                    if (seenGroup[group]) return;
+                    seenGroup[group] = true;
+                }
+                sum += val;
             }
         });
         var sumEl = document.getElementById('bom-sum-' + c);
@@ -96,6 +104,32 @@ function updateBomSums() {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    var formulaForm = document.querySelector('form');
+    var formDirty = false;
+    if (formulaForm) {
+        formulaForm.addEventListener('input', function () { formDirty = true; });
+        formulaForm.addEventListener('change', function () { formDirty = true; });
+    }
+    document.querySelectorAll('a.mode-switch').forEach(function (link) {
+        link.addEventListener('click', function (event) {
+            if (formDirty && !window.confirm('未保存的修改会丢掉，确定切换编辑方式？')) {
+                event.preventDefault();
+            }
+        });
+    });
+    var versionSwitch = document.getElementById('formula-version-switch');
+    if (versionSwitch) {
+        var previousVersion = versionSwitch.value;
+        versionSwitch.addEventListener('change', function () {
+            if (!versionSwitch.value) return;
+            if (formDirty && !window.confirm('未保存的修改会丢掉，确定切换版本？')) {
+                versionSwitch.value = previousVersion;
+                return;
+            }
+            window.location.href = versionSwitch.value;
+        });
+    }
+
     /* ── 远程搜索 TomSelect 初始化 ── */
     if (window.TomSelect) {
         document.querySelectorAll('.remote-search').forEach(function (el) {

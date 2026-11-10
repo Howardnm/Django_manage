@@ -111,6 +111,56 @@ function format3(value) {
     return round3(value).toFixed(3)
 }
 
+function cellText(value) {
+    if (value === null || value === undefined) return ""
+    return String(value).trim()
+}
+
+function sapStrategy(row) {
+    const code = cellText(row.alpst)
+    if (code === "1") return "按用途可能性"
+    if (code === "2") return "100%检查"
+    return code
+}
+
+function sapPriority(row) {
+    const text = cellText(row.alprf)
+    if (!text || !/^\d+$/.test(text)) return text
+    const number = String(Number(text))
+    return number === "0" ? "" : number
+}
+
+function sapUsage(row) {
+    const group = cellText(row.alpgr)
+    const usage = row.ewahr
+    const empty = usage === null || usage === undefined || usage === ""
+    const zero = usage === 0 || usage === "0" || usage === "0.00"
+    if (empty || (!group && zero)) return ""
+    return String(usage)
+}
+
+function altPreview(line) {
+    const group = cellText(line.alt_group).toUpperCase()
+    if (!group) return null
+    const strategy = cellText(line.alt_strategy)
+    const fields = {
+        alt_group: group,
+        alt_strategy_label: line.alt_strategy_label || "",
+        alt_priority: "",
+        usage_percent: "",
+    }
+    if (strategy === "2" && line.alt_priority !== null && line.alt_priority !== undefined && line.alt_priority !== "") {
+        fields.alt_priority = String(line.alt_priority)
+    }
+    if (strategy === "1" && line.usage_percent !== null && line.usage_percent !== undefined && line.usage_percent !== "") {
+        const usage = Number(line.usage_percent)
+        fields.usage_percent = Number.isFinite(usage) && Number.isInteger(usage)
+            ? String(usage)
+            : String(line.usage_percent)
+    }
+    return fields
+}
+
 function previewLines(main, color, merge, bmeng) {
     const source = merge ? main.concat(color) : main.slice()
     const buckets = []
@@ -118,6 +168,17 @@ function previewLines(main, color, merge, bmeng) {
     source.forEach(line => {
         const code = (line.warehouse_code || "").trim()
         if (!code) return
+        const alt = altPreview(line)
+        if (alt) {
+            buckets.push({
+                code,
+                name: line.name,
+                modelName: line.model_name,
+                percentage: Number(line.percentage),
+                alt,
+            })
+            return
+        }
         if (!index.has(code)) {
             index.set(code, buckets.length)
             buckets.push({
@@ -125,6 +186,7 @@ function previewLines(main, color, merge, bmeng) {
                 name: line.name,
                 modelName: line.model_name,
                 percentage: 0,
+                alt: null,
             })
         }
         buckets[index.get(code)].percentage += Number(line.percentage)
@@ -137,6 +199,10 @@ function previewLines(main, color, merge, bmeng) {
         model_name: row.modelName || "",
         menge: format3(row.percentage / 100 * base * 1000),
         meins: "G",
+        alt_group: row.alt ? row.alt.alt_group : "",
+        alt_strategy_label: row.alt ? row.alt.alt_strategy_label : "",
+        alt_priority: row.alt ? row.alt.alt_priority : "",
+        usage_percent: row.alt ? row.alt.usage_percent : "",
     }))
 }
 
@@ -298,6 +364,10 @@ createApp({
                 model_name: "",
                 menge: format3(Number(qty)),
                 meins: "PC",
+                alt_group: "",
+                alt_strategy_label: "",
+                alt_priority: "",
+                usage_percent: "",
             }])
         })
 
@@ -830,7 +900,8 @@ createApp({
             sapOpen, sapCurrent, deleting,
             packagingOpen, packagingQuery, packagingRows, packagingLoading, packagingLabel,
             missingNames: missingNamesOfForm, preview,
-            plantLabel, packagingTitle, rowClass, loadAll, onLocalClick, onSapClick, runCheck, submit, removeSap,
+            plantLabel, packagingTitle, rowClass, cellText, sapStrategy, sapPriority, sapUsage,
+            loadAll, onLocalClick, onSapClick, runCheck, submit, removeSap,
             openPackaging, clearPackaging, searchPackaging, pickPackaging,
         }
     },

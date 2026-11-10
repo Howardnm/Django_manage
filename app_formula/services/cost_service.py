@@ -52,6 +52,8 @@ import calendar
 import logging
 from decimal import Decimal
 
+from app_formula.services.alt_groups import collapse_cost_pairs
+
 from app_raw_material.services import RawMaterialPriceLookup
 
 logger = logging.getLogger(__name__)
@@ -97,12 +99,13 @@ def weighted_unit_cost(bom_lines, price_of):
     """按 BOM 份数加权求单位成本。
 
     Args:
-        bom_lines: FormulaBOM 可迭代对象（只有 .percentage 与 .raw_material_id 被用到）。
+        bom_lines: FormulaBOM 可迭代对象。没有替代组时只用 .percentage 与 .raw_material_id。
         price_of: callable(line) -> Decimal | None，返回该行的单价；None 表示缺价。
     Returns:
         Decimal（元/kg，量化到 0.01）或 None（缺价 / 无有效份数）。
     """
-    return _weighted((line.percentage, price_of(line)) for line in bom_lines)
+    # 替代组先收成一份。内核仍是「每对都加」，不认识组。
+    return _weighted(collapse_cost_pairs(bom_lines, price_of))
 
 
 def cost_timeline(bom_lines, series_of):
@@ -129,19 +132,22 @@ def cost_timeline(bom_lines, series_of):
     if not all_dates:
         return []
 
+    series_by_id = {id(line): series for line, series in lines}
+    line_list = [line for line, _ in lines]
     trend = []
     for day in sorted(all_dates):
-        # LOCF：series 升序，取最后一个 date <= day 的价格
-        prices = []
-        for line, series in lines:
+        # LOCF：series 升序，取最后一个 date <= day 的价格。
+        # 替代组按当天价格收成一份，再交给内核。
+        def price_of(line, day=day):
             price = None
-            for record_date, record_price in series:
+            for record_date, record_price in series_by_id[id(line)]:
                 if record_date <= day:
                     price = record_price
                 else:
                     break
-            prices.append((line.percentage, price))
-        cost = _weighted(prices)
+            return price
+
+        cost = _weighted(collapse_cost_pairs(line_list, price_of))
         if cost is not None:
             trend.append([calendar.timegm(day.timetuple()) * 1000, float(cost)])
     return trend

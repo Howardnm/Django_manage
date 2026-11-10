@@ -15,6 +15,7 @@ from app_sap_services.schemas.messages import FATAL_TYPES, normalize_type
 _LINE_FIELDS = {
     "BMENG", "POSNR", "POSTP", "IDNRK", "MENGE", "MEINS", "POTX1",
     "EWAHR", "STKTX", "ZTEXT", "STLST", "AUSCH", "DATUV",
+    "AI_GROUP", "AI_STRATEG", "AI_PRIO", "USAGE_PROB",
 }
 _LINE_ALIASES = {name.lower(): name for name in _LINE_FIELDS}
 

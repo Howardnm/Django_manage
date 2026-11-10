@@ -15,10 +15,10 @@ from app_sap_services import sap
 from app_sap_services.definitions.bom import MaterialBomQuery
 
 rows = sap.rfc(MaterialBomQuery).filter(
-    i_matnr="A02006000098",
+    i_matnr="A02006000637",
     i_werks="3011",
-    i_stalt="01",
-    i_datuv="20261030",
+    i_stalt="05",
+    i_datuv="20261105",
 ).collect()
 
 print(rows)

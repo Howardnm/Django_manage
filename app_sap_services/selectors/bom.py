@@ -125,5 +125,7 @@ def _item_row(row) -> dict:
         "potx1": row.POTX1,
         "ewahr": row.EWAHR,
         "alpgr": row.ALPGR,
+        "alpst": row.ALPST,
+        "alprf": row.ALPRF,
         "datuv": _iso(row.DATUV),
     }

@@ -27,6 +27,12 @@
         </div>
         <div class="col-auto ms-auto">
             <div class="btn-list">
+                {% if order.project %}
+                <a href="{% url 'project_formula_process' order.project.pk %}{% if order.project_node %}?stage={{ order.project_node.stage }}&round={{ order.project_node.round }}{% if formulas %}&formula_id={{ formulas.0.pk }}{% endif %}{% elif order.skip_extrusion %}?stage=COMPETITOR{% if formulas %}&formula_id={{ formulas.0.pk }}{% endif %}{% endif %}"
+                   class="btn btn-outline-secondary">
+                    <i class="ti ti-arrow-left me-1"></i>返回配方过程
+                </a>
+                {% endif %}
                 <a href="{% url 'trial_order_print' order.pk %}" target="_blank"
                    class="btn btn-outline-secondary d-print-none">
                     <i class="ti ti-printer me-1"></i>打印工单
@@ -583,6 +589,7 @@
                             <td><span class="badge bg-blue-lt">{{ row.raw_material.category.name }}</span></td>
                             <td class="fw-bold">{{ row.raw_material.name }}
                                 <span class="text-muted small">({{ row.raw_material.model_name }})</span>
+                                {% if row.alt_label %}<span class="badge bg-orange-lt ms-1">{{ row.alt_label }}</span>{% endif %}
                             </td>
                             {% for col in row.pct_columns %}
                             <td class="pct-cell fw-bold bg-info-lt">{{ col.value|default:"-" }}</td>

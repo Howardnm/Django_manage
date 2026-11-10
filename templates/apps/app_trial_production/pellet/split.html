@@ -112,6 +112,13 @@
                             <i class="ti ti-plus me-1"></i>添加一行
                         </button>
                     </div>
+                    {% if formset.non_form_errors %}
+                    <div class="alert alert-danger m-3 mb-0" role="alert">
+                        {% for error in formset.non_form_errors %}
+                        <div>{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
                     <div class="table-responsive">
                         <table class="table card-table table-vcenter" id="split-table">
                             <thead>
@@ -124,19 +131,36 @@
                             </thead>
                             <tbody>
                                 {% for form in formset %}
-                                <tr class="split-row{% if form.DELETE.value %} d-none{% endif %}">
+                                <tr class="split-row{% if form.DELETE.value and not form.errors %} d-none{% endif %}">
                                     <td>
+                                        {% if form.row_label %}
                                         <span class="badge bg-azure-lt ">v{{ form.row_label.version }}</span>
                                         {{ form.formula.as_hidden }}
+                                        {% else %}
+                                        {{ form.formula }}
+                                        {% endif %}
+                                        {% if form.formula.errors %}
+                                        <div class="text-danger small mt-1">{{ form.formula.errors|join:", " }}</div>
+                                        {% endif %}
                                     </td>
                                     <td>
+                                        {% if form.row_label %}
                                         <span class="badge {{ form.row_label.type_css }} ">{{ form.row_label.type_label }}</span>
                                         {{ form.sub_type.as_hidden }}
+                                        {% else %}
+                                        {{ form.sub_type }}
+                                        {% endif %}
+                                        {% if form.sub_type.errors %}
+                                        <div class="text-danger small mt-1">{{ form.sub_type.errors|join:", " }}</div>
+                                        {% endif %}
                                     </td>
                                     <td>
                                         {{ form.quantity }}
                                         {% if form.quantity.errors %}
                                         <div class="text-danger small mt-1">{{ form.quantity.errors|join:", " }}</div>
+                                        {% endif %}
+                                        {% if form.non_field_errors %}
+                                        <div class="text-danger small mt-1">{{ form.non_field_errors|join:", " }}</div>
                                         {% endif %}
                                     </td>
                                     <td class="text-center">

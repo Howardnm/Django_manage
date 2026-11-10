@@ -12,6 +12,9 @@
         {% csrf_token %}
         <input type="hidden" name="next" value="{{ next_url|default:'' }}">
         <input type="hidden" name="num_columns" id="num_columns" value="{{ num_columns|default:1 }}">
+        {% if group_mode %}
+        <input type="hidden" name="edit_mode" value="group">
+        {% endif %}
         {% comment %}
         列注册表：每列一个隐藏域，DOM 顺序即列序；值为空串表示该列是尚未保存的新版本。
         服务端只认这个列表的个数与顺序（不再信任 num_columns），
@@ -188,7 +191,28 @@
                 <div class="card mb-3">
                     <div class="card-header bg-orange-lt">
                         <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM 明细</h3>
+                        <div class="card-actions d-flex align-items-center gap-2">
+                            {% if group_mode %}
+                                {% if formula_versions %}
+                                <select id="formula-version-switch" class="form-select form-select-sm w-auto">
+                                    {% for f in formula_versions %}
+                                    <option value="{% url 'formula_edit' f.pk %}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}" {% if object.pk == f.pk %}selected{% endif %}>v{{ f.version }}</option>
+                                    {% endfor %}
+                                </select>
+                                {% endif %}
+                                {% if not object.pk %}
+                                <a class="btn btn-sm mode-switch" href="{{ request.path }}{% if next_url %}?next={{ next_url|urlencode }}{% endif %}">多版本并排</a>
+                                {% endif %}
+                            {% elif not object.pk %}
+                                <a class="btn btn-sm btn-orange mode-switch" href="{{ request.path }}?mode=group{% if next_url %}&amp;next={{ next_url|urlencode }}{% endif %}">组合物料</a>
+                            {% endif %}
+                        </div>
                     </div>
+                    {% if group_mode %}
+                    <div class="px-3 py-2 text-muted small border-bottom">
+                        同一替代组的每一行都填完整份数。按用途可能性时填写使用可能性且合计 100；100% 检查时填写优先级 1、2、3。页脚同一组只加一次。
+                    </div>
+                    {% endif %}
                     <div class="formula-table-scroll">
                         <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" style="font-size: 13px; table-layout: auto;">
                             <thead>
@@ -198,7 +222,7 @@
                                 <th style="width: auto;">
                                     <div class="d-flex align-items-center justify-content-center">
                                         <span>比例/份数</span>
-                                        {% if edit_policy.can_manage_versions %}
+                                        {% if edit_policy.can_manage_versions and not group_mode %}
                                         <button type="button" class="btn btn-sm btn-icon ms-1" id="add-pct-col" title="添加配方版本列"><i class="ti ti-plus"></i></button>
                                         {% if not batch_edit_mode %}
                                         <button type="button" class="btn btn-sm btn-icon d-none" id="remove-pct-col" title="移除最后一个版本列"><i class="ti ti-minus"></i></button>
@@ -223,6 +247,12 @@
                                     </div>
                                     {% endif %}
                                 </th>
+                                {% if group_mode %}
+                                <th style="width: 70px;">替代组</th>
+                                <th style="width: 140px;">策略</th>
+                                <th style="width: 70px;">优先级</th>
+                                <th style="width: 90px;">使用可能性%</th>
+                                {% endif %}
                                 <th style="width: 60px;">尾料</th>
                                 <th style="width: 60px;">共混</th>
                                 <th style="width: 70px;">共混顺序</th>
@@ -258,6 +288,12 @@
                                             </div>
                                         </div>
                                     </td>
+                                    {% if group_mode %}
+                                    <td>{{ form.alt_group }}</td>
+                                    <td>{{ form.alt_strategy }}</td>
+                                    <td>{{ form.alt_priority }}</td>
+                                    <td>{{ form.usage_percent }}</td>
+                                    {% endif %}
                                     <td>{{ form.is_tail }}</td>
                                     <td>{{ form.is_pre_mix }}</td>
                                     <td>{{ form.pre_mix_order }}</td>
@@ -289,7 +325,7 @@
                                             </div>
                                         </div>
                                     </td>
-                                    <td colspan="6"></td>
+                                    <td colspan="{% if group_mode %}10{% else %}6{% endif %}"></td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -395,6 +431,12 @@
             <td>{{ bom_formset.empty_form.feeding_port }}</td>
             <td>{{ bom_formset.empty_form.raw_material }}</td>
             <td class="bom-percentages"><div class="d-flex gap-1 percentage-columns"></div></td>
+            {% if group_mode %}
+            <td>{{ bom_formset.empty_form.alt_group }}</td>
+            <td>{{ bom_formset.empty_form.alt_strategy }}</td>
+            <td>{{ bom_formset.empty_form.alt_priority }}</td>
+            <td>{{ bom_formset.empty_form.usage_percent }}</td>
+            {% endif %}
             <td>{{ bom_formset.empty_form.is_tail }}</td>
             <td>{{ bom_formset.empty_form.is_pre_mix }}</td>
             <td>{{ bom_formset.empty_form.pre_mix_order }}</td>
@@ -462,5 +504,5 @@
 {% block extra_js %}
 <script src="{% static 'js/common/rgb_color_input.js' %}"></script>
 <script src="{% static 'js/common/card_table_scroll.js' %}"></script>
-<script src="{% static 'js/apps/app_formula/form.js' %}"></script>
+<script src="{% static 'js/apps/app_formula/form.js' %}?v=1"></script>
 {% endblock %}

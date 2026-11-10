@@ -306,3 +306,113 @@ class PublishMappingTests(TestCase):
                 stlst="", stktx="", ztext="", merge_color=False,
                 packaging_code="K090150008", packaging_qty=Decimal("1"),
             )
+
+    def _group(self, line, group, strategy, priority=None, usage=None):
+        line.alt_group = group
+        line.alt_strategy = strategy
+        line.alt_priority = priority
+        line.usage_percent = None if usage is None else Decimal(usage)
+        line.save()
+        return line
+
+    def test_strategy_two_sends_each_member_at_full_quantity(self):
+        formula = self._formula("L-ALT2")
+        resin = self._group(
+            self._line(formula, self._raw("树脂", "A-RESIN-ALT", self.resin), "60"),
+            "A", "2", priority=1,
+        )
+        filler = self._group(
+            self._line(formula, self._raw("填充", "A-FILL-ALT", self.filler), "60"),
+            "A", "2", priority=2,
+        )
+        self._line(formula, self._raw("助剂", "A-ADD-ALT", self.filler), "40", "2_SIDE_1")
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="1", stktx="", ztext="", merge_color=False,
+        )
+
+        self.assertEqual(
+            [row["idnrk"] for row in lines],
+            ["A-RESIN-ALT", "A-FILL-ALT", "A-ADD-ALT"],
+        )
+        self.assertEqual([row["posnr"] for row in lines], ["0010", "0020", "0030"])
+        self.assertEqual(lines[0]["menge"], "600000.000")
+        self.assertEqual(lines[1]["menge"], "600000.000")
+        self.assertEqual(lines[0]["ai_group"], "A")
+        self.assertEqual(lines[0]["ai_strateg"], "2")
+        self.assertEqual(lines[0]["ai_prio"], "1")
+        self.assertEqual(lines[1]["ai_prio"], "2")
+        self.assertNotIn("usage_prob", lines[0])
+        self.assertNotIn("ewahr", lines[0])
+        self.assertNotIn("ai_group", lines[2])
+        self.assertEqual(resin.percentage, filler.percentage)
+
+    def test_strategy_one_sends_usage_and_keeps_the_full_portion(self):
+        formula = self._formula("L-ALT1")
+        self._group(
+            self._line(formula, self._raw("树脂", "A-RESIN-U", self.resin), "60"),
+            "A", "1", usage="70",
+        )
+        self._group(
+            self._line(formula, self._raw("填充", "A-FILL-U", self.filler), "60"),
+            "A", "1", usage="30.00",
+        )
+
+        with patch("app_material.services.finished_bom_publish.create_bom") as create:
+            create.return_value = [{"type": "S", "text": "成功"}]
+            publish_finished_bom(
+                formula_id=formula.pk, werks="3011", stlan="1", stlal="01",
+                bmeng=Decimal("1000"), datuv=date(2026, 10, 26),
+                merge_color=False, mode="create",
+            )
+
+        lines = create.call_args.kwargs["lines"]
+        self.assertEqual([row["menge"] for row in lines], ["600000.000", "600000.000"])
+        self.assertEqual(lines[0]["usage_prob"], "70")
+        self.assertEqual(lines[1]["usage_prob"], "30")
+        self.assertEqual(lines[0]["ai_strateg"], "1")
+        self.assertNotIn("ai_prio", lines[0])
+        self.assertNotIn("ewahr", lines[0])
+
+    def test_grouped_line_is_not_summed_with_the_same_code(self):
+        formula = self._formula("L-ALT-SAME")
+        raw = self._raw("树脂", "A-SAME-ALT", self.resin)
+        self._group(self._line(formula, raw, "60"), "A", "2", priority=1)
+        self._line(formula, raw, "40", "2_SIDE_1")
+        self._group(
+            self._line(formula, self._raw("填充", "A-FILL-SAME", self.filler), "60"),
+            "A", "2", priority=2,
+        )
+
+        lines = build_sap_lines(
+            formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+            stlst="", stktx="", ztext="", merge_color=False,
+        )
+
+        same = [row for row in lines if row["idnrk"] == "A-SAME-ALT"]
+        self.assertEqual(
+            sorted(row["menge"] for row in same),
+            ["400000.000", "600000.000"],
+        )
+        grouped = next(row for row in same if row["menge"] == "600000.000")
+        plain = next(row for row in same if row["menge"] == "400000.000")
+        self.assertEqual(grouped["ai_group"], "A")
+        self.assertNotIn("ai_group", plain)
+
+    def test_fractional_usage_is_refused(self):
+        formula = self._formula("L-ALT-FRAC")
+        self._group(
+            self._line(formula, self._raw("树脂", "A-RESIN-F", self.resin), "60"),
+            "A", "1", usage="33.33",
+        )
+        self._group(
+            self._line(formula, self._raw("填充", "A-FILL-F", self.filler), "60"),
+            "A", "1", usage="66.67",
+        )
+
+        with self.assertRaisesMessage(FinishedBomPublishError, "整数"):
+            build_sap_lines(
+                formula, bmeng=Decimal("1000"), datuv="2026-10-26",
+                stlst="", stktx="", ztext="", merge_color=False,
+            )

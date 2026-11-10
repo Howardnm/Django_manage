@@ -98,11 +98,55 @@ class FinishedBomApiTests(TestCase):
         self.assertEqual(first["main_lines"][0]["category_name"], "接口-树脂")
         self.assertEqual(first["main_lines"][0]["percentage"], "100.000")
         self.assertFalse(first["main_lines"][0]["missing_sap_code"])
+        self.assertEqual(first["main_lines"][0]["alt_group"], "")
+        self.assertEqual(first["main_lines"][0]["alt_strategy"], "")
+        self.assertEqual(first["main_lines"][0]["alt_strategy_label"], "")
+        self.assertIsNone(first["main_lines"][0]["alt_priority"])
+        self.assertEqual(first["main_lines"][0]["usage_percent"], "")
+        self.assertEqual(second["color_lines"][0]["alt_group"], "")
+        self.assertIsNone(second["color_lines"][0]["alt_priority"])
         self.assertTrue(second["is_mature"])
         self.assertTrue(second["has_color_bom"])
         self.assertEqual(second["color_lines"][0]["percentage"], "0.004936")
         self.assertTrue(loose["unassigned"])
         self.assertEqual(loose["formulas"][0]["code"], "L-LOOSE")
+
+    def test_tree_includes_alternative_group_fields(self):
+        substitute = RawMaterial.objects.create(
+            name="替代树脂", warehouse_code="A-API-ALT", category=self.raw_type,
+        )
+        formula = LabFormula.objects.create(
+            name="替代组版", code="L-ALT-API", material_type=self.material_type,
+            project=self.project, project_node=self.node, version=1, creator=self.user,
+        )
+        FormulaBOM.objects.create(
+            formula=formula, raw_material=self.raw, percentage=Decimal("60"),
+            alt_group="a", alt_strategy="2", alt_priority=1,
+        )
+        FormulaBOM.objects.create(
+            formula=formula, raw_material=substitute, percentage=Decimal("60"),
+            alt_group="A", alt_strategy="1", usage_percent=Decimal("70.00"),
+        )
+
+        response = self.client.get(reverse("finished-bom-list"), {"sap_code": "A-API-01"})
+        stage = response.json()["projects"][0]["nodes"][0]
+        experiment = next(item for item in stage["formulas"] if item["code"] == "L-ALT-API")
+        lines = {
+            row["warehouse_code"]: row
+            for row in experiment["versions"][0]["main_lines"]
+        }
+
+        checked = lines["A-API-RAW"]
+        self.assertEqual(checked["alt_group"], "A")
+        self.assertEqual(checked["alt_strategy"], "2")
+        self.assertEqual(checked["alt_strategy_label"], "100%检查")
+        self.assertEqual(checked["alt_priority"], 1)
+        self.assertEqual(checked["usage_percent"], "")
+        blended = lines["A-API-ALT"]
+        self.assertEqual(blended["alt_strategy"], "1")
+        self.assertEqual(blended["alt_strategy_label"], "按用途可能性")
+        self.assertIsNone(blended["alt_priority"])
+        self.assertEqual(blended["usage_percent"], "70")
 
     def test_plants_skip_inactive(self):
         response = self.client.get(reverse("finished-bom-plants"))
@@ -274,6 +318,8 @@ class FinishedBomApiTests(TestCase):
         html = response.content.decode()
         self.assertIn("成品 BOM 发布 / 下架", html)
         self.assertIn("finished_bom_sync.js", html)
+        self.assertIn("替代组", html)
+        self.assertIn("使用可能性%", html)
         self.assertNotIn("{% verbatim %}", html)
         self.assertIn("csrftoken", response.cookies)
 

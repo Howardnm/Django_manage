@@ -54,6 +54,7 @@
                                         {{ item.raw_material.name }}
                                     </a>
                                     <span class="text-muted small">({{ item.raw_material.model_name }})</span>
+                                    {% if item.alt_label %}<span class="badge bg-orange-lt ms-1">{{ item.alt_label }}</span>{% endif %}
                                 </td>
                                 <td class="fs-3">{{ item.percentage|smart_decimal }}</td>
                                 <td>

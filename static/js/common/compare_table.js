@@ -115,6 +115,10 @@
         } else {
             td.appendChild(el('span', 'fw-bold', v.v));
         }
+        if (v.note) {
+            td.appendChild(document.createTextNode(' '));
+            td.appendChild(el('span', 'badge bg-orange-lt', v.note));
+        }
         return td;
     }
 

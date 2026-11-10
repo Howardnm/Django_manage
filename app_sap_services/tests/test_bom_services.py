@@ -8,6 +8,7 @@ from app_sap_services.exceptions import SAPBusinessError
 from app_sap_services.query.gateway import SAPGateway
 from app_sap_services.services.bom import (
     BomMaintainError,
+    _t_main_row,
     create_bom,
     delete_bom,
     update_bom,
@@ -68,11 +69,27 @@ class MaintainBomTest(SimpleTestCase):
         self.assertNotIn("BMENG", row)
         self.assertNotIn("POTX1", row)
         self.assertNotIn("EWAHR", row)
+        self.assertNotIn("AI_GROUP", row)
         self.assertNotIn("STKTX", row)
         self.assertNotIn("ZTEXT", row)
         self.assertEqual(messages[0]["type"], "S")
         self.assertEqual(messages[0]["text"], "成功")
         self.assertEqual(conn.closed, 1)
+
+    def test_alternative_columns_pass_and_blank_usage_is_omitted(self):
+        row = _t_main_row("A02006000027", "3011", "1", "01", {
+            "POSNR": "0010",
+            "ai_group": "A",
+            "ai_strateg": "2",
+            "ai_prio": "1",
+            "usage_prob": "",
+            "ewahr": "",
+        })
+        self.assertEqual(row["AI_GROUP"], "A")
+        self.assertEqual(row["AI_STRATEG"], "2")
+        self.assertEqual(row["AI_PRIO"], "1")
+        self.assertNotIn("USAGE_PROB", row)
+        self.assertNotIn("EWAHR", row)
 
     def test_update_does_not_read_first(self):
         conn = FakeConnMgr({"T_MSG": [_ok_msg(), {

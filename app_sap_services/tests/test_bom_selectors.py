@@ -87,6 +87,8 @@ class GetBomTest(SimpleTestCase):
             "POTX1": "",
             "EWAHR": Decimal("98"),
             "ALPGR": "A",
+            "ALPST": "2",
+            "ALPRF": "01",
             "DATUV": "20250901",
         }
         raw.update(overrides)
@@ -120,10 +122,13 @@ class GetBomTest(SimpleTestCase):
         item = result["items"][0]
         self.assertEqual(set(item), {
             "stlnr", "stlan", "stlal", "werks", "posnr", "postp", "idnrk",
-            "menge", "meins", "ausch", "potx1", "ewahr", "alpgr", "datuv",
+            "menge", "meins", "ausch", "potx1", "ewahr", "alpgr", "alpst", "alprf", "datuv",
         })
         self.assertEqual(item["menge"], 649.8)
         self.assertEqual(item["ewahr"], 98)
+        self.assertEqual(item["alpgr"], "A")
+        self.assertEqual(item["alpst"], "2")
+        self.assertEqual(item["alprf"], "01")
         self.assertEqual(item["datuv"], "2025-09-01")
 
     def test_emeng_omitted_is_not_sent(self):

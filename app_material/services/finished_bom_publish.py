@@ -3,7 +3,8 @@
 数量口径：用户填的基准数量是公斤，且必须是整数，原样写入 ``bmeng``，不带小数。
 组件数量 ``menge = 份数 / 100 × 基准数量(kg) × 1000``，单位固定 ``G``。
 色粉与主配方量纲相同，勾选合并时接在主 BOM 后面，不重新归一。
-同一 SAP 编码的多行先把份数加总，再换算一次。
+没有替代组时，同一 SAP 编码的多行先把份数加总，再换算一次。
+替代组的每一行单独成组件，份数不拆开，也不和同编码的普通行相加。
 包装袋是可选的额外一行：单位 ``PC``，项目类别与原材料行相同，数量按件数原样写入，不换算、不合并。
 损耗率 ``AUSCH`` 默认 ``1``，不写小数。BOM 状态 ``STLST`` 默认 ``1``。
 """
@@ -123,8 +124,8 @@ def build_sap_lines(
 
     base = _base(bmeng)
     rows = []
-    for index, (code, percentage) in enumerate(collapsed, start=1):
-        rows.append({
+    for index, (code, percentage, alt) in enumerate(collapsed, start=1):
+        row = {
             "posnr": f"{index * 10:04d}",
             "postp": _ITEM_CATEGORY,
             "idnrk": code,
@@ -136,7 +137,10 @@ def build_sap_lines(
             "stktx": stktx,
             "ztext": ztext,
             "ausch": _scrap(ausch),
-        })
+        }
+        if alt:
+            row.update(alt)
+        rows.append(row)
     _append_packaging(
         rows,
         code=packaging_code,
@@ -218,20 +222,55 @@ def _missing_names(entries) -> list[str]:
     return names
 
 
-def _collapse(entries) -> list[tuple[str, Decimal]]:
-    """按 SAP 编码加总份数，保留第一次出现的位置。"""
-    buckets: list[tuple[str, Decimal]] = []
+def _collapse(entries) -> list[tuple[str, Decimal, dict | None]]:
+    """没有替代组的行按 SAP 编码加总，保留第一次出现的位置。
+
+    有替代组的行单独占一格。同编码的普通行、色粉行都不能并进来，
+    否则组号会丢，份数也会被加两次。
+    """
+    buckets: list[tuple[str, Decimal, dict | None]] = []
     index = {}
     for entry in entries:
         code = entry.raw_material.warehouse_code.strip()
+        group = (getattr(entry, "alt_group", None) or "").strip()
+        percentage = Decimal(str(entry.percentage or 0))
+        if group:
+            buckets.append((code, percentage, _alt_fields(entry)))
+            continue
         slot = index.get(code)
         if slot is None:
             index[code] = len(buckets)
-            buckets.append((code, entry.percentage))
+            buckets.append((code, percentage, None))
         else:
             previous = buckets[slot]
-            buckets[slot] = (previous[0], previous[1] + entry.percentage)
+            buckets[slot] = (previous[0], previous[1] + percentage, None)
     return buckets
+
+
+def _alt_fields(entry) -> dict:
+    """只放有值的替代列。策略 2 不带使用可能性，策略 1 不带优先级。"""
+    group = (entry.alt_group or "").strip().upper()
+    strategy = (entry.alt_strategy or "").strip()
+    if strategy not in ("1", "2"):
+        raise FinishedBomPublishError(f"替代组 {group} 没有策略。")
+    fields = {"ai_group": group, "ai_strateg": strategy}
+    if strategy == "2":
+        fields["ai_prio"] = str(int(entry.alt_priority))
+        return fields
+    if entry.usage_percent is None:
+        raise FinishedBomPublishError(f"替代组 {group} 没有使用可能性。")
+    usage = Decimal(str(entry.usage_percent))
+    if usage != usage.to_integral_value():
+        raise FinishedBomPublishError(
+            f"替代组 {group} 的使用可能性必须是整数，现在是 {usage}。"
+        )
+    text = str(int(usage))
+    if len(text) > 3:
+        raise FinishedBomPublishError(
+            f"替代组 {group} 的使用可能性超出 3 位，现在是 {text}。"
+        )
+    fields["usage_prob"] = text
+    return fields
 
 
 def _base(value) -> str:

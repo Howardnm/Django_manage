@@ -377,6 +377,10 @@ class MaterialBomMaintain(RfcSchema):
         "STLST",   # BOM 状态 (BTCI)
         "AUSCH",   # 部件废品用百分比表示(BTCI)
         "DATUV",   # 有效期自。CHAR 10，不是读取接口的 8 位 YYYYMMDD
+        "AI_GROUP",    # 替代项目：组。CHAR 2
+        "AI_STRATEG",  # 替代项目：策略。CHAR 1
+        "AI_PRIO",     # 备选项目：分类订单。CHAR 2
+        "USAGE_PROB",  # 使用可能性 %。CHAR 3。旧列 EWAHR 不传
     )
 
     # ---- Import ----

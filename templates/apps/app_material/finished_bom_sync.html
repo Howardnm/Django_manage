@@ -148,7 +148,7 @@
         </el-card>
     </div>
 
-    <el-dialog v-model="localOpen" title="成品 BOM" width="1100px" destroy-on-close>
+    <el-dialog v-model="localOpen" title="成品 BOM" width="1360px" destroy-on-close>
         <div class="dialog-grid" v-if="current">
             <div>
                 <div class="section-title">主 BOM</div>
@@ -158,6 +158,10 @@
                     <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
                     <el-table-column prop="warehouse_code" label="SAP 编码" width="140"></el-table-column>
                     <el-table-column prop="percentage" label="份数" width="90"></el-table-column>
+                    <el-table-column prop="alt_group" label="替代组" width="80"></el-table-column>
+                    <el-table-column prop="alt_strategy_label" label="策略" width="120"></el-table-column>
+                    <el-table-column prop="alt_priority" label="优先级" width="80"></el-table-column>
+                    <el-table-column prop="usage_percent" label="使用可能性%" width="110"></el-table-column>
                 </el-table>
                 <template v-if="current.has_color_bom">
                     <div class="section-title">色粉 BOM</div>
@@ -177,6 +181,10 @@
                     <el-table-column prop="model_name" label="型号" width="140"></el-table-column>
                     <el-table-column prop="menge" label="数量" width="120"></el-table-column>
                     <el-table-column prop="meins" label="单位" width="80"></el-table-column>
+                    <el-table-column prop="alt_group" label="替代组" width="80"></el-table-column>
+                    <el-table-column prop="alt_strategy_label" label="策略" width="120"></el-table-column>
+                    <el-table-column prop="alt_priority" label="优先级" width="80"></el-table-column>
+                    <el-table-column prop="usage_percent" label="使用可能性%" width="110"></el-table-column>
                 </el-table>
             </div>
             <div>
@@ -289,7 +297,7 @@
         </el-table>
     </el-dialog>
 
-    <el-dialog v-model="sapOpen" title="SAP BOM" width="1280px">
+    <el-dialog v-model="sapOpen" title="SAP BOM" width="1480px">
         <template v-if="sapCurrent">
             <p class="hint">{{ sapCurrent.werks }} / 用途 {{ sapCurrent.stlan }} / 可选 {{ sapCurrent.stlal }}</p>
             <el-table class="sap-bom-table" :data="sapCurrent.items" size="small" border>
@@ -299,6 +307,18 @@
                 <el-table-column prop="menge" label="数量" width="120"></el-table-column>
                 <el-table-column prop="meins" label="单位" width="80"></el-table-column>
                 <el-table-column prop="postp" label="类别" width="80"></el-table-column>
+                <el-table-column label="替代组" width="80">
+                    <template #default="{ row }">{{ cellText(row.alpgr) }}</template>
+                </el-table-column>
+                <el-table-column label="策略" width="120">
+                    <template #default="{ row }">{{ sapStrategy(row) }}</template>
+                </el-table-column>
+                <el-table-column label="优先级" width="80">
+                    <template #default="{ row }">{{ sapPriority(row) }}</template>
+                </el-table-column>
+                <el-table-column label="使用可能性%" width="110">
+                    <template #default="{ row }">{{ sapUsage(row) }}</template>
+                </el-table-column>
                 <el-table-column prop="potx1" label="文本" min-width="160"></el-table-column>
             </el-table>
             <div style="margin-top: 12px">
@@ -312,6 +332,6 @@
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/locale/zh-cn.js' %}"></script>
 <script>window.__FINISHED_BOM_SAP_CODE__ = "{{ initial_sap_code|escapejs }}";</script>
-<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=25"></script>
+<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=27"></script>
 </body>
 </html>

@@ -13,17 +13,22 @@ class FormulaBOMSerializer(serializers.ModelSerializer):
     percentage = FloatDecimalField()
     feeding_port = serializers.CharField(source="get_feeding_port_display", read_only=True)
     weighing_scale = serializers.CharField(source="get_weighing_scale_display", read_only=True)
+    alt_priority = serializers.IntegerField(allow_null=True)
+    usage_percent = FloatDecimalField()
 
     class Meta:
         model = FormulaBOM
         fields = (
             "raw_material", "model", "category", "percentage",
             "feeding_port", "weighing_scale", "is_pre_mix",
+            "alt_group", "alt_strategy", "alt_priority", "usage_percent",
         )
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
         data["model"] = blank_to_none(data.get("model"))
+        data["alt_group"] = blank_to_none(data.get("alt_group"))
+        data["alt_strategy"] = blank_to_none(data.get("alt_strategy"))
         return data
 
 

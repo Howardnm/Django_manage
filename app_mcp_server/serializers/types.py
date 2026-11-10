@@ -119,6 +119,10 @@ class FormulaBOMOut(TypedDict):
     feeding_port: str
     weighing_scale: str
     is_pre_mix: bool
+    alt_group: NotRequired[str | None]
+    alt_strategy: NotRequired[str | None]
+    alt_priority: NotRequired[int | None]
+    usage_percent: NotRequired[float | None]
 
 
 class FormulaTestOut(TypedDict):

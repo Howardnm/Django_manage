@@ -23,10 +23,10 @@ from app_sap_services.definitions.bom import MaterialBomMaintain
 msgs = sap.rfc(MaterialBomMaintain).filter(
     i_type="M",
     t_main=[{
-        "MATNR": "A02006000027",   # 物料编号
+        "MATNR": "A02006000637",   # 物料编号
         "WERKS": "3011",   # 工厂
         "STLAN": "1",   # BOM 用途
-        "STLAL": "05",   # 可选的 BOM
+        "STLAL": "07",   # 可选的 BOM
         "BMENG": "1000",   # 基准数量(BTCI)
         "STLST": "1",
         "POSNR": "0010",   # BOM 项目号
@@ -36,7 +36,31 @@ msgs = sap.rfc(MaterialBomMaintain).filter(
         "MEINS": "G",   # 组件计量单位
         "AUSCH": "1",
         "DATUV": "2026-10-26",
-    }],
+        "AI_GROUP": "A",  # 替代项目：组。CHAR 2
+        "AI_STRATEG": "2",  # 替代项目：策略。CHAR 1
+        "AI_PRIO": "1",  # 备选项目：分类订单。CHAR 2
+        "USAGE_PROB": "6",  # 使用可能性 %。CHAR 3。旧列 EWAHR 不传
+    },
+        {
+        "MATNR": "A02006000637",  # 物料编号
+        "WERKS": "3011",  # 工厂
+        "STLAN": "1",  # BOM 用途
+        "STLAL": "07",  # 可选的 BOM
+        "BMENG": "1000",  # 基准数量(BTCI)
+        "STLST": "1",
+        "POSNR": "0020",  # BOM 项目号
+        "POSTP": "L",  # 项目类别（物料单）
+        "IDNRK": "A01002000017",  # 带有转换MATN2的组件(BTCI)
+        "MENGE": "88.800",  # 组件数量 (BTCI)
+        "MEINS": "G",  # 组件计量单位
+        "AUSCH": "1",
+        "DATUV": "2026-10-26",
+        "AI_GROUP": "A",  # 替代项目：组。CHAR 2
+        "AI_STRATEG": "2",  # 替代项目：策略。CHAR 1
+        "AI_PRIO": "2",  # 备选项目：分类订单。CHAR 2
+        "USAGE_PROB": "94",  # 使用可能性 %。CHAR 3。旧列 EWAHR 不传
+    }
+    ],
 ).call()
 for msg in msgs:
     print(msg.TYPE, msg.MESSAGE)

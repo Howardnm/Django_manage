@@ -17,7 +17,11 @@ from app_color_center.models import ColorMatchingTask
 from app_project.models import Project, ProjectStage
 from app_formula.models import LabFormula, ColorPowderBOM
 from app_color_center.forms import ColorPowderBOMForm, ColorPowderBOMEntryFormSet
-from app_color_center.services import ColorMatchingTaskService, check_order_bom_complete, batch_copy_bom
+from app_color_center.services import (
+    ColorMatchingTaskService, batch_copy_bom, check_order_bom_complete,
+    color_bom_counts_as_filled, confirmed_color_formula_ids,
+    formula_has_open_color_task,
+)
 from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
@@ -33,15 +37,28 @@ COLOR_TASK_STATUS_TABS = [
 ]
 
 
+def _order_color_task(formula_details_qs):
+    """明细来自同一张工单时，取出它的配色任务。没有任务则 None。"""
+    order = getattr(formula_details_qs, 'instance', None)
+    if order is None:
+        return None
+    return getattr(order, 'color_task', None)
+
+
 def _first_unfilled_formula(formula_details_qs):
-    """首个『未填写色粉BOM』且带 project_node 的配方（用于跳转定位）；无则 None。"""
+    """首个『色粉还没确认』且带 project_node 的配方（用于跳转定位）；无则 None。
+
+    未完成的配色任务下发之前填的明细，不算已确认。
+    """
+    task = _order_color_task(formula_details_qs)
     for fd in formula_details_qs.filter(needs_color_matching=True):
         formula = LabFormula.objects.filter(
-            pk=fd.formula_id).select_related('project_node').first()
+            pk=fd.formula_id).select_related(
+                'project_node', 'color_powder_bom',
+            ).first()
         if not formula or not formula.project_node:
             continue  # 无 project_node 的配方无法在 fill 页定位，跳过
-        bom = getattr(formula, 'color_powder_bom', None)
-        if not bom or not bom.entries.exists():
+        if not color_bom_counts_as_filled(formula, task):
             return formula
     return None
 
@@ -234,16 +251,12 @@ class _ColorProjectContextMixin:
         all_formulas = self._fetch_formulas(project, material)
         stage_round_items, all_stage_formulas = self._build_stage_groups(all_formulas)
 
-        # 预计算哪些配方需要配色（关联的工单有 needs_color_matching=True）
-        from app_trial_production.models import ProductionOrderFormulaDetail
-        # 仅允许那些关联工单已下发配色任务（ColorMatchingTask 已创建）的配方
-        color_formula_ids = set(
-            ProductionOrderFormulaDetail.objects.filter(
-                formula__project=project,
-                needs_color_matching=True,
-                production_order__color_task__isnull=False,
-            ).values_list('formula_id', flat=True).distinct()
-        )
+        # 本项目实验单都能补色粉，不看有没有工单、有没有勾需要配色。
+        # 别的项目带过来的历史配方不在这里。
+        color_formula_ids = {
+            formula.pk for formula in all_formulas
+            if formula.project_id == project.pk
+        }
 
         return {
             'project': project,
@@ -252,6 +265,7 @@ class _ColorProjectContextMixin:
             'all_stage_formulas': all_stage_formulas,
             'all_formulas': all_formulas,
             'color_formula_ids': color_formula_ids,
+            'confirmed_color_formula_ids': confirmed_color_formula_ids(all_formulas),
         }
 
 
@@ -308,12 +322,14 @@ class TaskListView(ColorCenterAccessMixin, ListView):
         for o in page_obj:
             total = 0
             done = 0
+            task = getattr(o, 'color_task', None)
             for fd in o.formula_details.filter(needs_color_matching=True):
                 total += 1
                 formula = LabFormula.objects.filter(
-                    pk=fd.formula_id).select_related('project_node').first()
-                bom = getattr(formula, 'color_powder_bom', None)
-                if bom and bom.entries.exists():
+                    pk=fd.formula_id).select_related(
+                        'project_node', 'color_powder_bom',
+                    ).first()
+                if formula and color_bom_counts_as_filled(formula, task):
                     done += 1
             order_stats[o.pk] = {'total': total, 'done': done}
             order_redirect_params[o.pk] = _fill_redirect_params(
@@ -333,14 +349,11 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
     paginate_by = 10
 
     def get_queryset(self):
-        # 配色中心已关闭部门隔离（enforce_dept_isolation=False），此处按角色全量可见，无需 L4 过滤
-        project_ids = ProductionOrder.objects.filter(
-            formula_details__needs_color_matching=True,
-            status__in=[ProductionOrder.Status.EXTRUDING,
-                        ProductionOrder.Status.INJECTION_MOLDING,
-                        ProductionOrder.Status.TESTING],
-            project__isnull=False,
-        ).values_list('project_id', flat=True).distinct()
+        # 配色中心已关闭部门隔离（enforce_dept_isolation=False），此处按角色全量可见，无需 L4 过滤。
+        # 有关联配方的项目都列出，不看有没有工单、也不看是否勾了需要配色。
+        project_ids = LabFormula.objects.exclude(
+            project_id=None,
+        ).values('project_id')
         qs = Project.objects.filter(
             pk__in=project_ids,
         ).select_related('manager', 'material')
@@ -359,24 +372,29 @@ class ProjectListPageView(ColorCenterAccessMixin, ListView):
 
     @staticmethod
     def _compute_project_stats(page_obj):
-        project_stats = {}
-        for p in page_obj:
-            orders = ProductionOrder.objects.filter(
-                project=p,
-                formula_details__needs_color_matching=True,
-            ).distinct()
-            total = 0
-            done = 0
-            for o in orders:
-                for fd in o.formula_details.filter(needs_color_matching=True):
-                    total += 1
-                    bom = getattr(
-                        LabFormula.objects.filter(pk=fd.formula_id).first(),
-                        'color_powder_bom', None,
-                    )
-                    if bom and bom.entries.exists():
-                        done += 1
-            project_stats[p.pk] = {'total': total, 'done': done}
+        """分母是项目工单里勾了「需要配色」的配方明细数，分子是其中已确认的。"""
+        from app_trial_production.models import ProductionOrderFormulaDetail
+
+        projects = list(page_obj)
+        if not projects:
+            return {}
+        details = ProductionOrderFormulaDetail.objects.filter(
+            production_order__project__in=projects,
+            needs_color_matching=True,
+        ).select_related(
+            'production_order__color_task',
+        ).prefetch_related('formula__color_powder_bom__entries')
+        project_stats = {
+            project.pk: {'total': 0, 'done': 0} for project in projects
+        }
+        for detail in details:
+            stats = project_stats.get(detail.production_order.project_id)
+            if stats is None:
+                continue
+            stats['total'] += 1
+            task = getattr(detail.production_order, 'color_task', None)
+            if color_bom_counts_as_filled(detail.formula, task):
+                stats['done'] += 1
         return project_stats
 
 
@@ -426,10 +444,15 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
         readonly = False
         if selected_formula:
             bom = getattr(selected_formula, 'color_powder_bom', None)
+            # 还挂着未完成的配色任务时，有写权限直接进编辑，不必再点「修改」。
+            open_task = (
+                not compare_mode
+                and formula_has_open_color_task(selected_formula)
+            )
             if bom:
                 bom_entries = bom.entries.select_related('raw_material__category').order_by('id')
                 # 有写权限且显式进入编辑态时才展示表单，否则只读
-                if can_write and request.GET.get('edit') == '1':
+                if can_write and (request.GET.get('edit') == '1' or open_task):
                     bom_form = ColorPowderBOMForm(instance=bom)
                     entry_formset = ColorPowderBOMEntryFormSet(instance=bom, prefix='entries')
                     readonly = False
@@ -464,6 +487,7 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
             'readonly': readonly,
             'can_write': can_write,
             'color_formula_ids': ctx['color_formula_ids'],
+            'confirmed_color_formula_ids': ctx['confirmed_color_formula_ids'],
         }
         return render(request, self.template_name, context)
 
@@ -481,16 +505,6 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
         self.check_object_permission(project)
         if selected_formula.project_id != project.pk:
             raise PermissionDenied("配方不属于当前项目")
-
-        # 仅允许为已下发配色任务的配方提交 BOM
-        from app_trial_production.models import ProductionOrderFormulaDetail
-        has_color_task = ProductionOrderFormulaDetail.objects.filter(
-            formula=selected_formula,
-            needs_color_matching=True,
-            production_order__color_task__isnull=False,
-        ).exists()
-        if not has_color_task:
-            raise PermissionDenied("该配方关联的工单未下发配色任务，不允许提交色粉BOM")
 
         # 绑定到已有 BOM（或带 formula 的未保存实例），待校验通过后才真正落库，
         # 避免校验失败时留下 0 条目的空 BOM。
@@ -535,8 +549,16 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
                         task = ColorMatchingTask.objects.get(production_order_id=order_id)
                     except ColorMatchingTask.DoesNotExist:
                         continue
-                    # 已经完成的跳过
-                    if task.status == ColorMatchingTask.Status.COMPLETED:
+                    # 已经完成的跳过。没勾需要配色的工单也不推进：
+                    # 那种工单没有需配色明细，完成检查会空过，误判成配色完成。
+                    if task.status in (
+                        ColorMatchingTask.Status.COMPLETED,
+                        ColorMatchingTask.Status.NOT_REQUIRED,
+                    ):
+                        continue
+                    if not task.production_order.formula_details.filter(
+                        needs_color_matching=True,
+                    ).exists():
                         continue
                     if task.status == ColorMatchingTask.Status.PENDING:
                         try:
@@ -612,4 +634,5 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
             'bom_entries': bom_entries,
             'readonly': False,
             'color_formula_ids': ctx['color_formula_ids'],
+            'confirmed_color_formula_ids': ctx['confirmed_color_formula_ids'],
         })

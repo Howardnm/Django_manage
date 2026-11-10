@@ -1,5 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
+from app_formula.services.alt_groups import AltGroupError, validate_alt_rows
 from common_utils.filters import TablerFormMixin
 from common_utils.forms import RgbColorWidget
 from .models import LabFormula, FormulaBOM, FormulaTestResult
@@ -131,13 +132,26 @@ class LabFormulaForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
 class FormulaBOMForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     class Meta:
         model = FormulaBOM
-        fields = ['feeding_port', 'weighing_scale', 'raw_material', 'percentage', 'is_tail', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time']
+        fields = [
+            'feeding_port', 'weighing_scale', 'raw_material', 'percentage',
+            'alt_group', 'alt_strategy', 'alt_priority', 'usage_percent',
+            'is_tail', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time',
+        ]
         widgets = {
             'feeding_port': forms.Select(attrs={'class': 'form-select'}),
             'weighing_scale': forms.Select(attrs={'class': 'form-select'}),
             'raw_material': forms.Select(attrs={'class': 'form-select remote-search', 'data-model': 'raw_material'}),
             'percentage': forms.NumberInput(attrs={'step': '0.01'}),
+            'alt_group': forms.TextInput(attrs={'maxlength': '2', 'class': 'form-control', 'placeholder': 'A'}),
+            'alt_strategy': forms.Select(attrs={'class': 'form-select'}),
+            'alt_priority': forms.NumberInput(attrs={'min': '1', 'max': '3', 'step': '1'}),
+            'usage_percent': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'max': '100'}),
         }
+
+    def clean(self):
+        cleaned = super().clean()
+        cleaned['alt_group'] = (cleaned.get('alt_group') or '').strip().upper()
+        return cleaned
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -311,11 +325,30 @@ class BaseFormulaTestResultFormSet(BaseInlineFormSet):
                             '测试项目"%s"已存在于此配方中，请勿重复添加。' % tc.name
                         )
 
+class BaseFormulaBOMFormSet(BaseInlineFormSet):
+    def clean(self):
+        super().clean()
+        if any(self.errors):
+            return
+        rows = []
+        for form in self.forms:
+            if not getattr(form, 'cleaned_data', None) or form.cleaned_data.get('DELETE'):
+                continue
+            if not form.cleaned_data.get('raw_material'):
+                continue
+            rows.append(form.cleaned_data)
+        try:
+            validate_alt_rows(rows)
+        except AltGroupError as exc:
+            raise forms.ValidationError(str(exc)) from exc
+
+
 # 定义 FormSet
 FormulaBOMFormSet = inlineformset_factory(
     LabFormula,
     FormulaBOM,
     form=FormulaBOMForm,
+    formset=BaseFormulaBOMFormSet,
     extra=0,
     can_delete=True
 )

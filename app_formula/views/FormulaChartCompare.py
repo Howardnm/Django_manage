@@ -91,9 +91,12 @@ class FormulaChartDataAPI(FormulaAccessMixin, TemplateView):
             for f in formulas:
                 x_val, y_val = None, None
                 
+                marks = []
                 if x_axis_type == 'raw_material':
                     bom_line = f.bom_lines.filter(raw_material_id=x_axis_id).first()
                     x_val = bom_line.percentage if bom_line else 0
+                    if bom_line and bom_line.alt_label:
+                        marks.append(bom_line.alt_label)
                 elif x_axis_type == 'test_config':
                     test_res = f.test_results.filter(test_config_id=x_axis_id, production_order__isnull=True).first()
                     x_val = test_res.value if test_res else None
@@ -101,15 +104,17 @@ class FormulaChartDataAPI(FormulaAccessMixin, TemplateView):
                 if y_axis_type == 'raw_material':
                     bom_line = f.bom_lines.filter(raw_material_id=y_axis_id).first()
                     y_val = bom_line.percentage if bom_line else 0
+                    if bom_line and bom_line.alt_label and bom_line.alt_label not in marks:
+                        marks.append(bom_line.alt_label)
                 elif y_axis_type == 'test_config':
                     test_res = f.test_results.filter(test_config_id=y_axis_id, production_order__isnull=True).first()
                     y_val = test_res.value if test_res else None
-                
+
                 if x_val is not None and y_val is not None:
                     current_series_data.append({
                         'x': float(x_val),
                         'y': float(y_val),
-                        'name': f.code,
+                        'name': f.code if not marks else f"{f.code} {' '.join(marks)}",
                         'formula_id': f.id
                     })
             

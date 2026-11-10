@@ -27,29 +27,48 @@ def build_compare_matrices(columns):
     formula_columns = [c for c in columns if c['type'] == 'formula']
 
     # ---- BOM 对比矩阵（仅配方有 BOM） ----
+    # 一行一个原料。替代组不合并格子，只在格子上带标记，并把同一组排在一起。
     all_raw_materials = set()
-    bom_map = {}  # {formula_id: {raw_material_id: percentage}}
+    bom_map = {}  # {formula_id: {raw_material_id: {percentage, alt_mark, alt_group}}}
     for c in formula_columns:
         f = c['obj']
         bom_map[f.id] = {}
         for line in f.bom_lines.all():
             all_raw_materials.add(line.raw_material)
-            bom_map[f.id][line.raw_material_id] = line.percentage
-    sorted_raw_materials = sorted(all_raw_materials, key=lambda x: (x.category.order, x.name))
+            bom_map[f.id][line.raw_material_id] = {
+                'percentage': line.percentage,
+                'alt_mark': line.alt_label,
+                'alt_group': (line.alt_group or '').strip().upper(),
+            }
+    group_of = {}
+    for per_formula in bom_map.values():
+        for raw_id, cell in per_formula.items():
+            if cell['alt_group'] and not group_of.get(raw_id):
+                group_of[raw_id] = cell['alt_group']
+    sorted_raw_materials = sorted(
+        all_raw_materials,
+        key=lambda x: (
+            0 if group_of.get(x.id) else 1,
+            group_of.get(x.id, ''),
+            x.category.order,
+            x.name,
+        ),
+    )
 
     bom_matrix = []
     for rm in sorted_raw_materials:
         row = {'item': rm, 'values': []}
         for c in columns:
             if c['type'] == 'formula':
-                pct = bom_map.get(c['obj'].id, {}).get(rm.id)
+                cell = bom_map.get(c['obj'].id, {}).get(rm.id)
                 row['values'].append({
-                    'val': pct if pct is not None else '-',
-                    'is_empty': pct is None,
+                    'val': cell['percentage'] if cell else '-',
+                    'is_empty': cell is None,
+                    'alt_mark': cell['alt_mark'] if cell else '',
                 })
             else:
                 # 材料/原材料没有 BOM
-                row['values'].append({'val': '-', 'is_empty': True})
+                row['values'].append({'val': '-', 'is_empty': True, 'alt_mark': ''})
         bom_matrix.append(row)
 
     # ---- 色粉BOM 对比矩阵（仅配方有） ----

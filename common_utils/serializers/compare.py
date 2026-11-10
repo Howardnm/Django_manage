@@ -36,6 +36,7 @@ class CompareValueSerializer(serializers.Serializer):
     cls = serializers.CharField(allow_blank=True, default='', required=False)  # text-green / text-red
     base = serializers.BooleanField(default=False, required=False)          # 基准列高亮
     url = serializers.CharField(allow_blank=True, default='', required=False)  # 可选跳转链接
+    note = serializers.CharField(allow_blank=True, default='', required=False)  # 替代组短标记
 
 
 class CompareRowSerializer(serializers.Serializer):
@@ -113,8 +114,8 @@ def as_plain(data):
     return data
 
 
-def _val(v='-', empty=True, cls='', base=False, url=''):
-    return {'v': v, 'empty': empty, 'cls': cls, 'base': base, 'url': url}
+def _val(v='-', empty=True, cls='', base=False, url='', note=''):
+    return {'v': v, 'empty': empty, 'cls': cls, 'base': base, 'url': url, 'note': note}
 
 
 def _row(label, label2, unit, values, label2_url='', label2_sap='', label2_price=''):
@@ -314,7 +315,8 @@ def serialize_compare(columns, matrices, avg_months, project=None, cost_calc=Non
     for row in bom_matrix:
         rm = row['item']
         values = [_val(_fmt(cell['val']) if not cell['is_empty'] else '-',
-                       empty=cell['is_empty']) for cell in row['values']]
+                       empty=cell['is_empty'], note=cell.get('alt_mark') or '')
+                  for cell in row['values']]
         name2 = f"{rm.name} {rm.model_name}".strip() if getattr(rm, 'model_name', None) else rm.name
         price = prices.latest(rm.pk)
         bom_rows.append(_row(

@@ -5,7 +5,11 @@ from .models import LabFormula, FormulaBOM, FormulaTestResult
 class FormulaBOMInline(admin.TabularInline):
     model = FormulaBOM
     extra = 0
-    fields = ('feeding_port', 'weighing_scale', 'raw_material', 'percentage', 'is_pre_mix', 'pre_mix_order', 'pre_mix_time', 'is_tail')
+    fields = (
+        'feeding_port', 'weighing_scale', 'raw_material', 'percentage',
+        'alt_group', 'alt_strategy', 'alt_priority', 'usage_percent',
+        'is_pre_mix', 'pre_mix_order', 'pre_mix_time', 'is_tail',
+    )
     ordering = ('feeding_port', 'weighing_scale', 'raw_material__category__order', 'raw_material__name')
 
 # 2. 测试结果内联

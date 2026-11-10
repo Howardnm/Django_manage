@@ -197,4 +197,21 @@ def _entry_payload(entry, *, precise=False) -> dict:
         "weighing_scale": entry.weighing_scale,
         "weighing_scale_label": entry.get_weighing_scale_display(),
         "missing_sap_code": not code,
+        **_alt_payload(entry),
+    }
+
+
+def _alt_payload(entry) -> dict:
+    """色粉行没有这四列，读出来是空。空优先级、空使用可能性不要写成 0。"""
+    group = (getattr(entry, "alt_group", None) or "").strip().upper()
+    strategy = (getattr(entry, "alt_strategy", None) or "").strip()
+    priority = getattr(entry, "alt_priority", None)
+    usage = getattr(entry, "usage_percent", None)
+    labels = dict(FormulaBOM.AltStrategy.choices)
+    return {
+        "alt_group": group,
+        "alt_strategy": strategy,
+        "alt_strategy_label": labels.get(strategy, ""),
+        "alt_priority": priority,
+        "usage_percent": "" if usage is None else exact_decimal(usage),
     }

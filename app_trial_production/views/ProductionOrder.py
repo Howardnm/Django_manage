@@ -13,6 +13,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 
 from app_formula.models import LabFormula
+from app_formula.services.alt_groups import dose_index, dose_shares
 from app_material.models import TestConfig
 from app_mold_injection.models import MoldRequirement, MoldRequirementFormulaDetail, MoldType
 from app_project.models import Project
@@ -44,16 +45,15 @@ def _build_merged_bom(formulas, details_map=None):
     rows = []
     formula_totals = {f.pk: 0 for f in formulas}
     grand_total = 0
-    for base_line in base_formula.bom_lines.all():
+    # 行骨架只用基准配方实际领用的那几笔。策略 2 不含优先级 2、3。
+    indexes = {f.pk: dose_index(list(f.bom_lines.all())) for f in formulas}
+    for base_line, _share in dose_shares(list(base_formula.bom_lines.all())):
         raw_id = base_line.raw_material_id
         pct_columns = []
         row_total = 0
         for f in formulas:
-            pct = ''
-            for bl in f.bom_lines.all():
-                if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
-                    pct = bl.percentage
-                    break
+            share = indexes[f.pk].get((raw_id, base_line.feeding_port))
+            pct = share if share is not None else ''
             fd = details_map.get(f.pk)
             planned_qty = float(fd.planned_quantity) if fd else 0
             pct_val = float(pct) if pct else 0
@@ -68,6 +68,7 @@ def _build_merged_bom(formulas, details_map=None):
         rows.append({
             'feeding_port': base_line.get_feeding_port_display(),
             'raw_material': base_line.raw_material,
+            'alt_label': base_line.alt_label,
             'is_pre_mix': base_line.is_pre_mix,
             'pre_mix_order': base_line.pre_mix_order,
             'pre_mix_time': base_line.pre_mix_time,
@@ -90,16 +91,13 @@ def _build_bom_data(formulas):
         return {'formulas': [], 'rows': []}
     rows = []
     base_formula = formulas[0]
-    for base_line in base_formula.bom_lines.all():
+    indexes = {f.pk: dose_index(list(f.bom_lines.all())) for f in formulas}
+    for base_line, _share in dose_shares(list(base_formula.bom_lines.all())):
         raw_id = base_line.raw_material_id
         percentages = {}
         for f in formulas:
-            pct = 0
-            for bl in f.bom_lines.all():
-                if bl.raw_material_id == raw_id and bl.feeding_port == base_line.feeding_port:
-                    pct = float(bl.percentage)
-                    break
-            percentages[str(f.pk)] = pct
+            share = indexes[f.pk].get((raw_id, base_line.feeding_port))
+            percentages[str(f.pk)] = float(share) if share is not None else 0
         rows.append({'percentages': percentages})
     return {
         'formulas': [{'pk': str(f.pk), 'version': f.version} for f in formulas],

@@ -35,6 +35,9 @@ class LabFormula(models.Model):
     # 客户竞品标记
     is_competitor = models.BooleanField("客户竞品", default=False, help_text="客户竞品配方（由竞品工单自动创建，跳过挤出直达注塑）")
 
+    # 第一次保存时定下来。编辑页只认它，不再看地址栏。
+    is_group_mode = models.BooleanField("组合料模式", default=False)
+
     # 版本号
     version = models.PositiveIntegerField("版本号", default=1, help_text="同一项目+节点的配方版本序号")
 
@@ -240,12 +243,34 @@ class AbstractBOMEntry(models.Model):
 
 class FormulaBOM(AbstractBOMEntry):
     """配方 BOM 明细行"""
+
+    class AltStrategy(models.TextChoices):
+        USAGE = '1', '按用途可能性'
+        CHECK = '2', '100%检查'
+
     formula = models.ForeignKey(LabFormula, on_delete=models.CASCADE, related_name='bom_lines')
     is_tail = models.BooleanField("是否尾料", default=False, help_text="是否为上一批次的尾料回掺")
+    # 空着就是普通行，份数照加。同一组的每一行都写该位置的完整份数。
+    alt_group = models.CharField("替代组", max_length=2, blank=True, default='')
+    alt_strategy = models.CharField("替代策略", max_length=1, blank=True, default='', choices=AltStrategy.choices)
+    alt_priority = models.PositiveSmallIntegerField("优先级", null=True, blank=True)
+    usage_percent = models.DecimalField("使用可能性%", max_digits=5, decimal_places=2, null=True, blank=True)
 
     class Meta:
         verbose_name = "BOM明细"
         ordering = ['feeding_port', 'weighing_scale', 'raw_material__category__order', 'raw_material__name']
+
+    @property
+    def alt_label(self):
+        """给详情、对比、图表用的短标记。没有替代组时是空串。"""
+        group = (self.alt_group or '').strip()
+        if not group:
+            return ''
+        if self.alt_strategy == self.AltStrategy.CHECK:
+            return f'{group}·{self.alt_priority}'
+        if self.usage_percent is not None:
+            return f'{group}·{self.usage_percent}%'
+        return f'{group}'
 
 
 # 3. 实验物性结果 (Test Result)

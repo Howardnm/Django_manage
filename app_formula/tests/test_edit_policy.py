@@ -15,6 +15,7 @@ from app_material.models import MaterialType
 from app_formula.models import LabFormula
 from app_formula.services import FormulaEditPolicy, FormulaVersionError
 from app_project.models import Project, ProjectNode, ProjectStage
+from app_raw_material.models import RawMaterial, RawMaterialType
 from app_mold_injection.models import (
     MoldRequirement, MoldRequirementFormulaDetail, MoldType)
 from app_trial_production.models import ProductionOrder, ProductionOrderFormulaDetail
@@ -93,6 +94,68 @@ class SingleVersionEditCodeTests(TestCase):
         self.assertEqual(
             self.formula.code, 'T-0001',
             '编辑配方不得改变实验单号（重新生成单号会拆散实验单的版本分组）')
+
+    def test_group_mode_cannot_add_a_version(self):
+        """组合物料一次只编辑当前版本，不能再开空版本。"""
+        self.formula.is_group_mode = True
+        self.formula.save(update_fields=['is_group_mode'])
+        page = self.client.get(reverse('formula_edit', kwargs={'pk': self.formula.pk}))
+        self.assertNotContains(page, 'add_empty_version')
+        self.assertNotContains(page, '>新版本<')
+
+        resp = self.client.post(
+            reverse('formula_edit', kwargs={'pk': self.formula.pk}),
+            _edit_post(add_empty_version='1', edit_mode='group', material_type=self.mt.pk),
+            follow=True,
+        )
+        self.assertRedirects(resp, reverse('formula_edit', kwargs={'pk': self.formula.pk}))
+        self.assertEqual(LabFormula.objects.filter(code='T-0001').count(), 1)
+        self.assertContains(resp, '组合物料模式不能新增版本')
+
+    def test_saved_group_sheet_ignores_the_address_bar_and_an_extra_column(self):
+        """保存成组合料之后，不带参数也是组合表，多塞一列也不会开出版本。"""
+        self.formula.is_group_mode = True
+        self.formula.save(update_fields=['is_group_mode'])
+
+        page = self.client.get(reverse('formula_edit', kwargs={'pk': self.formula.pk}))
+        self.assertContains(page, '>替代组<')
+        self.assertNotContains(page, '>组合物料<')
+        self.assertNotContains(page, '>多版本并排<')
+        self.assertNotContains(page, 'id="add-pct-col"')
+
+        resp = self.client.post(
+            reverse('formula_edit', kwargs={'pk': self.formula.pk}),
+            _edit_post(
+                material_type=self.mt.pk,
+                column_formula_ids=[str(self.formula.pk), ''],
+            ),
+        )
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(LabFormula.objects.filter(code='T-0001').count(), 1)
+        self.formula.refresh_from_db()
+        self.assertTrue(self.formula.is_group_mode)
+
+    def test_saved_side_by_side_sheet_cannot_be_switched_into_group_mode(self):
+        """并排单带上 mode=group 或 edit_mode=group，仍按列保存，并开出新版本。"""
+        page = self.client.get(
+            reverse('formula_edit', kwargs={'pk': self.formula.pk}) + '?mode=group')
+        self.assertContains(page, 'id="add-pct-col"')
+        self.assertNotContains(page, '>替代组<')
+        self.assertNotContains(page, '>组合物料<')
+
+        resp = self.client.post(
+            reverse('formula_edit', kwargs={'pk': self.formula.pk}) + '?mode=group',
+            _edit_post(
+                name='改名后',
+                material_type=self.mt.pk,
+                edit_mode='group',
+                column_formula_ids=[str(self.formula.pk), ''],
+            ),
+        )
+        self.assertEqual(resp.status_code, 302)
+        versions = LabFormula.objects.filter(code='T-0001')
+        self.assertEqual(versions.count(), 2)
+        self.assertFalse(versions.filter(is_group_mode=True).exists())
 
     def test_single_version_page_renders_as_one_column(self):
         """单版本实验单也走批量（列）路径 —— 否则编辑页加不出新版本。"""
@@ -405,6 +468,17 @@ class VersionEditViewTests(TestCase):
         self.assertIsNone(new_version.project_id)
         self.assertIsNone(new_version.project_node_id)
 
+    def test_new_version_copies_the_saved_mode(self):
+        """并排加列出来的新版本，模式跟原版本一样。
+
+        组合料单走不到加列（编辑页不认地址栏），所以这条路径上抄到的值是否。
+        """
+        resp = self._post([str(self.v1.pk), str(self.v2.pk), str(self.v3.pk), ''])
+        self.assertEqual(resp.status_code, 302)
+        flags = set(
+            LabFormula.objects.filter(code=self.code).values_list('is_group_mode', flat=True))
+        self.assertEqual(flags, {False})
+
 
 class FormulaFormRenderSmokeTests(TestCase):
     """form.html 由新增/编辑两个视图共用 —— 两者都必须拿到 edit_policy。
@@ -431,6 +505,82 @@ class FormulaFormRenderSmokeTests(TestCase):
             reverse('formula_edit', kwargs={'pk': self.formula.pk}))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, '保存配方')
+
+    def test_group_create_keeps_project_when_bom_is_rejected(self):
+        """组合物料保存失败后，关联项目和节点还在。
+
+        这两个字段是禁用的，浏览器不提交。回填只认 session。
+        若在 BOM 校验失败前清掉 session，重绘页会变成「-」，再保存就丢关联。
+        """
+        project = Project.objects.create(name='关联项目甲', manager=self.user)
+        node = ProjectNode.objects.create(
+            project=project, stage=ProjectStage.RND, round=1)
+        raw = RawMaterial.objects.create(
+            name='树脂777',
+            category=RawMaterialType.objects.create(name='树脂-丢失'),
+        )
+        session = self.client.session
+        session['formula_prepare'] = {
+            'project_id': str(project.pk),
+            'project_node_id': str(node.pk),
+            'name': '组合配方',
+        }
+        session.save()
+
+        resp = self.client.post(reverse('formula_add') + '?mode=group', _edit_post(
+            edit_mode='group',
+            name='组合配方',
+            material_type=str(self.mt.pk),
+            **{
+                'bom-TOTAL_FORMS': '1',
+                'bom-0-feeding_port': '1_MAIN',
+                'bom-0-weighing_scale': 'A',
+                'bom-0-raw_material': str(raw.pk),
+                'bom-0-percentage': '60',
+                'bom-0-alt_group': 'A',
+                'bom-0-alt_strategy': '2',
+                'bom-0-alt_priority': '1',
+            },
+        ))
+
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, '关联项目甲')
+        self.assertContains(resp, '关联项目甲 — ② 研发阶段（第1轮）')
+        self.assertEqual(
+            self.client.session['formula_prepare']['project_id'], str(project.pk))
+        self.assertEqual(
+            self.client.session['formula_prepare']['project_node_id'], str(node.pk))
+        self.assertFalse(LabFormula.objects.filter(name='组合配方').exists())
+
+    def test_group_mode_returns_to_the_same_page_as_plain_add(self):
+        """组合物料是从新增页点过去的，保存后仍回到原先的来源页。"""
+        back = '/project/list/'
+        plain = self.client.get(reverse('formula_add'), HTTP_REFERER=back)
+        self.assertContains(plain, f'?mode=group&amp;next={back}')
+
+        group = self.client.get(reverse('formula_add') + '?mode=group&next=' + back)
+        self.assertContains(group, f'name="next" value="{back}"')
+        self.assertContains(group, f'?next={back}')
+
+    def test_create_page_can_still_switch_mode(self):
+        """没保存之前，两个方向的切换都还在。保存之后的编辑页才锁死。"""
+        plain = self.client.get(reverse('formula_add'))
+        self.assertContains(plain, '>组合物料<')
+        self.assertNotContains(plain, '>多版本并排<')
+
+        group = self.client.get(reverse('formula_add') + '?mode=group')
+        self.assertContains(group, '>多版本并排<')
+        self.assertNotContains(group, '>组合物料<')
+
+    def test_group_create_records_the_mode(self):
+        """新建页以组合物料保存成功后，这一行就标成组合料。"""
+        resp = self.client.post(
+            reverse('formula_add') + '?mode=group',
+            _edit_post(edit_mode='group', name='组合配方', material_type=str(self.mt.pk)),
+        )
+        self.assertEqual(resp.status_code, 302, '组合物料新建应保存成功')
+        created = LabFormula.objects.get(name='组合配方')
+        self.assertTrue(created.is_group_mode)
 
 
 class VersionStructureServiceTests(TestCase):

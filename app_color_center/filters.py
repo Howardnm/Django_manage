@@ -39,22 +39,32 @@ class ColorTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fi
 class ColorProjectFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """配色项目列表筛选器"""
 
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
+    name = django_filters.CharFilter(
+        field_name='name',
+        lookup_expr='icontains',
+        label='项目名称',
+        widget=forms.TextInput(attrs={
+            'placeholder': '项目名称',
+            'class': 'form-control js-filter-keyword',
+        }),
+    )
+    product = django_filters.CharFilter(
+        method='filter_product',
+        label='成品编号/成品牌号',
+        widget=forms.TextInput(attrs={
+            'placeholder': '成品编号/成品牌号',
+            'class': 'form-control js-filter-keyword',
+        }),
+    )
 
     class Meta:
         model = Project
-        fields = ['q', 'start_date', 'end_date']
+        fields = ['name', 'product', 'start_date', 'end_date']
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs['placeholder'] = '检索项目名称 / 成品材料 / SAP编码'
-
-    def filter_search(self, queryset, name, value):
+    def filter_product(self, queryset, name, value):
         if not value:
             return queryset
         return queryset.filter(
-            Q(name__icontains=value) |
             Q(material__grade_name__icontains=value) |
             Q(material__sap_material_code__icontains=value)
         )

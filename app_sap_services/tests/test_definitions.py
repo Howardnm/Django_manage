@@ -270,6 +270,7 @@ class MaterialBomMaintainStructureTest(SimpleTestCase):
                 "MATNR", "WERKS", "BMENG", "STLAN", "POSNR", "POSTP", "IDNRK",
                 "MENGE", "MEINS", "POTX1", "EWAHR", "STLAL", "STKTX", "ZTEXT",
                 "STLST", "AUSCH", "DATUV",
+                "AI_GROUP", "AI_STRATEG", "AI_PRIO", "USAGE_PROB",
             ),
         )
 

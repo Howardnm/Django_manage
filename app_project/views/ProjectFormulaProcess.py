@@ -290,6 +290,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     'planned_quantity': o.quantity_planned,
                     'quantity_actual': o.quantity_actual,
                     'creator': o.creator.username,
+                    'trial_code': o.trial_code,
                     'created_at': o.created_at,
                     'scheduled_date': o.extrusion_scheduled_date,
                     'scheduled_end': o.extrusion_scheduled_end,

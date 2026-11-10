@@ -18,6 +18,7 @@ from typing import Any
 from common_utils.printing.base import BasePrintRenderer, PrintConfig
 from app_workflow.models import ApprovalHistory
 from app_formula.models import AbstractBOMEntry
+from app_formula.services.alt_groups import dose_index, dose_shares
 
 
 class TrialProductionSheetRenderer(BasePrintRenderer):
@@ -305,26 +306,27 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         base_formula = formulas[0]
 
         row_index = 0
-        for base_line in base_formula.bom_lines.all().order_by(
-            'feeding_port', 'weighing_scale',
-            'raw_material__category__order', 'raw_material__name',
-        ):
+        indexes = {f.pk: dose_index(list(f.bom_lines.all())) for f in formulas}
+        base_lines = [
+            line for line, _share in dose_shares(list(base_formula.bom_lines.all()))
+        ]
+        base_lines.sort(key=lambda line: (
+            line.feeding_port,
+            line.weighing_scale,
+            line.raw_material.category.order,
+            line.raw_material.name,
+        ))
+        for base_line in base_lines:
             raw_id = base_line.raw_material_id
             raw_material = base_line.raw_material
             feeding_port = base_line.feeding_port
 
-            # 仅构建本组配方索引对应的列
+            # 仅构建本组配方索引对应的列。份数是实际领用，不是库存里的完整份数。
             formula_data = []
             for idx in group_indices:
                 f = formulas[idx]
-                pct = Decimal('0')
-                for bl in f.bom_lines.all():
-                    if (
-                        bl.raw_material_id == raw_id
-                        and bl.feeding_port == feeding_port
-                    ):
-                        pct = bl.percentage
-                        break
+                share = indexes[f.pk].get((raw_id, feeding_port))
+                pct = share if share is not None else Decimal('0')
                 fd = details_map.get(f.pk)
                 planned_qty = float(fd.planned_quantity) if fd else 0
                 pct_val = float(pct) if pct else 0
@@ -350,6 +352,8 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
                 )
             if base_line.is_tail:
                 notes_parts.append('尾料回掺')
+            if base_line.alt_label:
+                notes_parts.append(base_line.alt_label)
 
             row_index += 1
             rows.append({
@@ -381,8 +385,8 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
             planned_qty = float(fd.planned_quantity) if fd else 0
             row_total = Decimal('0')
             pct_total = Decimal('0')
-            for bl in f.bom_lines.all():
-                pct_val = float(bl.percentage) if bl.percentage else 0
+            for _line, share in dose_shares(list(f.bom_lines.all())):
+                pct_val = float(share) if share else 0
                 pct_total += Decimal(str(pct_val))
                 qty = (pct_val / 100.0) * planned_qty if planned_qty > 0 else 0
                 row_total += Decimal(str(round(qty, 3)))

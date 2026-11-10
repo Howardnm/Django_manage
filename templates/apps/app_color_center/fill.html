@@ -109,7 +109,7 @@
                 </div>
             </div>
 
-            <!-- 色粉BOM（仅当该配方关联的工单需要配色时才显示） -->
+            <!-- 色粉BOM：本项目实验单可填。历史配方走下面的无需配色。 -->
             {% if selected_formula.pk in color_formula_ids %}
                 {% if not readonly %}
                 {% include 'apps/app_color_center/_color_bom_form.html' %}
@@ -118,7 +118,9 @@
                     <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
                         <h3 class="card-title text-orange mb-0">
                             <i class="ti ti-palette me-2"></i>色粉配比BOM
+                            {% if selected_formula.pk in confirmed_color_formula_ids %}
                             <span class="badge bg-green-lt ms-1">已填写</span>
+                            {% endif %}
                             {% if selected_formula.color_powder_bom and selected_formula.color_powder_bom.cost is not None %}
                             <span class="badge bg-yellow-lt ms-1">¥{{ selected_formula.color_powder_bom.cost }}/kg</span>
                             {% endif %}
@@ -195,7 +197,7 @@
                     <div class="card-body text-center py-4 text-muted">
                         <i class="ti ti-palette-off fs-1 d-block mb-2 opacity-50"></i>
                         <p class="mb-0">该配方无需配色</p>
-                        <p class="small">此配方的关联工单未标记需要配色</p>
+                        <p class="small">历史配方不能在本项目补充色粉BOM</p>
                     </div>
                 </div>
             {% endif %}

@@ -10,12 +10,14 @@
      未填配方（stage/round/formula_id 完整）。
 """
 
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from app_user.models import Department, ModuleAccessConfig, RoleGroup, UserRole
 from app_user.services.identity_service import IdentityService
@@ -303,21 +305,20 @@ class BOMEmptyTableValidationTests(BOMSaveBase):
 
 
 class BOMFillButtonAndRedirectTests(BOMSaveBase):
-    """入口与跳转：空卡片「填写」按钮 + 列表按钮条件化与跳转参数。"""
+    """入口与跳转：未完成任务直接进编辑，列表按钮按是否已确认显示。"""
 
     def _create_empty_bom(self):
         """创建一条 0 条目的 ColorPowderBOM（模拟已填写主表但无明细）。"""
         return ColorPowderBOM.objects.create(formula=self.formula, filled_by=self.writer)
 
-    def test_empty_bom_write_permission_shows_fill_button(self):
-        """0 条目 BOM + 写权限 → 空卡片显示「填写」按钮（edit=1），不显示表单。"""
+    def test_empty_bom_write_permission_opens_the_form(self):
+        """0 条目 BOM + 写权限 + 任务未完成 → 直接进编辑，不再停在「填写」按钮。"""
         self._create_empty_bom()
         self.client.force_login(self.writer)
         resp = self.client.get(self._project_url())
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, '尚未填写色粉配比BOM')
-        self.assertContains(resp, 'edit=1')          # 「填写」按钮跳转编辑态
-        self.assertNotContains(resp, 'id="bom-form"')  # 仍未进入表单态
+        self.assertContains(resp, 'id="bom-form"')
+        self.assertNotContains(resp, '>已填写<')
 
     def test_empty_bom_no_permission_no_fill_button(self):
         """0 条目 BOM + 无写权限 → 仅提示只读，无「填写」按钮。"""
@@ -363,6 +364,60 @@ class BOMFillButtonAndRedirectTests(BOMSaveBase):
         self.assertNotContains(resp, '填写配色')
         self.assertContains(resp, '查看详情')
         self.assertNotContains(resp, 'formula_id=')
+
+    def test_project_list_progress_counts_only_color_order_lines(self):
+        """项目只要挂了配方就列出。进度分母只数工单里勾了需要配色的明细。"""
+        bare = Project.objects.create(
+            code='BOMT-P-BARE', name='无配方项目', manager=self.project.manager,
+            material=self.material)
+        self.client.force_login(self.viewer)
+        listed = self.client.get(self._project_list_url())
+        self.assertContains(listed, self.project.name)
+        self.assertContains(listed, '0/1')
+        self.assertNotContains(listed, bare.name)
+
+        self.order.delete()
+        without_order = self.client.get(self._project_list_url())
+        self.assertContains(without_order, self.project.name)
+        self.assertContains(without_order, '0/0')
+
+        self.order = ProductionOrder.objects.create(
+            creator=self.formula.creator, code='BOMT-O-001', trial_code=self.formula.code,
+            quantity_planned=100, status=ProductionOrder.Status.DRAFT,
+            project=self.project)
+        detail = ProductionOrderFormulaDetail.objects.create(
+            production_order=self.order, formula=self.formula,
+            planned_quantity=100, needs_color_matching=False)
+        unmarked = self.client.get(self._project_list_url())
+        self.assertContains(unmarked, '0/0')
+
+        detail.needs_color_matching = True
+        detail.save(update_fields=['needs_color_matching'])
+        marked = self.client.get(self._project_list_url())
+        self.assertContains(marked, '0/1')
+
+    def test_project_list_filters_name_and_product_separately(self):
+        """项目名称、成品编号/成品牌号分开筛，互不串到另一个框。"""
+        self.client.force_login(self.viewer)
+        page = self.client.get(self._project_list_url())
+        self.assertContains(page, 'placeholder="项目名称"')
+        self.assertContains(page, 'placeholder="成品编号/成品牌号"')
+
+        by_name = self.client.get(self._project_list_url(), {'name': 'BOM回归'})
+        self.assertContains(by_name, self.project.name)
+        by_material_in_name = self.client.get(
+            self._project_list_url(), {'name': self.material.grade_name})
+        self.assertNotContains(by_material_in_name, self.project.name)
+
+        by_code = self.client.get(
+            self._project_list_url(), {'product': self.material.sap_material_code})
+        self.assertContains(by_code, self.project.name)
+        by_grade = self.client.get(
+            self._project_list_url(), {'product': self.material.grade_name})
+        self.assertContains(by_grade, self.project.name)
+        by_name_in_product = self.client.get(
+            self._project_list_url(), {'product': 'BOM回归'})
+        self.assertNotContains(by_name_in_product, self.project.name)
 
 
 class ColorTaskStatusTabTests(BOMSaveBase):
@@ -473,3 +528,136 @@ class BOMRedirectHelperTests(TestCase):
         params = _fill_redirect_params(found)
         self.assertEqual(
             params, f'stage={node.stage}&round={node.round}&formula_id={with_node.pk}')
+
+
+class ColorBomWithoutTaskTests(BOMSaveBase):
+    """没下发配色任务也能补色粉。下发前填过的，要配色员再保存一次才算完成。"""
+
+    def _fill_bom_before_the_task(self):
+        """任务已经在，但色粉是更早填的。update 绕开 auto_now。"""
+        bom = ColorPowderBOM.objects.create(formula=self.formula, filled_by=self.writer)
+        ColorPowderBOMEntry.objects.create(
+            color_powder_bom=bom,
+            raw_material=self.raw,
+            percentage=Decimal('0.500'),
+            feeding_port='1_MAIN',
+            weighing_scale='D',
+        )
+        ColorPowderBOM.objects.filter(pk=bom.pk).update(
+            updated_at=timezone.now() - timedelta(days=1))
+        return bom
+
+    def _formula_url(self):
+        return (
+            f'{self._project_url()}?stage={self.node.stage}'
+            f'&round={self.node.round}&formula_id={self.formula.pk}'
+        )
+
+    def test_can_save_color_bom_before_a_task_exists(self):
+        """需要配色、但任务还没建：能填、能存，保存不会凭空建任务。"""
+        self.task.delete()
+        self.client.force_login(self.writer)
+        page = self.client.get(self._project_url())
+        self.assertContains(page, 'id="bom-form"')
+
+        resp = self._post_bom(
+            total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(ColorPowderBOM.objects.filter(formula=self.formula).exists())
+        self.assertFalse(
+            ColorMatchingTask.objects.filter(production_order=self.order).exists())
+
+    def test_can_save_color_bom_with_no_order(self):
+        """实验单没有关联任何工单：能看到表单，能保存，不新建工单或配色任务。"""
+        self.order.delete()
+        self.client.force_login(self.writer)
+        page = self.client.get(self._formula_url())
+        self.assertContains(page, 'id="bom-form"')
+        self.assertNotContains(page, '该配方无需配色')
+
+        order_count = ProductionOrder.objects.count()
+        task_count = ColorMatchingTask.objects.count()
+        resp = self._post_bom(
+            total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn(reverse('permission_denied'), resp.url)
+        self.assertTrue(ColorPowderBOM.objects.filter(formula=self.formula).exists())
+        self.assertEqual(ProductionOrder.objects.count(), order_count)
+        self.assertEqual(ColorMatchingTask.objects.count(), task_count)
+
+    def test_can_save_when_order_does_not_need_color(self):
+        """有工单但没勾需要配色，同样能保存，也不把配色任务判成完成。"""
+        detail = self.order.formula_details.get()
+        detail.needs_color_matching = False
+        detail.save()
+        self.task.status = ColorMatchingTask.Status.NOT_REQUIRED
+        self.task.save(update_fields=['status'])
+
+        self.client.force_login(self.writer)
+        page = self.client.get(self._formula_url())
+        self.assertContains(page, 'id="bom-form"')
+
+        resp = self._post_bom(
+            total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotIn(reverse('permission_denied'), resp.url)
+        self.assertTrue(ColorPowderBOM.objects.filter(formula=self.formula).exists())
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, ColorMatchingTask.Status.NOT_REQUIRED)
+
+    def test_prefilled_bom_opens_in_edit_until_the_colorist_saves(self):
+        """下发前已有明细：进度不满，有写权限直接进编辑。再保存一次才完成。"""
+        self._fill_bom_before_the_task()
+
+        self.client.force_login(self.writer)
+        page = self.client.get(self._formula_url())
+        self.assertContains(page, 'id="bom-form"')
+        self.assertNotContains(page, '>已填写<')
+        self.assertContains(page, '色粉BOM待填写')
+
+        listing = self.client.get(self._list_url())
+        self.assertEqual(
+            listing.context['order_stats'][self.order.pk], {'total': 1, 'done': 0})
+        self.assertContains(listing, '填写配色')
+
+        resp = self._post_bom(
+            total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        self.assertEqual(resp.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, ColorMatchingTask.Status.COMPLETED)
+
+        again = self.client.get(self._formula_url())
+        self.assertNotContains(again, 'id="bom-form"')
+        self.assertContains(again, '>已填写<')
+
+    def test_viewer_sees_prefilled_rows_without_the_filled_badge(self):
+        """没写权限的人看得到明细，但不标已填写，也不出表单。"""
+        self._fill_bom_before_the_task()
+        self.client.force_login(self.viewer)
+        page = self.client.get(self._formula_url())
+        self.assertEqual(page.status_code, 200)
+        self.assertContains(page, self.raw.name)
+        self.assertNotContains(page, 'id="bom-form"')
+        self.assertNotContains(page, '>已填写<')
+
+    def test_saving_one_prefilled_version_leaves_the_other_open(self):
+        """只确认了其中一个版本，任务停在配色中，进度按已确认的算。"""
+        self._fill_bom_before_the_task()
+        other = LabFormula.objects.create(
+            code='BOMT-F-002', name='另一配方',
+            material_type=self.formula.material_type,
+            project=self.project, project_node=self.node,
+            creator=self.formula.creator, version=1)
+        ProductionOrderFormulaDetail.objects.create(
+            production_order=self.order, formula=other,
+            planned_quantity=100, needs_color_matching=True)
+
+        resp = self._post_bom(
+            total_forms=1, entry_fields=self._entry_fields(0, self.raw.pk))
+        self.assertEqual(resp.status_code, 302)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.status, ColorMatchingTask.Status.IN_PROGRESS)
+
+        listing = self.client.get(self._list_url())
+        self.assertEqual(
+            listing.context['order_stats'][self.order.pk], {'total': 2, 'done': 1})

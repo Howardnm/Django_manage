@@ -23,6 +23,30 @@ from common_utils.constants import STD_TABS
 logger = logging.getLogger(__name__)
 
 
+def _return_url(request):
+    """保存成功后回到进入配方页之前的地址。
+
+    表单里已经带了 next 时以它为准。校验失败重绘时 Referer 是本页，
+    不能拿它把原先的去向盖掉。模式切换的链接继续带这个值。
+    """
+    if request.method == 'POST':
+        posted = request.POST.get('next', '')
+        if posted:
+            return posted
+    return request.GET.get('next') or request.META.get('HTTP_REFERER', '')
+
+
+def _alt_kwargs(cleaned):
+    """从一行 BOM 的 cleaned_data 取出替代组四列。没有就全部空着。"""
+    cleaned = cleaned or {}
+    return {
+        'alt_group': (cleaned.get('alt_group') or '').strip().upper(),
+        'alt_strategy': cleaned.get('alt_strategy') or '',
+        'alt_priority': cleaned.get('alt_priority'),
+        'usage_percent': cleaned.get('usage_percent'),
+    }
+
+
 def _build_integrity_error_message(e):
     """将 IntegrityError（唯一约束冲突）转为用户友好的错误信息"""
     err_str = str(e)
@@ -326,6 +350,11 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
 class LabFormulaCreateView(FormulaAccessMixin, CreateView):
     """创建配方：需有增加权限，且通常仅限研发。"""
     permission_required = 'app_formula.add_labformula'
+
+    def _group_mode(self):
+        if self.request.method == 'POST':
+            return self.request.POST.get('edit_mode') == 'group'
+        return self.request.GET.get('mode') == 'group'
     model = LabFormula
     form_class = LabFormulaForm
     template_name = 'apps/app_formula/form.html'
@@ -400,6 +429,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = '新增实验配方'
+        context['group_mode'] = self._group_mode()
         context['show_import_button'] = True
         context['enable_multi_column'] = True
         # 新建页操作的是尚不存在的实验单，不可能被工单引用 → 无限制
@@ -469,7 +499,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
 
                     source_count = len(source_formulas)
 
-                    if source_count > 1:
+                    if source_count > 1 and not self._group_mode():
                         # 多版本 → 多列模式：每个源版本一列，用户可调整各列百分比
                         from collections import OrderedDict
 
@@ -555,18 +585,26 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                         # 设置列标签（显示源版本号）
                         context['column_labels'] = [f'v{f.version}' for f in source_formulas]
                     else:
-                        # 只有一个版本 → 单列，直接展示其 BOM
+                        # 单列。组合物料一次只带一个版本，优先带已有替代组的那一版。
+                        chosen = source_formulas[0]
+                        if self._group_mode():
+                            for candidate in reversed(source_formulas):
+                                if any((line.alt_group or '').strip() for line in candidate.bom_lines.all()):
+                                    chosen = candidate
+                                    break
                         bom_initial = [{
                             'feeding_port': b.feeding_port, 'weighing_scale': b.weighing_scale,
                             'raw_material': b.raw_material, 'percentage': b.percentage,
+                            'alt_group': b.alt_group, 'alt_strategy': b.alt_strategy,
+                            'alt_priority': b.alt_priority, 'usage_percent': b.usage_percent,
                             'is_tail': b.is_tail, 'is_pre_mix': b.is_pre_mix,
                             'pre_mix_order': b.pre_mix_order, 'pre_mix_time': b.pre_mix_time,
-                        } for b in source_formulas[0].bom_lines.all()]
+                        } for b in chosen.bom_lines.all()]
+                        FormulaBOMFormSet.extra = max(len(bom_initial), 1)
                         context['bom_formset'] = FormulaBOMFormSet(prefix='bom', initial=bom_initial)
-                        context['bom_formset'].extra = max(len(bom_initial), 1)
-                        test_initial = [{'test_config': r.test_config} for r in source_formulas[0].test_results.filter(production_order__isnull=True)]
+                        test_initial = [{'test_config': r.test_config} for r in chosen.test_results.filter(production_order__isnull=True)]
+                        FormulaTestResultFormSet.extra = max(len(test_initial), 1)
                         context['test_formset'] = FormulaTestResultFormSet(prefix='test', initial=test_initial)
-                        context['test_formset'].extra = max(len(test_initial), 1)
                         context['num_columns'] = 1
 
                 except LabFormula.DoesNotExist:
@@ -585,15 +623,16 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             # 只有当没有导入多版本实验单时，才用 POST 中的 num_columns 覆盖
             if 'num_columns' not in context or context['num_columns'] == 1:
                 context['num_columns'] = int(self.request.POST.get('num_columns', 1))
+            if self._group_mode():
+                context['num_columns'] = 1
+                context['group_mode'] = True
             if 'variant_data' not in context:
                 context['variant_data'] = {k: v for k, v in self.request.POST.items() if '_col' in k}
         else:
             # 只有在没有导入数据时，才将 num_columns 重置为 1
             if 'num_columns' not in context:
                 context['num_columns'] = 1
-        context['next_url'] = self.request.GET.get(
-            'next', self.request.META.get('HTTP_REFERER', '')
-        )
+        context['next_url'] = _return_url(self.request)
         return context
 
     @staticmethod
@@ -612,7 +651,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
 
     def _create_formula_variants(self, form, bom_formset, test_formset):
         """多列批量创建配方，返回 created_formulas 列表"""
-        num_columns = int(self.request.POST.get('num_columns', 1))
+        num_columns = 1 if self._group_mode() else int(self.request.POST.get('num_columns', 1))
         project = form.cleaned_data.get('project')
         project_node = form.cleaned_data.get('project_node')
 
@@ -672,6 +711,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                     project=project,
                     project_node=project_node,
                     is_mature=form.cleaned_data.get('is_mature', False),
+                    is_group_mode=self._group_mode(),
                     description=form.cleaned_data.get('description', ''),
                     material_color_name=form.cleaned_data.get('material_color_name', ''),
                     pantone_code=form.cleaned_data.get('pantone_code', ''),
@@ -683,14 +723,17 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                 formula.save()
 
                 for row in bom_rows:
+                    cleaned = bom_formset.forms[row['form_idx']].cleaned_data
                     if col_idx == 0:
-                        percentage = bom_formset.forms[row['form_idx']].cleaned_data['percentage']
+                        percentage = cleaned['percentage']
+                        alt = _alt_kwargs(cleaned)
                     else:
                         pct_str = post_data.get(f"bom-{row['form_idx']}-percentage_col{col_idx}", '')
                         try:
                             percentage = Decimal(pct_str) if pct_str else Decimal('0')
                         except (InvalidOperation, ValueError):
                             percentage = Decimal('0')
+                        alt = _alt_kwargs({})
                     if percentage == 0:
                         continue
                     FormulaBOM.objects.create(
@@ -703,6 +746,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
                         is_pre_mix=row['is_pre_mix'],
                         pre_mix_order=row['pre_mix_order'],
                         pre_mix_time=row['pre_mix_time'],
+                        **alt,
                     )
 
                 for row in test_rows:
@@ -748,7 +792,6 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         return super().form_invalid(form)
 
     def form_valid(self, form):
-        self.request.session.pop('formula_prepare', None)
         context = self.get_context_data()
         bom_formset = context['bom_formset']
         test_formset = context['test_formset']
@@ -760,6 +803,9 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
         except IntegrityError as e:
             messages.error(self.request, _build_integrity_error_message(e))
             return self.render_to_response(self.get_context_data(form=form))
+        # 项目和节点只放在 session 里，页面上那两个字段又不提交。
+        # 失败重绘还要靠它回填，成功落库之后再清。
+        self.request.session.pop('formula_prepare', None)
         self.object = created[0]
         count = len(created)
         if count == 1:
@@ -829,6 +875,41 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         return (self.request.POST.getlist('column_formula_ids')
                 or self.request.POST.getlist('formula_ids'))
 
+    def _group_mode(self):
+        """保存之后模式就定了。地址栏和 POST 都不能再改。"""
+        return bool(self.object.is_group_mode)
+
+    def _experiment_has_group(self):
+        for formula in self.experiment_formulas():
+            for line in formula.bom_lines.all():
+                if (line.alt_group or '').strip():
+                    return True
+        return False
+
+    def _fill_group_formsets(self, context):
+        """一次只编辑当前版本。表单集挂在这一版上，不再做跨版本并集。"""
+        has_bom = self.object.bom_lines.exists()
+        has_tests = self.object.test_results.filter(production_order__isnull=True).exists()
+        # extra 是类属性。并排模式会把它改大，这里必须先收回来，否则会多出空行。
+        FormulaBOMFormSet.extra = 0 if has_bom else 1
+        FormulaTestResultFormSet.extra = 0 if has_tests else 1
+        if self.request.POST:
+            context['bom_formset'] = FormulaBOMFormSet(
+                self.request.POST, instance=self.object, prefix='bom')
+            context['test_formset'] = FormulaTestResultFormSet(
+                self.request.POST, instance=self.object, prefix='test')
+        else:
+            context['bom_formset'] = FormulaBOMFormSet(instance=self.object, prefix='bom')
+            context['test_formset'] = FormulaTestResultFormSet(instance=self.object, prefix='test')
+        context['group_mode'] = True
+        context['group_locked'] = self._experiment_has_group()
+        context['formula_versions'] = self.experiment_formulas()
+        context['enable_multi_column'] = False
+        context['batch_edit_mode'] = False
+        context['num_columns'] = 1
+        context['column_ids'] = [self.object.pk]
+        context['formula_columns'] = [self.object]
+
     def formulas_for_columns(self, column_ids):
         """把列标识还原成配方对象列表，顺序与列一致；新增列用 None 占位。"""
         def _as_pk(value):
@@ -850,6 +931,16 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         context['can_be_mature'] = self.object.project_node.can_be_mature if self.object.project_node else True
         context['project_name'] = self.object.project.name if self.object.project else None
         context['project_node_display'] = str(self.object.project_node) if self.object.project_node else None
+        context['group_mode'] = self._group_mode()
+        context['group_locked'] = self._experiment_has_group()
+        context['formula_versions'] = self.experiment_formulas()
+
+        if context['group_mode']:
+            self._fill_group_formsets(context)
+            if not policy['can_edit_content']:
+                self._lock_readonly_forms(context)
+            context['next_url'] = _return_url(self.request)
+            return context
 
         # 每个配方版本一列。单版本实验单同样走这条路径 —— 否则编辑页加不出新版本。
         # 下面的 else 分支是防御性兜底：self.object 自身必然是一个版本，
@@ -975,9 +1066,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         if not policy['can_edit_content']:
             self._lock_readonly_forms(context)
 
-        context['next_url'] = self.request.GET.get(
-            'next', self.request.META.get('HTTP_REFERER', '')
-        )
+        context['next_url'] = _return_url(self.request)
         return context
 
     @staticmethod
@@ -1011,6 +1100,9 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
         column_ids = self.submitted_column_ids()
         post_data = self.request.POST
         policy = self.edit_policy()
+
+        if self._experiment_has_group():
+            raise FormulaVersionError('这个实验单已经有替代组，请切换到组合物料模式再保存。')
 
         if not column_ids:
             raise FormulaVersionError('没有收到任何配方版本列，请刷新页面后重试。')
@@ -1107,6 +1199,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
                         # 那里可能残留着上一次「新增配方」留下的别的项目。
                         project=form.cleaned_data.get('project'),
                         project_node=form.cleaned_data.get('project_node'),
+                        is_group_mode=existing[0].is_group_mode,
                     )
                 else:
                     formula = formula_map[pk]
@@ -1207,6 +1300,94 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
 
         return updated
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if request.POST.get('add_empty_version'):
+            messages.error(request, '组合物料模式不能新增版本。')
+            return redirect(request.get_full_path())
+        return super().post(request, *args, **kwargs)
+
+    def _update_group_version(self, form, bom_formset, test_formset):
+        """共享表头写到每个版本。BOM 和手动测试只重写当前这一版。"""
+        existing = self.experiment_formulas()
+        for formula in existing:
+            self.check_edit_permission(formula)
+        cleaned = form.cleaned_data
+        target = next(formula for formula in existing if formula.pk == self.object.pk)
+
+        from django.contrib.contenttypes.models import ContentType
+        from app_attachment.models import Attachment
+        ct = ContentType.objects.get_for_model(FormulaTestResult)
+        old_reports = {}
+        for result in target.test_results.filter(production_order__isnull=True):
+            attachment = Attachment.objects.filter(
+                content_type=ct, object_id=result.pk,
+                category='REPORT', is_deleted=False,
+            ).first()
+            if attachment:
+                old_reports[result.test_config_id] = attachment.file
+
+        with transaction.atomic():
+            for formula in existing:
+                formula.name = cleaned['name']
+                formula.material_type = cleaned['material_type']
+                formula.process = cleaned.get('process')
+                formula.is_mature = cleaned.get('is_mature', False)
+                formula.description = cleaned.get('description', '')
+                formula.material_color_name = cleaned.get('material_color_name', '')
+                formula.pantone_code = cleaned.get('pantone_code', '')
+                formula.rgb_value = cleaned.get('rgb_value', '')
+                formula.save()
+                formula.research_projects.set(cleaned.get('research_projects', []))
+
+            target.bom_lines.all().delete()
+            target.test_results.filter(production_order__isnull=True).delete()
+            for bom_form in bom_formset:
+                if not bom_form.cleaned_data or bom_form.cleaned_data.get('DELETE'):
+                    continue
+                percentage = bom_form.cleaned_data.get('percentage') or Decimal('0')
+                if percentage == 0:
+                    continue
+                FormulaBOM.objects.create(
+                    formula=target,
+                    feeding_port=bom_form.cleaned_data['feeding_port'],
+                    weighing_scale=bom_form.cleaned_data['weighing_scale'],
+                    raw_material=bom_form.cleaned_data['raw_material'],
+                    percentage=percentage,
+                    is_tail=bom_form.cleaned_data.get('is_tail', False),
+                    is_pre_mix=bom_form.cleaned_data.get('is_pre_mix', False),
+                    pre_mix_order=bom_form.cleaned_data.get('pre_mix_order') or 0,
+                    pre_mix_time=bom_form.cleaned_data.get('pre_mix_time') or 0,
+                    **_alt_kwargs(bom_form.cleaned_data),
+                )
+            for test_form in test_formset:
+                if not test_form.cleaned_data or test_form.cleaned_data.get('DELETE'):
+                    continue
+                test_config = test_form.cleaned_data.get('test_config')
+                if not test_config:
+                    continue
+                value = test_form.cleaned_data.get('value')
+                value_text = test_form.cleaned_data.get('value_text', '')
+                if test_config.data_type == 'SELECT':
+                    value_text = test_form.cleaned_data.get('value_select') or value_text
+                if value is None and not value_text:
+                    continue
+                new_result = FormulaTestResult.objects.create(
+                    formula=target,
+                    test_config=test_config,
+                    value=value,
+                    value_text=value_text,
+                    test_date=test_form.cleaned_data.get('test_date'),
+                    remark=test_form.cleaned_data.get('remark', ''),
+                )
+                if test_config.pk in old_reports:
+                    Attachment.objects.create(
+                        content_type=ct, object_id=new_result.pk,
+                        category='REPORT', file=old_reports[test_config.pk],
+                        display_name=f'测试报告_{new_result.pk}',
+                    )
+        self.object = target
+
     def form_invalid(self, form):
         messages.error(self.request, _build_formula_error_message(form))
         return super().form_invalid(form)
@@ -1234,13 +1415,17 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             return self.render_to_response(self.get_context_data(form=form))
 
         try:
-            # 编辑页只有这一条写入路径：所有版本统一按列处理（含单版本实验单）。
-            # 旧版「单配方」分支已删除 —— 它靠 form.save() 落库，而模板从不提交
-            # code 字段，会把实验单号清空触发放 LabFormula.save() 的单号重生成，
-            # 导致配方脱离原实验单的版本分组。
-            updated = self._update_formula_variants(form, bom_formset, test_formset)
-            self.object = updated[0]
-            messages.success(self.request, f"已更新 {len(updated)} 个配方")
+            if self._group_mode():
+                self._update_group_version(form, bom_formset, test_formset)
+                messages.success(self.request, f"已保存配方 v{self.object.version}")
+            else:
+                # 编辑页的并排路径：所有版本统一按列处理（含单版本实验单）。
+                # 旧版「单配方」分支已删除 —— 它靠 form.save() 落库，而模板从不提交
+                # code 字段，会把实验单号清空触发放 LabFormula.save() 的单号重生成，
+                # 导致配方脱离原实验单的版本分组。
+                updated = self._update_formula_variants(form, bom_formset, test_formset)
+                self.object = updated[0]
+                messages.success(self.request, f"已更新 {len(updated)} 个配方")
         except FormulaVersionError as e:
             messages.error(self.request, str(e))
             return self.render_to_response(self.get_context_data(form=form))
@@ -1283,7 +1468,11 @@ class FormulaImportFromView(FormulaAccessMixin, View):
             return redirect(reverse('formula_edit', kwargs={'pk': pk}))
 
         # 源：被选中的实验单下所有版本
-        source_formulas = list(LabFormula.objects.filter(code=experiment_code).prefetch_related('bom_lines', 'test_results'))
+        source_formulas = list(
+            LabFormula.objects.filter(code=experiment_code)
+            .prefetch_related('bom_lines', 'test_results')
+            .order_by('version')
+        )
         if not source_formulas:
             messages.error(request, f'实验单「{experiment_code}」不存在')
             return redirect(reverse('formula_edit', kwargs={'pk': pk}))
@@ -1308,6 +1497,11 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                     existing = bom_merged[key]
                     existing['percentage_sum'] += bom.percentage
                     existing['count'] += 1
+                    if (bom.alt_group or '').strip():
+                        existing['alt_group'] = bom.alt_group
+                        existing['alt_strategy'] = bom.alt_strategy
+                        existing['alt_priority'] = bom.alt_priority
+                        existing['usage_percent'] = bom.usage_percent
                 else:
                     bom_merged[key] = {
                         'feeding_port': bom.feeding_port,
@@ -1319,6 +1513,10 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                         'is_pre_mix': bom.is_pre_mix,
                         'pre_mix_order': bom.pre_mix_order,
                         'pre_mix_time': bom.pre_mix_time,
+                        'alt_group': bom.alt_group,
+                        'alt_strategy': bom.alt_strategy,
+                        'alt_priority': bom.alt_priority,
+                        'usage_percent': bom.usage_percent,
                     }
 
         # 测试项目合并去重（所有源版本按 test_config 去重）
@@ -1365,6 +1563,10 @@ class FormulaImportFromView(FormulaAccessMixin, View):
                         is_pre_mix=data['is_pre_mix'],
                         pre_mix_order=data['pre_mix_order'],
                         pre_mix_time=data['pre_mix_time'],
+                        alt_group=data.get('alt_group') or '',
+                        alt_strategy=data.get('alt_strategy') or '',
+                        alt_priority=data.get('alt_priority'),
+                        usage_percent=data.get('usage_percent'),
                     )
 
                 for tc in test_configs:
