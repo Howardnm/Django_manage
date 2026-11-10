@@ -1,5 +1,5 @@
 from django.db.models import Count
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_material.forms import MaterialTypeForm
@@ -43,7 +43,10 @@ class MaterialTypeCreateView(MaterialAccessMixin, CreateView):
     model = MaterialType
     form_class = MaterialTypeForm
     template_name = 'apps/app_material/form_generic.html'
-    success_url = reverse_lazy('type_list')
+
+    def get_success_url(self):
+        """先落库拿到主键，再去编辑页上传背景图。"""
+        return reverse('type_edit', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -62,4 +65,5 @@ class MaterialTypeUpdateView(MaterialAccessMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'编辑类型: {self.object.name}'
+        context['show_background_panel'] = True
         return context

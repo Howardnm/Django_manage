@@ -184,3 +184,23 @@ class AppMaterialConfig(AppConfig):
             ],
             folder_id_resolver=lambda m: str(m.pk),
         ))
+
+        # 导航背景图：三个维度各一张，只收图片。编辑页挂附件面板，不走 Admin
+        background_extensions = ('jpg', 'jpeg', 'png', 'webp')
+
+        def _register_background(model, perm_name):
+            register_attachment(AttachmentConfig(
+                parent_model=model,
+                access_mixin=MaterialAccessMixin,
+                view_permission=f'app_material.view_{perm_name}',
+                add_permission=f'app_material.add_{perm_name}',
+                delete_permission=f'app_material.change_{perm_name}',
+                categories=[('BACKGROUND', '导航背景图')],
+                max_attachments=1,
+                allowed_extensions=background_extensions,
+                folder_id_resolver=lambda obj: str(obj.pk),
+            ))
+
+        _register_background(ApplicationScenario, 'applicationscenario')
+        _register_background(MaterialType, 'materialtype')
+        _register_background(MaterialCharacteristic, 'materialcharacteristic')

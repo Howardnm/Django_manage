@@ -24,7 +24,11 @@
             {% if form.file.errors %}
             <div class="invalid-feedback d-block">{{ form.file.errors.0 }}</div>
             {% endif %}
+            {% if config.allowed_extensions %}
+            <small class="form-hint">只支持 {% for ext in config.allowed_extensions %}{{ ext }}{% if not forloop.last %}、{% endif %}{% endfor %}，最大 50MB</small>
+            {% else %}
             <small class="form-hint">支持 PDF、Word、Excel、图片、CAD 等格式，最大 50MB</small>
+            {% endif %}
         </div>
 
         <div class="mb-3">

@@ -1,14 +1,25 @@
-from django.urls import path
+from django.urls import include, path
 
-from . import views
+from app_catalog.api.views import (
+    CatalogBackgroundView,
+    CatalogNavTreeView,
+    MaterialDownloadView,
+    router,
+)
 
 app_name = 'app_catalog'
 
 urlpatterns = [
-    path('', views.CatalogListView.as_view(), name='home'),
-    path('search/', views.CatalogListView.as_view(), name='search'),
-    path('p/<int:pk>/', views.CatalogDetailView.as_view(), name='product_detail'),
-    path('login/', views.MemberLoginView.as_view(), name='login'),
-    path('logout/', views.MemberLogoutView.as_view(), name='logout'),
-    path('download/<int:pk>/<str:file_type>/', views.MaterialDownloadView.as_view(), name='material_download'),
+    path('nav-tree/', CatalogNavTreeView.as_view(), name='nav_tree'),
+    path(
+        'background/<str:kind>/<int:pk>/',
+        CatalogBackgroundView.as_view(),
+        name='background',
+    ),
+    path(
+        'materials/<int:pk>/download/<str:file_type>/',
+        MaterialDownloadView.as_view(),
+        name='material_download',
+    ),
+    path('', include(router.urls)),
 ]

@@ -1,12 +1,17 @@
 from collections import defaultdict
 
-from django.contrib.contenttypes.models import ContentType
+from django.urls import reverse
 from rest_framework import serializers
 
-from app_attachment.models import Attachment
+from app_catalog.selectors import attachment_for
 from app_material.models.material import (
-    MaterialType, ApplicationScenario, TestConfig,
-    MaterialLibrary, MaterialDataPoint, MaterialCharacteristic,
+    ApplicationScenario,
+    MaterialCharacteristic,
+    MaterialDataPoint,
+    MaterialLibrary,
+    MaterialProcessingCondition,
+    MaterialType,
+    TestConfig,
 )
 
 
@@ -40,11 +45,15 @@ class MaterialDataPointSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = MaterialDataPoint
-        fields = ('id', 'test_config', 'value', 'value_text', 'unit', 'remark')
+        fields = (
+            'id', 'test_config', 'value', 'value_text', 'unit', 'remark',
+            'min_value', 'max_value', 'min_value_text', 'max_value_text',
+        )
 
 
 class MaterialLightSerializer(serializers.ModelSerializer):
-    """材料列表轻量序列化：供目录列表页渲染。"""
+    """材料列表。"""
+
     pk = serializers.IntegerField(source='id', read_only=True)
     display_name = serializers.CharField(source='grade_name', read_only=True)
     category = MaterialTypeSerializer(read_only=True)
@@ -55,61 +64,83 @@ class MaterialLightSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaterialLibrary
         fields = (
-            'pk', 'display_name', 'grade_name', 'manufacturer',
+            'pk', 'display_name', 'grade_name', 'manufacturer', 'sap_material_code',
             'category', 'scenarios', 'characteristics',
+            'flammability', 'material_color_name', 'pantone_code', 'rgb_value',
             'description', 'published_at',
         )
 
 
+class MaterialProcessingConditionSerializer(serializers.ModelSerializer):
+    """典型加工条件。不带内部主键和材料外键。"""
+
+    class Meta:
+        model = MaterialProcessingCondition
+        fields = (
+            'melt_temp_value', 'melt_temp_range',
+            'barrel_rear_value', 'barrel_rear_range',
+            'barrel_center_value', 'barrel_center_range',
+            'barrel_front_value', 'barrel_front_range',
+            'mold_temp_value', 'mold_temp_range',
+            'temp_limit_value', 'temp_limit_range',
+            'injection_speed_value', 'injection_speed_range',
+            'pre_dry_value', 'pre_dry_range',
+        )
+
+
 class MaterialDetailSerializer(MaterialLightSerializer):
-    """材料详情序列化：在列表字段基础上追加性能分组与文件下载链接。"""
+    """详情。物性和文档链接对持有服务端密钥的调用方始终返回。"""
+
     file_tds = serializers.SerializerMethodField()
     file_msds = serializers.SerializerMethodField()
     file_rohs = serializers.SerializerMethodField()
     grouped_properties = serializers.SerializerMethodField()
+    processing_condition = serializers.SerializerMethodField()
 
     class Meta(MaterialLightSerializer.Meta):
         fields = MaterialLightSerializer.Meta.fields + (
-            'flammability', 'file_tds', 'file_msds', 'file_rohs', 'grouped_properties',
+            'file_tds', 'file_msds', 'file_rohs',
+            'grouped_properties', 'processing_condition',
         )
 
-    def _is_member(self):
-        return bool(self.context.get('is_member'))
+    def get_processing_condition(self, obj):
+        """没填加工条件时一对一访问会抛异常，详情应返回 null 而不是 500。"""
+        try:
+            condition = obj.processing_condition
+        except MaterialProcessingCondition.DoesNotExist:
+            return None
+        return MaterialProcessingConditionSerializer(condition).data
 
-    def _attachment_url(self, obj, category):
-        if not self._is_member():
+    def _file_url(self, obj, file_type, category):
+        if attachment_for(obj, category) is None:
             return None
+        path = reverse(
+            'app_catalog:material_download',
+            kwargs={'pk': obj.pk, 'file_type': file_type},
+        )
         request = self.context.get('request')
-        if not request:
-            return None
-        ct = ContentType.objects.get_for_model(obj)
-        att = Attachment.objects.filter(
-            content_type=ct, object_id=obj.pk,
-            category=category, is_deleted=False,
-        ).first()
-        return request.build_absolute_uri(att.file.url) if att and att.file else None
+        if request is None:
+            return path
+        return request.build_absolute_uri(path)
 
     def get_file_tds(self, obj):
-        return self._attachment_url(obj, 'TDS')
+        return self._file_url(obj, 'tds', 'TDS')
 
     def get_file_msds(self, obj):
-        return self._attachment_url(obj, 'MSDS')
+        return self._file_url(obj, 'msds', 'MSDS')
 
     def get_file_rohs(self, obj):
-        return self._attachment_url(obj, 'RoHS')
+        return self._file_url(obj, 'rohs', 'RoHS')
 
     def get_grouped_properties(self, obj):
-        if not self._is_member():
-            return []
         grouped = defaultdict(list)
-        points = obj.properties.select_related('test_config', 'test_config__category').order_by(
-            'test_config__category__order', 'test_config__order'
-        )
+        points = list(obj.properties.all())
         for point in points:
             grouped[point.test_config.category.name].append(
                 MaterialDataPointSerializer(point, context=self.context).data
             )
-        result, seen = [], []
+        result = []
+        seen = []
         for point in points:
             cat_name = point.test_config.category.name
             if cat_name not in seen:

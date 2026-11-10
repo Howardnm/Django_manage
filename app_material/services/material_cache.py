@@ -164,7 +164,7 @@ class MaterialCache:
     def current_version():
         """返回权威 L2 版本号（直接读 DatabaseCache，跨 worker 一致）。
 
-        供主系统对外暴露给电子手册子系统做一致性校验；缓存不可用时返回空字符串。
+        缓存不可用时返回空字符串。目录接口直接读这份缓存，不再对外部暴露版本号。
         """
         try:
             return _material_cache().get(MATERIAL_VERSION_KEY, '')

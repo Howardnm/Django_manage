@@ -7,7 +7,7 @@ class CustomerActivityOverviewView(PanelAccessMixin, ListView):
     """
     客户行为全览看板：
     - 准入：内部全员 (INTERNAL_STAFF)。
-    - 功能：展示外部会员在电子手册上的实时轨迹和热点分析。
+    - 功能：只读历史行为。目录 API 不再写入新的浏览/下载记录。
     """
     permission_required = 'app_repository.view_customer'
     model = ExternalMemberActivity

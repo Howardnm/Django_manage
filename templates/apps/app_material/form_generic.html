@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load attachment_tags %}
 
 {% block content %}
 <div class="page-header d-print-none">
@@ -9,7 +10,7 @@
     </div>
 </div>
 
-<div class="card">
+<div class="card mb-3">
     <div class="card-body">
         <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
@@ -43,4 +44,9 @@
         </form>
     </div>
 </div>
+
+{# 指标分类、客户、OEM 共用本模板，只有三个维度的编辑页打开背景图面板 #}
+{% if show_background_panel %}
+    {% attachment_panel object %}
+{% endif %}
 {% endblock %}

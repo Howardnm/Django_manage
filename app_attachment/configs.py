@@ -48,6 +48,9 @@ class AttachmentConfig:
     # 每个父对象最大附件数（None = 不限制）
     max_attachments: Optional[int] = None
 
+    # 允许的文件后缀（不含点，小写）。None = 不额外限制，沿用上传表单的全局类型
+    allowed_extensions: Optional[Tuple[str, ...]] = None
+
     # 是否允许上传/删除操作（模板中控制按钮显示）
     allow_upload: bool = True
     allow_delete: bool = True
@@ -70,3 +73,14 @@ class AttachmentConfig:
     # 用于 upload_file_path 确定文件存储子目录
     # 默认: str(parent_obj.pk)
     folder_id_resolver: Optional[Callable] = None
+
+    def allows_filename(self, filename) -> bool:
+        """未限制扩展名时一律通过。比较的是最后一个后缀，大小写不敏感。"""
+        if not self.allowed_extensions:
+            return True
+        name = str(filename or '').replace('\\', '/').rsplit('/', 1)[-1]
+        if '.' not in name:
+            return False
+        suffix = name.rsplit('.', 1)[-1].lower()
+        allowed = {ext.lower().lstrip('.') for ext in self.allowed_extensions}
+        return suffix in allowed

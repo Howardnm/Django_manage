@@ -2,7 +2,7 @@
 
 导出: UserRole, RoleGroup, ModuleAccessConfig, SidebarModule, SidebarSubItem,
       PermissionGroup, Subsidiary, Department, OrgRole,
-      OrgRoleAssignment, ReviewGroup, WorkGroup, User。"""
+      OrgRoleAssignment, ReviewGroup, WorkGroup, User, ServiceApiKey。"""
 
 import uuid
 from django.db import models
@@ -507,5 +507,32 @@ class SidebarSubItem(models.Model):
 
     def __str__(self):
         return f"{self.module.name} > {self.name}"
+
+
+class ServiceApiKey(models.Model):
+    """CRM 等外部系统调用目录 API 的服务端密钥。
+
+    不挂到 User，避免这把钥匙能登录后台。expires_at 为空表示永不过期。
+    明文只在生成时出现一次，库里只存 SHA-256。
+    """
+
+    name = models.CharField("名称", max_length=100, help_text="例如：CRM 官网")
+    key_prefix = models.CharField("密钥前缀", max_length=16, editable=False)
+    key_hash = models.CharField(max_length=64, unique=True, editable=False)
+    is_active = models.BooleanField("启用", default=True)
+    expires_at = models.DateTimeField(
+        "过期时间", null=True, blank=True,
+        help_text="留空表示永不过期。填写后到期即拒绝。",
+    )
+    last_used_at = models.DateTimeField("最近使用", null=True, blank=True, editable=False)
+    created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "服务端 API 密钥"
+        verbose_name_plural = "服务端 API 密钥"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.key_prefix})"
 
 

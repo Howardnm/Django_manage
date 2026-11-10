@@ -43,8 +43,8 @@ class CustomLoginView(LoginView):
         """验证用户身份后执行 INTERNAL_STAFF 角色检查，处理 session 过期策略。Args: form: UserLoginForm。Returns: HttpResponse。"""
         # --- 核心拦截：只允许内部成员用户登录此管理系统 ---
         user = form.get_user()
-        # 外部角色 (CUSTOMER, OEM) 禁止登录此后台管理系统
-        # 他们应该前往电子手册系统 (app_catalog)
+        # 外部角色 (CUSTOMER, OEM) 禁止登录此后台管理系统。
+        # 官网目录由 CRM 调用 /api/catalog/v1/，不在这里登录。
         allowed_roles = IdentityService.get_internal_role_codes()
         
         if not user.is_superuser and user.user_type not in allowed_roles:

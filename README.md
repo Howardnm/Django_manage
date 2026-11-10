@@ -16,12 +16,12 @@
 | `app_project` | `/project/` | 项目管理（6 阶段 + 量产过程跟踪）、绩效考核 |
 | `app_repository` | `/repository/` | 项目物料仓库、OEM/客户管理 |
 | `app_material` | `/material/` | 物料主数据、性能指标、测试标准 |
-| `app_external_api` | `/api/external/` | 对外数据接口（只读资源 · 鉴权 · 下载） |
+| `app_external_api` | — | 外部行为历史日志（只读留存，不再写入） |
 | `app_raw_material` | `/raw-material/` | 原材料类型、供应商、批次管理 |
 | `app_process` | `/process/` | 挤出工艺参数、螺杆组合、设备管理 |
 | `app_formula` | `/formula/` | 实验配方 BOM、测试结果、配色粉配方 |
 | `app_basic_research` | `/research/` | 基础预研项目（6 阶段独立生命周期） |
-| `app_catalog` | `/catalog/` | 产品电子手册（纯前端展示，实时拉取主系统） |
+| `app_catalog` | `/api/catalog/v1/` | 官网目录 API（CRM 用服务端密钥读取已发布材料） |
 | `app_workflow` | `/workflow/` | BPMN 工作流引擎、任务分配（4 种指派模式） |
 | `app_form_management` | `/forms/` | 动态表单生成器（分步骤流程适配） |
 | `app_trial_production` | `/trial-production/` | 试验排产、挤出注塑任务、样品库存 |
@@ -408,12 +408,12 @@ Django_manage/
 ├── app_project/                # 项目 · 绩效
 ├── app_repository/             # OEM · 客户 · 项目档案
 ├── app_material/               # 物料主数据
-├── app_external_api/           # 对外数据接口
+├── app_external_api/           # 外部行为历史日志
 ├── app_raw_material/           # 原材料
 ├── app_process/                # 工艺参数
 ├── app_formula/                # 配方 BOM
 ├── app_basic_research/         # 基础研究
-├── app_catalog/                # 产品电子手册（纯前端）
+├── app_catalog/                # 官网目录 API（/api/catalog/v1/）
 ├── app_workflow/               # 工作流引擎
 ├── app_form_management/        # 动态表单
 ├── app_trial_production/       # 试验排产

@@ -261,24 +261,13 @@ SESSION_EXPIRE_AT_BROWSER_CLOSE = True  # 默认关闭浏览器后需重新登�
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
-    'DEFAULT_THROTTLE_RATES': {
-        'auth_verify': '10/min',
-    },
 }
 
 
 # ==============================================================================
-# 主系统 ↔ 电子手册子系统（app_catalog）集成配置
+# MCP Streamable HTTP
 # ==============================================================================
-# 当前为「单工程双实例」部署：主系统与手册系统共用本 settings.py。
-# 手册系统（app_catalog）设计为可独立迁移，迁移时按下侧标注摘取配置。
-
-# 通信安全 Token（两侧必须一致）：
-#   主系统侧 —— InternalApiTokenPermission 校验入站请求头 X-Internal-Api-Token
-#   手册系统侧 —— CatalogGateway 出站请求携带该头
-INTERNAL_API_TOKEN = os.environ.get('INTERNAL_API_TOKEN', '')
-
-# MCP Streamable HTTP：IT 签发的 RS256 JWT（Authorization: Bearer <JWT>）。
+# IT 签发的 RS256 JWT（Authorization: Bearer <JWT>）。
 # 无公钥时 HTTP /mcp 全部 401。PATH 优先于 KEY。
 _MCP_JWT_PUBLIC_KEY_DEFAULT = (
     "-----BEGIN PUBLIC KEY-----\n"
@@ -294,17 +283,6 @@ _MCP_JWT_PUBLIC_KEY_DEFAULT = (
 MCP_JWT_PUBLIC_KEY = os.environ.get('MCP_JWT_PUBLIC_KEY') or _MCP_JWT_PUBLIC_KEY_DEFAULT
 MCP_JWT_PUBLIC_KEY_PATH = os.environ.get('MCP_JWT_PUBLIC_KEY_PATH', '') or ''
 MCP_JWT_LEEWAY = int(os.environ.get('MCP_JWT_LEEWAY', '30'))
-
-# ── 手册系统侧配置（迁移手册系统时，以下 3 项需一并带走）──────────────
-# 主系统对外接口基础地址：手册系统连接主系统的入口（结尾需带斜杠）
-EXTERNAL_API_BASE_URL = os.environ.get('EXTERNAL_API_BASE_URL', 'http://127.0.0.1:8000/api/external/')
-# 手册系统本地 worker 内存缓存：轮询主系统数据版本号的间隔（秒）
-CATALOG_CACHE_VERSION_CHECK_INTERVAL = int(os.environ.get('CATALOG_CACHE_VERSION_CHECK_INTERVAL', '5'))
-# 手册系统请求主系统的超时（秒）
-REMOTE_API_TIMEOUT = float(os.environ.get('REMOTE_API_TIMEOUT', '15'))
-
-# ── 主系统侧配置（本实例作为主系统对外提供数据时使用）──────────────
-# 材料库对外接口的 L2 版本号缓存见下方 CACHES['material']，无需在此额外配置。
 
 
 # ==============================================================================

@@ -17,7 +17,7 @@ def permission_denied_view(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('app_panel.urls')),
-    path('catalog/', include('app_catalog.urls')), 
+    path('api/catalog/v1/', include('app_catalog.urls')),
     path('project/', include('app_project.urls')),
     path('workflow/', include('app_workflow.urls')), # 【新增】工作流中心
     path('research/', include('app_basic_research.urls')),
@@ -31,9 +31,6 @@ urlpatterns = [
     path('common/', include('common_utils.urls')),
     path('notifications/', include('app_notification.urls')),
     
-    # 对外数据接口：由 app_external_api 管控
-    path('api/external/', include('app_external_api.urls')),
-
     # SAP BOM。会话登录，不走对外令牌。
     path('api/sap/', include('app_sap_services.api.urls')),
 

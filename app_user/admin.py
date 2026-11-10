@@ -1,7 +1,7 @@
 """Django Admin 配置。注册全部 app_user 模型的管理界面。"""
 
 from django import forms
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.admin.widgets import FilteredSelectMultiple
 from django.contrib.auth.admin import UserAdmin, GroupAdmin
 from django.contrib.auth.forms import UserCreationForm
@@ -11,8 +11,9 @@ from .models import (
     User, Department, Subsidiary, OrgRole, OrgRoleAssignment,
     ReviewGroup, WorkGroup, PermissionGroup,
     UserRole, RoleGroup, ModuleAccessConfig,
-    SidebarModule, SidebarSubItem,
+    SidebarModule, SidebarSubItem, ServiceApiKey,
 )
+from .services.service_api_key import issue_token, rotate_service_api_key
 
 admin.site.unregister(Group)
 
@@ -538,3 +539,37 @@ class SidebarModuleAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ServiceApiKey)
+class ServiceApiKeyAdmin(admin.ModelAdmin):
+    """服务端 API 密钥。新建或轮换时明文只提示一次。"""
+
+    list_display = ('name', 'key_prefix', 'is_active', 'expires_at', 'last_used_at', 'created_at')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'key_prefix')
+    readonly_fields = ('key_prefix', 'last_used_at', 'created_at')
+    fields = ('name', 'is_active', 'expires_at', 'key_prefix', 'last_used_at', 'created_at')
+    actions = ('deactivate_keys', 'rotate_keys')
+
+    def save_model(self, request, obj, form, change):
+        token = None
+        if not change:
+            token = issue_token(obj)
+        super().save_model(request, obj, form, change)
+        if token:
+            messages.warning(request, f"密钥明文只显示这一次，请立即复制：{token}")
+
+    @admin.action(description='停用所选密钥')
+    def deactivate_keys(self, request, queryset):
+        updated = queryset.update(is_active=False)
+        self.message_user(request, f"已停用 {updated} 把密钥")
+
+    @admin.action(description='轮换所选密钥（旧密钥立即失效）')
+    def rotate_keys(self, request, queryset):
+        for obj in queryset:
+            token = rotate_service_api_key(obj)
+            messages.warning(
+                request,
+                f"{obj.name}（{obj.key_prefix}）新密钥只显示这一次：{token}",
+            )

@@ -1,5 +1,5 @@
 from django.db.models import Count
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView
 
 from app_material.forms import MaterialCharacteristicForm
@@ -46,7 +46,10 @@ class CharacteristicCreateView(MaterialAccessMixin, CreateView):
     model = MaterialCharacteristic
     form_class = MaterialCharacteristicForm
     template_name = 'apps/app_material/form_generic.html'
-    success_url = reverse_lazy('characteristic_list')
+
+    def get_success_url(self):
+        """先落库拿到主键，再去编辑页上传背景图。"""
+        return reverse('characteristic_edit', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -65,4 +68,5 @@ class CharacteristicUpdateView(MaterialAccessMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['page_title'] = f'编辑特征: {self.object.name}'
+        context['show_background_panel'] = True
         return context
