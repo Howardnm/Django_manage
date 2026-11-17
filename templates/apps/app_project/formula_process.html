@@ -24,7 +24,7 @@
                         <i class="ti ti-columns me-1"></i> 全局配方对比
                     </a>
                 {% endif %}
-                <a href="{% url 'finished_bom_sync' %}{% if project.material.sap_material_code %}?sap_code={{ project.material.sap_material_code|urlencode }}{% endif %}" class="btn btn-white" target="_blank" rel="noopener">
+                <a href="{% url 'finished_bom_sync' %}{% if project.material.sap_material_code %}?sap_code={{ project.material.sap_material_code|urlencode }}{% endif %}" class="btn btn-outline-green" target="_blank" rel="noopener">
                     <i class="ti ti-cloud-upload me-1"></i> BOM 发布
                 </a>
             </div>
