@@ -1,4 +1,4 @@
-// 选文件时按 data-max-bytes 校验。通过后才放开上传按钮，避免超限文件先上传。
+// 点击上传时才按 data-max-bytes 校验。通过才让 POST 发出，否则留在模态框里提示。
 // 上传框会由 HTMX 塞进不同页面的模态框，所以脚本放在 base.html，监听绑在 document 上。
 (function () {
   if (window.__attachmentUploadSizeBound) return;
@@ -38,39 +38,17 @@
     if (alert) alert.remove();
   }
 
-  function setSubmitEnabled(input, enabled) {
-    var form = input.closest('form');
-    var button = form && form.querySelector('button[type="submit"]');
-    if (button) button.disabled = !enabled;
-  }
-
-  document.addEventListener('change', function (event) {
-    var input = event.target;
-    if (!input.matches || !input.matches('input[type="file"][data-max-bytes]')) return;
-    var file = oversized(input);
-    if (file) {
-      input.value = '';
-      showError(input, file);
-      setSubmitEnabled(input, false);
-      return;
-    }
-    clearError(input);
-    setSubmitEnabled(input, !!(input.files && input.files[0]));
-  }, true);
-
   document.addEventListener('submit', function (event) {
     var form = event.target;
     if (!form || !form.querySelector) return;
     var input = form.querySelector('input[type="file"][data-max-bytes]');
     if (!input) return;
     var file = oversized(input);
-    var chosen = input.files && input.files[0];
-    if (!file && chosen) return;
-    event.preventDefault();
-    if (file) {
-      input.value = '';
-      showError(input, file);
+    if (!file) {
+      clearError(input);
+      return;
     }
-    setSubmitEnabled(input, false);
+    event.preventDefault();
+    showError(input, file);
   }, true);
 })();

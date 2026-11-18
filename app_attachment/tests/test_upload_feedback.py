@@ -43,9 +43,9 @@ class UploadFailureFeedbackTests(TestCase):
         response = self.client.get(self.url)
         self.assertContains(response, f'data-max-bytes="{MAX_UPLOAD_BYTES}"')
         self.assertContains(response, '最大 50MB')
-        self.assertContains(response, 'type="submit" class="btn btn-primary" disabled')
+        self.assertNotContains(response, 'type="submit" class="btn btn-primary" disabled')
         self.assertIn(
-            'js/apps/app_attachment/upload_size.js',
+            "js/apps/app_attachment/upload_size.js' %}?v=2",
             get_template('base.html').template.source,
         )
 
