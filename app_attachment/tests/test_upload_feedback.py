@@ -6,7 +6,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.utils import DataError
-from django.template.loader import render_to_string
+from django.template.loader import get_template
 from django.test import TestCase
 from django.urls import reverse
 
@@ -43,12 +43,11 @@ class UploadFailureFeedbackTests(TestCase):
         response = self.client.get(self.url)
         self.assertContains(response, f'data-max-bytes="{MAX_UPLOAD_BYTES}"')
         self.assertContains(response, '最大 50MB')
-        panel = render_to_string('apps/app_attachment/_attachment_panel.html', {
-            'content_type_id': 1,
-            'object_id': 1,
-            'config': None,
-        })
-        self.assertIn('js/apps/app_attachment/upload_size.js', panel)
+        self.assertContains(response, 'type="submit" class="btn btn-primary" disabled')
+        self.assertIn(
+            'js/apps/app_attachment/upload_size.js',
+            get_template('base.html').template.source,
+        )
 
     def test_invalid_htmx_post_shows_error_in_modal(self):
         response = self.client.post(self.url, HTTP_HX_REQUEST='true')
