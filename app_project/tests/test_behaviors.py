@@ -242,6 +242,11 @@ class ProjectStagePipelineTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('remark', form.errors)
 
+        for status in ('DONE', 'PAUSED'):
+            form = ProjectNodeUpdateForm({'status': status, 'remark': '  '}, instance=rnd)
+            self.assertFalse(form.is_valid(), status)
+            self.assertIn('remark', form.errors)
+
         project = _complete_progress_nodes(project)
         track = project.nodes.get(stage=ProjectStage.MASS_TRACK)
         form = ProjectNodeUpdateForm({'status': 'TERMINATED', 'remark': '停'}, instance=track)

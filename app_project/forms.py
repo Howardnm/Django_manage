@@ -66,7 +66,10 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
         widgets = {
             # status 字段会通过 TablerFormMixin 自动获得 form-select 样式
             'status': forms.Select(),
-            'remark': forms.Textarea(attrs={'rows': 12, 'placeholder': '填写备注信息...'}),
+            'remark': forms.Textarea(attrs={
+                'rows': 12,
+                'placeholder': '已完成、暂停、已终止时必填',
+            }),
         }
 
     def __init__(self, *args, **kwargs):
@@ -88,8 +91,10 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
-        if cleaned.get('status') == 'TERMINATED' and not (cleaned.get('remark') or '').strip():
-            self.add_error('remark', '终止项目时必须填写原因')
+        status = cleaned.get('status')
+        remark = (cleaned.get('remark') or '').strip()
+        if status in ('DONE', 'PAUSED', 'TERMINATED') and not remark:
+            self.add_error('remark', '选择已完成、暂停或已终止时必须填写备注')
         return cleaned
 
 
