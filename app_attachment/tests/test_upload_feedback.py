@@ -1,6 +1,7 @@
 """上传失败时，HTMX 弹窗里要能看到提示，而不是错误页或下一次整页的 message。"""
 from unittest.mock import patch
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
@@ -43,11 +44,18 @@ class UploadFailureFeedbackTests(TestCase):
         response = self.client.get(self.url)
         self.assertContains(response, f'data-max-bytes="{MAX_UPLOAD_BYTES}"')
         self.assertContains(response, '最大 50MB')
-        self.assertNotContains(response, 'type="submit" class="btn btn-primary" disabled')
+        self.assertContains(response, 'attachmentUploadSize.check(this)')
+        self.assertContains(response, 'attachmentUploadSize.reset(this)')
+        self.assertContains(
+            response,
+            'type="submit" class="btn btn-primary" data-upload-submit disabled',
+        )
         self.assertIn(
-            "js/apps/app_attachment/upload_size.js' %}?v=2",
+            "js/apps/app_attachment/upload_size.js' %}?v=3",
             get_template('base.html').template.source,
         )
+        script = (settings.BASE_DIR / 'static/js/apps/app_attachment/upload_size.js').read_text(encoding='utf-8')
+        self.assertNotIn('addEventListener', script)
 
     def test_invalid_htmx_post_shows_error_in_modal(self):
         response = self.client.post(self.url, HTTP_HX_REQUEST='true')

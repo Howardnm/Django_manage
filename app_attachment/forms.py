@@ -63,6 +63,7 @@ class AttachmentUploadForm(TablerFormMixin, forms.ModelForm):
             'class': 'form-control',
             'accept': self._accept_value(config),
             'data-max-bytes': MAX_UPLOAD_BYTES,
+            'onchange': 'attachmentUploadSize.reset(this)',
         })
 
     @staticmethod

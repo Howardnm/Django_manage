@@ -1,54 +1,50 @@
-// 点击上传时才按 data-max-bytes 校验。通过才让 POST 发出，否则留在模态框里提示。
-// 上传框会由 HTMX 塞进不同页面的模态框，所以脚本放在 base.html，监听绑在 document 上。
-(function () {
-  if (window.__attachmentUploadSizeBound) return;
-  window.__attachmentUploadSizeBound = true;
+// 点「校验」才看 file.size。通过才放开上传按钮。不监听 document，也不改 input.value。
+window.attachmentUploadSize = {
+  check: function (button) {
+    var form = button.closest('form');
+    var input = form && form.querySelector('input[type="file"][data-max-bytes]');
+    var submit = form && form.querySelector('[data-upload-submit]');
+    if (!input || !submit) return;
 
-  function maxBytes(input) {
-    var max = Number(input.getAttribute('data-max-bytes'));
-    return max > 0 ? max : 0;
-  }
-
-  function oversized(input) {
-    var max = maxBytes(input);
     var file = input.files && input.files[0];
-    if (!max || !file || file.size <= max) return null;
-    return file;
-  }
+    if (!file) {
+      submit.disabled = true;
+      this._show(input, '请先选择文件。', true);
+      return;
+    }
 
-  function showError(input, file) {
+    var max = Number(input.getAttribute('data-max-bytes'));
+    if (max > 0 && file.size > max) {
+      submit.disabled = true;
+      var maxMb = max / 1024 / 1024;
+      var maxLabel = maxMb % 1 === 0 ? String(maxMb) : maxMb.toFixed(2);
+      var actual = (file.size / 1024 / 1024).toFixed(2);
+      this._show(input, '文件大小不能超过 ' + maxLabel + 'MB。当前文件大小: ' + actual + 'MB', true);
+      return;
+    }
+
+    submit.disabled = false;
+    this._show(input, '文件大小符合要求，可以上传', false);
+  },
+
+  reset: function (input) {
+    var form = input.closest('form');
+    var submit = form && form.querySelector('[data-upload-submit]');
+    if (submit) submit.disabled = true;
+    var body = input.closest('.modal-body') || input.parentNode;
+    var alert = body && body.querySelector('[data-upload-size-error]');
+    if (alert) alert.remove();
+  },
+
+  _show: function (input, text, isError) {
     var body = input.closest('.modal-body') || input.closest('form') || input.parentNode;
     var alert = body.querySelector('[data-upload-size-error]');
     if (!alert) {
       alert = document.createElement('div');
-      alert.className = 'alert alert-danger';
       alert.setAttribute('data-upload-size-error', '');
       body.insertBefore(alert, body.firstChild);
     }
-    var max = maxBytes(input);
-    var maxMb = max / 1024 / 1024;
-    var maxLabel = maxMb % 1 === 0 ? String(maxMb) : maxMb.toFixed(2);
-    var actual = (file.size / 1024 / 1024).toFixed(2);
-    alert.textContent = '文件大小不能超过 ' + maxLabel + 'MB。当前文件大小: ' + actual + 'MB';
+    alert.className = isError ? 'alert alert-danger' : 'alert alert-success';
+    alert.textContent = text;
   }
-
-  function clearError(input) {
-    var body = input.closest('.modal-body') || input.parentNode;
-    var alert = body && body.querySelector('[data-upload-size-error]');
-    if (alert) alert.remove();
-  }
-
-  document.addEventListener('submit', function (event) {
-    var form = event.target;
-    if (!form || !form.querySelector) return;
-    var input = form.querySelector('input[type="file"][data-max-bytes]');
-    if (!input) return;
-    var file = oversized(input);
-    if (!file) {
-      clearError(input);
-      return;
-    }
-    event.preventDefault();
-    showError(input, file);
-  }, true);
-})();
+};
