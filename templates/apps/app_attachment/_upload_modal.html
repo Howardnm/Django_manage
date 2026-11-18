@@ -12,6 +12,9 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
     <div class="modal-body">
+        {% if upload_error %}
+        <div class="alert alert-danger">{{ upload_error }}</div>
+        {% endif %}
         {% if form.non_field_errors %}
         <div class="alert alert-danger">
             {{ form.non_field_errors }}

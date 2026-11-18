@@ -53,7 +53,8 @@ class AttachmentPreviewKindTests(SimpleTestCase):
 
 class AttachmentUploadAcceptTests(SimpleTestCase):
     def test_accept_includes_iges(self):
-        accept = AttachmentUploadForm._get_accept_types()
+        # 未限制扩展名时走默认 accept；配了 allowed_extensions 的业务不走这份列表
+        accept = AttachmentUploadForm._accept_value(None)
         self.assertIn('.stp', accept)
         self.assertIn('.step', accept)
         self.assertIn('.igs', accept)

@@ -1,5 +1,6 @@
 """app_project 通知接线测试：ProjectNode 更新 → 项目负责人与成员收到通知。"""
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from app_notification.models import Notification
@@ -177,6 +178,78 @@ class ProjectStagePipelineTests(TestCase):
         self.assertGreater(feedback.order, track.order)
         self.assertEqual(project.current_active_node.pk, track.pk)
         self.assertEqual(project.progress_percent, 100)
+
+    def test_terminate_from_current_node_drops_later_pending(self):
+        manager = _make_user('term_mgr')
+        project = Project.objects.create(name='终止项目', manager=manager)
+        for stage in (ProjectStage.INIT, ProjectStage.RND):
+            node = project.nodes.get(stage=stage)
+            node.status = 'DONE'
+            node.save()
+        pilot = project.nodes.get(stage=ProjectStage.PILOT)
+
+        project.terminate_from(pilot, '客户取消')
+        project.refresh_from_db()
+        pilot.refresh_from_db()
+
+        self.assertEqual(pilot.status, 'TERMINATED')
+        self.assertEqual(pilot.remark, '客户取消')
+        self.assertTrue(project.nodes.filter(stage=ProjectStage.INIT, status='DONE').exists())
+        self.assertFalse(project.nodes.filter(order__gt=pilot.order, status='PENDING').exists())
+        self.assertFalse(project.nodes.filter(stage=ProjectStage.MASS_TRACK).exists())
+        self.assertFalse(project.nodes.filter(stage=ProjectStage.FEEDBACK).exists())
+        self.assertTrue(project.is_terminated)
+        self.assertEqual(project.current_stage, ProjectStage.PILOT)
+
+    def test_mass_track_cannot_terminate(self):
+        manager = _make_user('track_term_mgr')
+        project = Project.objects.create(name='跟踪终止', manager=manager)
+        project = _complete_progress_nodes(project)
+        track = project.nodes.get(stage=ProjectStage.MASS_TRACK)
+        before = project.nodes.count()
+
+        with self.assertRaises(ValidationError):
+            project.terminate_from(track, '不想跟踪了')
+        track.refresh_from_db()
+        project.refresh_from_db()
+        self.assertEqual(track.status, 'DOING')
+        self.assertEqual(project.nodes.count(), before)
+        self.assertFalse(project.is_terminated)
+
+    def test_customer_feedback_stop_does_not_terminate(self):
+        manager = _make_user('stop_mgr')
+        project = Project.objects.create(name='意见不终止', manager=manager)
+        pilot = project.nodes.get(stage=ProjectStage.PILOT)
+        before = list(project.nodes.order_by('order').values_list('pk', 'status'))
+
+        with self.assertRaises(ValueError):
+            project.handle_customer_feedback(pilot, 'STOP', '不想做了')
+
+        pilot.refresh_from_db()
+        self.assertNotEqual(pilot.status, 'TERMINATED')
+        after = list(project.nodes.order_by('order').values_list('pk', 'status'))
+        self.assertEqual(before, after)
+
+    def test_update_form_terminated_requires_remark_and_blocks_mass_track(self):
+        manager = _make_user('form_term_mgr')
+        project = Project.objects.create(name='表单终止', manager=manager)
+        rnd = project.nodes.get(stage=ProjectStage.RND)
+
+        form = ProjectNodeUpdateForm({'status': 'TERMINATED', 'remark': '客户取消'}, instance=rnd)
+        self.assertTrue(form.is_valid())
+
+        form = ProjectNodeUpdateForm({'status': 'TERMINATED', 'remark': '   '}, instance=rnd)
+        self.assertFalse(form.is_valid())
+        self.assertIn('remark', form.errors)
+
+        project = _complete_progress_nodes(project)
+        track = project.nodes.get(stage=ProjectStage.MASS_TRACK)
+        form = ProjectNodeUpdateForm({'status': 'TERMINATED', 'remark': '停'}, instance=track)
+        self.assertFalse(form.is_valid())
+        self.assertIn('status', form.errors)
+
+        form = ProjectNodeUpdateForm({'status': 'PAUSED', 'remark': '暂停跟进'}, instance=track)
+        self.assertTrue(form.is_valid())
 
 
 # ── 测试数据回写页（FormulaMeanWritebackView）──

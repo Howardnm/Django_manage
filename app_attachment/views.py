@@ -4,6 +4,7 @@
 提供统一的附件上传、列表、下载、删除功能。
 所有视图通过 PermissionAdapter 自动适配各业务模块的权限策略。
 """
+import logging
 import uuid as _uuid
 
 from django.contrib import messages
@@ -18,6 +19,12 @@ from .forms import AttachmentUploadForm
 from .models import Attachment
 from .registry import get_attachment_config_for_ct
 from .utils import PermissionAdapter
+
+logger = logging.getLogger(__name__)
+
+# HTMX 弹窗里的失败文案。普通表单提交也用同一句，避免两套说法。
+_UPLOAD_FORM_ERROR = '上传失败，请检查文件格式和大小（最大50MB）。'
+_UPLOAD_SAVE_ERROR = '上传失败，文件未能保存，请稍后重试。'
 
 
 # ==========================================
@@ -111,35 +118,16 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
         ct, parent, config = self.resolve_parent(content_type_id, object_id)
         self.check_permission(config, parent, action='add')
 
-        # 分组选项：如果配置了 group_field，尝试从父对象获取节点列表
-        group_choices = None
-        if config.group_field:
-            group_choices = self._get_group_choices(parent, config)
-
         # 支持 URL query param 预填 group_key
         initial_group_key = request.GET.get('group_key', '')
-
         form = AttachmentUploadForm(
             config=config,
             initial={'group_key': initial_group_key},
         )
-
-        # 查找 group_key 对应的显示标签
-        group_label = ''
-        if initial_group_key and group_choices:
-            for key, label in group_choices:
-                if key == initial_group_key:
-                    group_label = label
-                    break
-
-        return render(request, 'apps/app_attachment/_upload_modal.html', {
-            'form': form,
-            'parent': parent,
-            'config': config,
-            'content_type_id': content_type_id,
-            'object_id': object_id,
-            'group_label': group_label,
-        })
+        return self._render_upload_modal(
+            request, parent, config, content_type_id, object_id, form,
+            group_label=self._group_label_for(parent, config, initial_group_key),
+        )
 
     def _get_group_choices(self, parent, config):
         """通过 config.group_choices_resolver 获取分组选项"""
@@ -153,6 +141,43 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
                 pass
         return choices
 
+    def _group_label_for(self, parent, config, group_key):
+        if not group_key or not config.group_field:
+            return ''
+        for key, label in self._get_group_choices(parent, config):
+            if key == group_key:
+                return label
+        return ''
+
+    def _render_upload_modal(
+        self, request, parent, config, content_type_id, object_id, form,
+        group_label='', upload_error='',
+    ):
+        return render(request, 'apps/app_attachment/_upload_modal.html', {
+            'form': form,
+            'parent': parent,
+            'config': config,
+            'content_type_id': content_type_id,
+            'object_id': object_id,
+            'group_label': group_label,
+            'upload_error': upload_error,
+        })
+
+    def _reject_upload(
+        self, request, parent, config, content_type_id, object_id, form, upload_error,
+    ):
+        """HTMX 把错误画回弹窗（200，否则 htmx 2 不替换 4xx）。普通提交仍走 message。"""
+        if request.headers.get('HX-Request'):
+            return self._render_upload_modal(
+                request, parent, config, content_type_id, object_id, form,
+                group_label=self._group_label_for(
+                    parent, config, request.POST.get('group_key', ''),
+                ),
+                upload_error=upload_error,
+            )
+        messages.error(request, upload_error)
+        return redirect(request.META.get('HTTP_REFERER', '/'))
+
     def post(self, request, content_type_id, object_id):
         ct, parent, config = self.resolve_parent(content_type_id, object_id)
         self.check_permission(config, parent, action='add')
@@ -165,13 +190,11 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
                 is_deleted=False,
             ).count()
             if current_count >= config.max_attachments:
-                messages.error(
-                    request,
-                    f'附件数量已达上限（{config.max_attachments}个），请删除旧文件后再上传。'
+                form = AttachmentUploadForm(request.POST, request.FILES, config=config)
+                return self._reject_upload(
+                    request, parent, config, content_type_id, object_id, form,
+                    f'附件数量已达上限（{config.max_attachments}个），请删除旧文件后再上传。',
                 )
-                if request.headers.get('HX-Request'):
-                    return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
-                return redirect(request.META.get('HTTP_REFERER', '/'))
 
         form = AttachmentUploadForm(request.POST, request.FILES, config=config)
 
@@ -180,35 +203,27 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
             attachment.content_type = ct
             attachment.object_id = object_id
             attachment.uploader = request.user
-            attachment.save()
+            try:
+                attachment.save()
+            except Exception:
+                logger.exception(
+                    '附件上传写入失败 content_type=%s object_id=%s',
+                    content_type_id, object_id,
+                )
+                return self._reject_upload(
+                    request, parent, config, content_type_id, object_id, form,
+                    _UPLOAD_SAVE_ERROR,
+                )
 
             messages.success(request, f'文件 "{attachment.display_name}" 上传成功')
             if request.headers.get('HX-Request'):
                 return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
             return redirect(request.META.get('HTTP_REFERER', '/'))
 
-        # 表单验证失败
-        messages.error(request, '上传失败，请检查文件格式和大小（最大50MB）')
-        if request.headers.get('HX-Request'):
-            # 重新获取 group_label（与 GET 逻辑一致）
-            group_label = ''
-            group_key_val = request.POST.get('group_key', '')
-            if group_key_val and config.group_field:
-                choices = self._get_group_choices(parent, config)
-                for key, label in choices:
-                    if key == group_key_val:
-                        group_label = label
-                        break
-            return render(request, 'apps/app_attachment/_upload_modal.html', {
-                'form': form,
-                'parent': parent,
-                'config': config,
-                'content_type_id': content_type_id,
-                'object_id': object_id,
-                'group_label': group_label,
-            }, status=422)
-
-        return redirect(request.META.get('HTTP_REFERER', '/'))
+        return self._reject_upload(
+            request, parent, config, content_type_id, object_id, form,
+            _UPLOAD_FORM_ERROR,
+        )
 
 
 # ==========================================

@@ -59,6 +59,10 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
             with transaction.atomic():
                 new_status = form.cleaned_data.get('status')
 
+                if new_status == 'TERMINATED':
+                    node.project.terminate_from(node, form.cleaned_data.get('remark'))
+                    return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+
                 # --- 优化权限逻辑：提交审批 (状态设为 DONE) 必须由项目负责人执行 ---
                 if new_status == 'DONE' and node.project.approval_workflow:
                     # 检查是否为项目负责人或超级管理员
@@ -173,10 +177,19 @@ class InsertFeedbackView(ProjectAccessMixin, View):
         if denied is not None:
             return denied
 
+        feedback_type = request.POST.get('feedback_type') or 'CHANGE'
+        if feedback_type == 'STOP':
+            feedback_types = FeedbackType.objects.filter(is_active=True).order_by('order', 'name')
+            return render(request, self.template_name, {
+                'node': current_node,
+                'feedback_types': feedback_types,
+                'error': '终止请使用更新状态',
+            })
+
         feedback_type_id = request.POST.get('feedback_type_id')
         current_node.project.handle_customer_feedback(
             current_node=current_node,
-            feedback_type=request.POST.get('feedback_type'),
+            feedback_type=feedback_type,
             content=request.POST.get('remark'),
             feedback_type_obj_id=feedback_type_id or None,
         )

@@ -74,14 +74,23 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
         # 【优化】使用模型类方法获取用户可选的状态选项
         choices = ProjectNode.get_user_selectable_choices()
         if self.instance and self.instance.stage == ProjectStage.MASS_TRACK:
-            choices = [(v, l) for v, l in choices if v != 'DONE']
+            choices = [(v, l) for v, l in choices if v not in ('DONE', 'TERMINATED')]
         self.fields['status'].choices = choices
 
     def clean_status(self):
         status = self.cleaned_data.get('status')
-        if self.instance and self.instance.stage == ProjectStage.MASS_TRACK and status == 'DONE':
-            raise ValidationError('量产过程跟踪不能标记为已完成')
+        if self.instance and self.instance.stage == ProjectStage.MASS_TRACK:
+            if status == 'DONE':
+                raise ValidationError('量产过程跟踪不能标记为已完成')
+            if status == 'TERMINATED':
+                raise ValidationError('量产过程跟踪不能终止项目')
         return status
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('status') == 'TERMINATED' and not (cleaned.get('remark') or '').strip():
+            self.add_error('remark', '终止项目时必须填写原因')
+        return cleaned
 
 
 # 【新增】项目成员管理表单

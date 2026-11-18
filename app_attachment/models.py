@@ -4,6 +4,7 @@
 通过 GenericForeignKey 支持任意业务模型作为父对象，
 替换项目中原有的分散附件子表和内联 FileField。
 """
+import logging
 import uuid
 
 from django.conf import settings
@@ -11,8 +12,10 @@ from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.db import models
 
-from .storage import upload_file_path
+from .storage import register_file_for_rollback, upload_file_path
 from .validators import validate_file_size
+
+logger = logging.getLogger(__name__)
 
 
 class Attachment(models.Model):
@@ -41,6 +44,7 @@ class Attachment(models.Model):
     file = models.FileField(
         '文件附件',
         upload_to=upload_file_path,
+        max_length=255,
         validators=[validate_file_size],
     )
     display_name = models.CharField(
@@ -106,7 +110,7 @@ class Attachment(models.Model):
         return self.display_name or self.filename
 
     def save(self, *args, **kwargs):
-        # 自动填充显示名称
+        # 自动填充显示名称。此时 upload_to 还没跑，file.name 仍是客户端原名。
         if not self.display_name and self.file:
             self.display_name = self.file.name.rsplit('/', 1)[-1]
         # 自动记录文件大小
@@ -115,7 +119,37 @@ class Attachment(models.Model):
                 self.file_size = self.file.size
             except Exception:
                 pass
-        super().save(*args, **kwargs)
+
+        # 新文件在 pre_save 里先落盘，INSERT 失败或外层事务回滚都要删掉。
+        was_new = bool(self.file) and not self.file._committed
+        name_before = self.file.name if was_new else None
+        try:
+            super().save(*args, **kwargs)
+        except Exception:
+            self._discard_new_file(was_new, name_before)
+            raise
+        if was_new:
+            name_after = self.file.name
+            if name_after and name_after != name_before:
+                register_file_for_rollback(
+                    self.file.storage, name_after, using=kwargs.get('using'),
+                )
+
+    def _discard_new_file(self, was_new, name_before):
+        """INSERT 失败时删掉 pre_save 刚写上的新文件，已有文件不动。"""
+        if not was_new or not self.file:
+            return
+        name_after = self.file.name
+        if not name_after or name_after == name_before:
+            return
+        try:
+            self.file.storage.delete(name_after)
+        except Exception:
+            logger.warning(
+                '写入数据库失败后删除附件文件失败: %s', name_after, exc_info=True,
+            )
+        self.file.name = name_before
+        self.file._committed = False
 
     IMAGE_EXTENSIONS = frozenset({
         'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp', 'svg',

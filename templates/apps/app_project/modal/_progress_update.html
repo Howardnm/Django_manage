@@ -6,7 +6,9 @@
 </div>
 
 <!-- hx-post 指向 update 路径 -->
-<form hx-post="{% url 'node_update' node.id %}" hx-swap="none">
+<form hx-post="{% url 'node_update' node.id %}"
+      hx-target="#modal-content-placeholder"
+      hx-swap="innerHTML">
     {% csrf_token %}
     <div class="modal-body">
         <div class="mb-3">
@@ -17,6 +19,9 @@
                     <div class="invalid-feedback d-block">{{ error }}</div>
                 {% endfor %}
             {% endif %}
+            <div id="terminate-warning" class="alert alert-danger mt-2 mb-0{% if form.status.value != 'TERMINATED' %} d-none{% endif %}" role="alert">
+                选择「已终止」后，当前节点记为已终止，其后所有「未开始」节点会被删除，项目标记为已终止。此操作不走审批。
+            </div>
         </div>
         <div class="mb-3">
             <label class="form-label">备注</label>
@@ -33,3 +38,15 @@
         <button type="submit" class="btn btn-primary">保存修改</button>
     </div>
 </form>
+<script>
+(function () {
+    var status = document.getElementById('id_status');
+    var warning = document.getElementById('terminate-warning');
+    if (!status || !warning) return;
+    function sync() {
+        warning.classList.toggle('d-none', status.value !== 'TERMINATED');
+    }
+    status.addEventListener('change', sync);
+    sync();
+})();
+</script>

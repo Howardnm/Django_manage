@@ -1,4 +1,5 @@
 # Create your models here.
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
 from django.utils.text import Truncator  # 导入文字截断器
@@ -158,32 +159,27 @@ class Project(AbstractProjectFields):
             )
 
     def handle_customer_feedback(self, current_node, feedback_type, content, feedback_type_obj_id=None):
+        if feedback_type == 'STOP':
+            raise ValueError('终止请使用更新状态')
         with transaction.atomic():
-            if feedback_type == 'STOP':
-                current_node.status = 'TERMINATED'
-                current_node.save()
-                self.terminate_project(current_node.order, content)
-            else:
-                self.add_iteration_node(ProjectStage.FEEDBACK, current_node.order)
-                feedback_node = self.nodes.filter(order=current_node.order + 1).first()
-                if feedback_node:
-                    feedback_node.status = 'FEEDBACK'
-                    feedback_node.remark = content
-                    if feedback_type_obj_id:
-                        feedback_node.feedback_type_id = feedback_type_obj_id
-                    feedback_node.save()
+            self.add_iteration_node(ProjectStage.FEEDBACK, current_node.order)
+            feedback_node = self.nodes.filter(order=current_node.order + 1).first()
+            if feedback_node:
+                feedback_node.status = 'FEEDBACK'
+                feedback_node.remark = content
+                if feedback_type_obj_id:
+                    feedback_node.feedback_type_id = feedback_type_obj_id
+                feedback_node.save()
 
-    def terminate_project(self, current_node_order, reason):
+    def terminate_from(self, node, reason):
+        """在当前节点终止项目：标记该节点，删除其后未开始节点，不插入客户意见节点。"""
+        if node.stage == ProjectStage.MASS_TRACK:
+            raise ValidationError('量产过程跟踪不能终止项目')
         with transaction.atomic():
-            self.nodes.filter(order__gt=current_node_order, status='PENDING').delete()
-            ProjectNode.objects.create(
-                project=self,
-                stage=ProjectStage.FEEDBACK,
-                order=current_node_order + 1,
-                round=1,
-                status='TERMINATED',
-                remark=f"终止原因：{reason}"
-            )
+            node.status = 'TERMINATED'
+            node.remark = reason
+            node.save()
+            self.nodes.filter(order__gt=node.order, status='PENDING').delete()
 
 
 # 4. 项目信息变更记录（审批申请 + 永久历史记录）
@@ -267,8 +263,8 @@ class ProjectNode(models.Model):
     @classmethod
     def get_user_selectable_choices(cls):
         """【优化】返回用户在界面上可选的状态子集"""
-        # 仅保留：未开始、进行中、暂停、已完成
-        allowed = ['PENDING', 'DOING', 'PAUSED', 'DONE']
+        # 界面可选：未开始、进行中、暂停、已完成、已终止。待审批/异常/客户意见由对应动作产生。
+        allowed = ['PENDING', 'DOING', 'PAUSED', 'DONE', 'TERMINATED']
         return [(v, l) for v, l in cls.STATUS_CHOICES if v in allowed]
 
     @property
