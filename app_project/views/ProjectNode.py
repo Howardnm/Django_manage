@@ -1,3 +1,4 @@
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render
 from django.views import View
@@ -8,6 +9,16 @@ from app_project.forms import ProjectNodeUpdateForm
 from app_project.mixins import ProjectAccessMixin
 from app_project.models import ProjectNode, FailureReason, FeedbackType
 from app_workflow.services import WorkflowService
+
+
+def _edit_denied_refresh(view, project):
+    """非数据所有者：留下 message 并刷新详情页。不能把 PermissionDenied 抛回 mixin，HTMX 会吞掉 JSON 403。"""
+    try:
+        view.check_edit_permission(project)
+    except PermissionDenied as exc:
+        messages.error(view.request, str(exc))
+        return HttpResponse(status=204, headers={'HX-Refresh': 'true'})
+    return None
 
 
 # ==========================================
@@ -39,7 +50,9 @@ class ProjectNodeUpdateView(ProjectAccessMixin, View):
 
     def post(self, request, pk):
         node = self.get_node_and_check_perm(pk)
-        self.check_edit_permission(node.project)
+        denied = _edit_denied_refresh(self, node.project)
+        if denied is not None:
+            return denied
         form = ProjectNodeUpdateForm(request.POST, instance=node)
 
         if form.is_valid():
@@ -124,7 +137,9 @@ class NodeFailedView(ProjectAccessMixin, View):
     def post(self, request, pk):
         node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(node.project)
-        self.check_edit_permission(node.project)
+        denied = _edit_denied_refresh(self, node.project)
+        if denied is not None:
+            return denied
 
         failure_reason_id = request.POST.get('failure_reason_id')
         failure_reason = None
@@ -154,7 +169,9 @@ class InsertFeedbackView(ProjectAccessMixin, View):
     def post(self, request, pk):
         current_node = get_object_or_404(ProjectNode, pk=pk)
         self.check_object_permission(current_node.project)
-        self.check_edit_permission(current_node.project)
+        denied = _edit_denied_refresh(self, current_node.project)
+        if denied is not None:
+            return denied
 
         feedback_type_id = request.POST.get('feedback_type_id')
         current_node.project.handle_customer_feedback(

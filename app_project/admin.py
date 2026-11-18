@@ -18,9 +18,10 @@ class ProjectMemberInline(admin.TabularInline):
 
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
-    list_display = ['name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at']
+    list_display = ['code', 'name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at']
     list_filter = ['current_stage', 'is_terminated', 'manager']
-    search_fields = ['name', 'description']
+    search_fields = ['code', 'name', 'description']
+    search_help_text = '项目编码 / 项目名称 / 描述'
     inlines = [ProjectMemberInline, ProjectNodeInline]
 
     def save_formset(self, request, form, formset, change):

@@ -1,3 +1,4 @@
+from django.core.exceptions import PermissionDenied
 from django.http import JsonResponse, HttpResponse
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,7 +19,7 @@ User = get_user_model()
 
 
 class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
-    """档案更新：需有 change_projectrepository 权限，且仅限本部门。"""
+    """档案更新：需有 change_projectrepository 权限。查看沿用档案对象权限；提交仅超管、项目负责人或业务员。"""
     permission_required = 'app_repository.change_projectrepository'
     model = ProjectRepository
     form_class = ProjectRepositoryForm
@@ -33,6 +34,24 @@ class ProjectRepositoryUpdateView(RepositoryAccessMixin, UpdateView):
         )
         self.check_object_permission(repo)
         return repo
+
+    def _check_repo_edit_permission(self, repo):
+        """超管、项目负责人、业务员可改。不走基类 check_edit_permission：它不解析 project__manager，会把负责人误拒。"""
+        user = self.request.user
+        if user.is_superuser:
+            return
+        if user.pk == repo.project.manager_id or (repo.salesperson_id and user.pk == repo.salesperson_id):
+            return
+        raise PermissionDenied("仅项目负责人或业务员可编辑此档案。")
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        try:
+            self._check_repo_edit_permission(self.object)
+        except PermissionDenied as exc:
+            messages.error(request, str(exc))
+            return self.form_invalid(self.get_form())
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         repo = self.object

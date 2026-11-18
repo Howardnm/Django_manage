@@ -1,5 +1,6 @@
 import json
 
+from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.http import JsonResponse
 from django.db import IntegrityError, transaction
@@ -133,6 +134,15 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
     def get_object(self, queryset=None):
         return self.get_object_or_deny()
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        try:
+            self.check_edit_permission(self.object)
+        except PermissionDenied as exc:
+            messages.error(request, str(exc))
+            return self.form_invalid(self.get_form())
+        return super().post(request, *args, **kwargs)
+
     def get_success_url(self):
         return reverse('project_detail', kwargs={'pk': self.object.pk})
 
@@ -146,7 +156,6 @@ class ProjectUpdateView(ProjectAccessMixin, UpdateView):
         return context
 
     def form_valid(self, form):
-        self.check_edit_permission(self.object)
         project = self.object
         config = ProjectConfig.get()
         edit_workflow = config.default_project_edit_approval_workflow
