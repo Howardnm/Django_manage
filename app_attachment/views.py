@@ -17,6 +17,7 @@ from django.views import View
 
 from .forms import AttachmentUploadForm
 from .models import Attachment
+from .validators import MAX_UPLOAD_MB
 from .registry import get_attachment_config_for_ct
 from .utils import PermissionAdapter
 
@@ -161,6 +162,7 @@ class AttachmentUploadView(AttachmentBaseMixin, View):
             'object_id': object_id,
             'group_label': group_label,
             'upload_error': upload_error,
+            'max_upload_mb': MAX_UPLOAD_MB,
         })
 
     def _reject_upload(

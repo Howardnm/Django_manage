@@ -6,9 +6,11 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages import get_messages
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db.utils import DataError
+from django.template.loader import render_to_string
 from django.test import TestCase
 from django.urls import reverse
 
+from app_attachment.validators import MAX_UPLOAD_BYTES
 from app_attachment.views import _UPLOAD_FORM_ERROR, _UPLOAD_SAVE_ERROR
 from app_form_management.models import FormSubmission, FormTemplate
 
@@ -36,6 +38,17 @@ class UploadFailureFeedbackTests(TestCase):
             'content_type_id': ct.pk,
             'object_id': self.submission.pk,
         })
+
+    def test_upload_form_advertises_size_limit(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, f'data-max-bytes="{MAX_UPLOAD_BYTES}"')
+        self.assertContains(response, '最大 50MB')
+        panel = render_to_string('apps/app_attachment/_attachment_panel.html', {
+            'content_type_id': 1,
+            'object_id': 1,
+            'config': None,
+        })
+        self.assertIn('js/apps/app_attachment/upload_size.js', panel)
 
     def test_invalid_htmx_post_shows_error_in_modal(self):
         response = self.client.post(self.url, HTTP_HX_REQUEST='true')

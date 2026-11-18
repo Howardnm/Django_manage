@@ -5,6 +5,7 @@ from django import forms
 
 from common_utils.filters import TablerFormMixin
 from .models import Attachment
+from .validators import MAX_UPLOAD_BYTES
 
 # 未单独限制扩展名的业务沿用这份列表（文档、图片、压缩包、CAD）
 _DEFAULT_ACCEPT = (
@@ -61,6 +62,7 @@ class AttachmentUploadForm(TablerFormMixin, forms.ModelForm):
         self.fields['file'].widget.attrs.update({
             'class': 'form-control',
             'accept': self._accept_value(config),
+            'data-max-bytes': MAX_UPLOAD_BYTES,
         })
 
     @staticmethod

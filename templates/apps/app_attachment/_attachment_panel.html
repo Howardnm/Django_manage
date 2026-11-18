@@ -1,4 +1,4 @@
-{% load i18n %}
+{% load i18n static %}
 {# ============================================================ #}
 {# 附件面板：包含文件列表 + 上传按钮 + 上传弹窗              #}
 {# 通过 {% attachment_panel obj %} 调用                      #}
@@ -55,3 +55,4 @@
         </div>
     </div>
 </div>
+<script src="{% static 'js/apps/app_attachment/upload_size.js' %}"></script>
