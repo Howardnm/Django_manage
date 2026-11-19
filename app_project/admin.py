@@ -3,6 +3,7 @@ from urllib.parse import quote
 from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import HttpResponse
 from django.urls import path
 from django.utils import timezone
@@ -10,12 +11,26 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models import (
     Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectConfig,
-    ProjectFieldChange, MemberScoreSnapshot,
+    ProjectFieldChange, MemberScoreSnapshot, FailureReason, FeedbackType,
+    ProjectStage,
 )
 
 
+class _DashReasonWidget(forms.Widget):
+    """普通节点没有原因。不输出 input，避免随表单提交空值。"""
+
+    def render(self, name, value, attrs=None, renderer=None):
+        return mark_safe('<span class="quiet">—</span>')
+
+
 class ProjectNodeInlineForm(forms.ModelForm):
-    """压缩备注框。默认 Admin textarea 10 行，一个项目约 7 个节点会把表格撑得过长。"""
+    """压缩备注框。默认 Admin textarea 10 行，一个项目约 7 个节点会把表格撑得过长。
+
+    「原因」不是模型字段。按该行已保存的状态/阶段决定下拉：
+    异常节点写不合格原因，客户意见写意见类型，其余行只显示破折号。
+    """
+
+    reason = forms.CharField(required=False, label='原因')
 
     class Meta:
         model = ProjectNode
@@ -24,12 +39,60 @@ class ProjectNodeInlineForm(forms.ModelForm):
             'remark': forms.Textarea(attrs={'rows': 2, 'cols': 40}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 以库里的状态为准。同一轮把普通节点改成异常/客户意见后，下拉要刷新才出现。
+        self.reason_kind = self._reason_kind(self.instance)
+        if self.reason_kind == 'failure':
+            self.fields['reason'] = self._reason_choice(
+                FailureReason, self.instance.failure_reason_id,
+            )
+        elif self.reason_kind == 'feedback':
+            self.fields['reason'] = self._reason_choice(
+                FeedbackType, self.instance.feedback_type_id,
+            )
+        else:
+            self.fields['reason'].disabled = True
+            self.fields['reason'].widget = _DashReasonWidget()
+
+    @staticmethod
+    def _reason_kind(node):
+        if node.status == 'FAILED':
+            return 'failure'
+        if node.status == 'FEEDBACK' or node.stage == ProjectStage.FEEDBACK:
+            return 'feedback'
+        return None
+
+    @staticmethod
+    def _reason_choice(model, current_id):
+        query = Q(is_active=True)
+        if current_id:
+            query |= Q(pk=current_id)
+        return forms.ModelChoiceField(
+            queryset=model.objects.filter(query).order_by('order', 'name'),
+            required=False,
+            label='原因',
+            empty_label='-- 请选择 --',
+            initial=current_id,
+        )
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        if self.reason_kind == 'failure':
+            obj.failure_reason = self.cleaned_data.get('reason')
+        elif self.reason_kind == 'feedback':
+            obj.feedback_type = self.cleaned_data.get('reason')
+        if commit:
+            obj.save()
+            self.save_m2m()
+        return obj
+
 
 class ProjectNodeInline(admin.TabularInline):
     model = ProjectNode
     form = ProjectNodeInlineForm
     extra = 0
-    fields = ['stage', 'status', 'round', 'order', 'final_score', 'remark', 'updated_at']
+    fields = ['stage', 'status', 'reason', 'round', 'order', 'final_score', 'remark', 'updated_at']
     readonly_fields = ['updated_at']
 
 class ProjectMemberInline(admin.TabularInline):
