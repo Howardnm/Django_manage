@@ -19,32 +19,80 @@ class AttachmentOut(TypedDict):
 
 class ProjectListOut(TypedDict):
     id: int
+    code: str | None
     name: str
-    manager: str
+    manager: str | None
     current_stage: str
     progress_percent: int
     is_terminated: bool
     created_at: str | None
 
 
+class ProjectNodeWorkflowOut(TypedDict):
+    name: str
+    status: str
+
+
 class ProjectNodeOut(TypedDict):
     stage: str
     round: int
+    order: int
     status: str
     remark: str | None
+    # 页面上的「更新于」，YYYY-MM-DD HH:MM；每个节点都有
     updated_at: str | None
+    failure_reason: str | None
+    feedback_type: str | None
+    # 没有关联审批 → None。只有流程名称和状态，不含引擎数据
+    workflow: ProjectNodeWorkflowOut | None
+
+
+class ProjectMemberOut(TypedDict):
+    name: str | None
+    role: str
+    workload_share: float | None
+
+
+class ProjectSalesMemberOut(TypedDict):
+    name: str | None
+    workload_share: float | None
 
 
 class ProjectBusinessInfo(TypedDict):
     customer: str | None
+    customer_code: str | None
+    customer_company_name: str | None
     oem: str | None
     salesperson: str | None
     product_name: str | None
+    product_code: str | None
+    part_usage: str | None
+    part_color: str | None
+    rd_high_feasibility: bool
+    biz_high_feasibility: bool
     target_material: str | None
+    sap_material_code: str | None
+    material_category: str | None
     target_cost: float | None  # 未设目标成本 → None（0 表示目标成本为零）
+    competitor_price: float | None
+    estimated_order_volume: float | None
+    first_sample_date: str | None
+    first_trial_date: str | None
+    first_trial_cycle_days: int | None
+    pilot_date: str | None
+    mass_production_date: str | None
+    updated_at: str | None
 
 
 class ProjectDetailOut(ProjectListOut):
+    description: str | None
+    grade: str | None
+    business_segment: str | None
+    latest_remark: str | None
+    quality_score: float
+    sales_quality_score: float
+    members: list[ProjectMemberOut]
+    sales_members: list[ProjectSalesMemberOut]
     timeline: list[ProjectNodeOut]
     # 无业务档案 → None；有档案没附件 → []；读取失败 → None + warnings
     associated_files: list[AttachmentOut] | None

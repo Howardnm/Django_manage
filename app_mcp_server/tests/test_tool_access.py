@@ -273,6 +273,21 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         self.assertIn("协同项目", names)
         self.assertIn("销售项目", names)
 
+    def test_search_can_exclude_paused_projects(self):
+        node = self.p_alice.nodes.order_by("order", "pk").first()
+        node.status = "PAUSED"
+        node.save(update_fields=["status"])
+        ctx = fake_ctx(self.alice, "search_projects")
+
+        paused = search_projects(ctx, keyword="Alice项目", is_paused=True)
+        self.assertEqual([item["code"] for item in paused["data"]], ["PA"])
+
+        active = search_projects(ctx, keyword="Alice项目", is_paused=False)
+        self.assertEqual(active["data"], [])
+
+        both = search_projects(ctx, keyword="Alice项目")
+        self.assertEqual([item["code"] for item in both["data"]], ["PA"])
+
     def test_project_member_penetration(self):
         result = search_projects(fake_ctx(self.alice, "search_projects"), keyword="协同")
         self.assertEqual([item["name"] for item in result["data"]], ["协同项目"])
@@ -560,6 +575,132 @@ class McpToolAccessTests(McpToolFixtureMixin, TestCase):
         self.assertIsNone(data["business_info"]["target_cost"])
         self.assertIsNone(data["business_info"]["customer"])
         self.assertIsNone(data["business_info"]["target_material"])
+
+    def test_project_details_include_archive_members_and_every_node_remark(self):
+        from datetime import date
+
+        from app_project.models import BusinessSegment, FailureReason, ProjectStage
+        from app_repository.models import Customer, GradeFactor, OEM
+        from app_workflow.models import WorkflowDefinition, WorkflowInstance
+
+        self.alice.first_name = "李爱丽丝"
+        self.alice.save(update_fields=["first_name"])
+        project = self.p_alice
+        project.grade = GradeFactor.objects.create(name="A级", factor="1.20")
+        project.business_segment = BusinessSegment.objects.create(name="汽配")
+        project.description = "外观偏差"
+        project.save()
+
+        repo = project.repository
+        repo.customer = Customer.objects.create(
+            customer_code="C001", company_name="测试客户", short_name="测客",
+        )
+        repo.oem = OEM.objects.create(name="吉利汽车")
+        repo.salesperson = self.alice
+        repo.product_name = "风叶"
+        repo.product_code = "PN-001"
+        repo.part_usage = "台扇"
+        repo.part_color = "本色"
+        repo.rd_high_feasibility = True
+        repo.target_cost = Decimal("12.50")
+        repo.competitor_price = Decimal("11.00")
+        repo.estimated_order_volume = Decimal("80.00")
+        repo.first_sample_date = date(2026, 2, 1)
+        repo.first_trial_date = date(2026, 3, 1)
+        repo.first_trial_cycle_days = 28
+        repo.pilot_date = date(2026, 4, 1)
+        repo.mass_production_date = date(2026, 6, 1)
+        repo.save()
+
+        ProjectMember.objects.create(
+            project=project, user=self.carol, role="RND", workload_share=Decimal("60"),
+        )
+        ProjectSalesMember.objects.create(
+            project=project, user=self.dave, workload_share=Decimal("100"),
+        )
+        init = project.nodes.get(stage=ProjectStage.INIT, round=1)
+        init.remark = "立项备注"
+        init.save(update_fields=["remark"])
+        pilot = project.nodes.get(stage=ProjectStage.PILOT, round=1)
+        pilot.remark = "小试备注"
+        pilot.save(update_fields=["remark"])
+        rnd = project.nodes.get(stage=ProjectStage.RND, round=1)
+        rnd.remark = ""
+        rnd.failure_reason = FailureReason.objects.create(name="强度不够")
+        rnd.workflow_instance = WorkflowInstance.objects.create(
+            definition=WorkflowDefinition.objects.create(name="节点审批", bpmn_xml="<xml/>"),
+            status="RUNNING",
+            started_by=self.alice,
+        )
+        rnd.save()
+        # 节点保存会按当前节点回写最新进展和质量分，所以放在节点保存之后。
+        project.latest_remark = "当前送样备注"
+        project.quality_score = Decimal("1.50")
+        project.sales_quality_score = Decimal("2.00")
+        project.save(update_fields=["latest_remark", "quality_score", "sales_quality_score"])
+
+        data = get_project_details(
+            fake_ctx(self.alice, "get_project_details"), project_id=project.id,
+        )
+        self.assertEqual(data["code"], "PA")
+        self.assertEqual(data["manager"], "李爱丽丝")
+        self.assertEqual(data["grade"], "A级")
+        self.assertEqual(data["business_segment"], "汽配")
+        self.assertEqual(data["description"], "外观偏差")
+        self.assertEqual(data["latest_remark"], "当前送样备注")
+        self.assertEqual(data["quality_score"], 1.5)
+        self.assertEqual(data["sales_quality_score"], 2.0)
+        self.assertEqual(data["members"], [{
+            "name": "carol", "role": "实验研发", "workload_share": 60.0,
+        }])
+        self.assertEqual(data["sales_members"], [{
+            "name": "dave", "workload_share": 100.0,
+        }])
+
+        info = data["business_info"]
+        self.assertEqual(info["customer"], "测客")
+        self.assertEqual(info["customer_code"], "C001")
+        self.assertEqual(info["customer_company_name"], "测试客户")
+        self.assertEqual(info["oem"], "吉利汽车")
+        self.assertEqual(info["salesperson"], "李爱丽丝")
+        self.assertEqual(info["product_name"], "风叶")
+        self.assertEqual(info["product_code"], "PN-001")
+        self.assertEqual(info["part_usage"], "台扇")
+        self.assertEqual(info["part_color"], "本色")
+        self.assertIs(info["rd_high_feasibility"], True)
+        self.assertIs(info["biz_high_feasibility"], False)
+        self.assertEqual(info["target_material"], "PA66-A")
+        self.assertEqual(info["sap_material_code"], "SAP-A")
+        self.assertEqual(info["material_category"], "PA66")
+        self.assertEqual(info["target_cost"], 12.5)
+        self.assertEqual(info["competitor_price"], 11.0)
+        self.assertEqual(info["estimated_order_volume"], 80.0)
+        self.assertEqual(info["first_sample_date"], "2026-02-01")
+        self.assertEqual(info["first_trial_date"], "2026-03-01")
+        self.assertEqual(info["first_trial_cycle_days"], 28)
+        self.assertEqual(info["pilot_date"], "2026-04-01")
+        self.assertEqual(info["mass_production_date"], "2026-06-01")
+        self.assertRegex(info["updated_at"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+
+        remarks = {}
+        self.assertGreaterEqual(len(data["timeline"]), 2)
+        for node in data["timeline"]:
+            self.assertIn("remark", node)
+            self.assertRegex(node["updated_at"], r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$")
+            self.assertNotIn("final_score", node)
+            self.assertNotIn("sales_final_score", node)
+            remarks[node["stage"]] = node["remark"]
+        self.assertEqual(remarks["① 项目立项"], "立项备注")
+        self.assertEqual(remarks["③ 客户小试"], "小试备注")
+        self.assertIsNone(remarks["② 研发阶段"])
+        rnd_node = next(node for node in data["timeline"] if node["stage"] == "② 研发阶段")
+        self.assertEqual(rnd_node["failure_reason"], "强度不够")
+        self.assertIsNone(rnd_node["feedback_type"])
+        self.assertEqual(rnd_node["workflow"], {"name": "节点审批", "status": "运行中"})
+
+        listed = search_projects(fake_ctx(self.alice, "search_projects"), keyword="Alice项目")
+        self.assertEqual(listed["data"][0]["code"], "PA")
+        self.assertEqual(listed["data"][0]["manager"], "李爱丽丝")
 
     # ---------- 附件读取失败不再静默 ----------
 

@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import OuterRef, Q, Subquery
 from mcp.server.mcpserver.context import Context
 
 from app_mcp_server.access import gated_get, gated_qs, raise_empty, require_tool
@@ -14,14 +14,28 @@ from app_mcp_server.responses import (
 from app_mcp_server.serializers import serialize_project, serialize_project_full
 from app_mcp_server.serializers.types import ProjectDetailOut, ProjectSearchOut
 from app_project.mixins import ProjectAccessMixin
-from app_project.models import Project
+from app_project.models import Project, ProjectNode
 
 _PERM = "app_project.view_project"
 
 _EMPTY_HINT = (
     "已在你的可见范围内检索，没有匹配的项目。"
-    "可尝试放宽 keyword，或去掉 is_terminated 过滤后重试。"
+    "可尝试放宽 keyword，或去掉 is_terminated、is_paused 过滤后重试。"
 )
+# 与 Project.current_active_node 同一口径：按排序取第一个未结束节点。
+_ACTIVE_NODE_STATUSES = ("DOING", "PENDING", "PAUSED", "AWAITING_APPROVAL")
+
+
+def _filter_paused(qs, is_paused):
+    """当前节点是暂停才算已暂停，后面轮次里的暂停不算。"""
+    current_status = ProjectNode.objects.filter(
+        project_id=OuterRef("pk"),
+        status__in=_ACTIVE_NODE_STATUSES,
+    ).order_by("order", "pk").values("status")[:1]
+    qs = qs.annotate(_current_node_status=Subquery(current_status))
+    if is_paused:
+        return qs.filter(_current_node_status="PAUSED")
+    return qs.exclude(_current_node_status="PAUSED")
 
 
 def _project_list_qs():
@@ -32,19 +46,27 @@ def _project_list_qs():
 
 def _project_detail_qs():
     return Project.objects.select_related(
-        "manager", "material",
+        "manager", "grade", "business_segment",
+        "material", "material__category",
         "repository", "repository__customer", "repository__oem", "repository__salesperson",
-    ).prefetch_related("nodes")
+    ).prefetch_related(
+        "nodes__failure_reason",
+        "nodes__feedback_type",
+        "nodes__workflow_instance__definition",
+        "members__user",
+        "sales_members__user",
+    )
 
 
 @mcp.tool(annotations=READ_ONLY)
 @safe_tool
 def search_projects(
     ctx: Context, keyword: str = "", is_terminated: bool | None = None,
-    limit: int | None = None,
+    is_paused: bool | None = None, limit: int | None = None,
 ) -> ProjectSearchOut | ToolErrorOut:
-    """Search for projects by name, manager, customer, or OEM. Returns all matching projects (including terminated) unless is_terminated is set.
+    """Search for projects by name, manager, customer, or OEM. Returns all matching projects (including terminated and paused) unless is_terminated or is_paused is set.
 
+    is_paused=false excludes projects whose current node is paused; is_paused=true returns only those. Omit it to include both.
     Returns {"ok": true, "data": [...], "total": N, "returned": N, "has_more": bool}. Omit limit to get all matches; pass limit to cap the rows. A search with no matches still returns ok=true with total=0 and a hint explaining that.
     On failure returns {"ok": false, "error_code": ..., "message": ..., "hint": ...} instead of raising — read error_code and hint before telling the user nothing was found.
     """
@@ -59,6 +81,8 @@ def search_projects(
         )
     if is_terminated is not None:
         qs = qs.filter(is_terminated=is_terminated)
+    if is_paused is not None:
+        qs = _filter_paused(qs, is_paused)
 
     total = qs.count() if limit is not None else None
     if limit is not None:

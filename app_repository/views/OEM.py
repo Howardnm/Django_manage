@@ -37,7 +37,7 @@ class OEMListView(RepositoryAccessMixin, ListView):
                 'repo_records',
                 filter=Q(repo_records__project__is_terminated=True)
             )
-        ).order_by('name')
+        ).order_by('-created_at', '-pk')
         self.filterset = OEMFilter(self.request.GET, queryset=qs)
         return self.filterset.qs
 
