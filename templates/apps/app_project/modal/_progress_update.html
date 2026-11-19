@@ -20,7 +20,10 @@
                 {% endfor %}
             {% endif %}
             <div id="terminate-warning" class="alert alert-danger mt-2 mb-0{% if form.status.value != 'TERMINATED' %} d-none{% endif %}" role="alert">
-                选择「已终止」后，当前节点记为已终止，其后所有「未开始」节点会被删除，项目标记为已终止。此操作不走审批。
+                选择「已终止」后，当前节点记为已终止，其后所有「未开始」节点会被删除，项目标记为已终止。此操作不走审批。【终止后无法重启项目！】
+            </div>
+            <div id="done-warning" class="alert alert-warning mt-2 mb-0{% if form.status.value != 'DONE' %} d-none{% endif %}" role="alert">
+                研发成功、小试合格、中试合格才能标记为已完成。已送样未反馈请标记为进行中，并备注，不能判断为已完成。
             </div>
         </div>
         <div class="mb-3">
@@ -41,10 +44,12 @@
 <script>
 (function () {
     var status = document.getElementById('id_status');
-    var warning = document.getElementById('terminate-warning');
-    if (!status || !warning) return;
+    var terminateWarning = document.getElementById('terminate-warning');
+    var doneWarning = document.getElementById('done-warning');
+    if (!status || !terminateWarning || !doneWarning) return;
     function sync() {
-        warning.classList.toggle('d-none', status.value !== 'TERMINATED');
+        terminateWarning.classList.toggle('d-none', status.value !== 'TERMINATED');
+        doneWarning.classList.toggle('d-none', status.value !== 'DONE');
     }
     status.addEventListener('change', sync);
     sync();

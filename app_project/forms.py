@@ -68,7 +68,7 @@ class ProjectNodeUpdateForm(TablerFormMixin, forms.ModelForm):
             'status': forms.Select(),
             'remark': forms.Textarea(attrs={
                 'rows': 12,
-                'placeholder': '已完成、暂停、已终止时必填',
+                'placeholder': '已完成、暂停、已终止时必填。\n请说明原因，便于后续追踪。',
             }),
         }
 
