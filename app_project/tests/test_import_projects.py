@@ -7,9 +7,11 @@ from decimal import Decimal
 from io import StringIO
 
 import openpyxl
+from openpyxl.utils import get_column_letter
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from app_material.models import MaterialLibrary, MaterialType
@@ -306,16 +308,33 @@ class ImportProjectsTests(TestCase):
         workbook = openpyxl.load_workbook(export_path, data_only=True)
         worksheet = workbook.active
         headers = [worksheet.cell(1, col).value for col in range(1, worksheet.max_column + 1)]
-        self.assertIn('进度节点', headers)
+        self.assertNotIn('进度节点', headers)
+        self.assertNotIn('当前节点备注', headers)
+        self.assertIn('最新进展', headers)
+        self.assertIn('项目研发质量得分', headers)
+        self.assertIn('项目销售质量得分', headers)
         codes = [worksheet.cell(row, 1).value for row in range(2, worksheet.max_row + 1)]
         self.assertIn('26B02001001', codes)
         row = codes.index('26B02001001') + 2
-        node_text = worksheet.cell(row, headers.index('进度节点') + 1).value
-        remark = worksheet.cell(row, headers.index('当前节点备注') + 1).value
+        values = {
+            headers[col - 1]: worksheet.cell(row, col).value
+            for col in range(1, worksheet.max_column + 1)
+        }
+        node_width = worksheet.column_dimensions[
+            get_column_letter(headers.index('③ 客户小试（第1轮）') + 1)
+        ].width
+        code_width = worksheet.column_dimensions[
+            get_column_letter(headers.index('项目编号') + 1)
+        ].width
         workbook.close()
-        self.assertIn('已完成', node_text)
-        self.assertIn('进行中', node_text)
-        self.assertEqual(remark, '当前送样备注')
+        self.assertGreaterEqual(node_width, 36)
+        self.assertGreaterEqual(code_width, len('26B02001001') + 2)
+        pilot = values['③ 客户小试（第1轮）']
+        rnd = values['② 研发阶段（第1轮）']
+        self.assertIn('③ 客户小试（第1轮）', pilot)
+        self.assertIn('状态：进行中', pilot)
+        self.assertIn('备注：当前送样备注', pilot)
+        self.assertIn('状态：已完成', rnd)
 
     def test_export_includes_archive_fields_customer_name_and_members(self):
         _write(self.path, [_base_row()])
@@ -359,20 +378,67 @@ class ImportProjectsTests(TestCase):
         self.assertEqual(values['目标成本 (元/kg)'], '12.50')
         self.assertEqual(values['竞品售价 (元/kg)'], '11.00')
         self.assertEqual(values['预估市场订单用量 (吨/年)'], '80.00')
-        self.assertEqual(values['第一次客户送样时间'], '2026-02-01')
-        self.assertEqual(values['第一次客户小试时间'], '2026-03-01')
-        self.assertEqual(values['第一次小试完成周期 (天)'], 28)
-        self.assertEqual(values['中试进行时间'], '2026-04-01')
-        self.assertEqual(values['量产进行时间'], '2026-06-01')
+        self.assertEqual(values['计划第一次客户送样时间'], '2026-02-01')
+        self.assertEqual(values['计划第一次客户小试时间'], '2026-03-01')
+        self.assertEqual(values['计划第一次小试完成周期 (天)'], 28)
+        self.assertEqual(values['计划中试进行时间'], '2026-04-01')
+        self.assertEqual(values['计划量产进行时间'], '2026-06-01')
         self.assertEqual(
             values['档案最后更新'],
             timezone.localtime(repo.updated_at).strftime('%Y-%m-%d %H:%M:%S'),
         )
         self.assertEqual(values['项目协同成员'], '李协同、彭万')
+        self.assertEqual(values['项目协同成员占比'], '100%、100%')
         self.assertEqual(values['销售协同成员'], '王销售')
+        self.assertEqual(values['销售协同成员占比'], '100%')
         self.assertEqual(values['制件名称'], '风叶')
         self.assertEqual(values['研发高可落地性项目'], '是')
         self.assertEqual(values['业务高可落地性项目'], '否')
+
+    def test_export_puts_each_round_in_its_own_column(self):
+        _write(self.path, [
+            _base_row(),
+            _base_row(项目编号='26B02001002', 项目名称='第二个项目'),
+        ])
+        self._run()
+        first = Project.objects.get(code='26B02001001')
+        rnd = first.nodes.get(stage=ProjectStage.RND, round=1)
+        first.add_iteration_node(ProjectStage.RND, rnd.order)
+
+        export_path = os.path.join(self.tmp, 'export.xlsx')
+        call_command('import_projects', export=export_path, stdout=StringIO())
+        workbook = openpyxl.load_workbook(export_path, data_only=True)
+        worksheet = workbook.active
+        headers = [worksheet.cell(1, col).value for col in range(1, worksheet.max_column + 1)]
+        rows = {}
+        for row in range(2, worksheet.max_row + 1):
+            code = worksheet.cell(row, 1).value
+            rows[code] = {
+                headers[col - 1]: worksheet.cell(row, col).value
+                for col in range(1, worksheet.max_column + 1)
+            }
+        workbook.close()
+
+        self.assertIn('② 研发阶段（第2轮）', headers)
+        self.assertIn('② 研发阶段（第2轮）', rows['26B02001001']['② 研发阶段（第2轮）'])
+        self.assertIn('备注：第 2 轮调整：', rows['26B02001001']['② 研发阶段（第2轮）'])
+        self.assertFalse(rows['26B02001002']['② 研发阶段（第2轮）'])
+
+    def test_admin_export_downloads_xlsx(self):
+        _write(self.path, [_base_row()])
+        self._run()
+        staff = User.objects.create_superuser('exporter', 'exporter@test.local', 'x')
+        self.client.force_login(staff)
+        listing = self.client.get(reverse('admin:app_project_project_changelist'))
+        self.assertContains(listing, '导出 Excel')
+        response = self.client.get(reverse('admin:app_project_project_export'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            response['Content-Type'],
+        )
+        self.assertIn('attachment;', response['Content-Disposition'])
+        self.assertTrue(response.content.startswith(b'PK'))
 
     def test_import_does_not_leave_node_notifications_disconnected(self):
         _write(self.path, [_base_row()])

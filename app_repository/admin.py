@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.urls import reverse
 from django.contrib.auth import get_user_model
 from .models import (
@@ -82,9 +83,7 @@ class ProjectRepositoryAdmin(admin.ModelAdmin):
 
     def approval_status(self, obj):
         if obj.workflow_instance and obj.workflow_instance.status == 'RUNNING':
-            return format_html(
-                '<span class="badge bg-purple-lt">审批中</span>'
-            )
+            return mark_safe('<span class="badge bg-purple-lt">审批中</span>')
         return '-'
     approval_status.short_description = '审批状态'
 

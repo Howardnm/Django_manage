@@ -1,4 +1,11 @@
+from urllib.parse import quote
+
+from django import forms
 from django.contrib import admin
+from django.core.exceptions import PermissionDenied
+from django.http import HttpResponse
+from django.urls import path
+from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models import (
@@ -6,10 +13,23 @@ from .models import (
     ProjectFieldChange, MemberScoreSnapshot,
 )
 
+
+class ProjectNodeInlineForm(forms.ModelForm):
+    """压缩备注框。默认 Admin textarea 10 行，一个项目约 7 个节点会把表格撑得过长。"""
+
+    class Meta:
+        model = ProjectNode
+        fields = '__all__'
+        widgets = {
+            'remark': forms.Textarea(attrs={'rows': 2, 'cols': 40}),
+        }
+
+
 class ProjectNodeInline(admin.TabularInline):
     model = ProjectNode
+    form = ProjectNodeInlineForm
     extra = 0
-    fields = ['stage', 'status', 'round', 'order', 'final_score', 'updated_at']
+    fields = ['stage', 'status', 'round', 'order', 'final_score', 'remark', 'updated_at']
     readonly_fields = ['updated_at']
 
 class ProjectMemberInline(admin.TabularInline):
@@ -23,6 +43,32 @@ class ProjectAdmin(admin.ModelAdmin):
     search_fields = ['code', 'name', 'description']
     search_help_text = '项目编码 / 项目名称 / 描述'
     inlines = [ProjectMemberInline, ProjectNodeInline]
+    change_list_template = 'admin/app_project/project/change_list.html'
+
+    def get_urls(self):
+        custom = [
+            path(
+                'export/',
+                self.admin_site.admin_view(self.export_projects_view),
+                name='app_project_project_export',
+            ),
+        ]
+        return custom + super().get_urls()
+
+    def export_projects_view(self, request):
+        """现查现组，字节放进响应。不写盘，也不把表留在 admin 实例上。"""
+        if not self.has_view_permission(request):
+            raise PermissionDenied
+        from .utils.project_export import build_project_export
+
+        payload = build_project_export()
+        filename = f"项目导出-{timezone.localdate():%Y%m%d}.xlsx"
+        response = HttpResponse(
+            payload,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{quote(filename)}"
+        return response
 
     def save_formset(self, request, form, formset, change):
         """inline 成员/节点保存后，兜底重算本项目成绩并写成员快照。
