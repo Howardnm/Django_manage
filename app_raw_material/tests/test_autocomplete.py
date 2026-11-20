@@ -8,6 +8,8 @@ MaterialAutocompleteView + 本 app 注册的 'raw_material' 处理器。
    却不在查询条件里 —— 输编码搜不到；
 2. 候选文案不带价格，而选原材料时价格是主要判据之一。
 """
+import uuid
+from datetime import timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
@@ -18,7 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from app_raw_material.models import (
-    Plant, RawMaterial, RawMaterialPriceRecord, RawMaterialType)
+    Plant, RawMaterial, RawMaterialPriceRecord, RawMaterialStockSnapshot, RawMaterialType)
 
 User = get_user_model()
 
@@ -105,6 +107,36 @@ class RawMaterialAutocompleteTests(TestCase):
         self.assertIn('玻璃纤维', results[0]['text'])
         self.assertNotIn('¥', results[0]['text'])
         self.assertNotIn('3011', results[0]['text'])
+
+    def test_option_includes_rounded_stock_qty(self):
+        """候选项带当前非限制库存的整数。没有快照是 null，不能收成 0。"""
+        now = timezone.now()
+        current = uuid.uuid4()
+        RawMaterialStockSnapshot.objects.create(
+            sync_batch_id=uuid.uuid4(), raw_material=self.material, plant=self.plant,
+            unrestricted_stock=Decimal('999.000'), safety_stock=Decimal('1.000'),
+        ).pk
+        old = RawMaterialStockSnapshot.objects.order_by('-pk').first()
+        RawMaterialStockSnapshot.objects.filter(pk=old.pk).update(synced_at=now - timedelta(days=2))
+        RawMaterialStockSnapshot.objects.create(
+            sync_batch_id=current, raw_material=self.material, plant=self.plant,
+            storage_location='0001', unrestricted_stock=Decimal('10.500'),
+            safety_stock=Decimal('80.000'),
+        )
+        RawMaterialStockSnapshot.objects.create(
+            sync_batch_id=uuid.uuid4(), raw_material=self.other, plant=self.plant,
+            unrestricted_stock=Decimal('0.000'),
+        )
+
+        by_id = {row['value']: row for row in self._search('RM-000')}
+        self.assertEqual(by_id[self.material.pk]['stock_qty'], 11)
+        self.assertEqual(by_id[self.other.pk]['stock_qty'], 0)
+
+        bare = RawMaterial.objects.create(
+            name='无库存', model_name='NONE', warehouse_code='RM-000555',
+            category=self.category)
+        self.assertIsNone(self._search('RM-000555')[0]['stock_qty'])
+        self.assertEqual(bare.warehouse_code, 'RM-000555')
 
     def test_detail_url_is_injected(self):
         results = self._search('PA66')

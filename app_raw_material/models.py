@@ -255,6 +255,32 @@ class RawMaterial(models.Model):
         )
         return {row['raw_material_id']: row['total'] for row in rows}
 
+    @classmethod
+    def stock_display_map(cls, material_ids):
+        """给表单用的库存显示值。键是字符串 id。
+
+        没有快照的物料值为 None（页面显示 -），有快照则四舍五入到整数。
+        合计为 0 的物料保留 0，不能和「没数据」混成同一个空值。
+        """
+        from decimal import Decimal, ROUND_HALF_UP
+
+        totals = cls.unrestricted_stock_totals(material_ids)
+        display = {}
+        for raw_id in material_ids:
+            if raw_id in (None, ''):
+                continue
+            pk = int(raw_id)
+            key = str(pk)
+            if key in display:
+                continue
+            if pk not in totals:
+                display[key] = None
+            else:
+                display[key] = int(
+                    Decimal(totals[pk]).quantize(Decimal('1'), rounding=ROUND_HALF_UP)
+                )
+        return display
+
     class Meta:
         verbose_name = "原材料"
         verbose_name_plural = "原材料库"

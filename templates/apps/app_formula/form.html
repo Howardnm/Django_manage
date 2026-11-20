@@ -247,6 +247,7 @@
                                     </div>
                                     {% endif %}
                                 </th>
+                                <th style="width: 70px;">库存</th>
                                 {% if group_mode %}
                                 <th style="width: 70px;">替代组</th>
                                 <th style="width: 140px;">策略</th>
@@ -288,6 +289,11 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <td class="bom-stock">
+                                        {% with qty=stock_totals|get_item:form.raw_material.value %}
+                                            {% if qty is None %}-{% else %}{{ qty|floatformat:0 }}{% endif %}
+                                        {% endwith %}
+                                    </td>
                                     {% if group_mode %}
                                     <td>{{ form.alt_group }}</td>
                                     <td>{{ form.alt_strategy }}</td>
@@ -325,6 +331,7 @@
                                             </div>
                                         </div>
                                     </td>
+                                    <td></td>
                                     <td colspan="{% if group_mode %}10{% else %}6{% endif %}"></td>
                                 </tr>
                             </tfoot>
@@ -431,6 +438,7 @@
             <td>{{ bom_formset.empty_form.feeding_port }}</td>
             <td>{{ bom_formset.empty_form.raw_material }}</td>
             <td class="bom-percentages"><div class="d-flex gap-1 percentage-columns"></div></td>
+            <td class="bom-stock">-</td>
             {% if group_mode %}
             <td>{{ bom_formset.empty_form.alt_group }}</td>
             <td>{{ bom_formset.empty_form.alt_strategy }}</td>
@@ -504,5 +512,5 @@
 {% block extra_js %}
 <script src="{% static 'js/common/rgb_color_input.js' %}"></script>
 <script src="{% static 'js/common/card_table_scroll.js' %}"></script>
-<script src="{% static 'js/apps/app_formula/form.js' %}?v=1"></script>
+<script src="{% static 'js/apps/app_formula/form.js' %}?v=2"></script>
 {% endblock %}

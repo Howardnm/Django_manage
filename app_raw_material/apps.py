@@ -1,3 +1,5 @@
+from decimal import Decimal, ROUND_HALF_UP
+
 from django.apps import AppConfig
 
 class AppRawMaterialConfig(AppConfig):
@@ -37,6 +39,7 @@ class AppRawMaterialConfig(AppConfig):
             """
             materials = list(materials)
             prices = RawMaterialPriceService.for_ids([m.pk for m in materials])
+            stock_totals = RawMaterial.unrestricted_stock_totals(m.pk for m in materials)
 
             results = []
             for m in materials:
@@ -53,10 +56,16 @@ class AppRawMaterialConfig(AppConfig):
                 # latest() 的契约：None = 无报价，Decimal('0.00') 是有效价格
                 if price is not None:
                     text += f' (¥{price:.2f})'
+                total = stock_totals.get(m.pk)
                 results.append({
                     'value': m.pk,
                     'text': text,
                     'category_name': m.category.name,
+                    # 没有快照是 null，不能收成 0；有快照则四舍五入到整数。
+                    'stock_qty': (
+                        None if m.pk not in stock_totals
+                        else int(Decimal(total).quantize(Decimal('1'), rounding=ROUND_HALF_UP))
+                    ),
                 })
             return results
 

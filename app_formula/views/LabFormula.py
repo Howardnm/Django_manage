@@ -23,6 +23,18 @@ from common_utils.constants import STD_TABS
 logger = logging.getLogger(__name__)
 
 
+def _stock_totals_for_forms(forms):
+    """表单里已选原材料的当前非限制库存合计。没选料的行不参与。"""
+    from app_raw_material.models import RawMaterial
+
+    ids = []
+    for form in forms:
+        raw_id = form['raw_material'].value()
+        if raw_id:
+            ids.append(raw_id)
+    return RawMaterial.unrestricted_stock_totals(ids)
+
+
 def _return_url(request):
     """保存成功后回到进入配方页之前的地址。
 
@@ -636,6 +648,7 @@ class LabFormulaCreateView(FormulaAccessMixin, CreateView):
             if 'num_columns' not in context:
                 context['num_columns'] = 1
         context['next_url'] = _return_url(self.request)
+        context['stock_totals'] = _stock_totals_for_forms(context['bom_formset'])
         return context
 
     @staticmethod
@@ -943,6 +956,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             if not policy['can_edit_content']:
                 self._lock_readonly_forms(context)
             context['next_url'] = _return_url(self.request)
+            context['stock_totals'] = _stock_totals_for_forms(context['bom_formset'])
             return context
 
         # 每个配方版本一列。单版本实验单同样走这条路径 —— 否则编辑页加不出新版本。
@@ -1070,6 +1084,7 @@ class LabFormulaUpdateView(FormulaAccessMixin, UpdateView):
             self._lock_readonly_forms(context)
 
         context['next_url'] = _return_url(self.request)
+        context['stock_totals'] = _stock_totals_for_forms(context['bom_formset'])
         return context
 
     @staticmethod

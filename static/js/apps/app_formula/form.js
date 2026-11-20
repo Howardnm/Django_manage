@@ -139,9 +139,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 apiUrl = window.FORMULA_REPO_API_URL;
             }
             initRemoteTomSelect(el, {apiUrl: apiUrl});
+            bindRawMaterialStock(el);
         });
         // 本地搜索已由 base.html 的 initLocalTomSelectAll 建好，这里一并绑
         bindFormulaTableDropdowns(document);
+    }
+
+    /* 选中原材料后，用搜索结果里的 stock_qty 刷新该行库存。
+       页面初次带上的 option 没有这个字段，不能覆盖服务端已经渲出的数字。 */
+    function bindRawMaterialStock(el) {
+        if (!el.tomselect || el.getAttribute('data-model') !== 'raw_material' || el._stockBound) return;
+        el._stockBound = true;
+        function show(qty) {
+            var row = el.closest('tr');
+            var cell = row && row.querySelector('.bom-stock');
+            if (!cell) return;
+            cell.textContent = (qty === null || qty === undefined) ? '-' : String(qty);
+        }
+        el.tomselect.on('item_add', function (value) {
+            var data = el.tomselect.options[value];
+            if (!data || !Object.prototype.hasOwnProperty.call(data, 'stock_qty')) return;
+            show(data.stock_qty);
+        });
+        el.tomselect.on('item_remove', function () {
+            if (el.tomselect.items.length) return;
+            show(null);
+        });
     }
 
     /* ── 多列变体管理 ── */
@@ -432,6 +455,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         apiUrl = window.FORMULA_REPO_API_URL;
                     }
                     initRemoteTomSelect(el, {apiUrl: apiUrl});
+                    bindRawMaterialStock(el);
                 });
                 bindFormulaTableDropdowns(newRowElement);
             }

@@ -468,7 +468,17 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
                 readonly = True
 
         stock_totals = {}
-        if readonly and not compare_mode and bom_entries is not None:
+        stock_display = {}
+        if not compare_mode and entry_formset is not None:
+            from app_raw_material.models import RawMaterial
+            raw_ids = []
+            for form in entry_formset:
+                raw_id = form['raw_material'].value() or getattr(form.instance, 'raw_material_id', None)
+                if raw_id:
+                    raw_ids.append(raw_id)
+            stock_totals = RawMaterial.unrestricted_stock_totals(raw_ids)
+            stock_display = RawMaterial.stock_display_map(raw_ids)
+        elif readonly and not compare_mode and bom_entries is not None:
             bom_entries = list(bom_entries)
             from app_raw_material.models import RawMaterial
             stock_totals = RawMaterial.unrestricted_stock_totals(
@@ -493,6 +503,7 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
             'entry_formset': entry_formset,
             'bom_entries': bom_entries,
             'stock_totals': stock_totals,
+            'stock_display': stock_display,
             'readonly': readonly,
             'can_write': can_write,
             'color_formula_ids': ctx['color_formula_ids'],
@@ -617,6 +628,12 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
                 break
 
         formula_groups = self._build_formula_groups(active_formulas, selected_formula)
+        from app_raw_material.models import RawMaterial
+        raw_ids = []
+        for form in entry_formset:
+            raw_id = form['raw_material'].value() or getattr(form.instance, 'raw_material_id', None)
+            if raw_id:
+                raw_ids.append(raw_id)
 
         # 已有的 BOM entries（从已保存的 BOM 读取；未落库的实例无法访问反向关系）
         existing_bom = getattr(selected_formula, 'color_powder_bom', None)
@@ -641,6 +658,8 @@ class ProjectColorSaveView(ColorCenterWriteMixin, _ColorProjectContextMixin, Vie
             'bom_form': bom_form,
             'entry_formset': entry_formset,
             'bom_entries': bom_entries,
+            'stock_totals': RawMaterial.unrestricted_stock_totals(raw_ids),
+            'stock_display': RawMaterial.stock_display_map(raw_ids),
             'readonly': False,
             'color_formula_ids': ctx['color_formula_ids'],
             'confirmed_color_formula_ids': ctx['confirmed_color_formula_ids'],

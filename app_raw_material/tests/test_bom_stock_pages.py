@@ -104,6 +104,14 @@ class BomStockPageTests(TestCase):
         )
         self.assertRegex(html, pattern, f'{material_name} 的库存应显示 {expected}')
 
+    def _assert_form_stock(self, html, material_name, expected):
+        """表单里库存跟在物料选择后面，单元格是 .bom-stock，不是详情页的 fs-3。"""
+        pattern = (
+            rf'{re.escape(material_name)}[\s\S]{{0,2000}}?'
+            rf'class="bom-stock">\s*{re.escape(expected)}\s*</td>'
+        )
+        self.assertRegex(html, pattern, f'{material_name} 的表单库存应显示 {expected}')
+
     def _assert_column_contract(self, html, ratio_header):
         self.assertRegex(
             html,
@@ -140,6 +148,27 @@ class BomStockPageTests(TestCase):
         self.assertEqual(resp.context['stock_totals'][self.rounded.pk], Decimal('10.500'))
         self.assertNotIn(self.missing.pk, resp.context['stock_totals'])
 
+    def test_formula_edit_both_modes_show_stock_after_percentage(self):
+        url = reverse('formula_edit', kwargs={'pk': self.formula.pk})
+        normal = self.client.get(url)
+        self.assertEqual(normal.status_code, 200)
+        normal_html = normal.content.decode()
+        self.assertRegex(normal_html, r'比例/份数</span>[\s\S]{0,1600}?<th[^>]*>库存</th>')
+        self._assert_form_stock(normal_html, 'STK-ROUND', '11')
+        self._assert_form_stock(normal_html, 'STK-DOWN', '10')
+        self._assert_form_stock(normal_html, 'STK-ZERO', '0')
+        self._assert_form_stock(normal_html, 'STK-NONE', '-')
+
+        self.formula.is_group_mode = True
+        self.formula.save(update_fields=['is_group_mode'])
+        grouped = self.client.get(url)
+        self.assertEqual(grouped.status_code, 200)
+        grouped_html = grouped.content.decode()
+        self.assertRegex(grouped_html, r'比例/份数</span>[\s\S]{0,1600}?<th[^>]*>库存</th>')
+        self.assertIn('替代组', grouped_html)
+        self._assert_form_stock(grouped_html, 'STK-ROUND', '11')
+        self._assert_form_stock(grouped_html, 'STK-NONE', '-')
+
     def test_formula_process_compare_mode_still_renders(self):
         url = reverse('project_formula_process', kwargs={'pk': self.project.pk})
         resp = self.client.get(f'{url}?compare=1')
@@ -156,14 +185,17 @@ class BomStockPageTests(TestCase):
         self._assert_column_contract(html, 'G/25KG')
         self.assertEqual(resp.context['stock_totals'][self.down.pk], Decimal('10.400'))
 
-    def test_color_center_edit_form_does_not_add_stock_column(self):
+    def test_color_center_edit_form_shows_stock_next_to_ratio(self):
         url = reverse('color_center:project', kwargs={'project_pk': self.project.pk})
         resp = self.client.get(
             f'{url}?stage=RND&round=1&formula_id={self.formula.pk}&edit=1')
         self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
         self.assertContains(resp, 'id="bom-form"')
-        self.assertNotContains(resp, '<th>库存</th>')
-        self.assertEqual(resp.context['stock_totals'], {})
+        self.assertRegex(html, r'G/25KG</th>\s*<th[^>]*>库存</th>')
+        self._assert_form_stock(html, 'STK-ROUND', '11')
+        self._assert_form_stock(html, 'STK-NONE', '-')
+        self.assertEqual(resp.context['stock_totals'][self.rounded.pk], Decimal('10.500'))
 
     def test_color_center_open_task_stays_on_the_form(self):
         order = ProductionOrder.objects.create(
@@ -183,4 +215,5 @@ class BomStockPageTests(TestCase):
         resp = self.client.get(f'{url}?formula_id={self.formula.pk}')
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, 'id="bom-form"')
-        self.assertNotContains(resp, '<th>库存</th>')
+        self.assertContains(resp, '<th scope="col" style="width: 70px;">库存</th>')
+        self._assert_form_stock(resp.content.decode(), 'STK-ROUND', '11')

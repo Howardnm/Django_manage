@@ -11,8 +11,9 @@ function initColorBom() {
         bindFormulaTableDropdowns(document);
     }
 
-    /* 原材料选择后自动更新原材料类型列 */
+    /* 原材料选择后自动更新原材料类型列和库存 */
     attachCategoryUpdate();
+    bindRawMaterialStockAll(document);
 
     /* ---- Formset 动态新增行 ---- */
     var addBtn = document.getElementById('add-entry-row');
@@ -35,6 +36,7 @@ function initColorBom() {
                     bindFormulaTableDropdowns(newRowEl);
                 }
                 attachCategoryUpdate();
+                bindRawMaterialStockAll(newRowEl);
             });
         }
     }
@@ -61,6 +63,67 @@ function attachCategoryUpdate() {
         };
         el.tomselect.on('item_add', el._catHandler);
     });
+}
+
+function bomStockMap() {
+    if (!window.BOM_STOCK) {
+        var node = document.getElementById('bom-stock-map');
+        window.BOM_STOCK = node ? JSON.parse(node.textContent) : {};
+    }
+    return window.BOM_STOCK;
+}
+
+function bindRawMaterialStockAll(root) {
+    root.querySelectorAll('select[data-model="raw_material"]').forEach(bindRawMaterialStock);
+}
+
+function bindRawMaterialStock(el) {
+    if (!el.tomselect || el._stockBound) return;
+    el._stockBound = true;
+    var ts = el.tomselect;
+
+    function show(qty) {
+        var row = el.closest('tr');
+        var cell = row && row.querySelector('.bom-stock');
+        if (!cell) return;
+        cell.textContent = (qty === null || qty === undefined) ? '-' : String(qty);
+    }
+
+    function lookup(id, data) {
+        if (data && Object.prototype.hasOwnProperty.call(data, 'stock_qty')) return data.stock_qty;
+        var map = bomStockMap();
+        var key = String(id);
+        if (Object.prototype.hasOwnProperty.call(map, key)) return map[key];
+        return undefined;
+    }
+
+    function apply(id) {
+        var data = id ? ts.options[String(id)] : null;
+        var qty = lookup(id, data);
+        if (qty === undefined) return;
+        show(qty);
+    }
+
+    // 已在下拉里的物料，addOption 不会覆盖，搜索结果里的 stock_qty 要补回去。
+    ts.on('load', function (results) {
+        (results || []).forEach(function (opt) {
+            if (!opt || !Object.prototype.hasOwnProperty.call(opt, 'stock_qty')) return;
+            var key = String(opt.value);
+            bomStockMap()[key] = opt.stock_qty;
+            if (ts.options[key]) ts.options[key].stock_qty = opt.stock_qty;
+        });
+        if (ts.items.length) apply(ts.items[0]);
+    });
+    ts.on('item_add', function (value) {
+        apply(value);
+    });
+    ts.on('item_remove', function () {
+        var current = ts;
+        setTimeout(function () {
+            if (!current.items.length) show(null);
+        }, 0);
+    });
+    if (el.value) apply(el.value);
 }
 
 function escapeHtml(str) {

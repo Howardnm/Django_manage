@@ -1,3 +1,5 @@
+{% load project_extras %}
+{{ stock_display|json_script:"bom-stock-map" }}
 <form method="post" action="{% url 'color_center:project_save' project.pk %}" id="bom-form">
     {% csrf_token %}
     <input type="hidden" name="formula_id" value="{{ selected_formula.pk }}">
@@ -20,6 +22,7 @@
                     <th scope="col" style="width: 100px;">原材料类型</th>
                     <th scope="col" style="width: 200px;">颜料/色粉</th>
                     <th scope="col" style="min-width: 100px;">G/25KG</th>
+                    <th scope="col" style="width: 70px;">库存</th>
                     <th scope="col" style="width: 60px;">共混</th>
                     <th scope="col" style="width: 70px;">共混顺序</th>
                     <th scope="col" style="width: 80px;">共混时间(s)</th>
@@ -51,6 +54,13 @@
                             {% if entry_form.percentage.errors %}
                             <div class="invalid-feedback d-block">{{ entry_form.percentage.errors.0 }}</div>
                             {% endif %}
+                        </td>
+                        <td class="bom-stock">
+                            {% with raw_id=entry_form.instance.raw_material_id|default:entry_form.raw_material.value %}
+                                {% with qty=stock_display|get_item:raw_id %}
+                                    {% if qty is None %}-{% else %}{{ qty }}{% endif %}
+                                {% endwith %}
+                            {% endwith %}
                         </td>
                         <td>{{ entry_form.is_pre_mix }}</td>
                         <td>{{ entry_form.pre_mix_order }}</td>
@@ -168,6 +178,7 @@ function submitBatch(mode) {
         <td><span class="text-muted">-</span></td>
         <td>{{ entry_formset.empty_form.raw_material }}</td>
         <td>{{ entry_formset.empty_form.percentage }}</td>
+        <td class="bom-stock">-</td>
         <td>{{ entry_formset.empty_form.is_pre_mix }}</td>
         <td>{{ entry_formset.empty_form.pre_mix_order }}</td>
         <td>{{ entry_formset.empty_form.pre_mix_time }}</td>
