@@ -14,7 +14,7 @@ from app_color_center.mixins import (
 )
 from app_trial_production.models import ProductionOrder
 from app_color_center.models import ColorMatchingTask
-from app_project.models import Project, ProjectStage
+from app_project.models import Project, ProjectNode, ProjectStage
 from app_formula.models import LabFormula, ColorPowderBOM
 from app_color_center.forms import ColorPowderBOMForm, ColorPowderBOMEntryFormSet
 from app_color_center.services import (
@@ -88,7 +88,7 @@ class _ColorProjectContextMixin:
     与权限无关，故不以（外部）权限 Mixin 形式存在；下划线前缀表示模块内部私有。
     """
 
-    STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
+    STAGE_ORDER = ProjectNode.FORMULA_STAGES
 
     def _resolve_project(self):
         if not hasattr(self, '_project'):

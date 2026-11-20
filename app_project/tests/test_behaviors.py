@@ -783,3 +783,38 @@ class MemberShareRatioSnapshotTests(TestCase):
         self.assertEqual(snap.quality_score, Decimal('80'))
         self.assertEqual(snap.workload_score, Decimal('0.56'))
         self.assertEqual(snap.effective_score, Decimal('0.84'))
+
+
+class FormulaProcessStageTests(TestCase):
+    """开发周期完成可以挂配方，过程页必须出这个阶段的 Tab。"""
+
+    def test_order_stage_formula_stays_on_its_own_tab(self):
+        from django.urls import reverse
+
+        from app_formula.models import LabFormula
+        from app_material.models import MaterialType
+
+        manager = User.objects.create_superuser(
+            username='order_mgr', email='order_mgr@test.local', password='x')
+        project = Project.objects.create(name='周期完成', manager=manager)
+        material_type = MaterialType.objects.create(name='PA-ORDER')
+        rnd = project.nodes.get(stage=ProjectStage.RND)
+        order = project.nodes.get(stage=ProjectStage.ORDER)
+        LabFormula.objects.create(
+            code='T-RND', name='研发配方', material_type=material_type,
+            project=project, project_node=rnd, creator=manager, version=1)
+        LabFormula.objects.create(
+            code='T-ORDER', name='开发周期配方', material_type=material_type,
+            project=project, project_node=order, creator=manager, version=1)
+
+        self.client.force_login(manager)
+        url = reverse('project_formula_process', kwargs={'pk': project.pk})
+        overview = self.client.get(url)
+        self.assertEqual(overview.status_code, 200)
+        self.assertContains(overview, '开发周期完成')
+
+        pinned = self.client.get(f'{url}?stage=ORDER&round=1')
+        self.assertEqual(pinned.status_code, 200)
+        self.assertContains(pinned, 'T-ORDER')
+        self.assertEqual(pinned.context['active_stage'], ProjectStage.ORDER)
+        self.assertEqual(pinned.context['selected_formula'].code, 'T-ORDER')

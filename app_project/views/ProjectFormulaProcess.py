@@ -164,8 +164,8 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         all_formulas = self._fetch_formulas(project, material)
 
-        # 按阶段 + 轮次分组，用于顶部 tab
-        STAGE_ORDER = ['RND', 'PILOT', 'MID_TEST', 'MASS_PROD', 'MASS_TRACK']
+        # 按阶段 + 轮次分组，用于顶部 tab。名单与可新增配方的阶段同一份，含开发周期完成。
+        stage_order = ProjectNode.FORMULA_STAGES
         stage_grouped = OrderedDict()
         all_stage_formulas = []  # 所有配方(用于全局对比，含竞品)
         competitor_formulas = []  # 竞品配方 → 伪阶段「客户竞品」
@@ -186,7 +186,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
         # 构建 tab 列表：[{stage, stage_display, round, formulas}, ...]
         stage_round_items = []
-        for stage in STAGE_ORDER:
+        for stage in stage_order:
             if stage not in stage_grouped:
                 continue
             for r in sorted(stage_grouped[stage].keys()):
@@ -207,7 +207,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             })
 
         # 当前激活的阶段和轮次
-        active_stage = self.request.GET.get('stage', STAGE_ORDER[0])
+        active_stage = self.request.GET.get('stage', stage_order[0])
         active_round = self.request.GET.get('round')
         try:
             active_round = int(active_round) if active_round else None
