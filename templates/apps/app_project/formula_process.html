@@ -318,6 +318,7 @@
                             <th>原材料类型</th>
                             <th>原材料</th>
                             <th>比例/份数</th>
+                            <th>库存</th>
                             <th>共混信息</th>
                             <th>分秤</th>
                             <th>备注</th>
@@ -336,6 +337,11 @@
                                     {% if item.alt_label %}<span class="badge bg-orange-lt ms-1">{{ item.alt_label }}</span>{% endif %}
                                 </td>
                                 <td class="fs-3">{{ item.percentage|smart_decimal }}</td>
+                                <td class="fs-3">
+                                    {% with qty=stock_totals|get_item:item.raw_material_id %}
+                                        {% if qty is None %}-{% else %}{{ qty|floatformat:0 }}{% endif %}
+                                    {% endwith %}
+                                </td>
                                 <td>
                                     {% if item.is_pre_mix %}
                                         <span class="badge bg-purple-lt">{{ item.pre_mix_order }}. 共混({{ item.pre_mix_time }}s)</span>
@@ -351,7 +357,7 @@
                                 </td>
                             </tr>
                         {% empty %}
-                            <tr><td colspan="7" class="text-center text-muted py-3">暂无BOM数据</td></tr>
+                            <tr><td colspan="8" class="text-center text-muted py-3">暂无BOM数据</td></tr>
                         {% endfor %}
                         </tbody>
                     </table>
@@ -378,6 +384,7 @@
                             <th>原材料类型</th>
                             <th>颜料/色粉</th>
                             <th>比例(份) <span class="fw-bold small">kg/100kg</span></th>
+                            <th>库存</th>
                             <th>共混信息</th>
                             <th>分秤</th>
                         </tr>
@@ -394,6 +401,11 @@
                                 <span class="text-muted small">({{ entry.raw_material.model_name }})</span>
                             </td>
                             <td class="fs-3">{{ entry.percentage|exact_decimal }}</td>
+                            <td class="fs-3">
+                                {% with qty=stock_totals|get_item:entry.raw_material_id %}
+                                    {% if qty is None %}-{% else %}{{ qty|floatformat:0 }}{% endif %}
+                                {% endwith %}
+                            </td>
                             <td>
                                 {% if entry.is_pre_mix %}
                                     <span class="badge bg-purple-lt">{{ entry.pre_mix_order }}. 共混({{ entry.pre_mix_time }}s)</span>

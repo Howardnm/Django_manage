@@ -157,7 +157,9 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        from app_raw_material.models import PriceAvgConfig
+        from django.core.exceptions import ObjectDoesNotExist
+
+        from app_raw_material.models import PriceAvgConfig, RawMaterial
 
         project = self.object
         material = project.material
@@ -338,6 +340,21 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
                     'injection_pretreatment': o.injection_pretreatment,
                 }
 
+        stock_totals = {}
+        if selected_formula and not compare_mode:
+            material_ids = [
+                line.raw_material_id for line in selected_formula.bom_lines.all()
+            ]
+            try:
+                powder = selected_formula.color_powder_bom
+            except ObjectDoesNotExist:
+                powder = None
+            if powder is not None:
+                material_ids.extend(
+                    entry.raw_material_id for entry in powder.entries.all()
+                )
+            stock_totals = RawMaterial.unrestricted_stock_totals(material_ids)
+
         context.update({
             'material': material,
             'related_orders': related_orders,
@@ -355,6 +372,7 @@ class ProjectFormulaProcessView(ProjectAccessMixin, DetailView):
             'compare_data': compare_data,
             'selected_competitor_info': selected_competitor_info,
             'avg_months': PriceAvgConfig.get().months,
+            'stock_totals': stock_totals,
         })
         return context
 

@@ -225,6 +225,36 @@ class RawMaterial(models.Model):
             pk__in=self.stock_snapshots.values('plant').distinct()
         )
 
+    @classmethod
+    def unrestricted_stock_totals(cls, material_ids):
+        """当前非限制库存合计，按原材料 id 返回。
+
+        每个（物料, 工厂）只取 synced_at 最新的同步批次，汇总该批次下
+        全部库位/批号的 CLABS，再跨工厂相加。历史批次不算。
+        没有任何快照的物料不出现在字典里；合计为 0 的键保留。
+        """
+        ids = {pk for pk in material_ids if pk}
+        if not ids:
+            return {}
+
+        from django.db.models import OuterRef, Subquery, Sum
+
+        latest_batch = (
+            RawMaterialStockSnapshot.objects.filter(
+                raw_material_id=OuterRef('raw_material_id'),
+                plant_id=OuterRef('plant_id'),
+            )
+            .order_by('-synced_at', '-pk')
+            .values('sync_batch_id')[:1]
+        )
+        rows = (
+            RawMaterialStockSnapshot.objects.filter(raw_material_id__in=ids)
+            .filter(sync_batch_id=Subquery(latest_batch))
+            .values('raw_material_id')
+            .annotate(total=Sum('unrestricted_stock'))
+        )
+        return {row['raw_material_id']: row['total'] for row in rows}
+
     class Meta:
         verbose_name = "原材料"
         verbose_name_plural = "原材料库"

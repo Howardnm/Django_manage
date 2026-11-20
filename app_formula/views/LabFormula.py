@@ -301,7 +301,7 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
         context['sorted_test_results'] = sorted_results
 
         from app_formula.services import FormulaCostCalculator
-        from app_raw_material.models import Plant, PriceAvgConfig
+        from app_raw_material.models import Plant, PriceAvgConfig, RawMaterial
 
         # 一个计算器覆盖「全局趋势 + 各工厂趋势 + 各工厂成本」，
         # 三者共享同一份价格数据（原先每个工厂各重查一遍 BOM 行价格）
@@ -343,6 +343,9 @@ class LabFormulaDetailView(FormulaAccessMixin, DetailView):
                 'has_trend': len(trend_data) >= 2,
             })
         context['plant_costs'] = plant_costs
+        context['stock_totals'] = RawMaterial.unrestricted_stock_totals(
+            line.raw_material_id for line in formula.bom_lines.all()
+        )
 
         return context
 

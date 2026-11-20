@@ -132,13 +132,14 @@
                         {% endif %}
                     </div>
                     <div class="table-responsive">
-                        <table class="table table-vcenter card-table compact-table">
+                        <table class="table table-vcenter card-table table-sm small">
                             <thead>
                             <tr>
                                 <th>喂料口</th>
                                 <th>原材料类型</th>
                                 <th>颜料/色粉</th>
                                 <th>G/25KG</th>
+                                <th>库存</th>
                                 <th>共混信息</th>
                                 <th>分秤</th>
                             </tr>
@@ -155,6 +156,11 @@
                                     <span class="text-muted small">({{ entry.raw_material.model_name }})</span>
                                 </td>
                                 <td class="fs-3">{{ entry.percentage|grams_per_25kg }}</td>
+                                <td class="fs-3">
+                                    {% with qty=stock_totals|get_item:entry.raw_material_id %}
+                                        {% if qty is None %}-{% else %}{{ qty|floatformat:0 }}{% endif %}
+                                    {% endwith %}
+                                </td>
                                 <td>
                                     {% if entry.is_pre_mix %}
                                         <span class="badge bg-purple-lt">{{ entry.pre_mix_order }}. 共混({{ entry.pre_mix_time }}s)</span>

@@ -467,6 +467,14 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
                 # 无 BOM 且无写权限 → 无表单、无只读条目
                 readonly = True
 
+        stock_totals = {}
+        if readonly and not compare_mode and bom_entries is not None:
+            bom_entries = list(bom_entries)
+            from app_raw_material.models import RawMaterial
+            stock_totals = RawMaterial.unrestricted_stock_totals(
+                entry.raw_material_id for entry in bom_entries
+            )
+
         context = {
             'project': ctx['project'],
             'material': ctx['material'],
@@ -484,6 +492,7 @@ class ProjectColorView(ColorCenterReadMixin, _ColorProjectContextMixin, View):
             'bom_form': bom_form,
             'entry_formset': entry_formset,
             'bom_entries': bom_entries,
+            'stock_totals': stock_totals,
             'readonly': readonly,
             'can_write': can_write,
             'color_formula_ids': ctx['color_formula_ids'],
