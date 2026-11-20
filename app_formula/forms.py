@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import inlineformset_factory, BaseInlineFormSet
-from app_formula.services.alt_groups import AltGroupError, validate_alt_rows
+from app_formula.services.alt_groups import MAX_ALT_MEMBERS, AltGroupError, validate_alt_rows
 from common_utils.filters import TablerFormMixin
 from common_utils.forms import RgbColorWidget
 from .models import LabFormula, FormulaBOM, FormulaTestResult
@@ -144,7 +144,7 @@ class FormulaBOMForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
             'percentage': forms.NumberInput(attrs={'step': '0.01'}),
             'alt_group': forms.TextInput(attrs={'maxlength': '2', 'class': 'form-control', 'placeholder': 'A'}),
             'alt_strategy': forms.Select(attrs={'class': 'form-select'}),
-            'alt_priority': forms.NumberInput(attrs={'min': '1', 'max': '3', 'step': '1'}),
+            'alt_priority': forms.NumberInput(attrs={'min': '1', 'max': str(MAX_ALT_MEMBERS), 'step': '1'}),
             'usage_percent': forms.NumberInput(attrs={'step': '0.01', 'min': '0', 'max': '100'}),
         }
 

@@ -45,7 +45,7 @@ def _build_merged_bom(formulas, details_map=None):
     rows = []
     formula_totals = {f.pk: 0 for f in formulas}
     grand_total = 0
-    # 行骨架只用基准配方实际领用的那几笔。策略 2 不含优先级 2、3。
+    # 行骨架只用基准配方实际领用的那几笔。策略 2 只领优先级最小的一行。
     indexes = {f.pk: dose_index(list(f.bom_lines.all())) for f in formulas}
     for base_line, _share in dose_shares(list(base_formula.bom_lines.all())):
         raw_id = base_line.raw_material_id

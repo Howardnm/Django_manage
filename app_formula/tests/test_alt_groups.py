@@ -52,6 +52,23 @@ class AltGroupValidationTests(SimpleTestCase):
         with self.assertRaises(AltGroupError):
             validate_alt_rows(rows)
 
+    def test_strategy_two_accepts_priority_above_three(self):
+        rows = [
+            {'raw_material': i, 'percentage': '60', 'alt_group': 'A', 'alt_strategy': '2',
+             'alt_priority': i, 'usage_percent': None}
+            for i in range(1, 5)
+        ]
+        validate_alt_rows(rows)
+
+    def test_strategy_two_rejects_a_hundredth_member(self):
+        rows = [
+            {'raw_material': i, 'percentage': '60', 'alt_group': 'A', 'alt_strategy': '2',
+             'alt_priority': i, 'usage_percent': None}
+            for i in range(1, 101)
+        ]
+        with self.assertRaises(AltGroupError):
+            validate_alt_rows(rows)
+
     def test_ungrouped_row_cannot_carry_the_other_columns(self):
         with self.assertRaises(AltGroupError):
             validate_alt_rows([{
@@ -61,6 +78,18 @@ class AltGroupValidationTests(SimpleTestCase):
 
 
 class AltGroupCostTests(SimpleTestCase):
+
+    def test_strategy_two_ignores_priorities_above_one(self):
+        lines = [
+            _line(raw_material_id=i, alt_group='A', alt_strategy='2', alt_priority=i)
+            for i in range(1, 5)
+        ]
+        lines.append(_line(raw_material_id=5, percentage=Decimal('40')))
+        cost = weighted_unit_cost(lines, _prices({
+            1: Decimal('10'), 2: Decimal('30'), 3: Decimal('40'),
+            4: Decimal('50'), 5: Decimal('20'),
+        }))
+        self.assertEqual(cost, Decimal('14.00'))
 
     def test_strategy_two_uses_priority_one_price_once(self):
         lines = [
@@ -93,6 +122,14 @@ class AltGroupCostTests(SimpleTestCase):
 
 
 class AltGroupDoseTests(SimpleTestCase):
+
+    def test_missing_priority_does_not_outrank_ninety_nine(self):
+        blank = _line(raw_material_id=1, alt_group='A', alt_strategy='2', alt_priority=None)
+        last = _line(raw_material_id=2, alt_group='A', alt_strategy='2', alt_priority=99)
+        doses = dose_shares([blank, last])
+        self.assertEqual([(line.raw_material_id, share) for line, share in doses], [
+            (2, Decimal('60')),
+        ])
 
     def test_strategy_two_issues_only_priority_one(self):
         primary = _line(raw_material_id=1, alt_group='A', alt_strategy='2', alt_priority=1)

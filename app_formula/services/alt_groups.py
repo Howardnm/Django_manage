@@ -8,6 +8,9 @@ _GROUP = re.compile(r'^[0-9A-Z]{1,2}$')
 _HUNDRED = Decimal('100')
 _PCT = Decimal('0.000001')
 _USAGE = Decimal('0.01')
+# SAP 的 AI_PRIO 是 2 位。连续优先级从 1 排，所以一组最多这么多种原料。
+MAX_ALT_MEMBERS = 99
+_MISSING_PRIORITY = MAX_ALT_MEMBERS + 1
 
 
 class AltGroupError(Exception):
@@ -68,8 +71,8 @@ def validate_alt_rows(rows):
     for group, members in buckets.items():
         if len(members) < 2:
             raise AltGroupError(f'替代组 {group} 至少要两种原料。')
-        if len(members) > 3:
-            raise AltGroupError(f'替代组 {group} 最多三种原料。')
+        if len(members) > MAX_ALT_MEMBERS:
+            raise AltGroupError(f'替代组 {group} 最多 {MAX_ALT_MEMBERS} 种原料。')
         if len({member.raw_id for member in members}) != len(members):
             raise AltGroupError(f'替代组 {group} 里原料不能重复。')
         if len({member.strategy for member in members}) != 1:
@@ -114,7 +117,7 @@ def collapse_cost_pairs(lines, price_of):
     for members in grouped.values():
         percentage = members[0].percentage
         if (members[0].alt_strategy or '') == '2':
-            primary = min(members, key=lambda item: item.alt_priority or 99)
+            primary = min(members, key=lambda item: item.alt_priority or _MISSING_PRIORITY)
             pairs.append((percentage, price_of(primary)))
             continue
         total_price = Decimal('0')
@@ -156,7 +159,7 @@ def dose_shares(lines):
         emitted.add(group)
         members = grouped[group]
         if (members[0].alt_strategy or '') == '2':
-            primary = min(members, key=lambda item: item.alt_priority or 99)
+            primary = min(members, key=lambda item: item.alt_priority or _MISSING_PRIORITY)
             doses.append((primary, Decimal(str(primary.percentage or 0))))
             continue
         for member in members:
