@@ -1,6 +1,42 @@
+import re
 from decimal import Decimal, ROUND_HALF_UP
 
 from django.apps import AppConfig
+from django.db.models import CharField, Q, Value
+from django.db.models.functions import Coalesce, Concat
+
+
+def _wildcard_raw_materials(query):
+    """通配符同时落在「名称 型号 内部编码 工厂代码」上。
+
+    工厂是多对多，先按每个工厂拼一行再收成不重复的物料，
+    避免一个物料因为挂了两个工厂在下拉里出现两次。
+    没挂工厂的物料补一条空工厂代码，否则纯名称型号的通配会把它漏掉。
+    """
+    from app_raw_material.models import RawMaterial
+
+    pattern = re.escape(re.sub(r'\*+', '*', query)).replace(r'\*', '.*').replace(r'\?', '.')
+    parts = [
+        Coalesce('name', Value('')), Value(' '),
+        Coalesce('model_name', Value('')), Value(' '),
+        Coalesce('warehouse_code', Value('')), Value(' '),
+        Coalesce('plants__code', Value('')),
+    ]
+    per_plant = RawMaterial.objects.annotate(
+        _text_search=Concat(*parts, output_field=CharField())
+    ).filter(_text_search__iregex=pattern)
+    no_plant = RawMaterial.objects.filter(plants__isnull=True).annotate(
+        _text_search=Concat(
+            Coalesce('name', Value('')), Value(' '),
+            Coalesce('model_name', Value('')), Value(' '),
+            Coalesce('warehouse_code', Value('')), Value(' '),
+            Value(''),
+            output_field=CharField(),
+        )
+    ).filter(_text_search__iregex=pattern)
+    return RawMaterial.objects.filter(
+        Q(pk__in=per_plant.values('pk')) | Q(pk__in=no_plant.values('pk'))
+    )
 
 
 class AppRawMaterialConfig(AppConfig):
@@ -21,16 +57,16 @@ class AppRawMaterialConfig(AppConfig):
 
             warehouse_code 已经在候选项文案里展示，必须一并参与匹配 ——
             原先只搜 name 与 model_name，导致「输编码搜不到」。
-            ``*`` / ``?`` 见 ``text_q``。
+            有 ``*`` / ``?`` 时再把工厂代码拼进同一段，见 ``_wildcard_raw_materials``。
             """
-            return text_q(
-                RawMaterial.objects.select_related('category').prefetch_related(
-                    'plants'
-                ).only(
-                    'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
-                ),
-                query, 'name', 'model_name', 'warehouse_code',
+            base = RawMaterial.objects.select_related('category').prefetch_related(
+                'plants'
+            ).only(
+                'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
             )
+            if '*' in query or '?' in query:
+                return base.filter(pk__in=_wildcard_raw_materials(query).values('pk'))
+            return text_q(base, query, 'name', 'model_name', 'warehouse_code')
 
         def _format_raw_materials(materials):
             """批量格式化候选项 —— 价格一次装载，逐条查价会变成 N+1。

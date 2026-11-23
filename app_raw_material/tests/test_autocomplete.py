@@ -89,6 +89,35 @@ class RawMaterialAutocompleteTests(TestCase):
     def test_dot_is_literal_not_any_character(self):
         self.assertEqual(self._search('RM-000.23'), [])
 
+    def test_wildcard_spans_name_model_code_and_plant(self):
+        """pp*500n*A01*3011 要同时落在名称、型号、内部编码、工厂代码上。"""
+        target = RawMaterial.objects.create(
+            name='PP', model_name='HP500N/后面还有文字', warehouse_code='A01005000035',
+            category=self.category)
+        other_code = RawMaterial.objects.create(
+            name='PP', model_name='HP500N/后面还有文字', warehouse_code='B02005000035',
+            category=self.category)
+        no_plant = RawMaterial.objects.create(
+            name='PP', model_name='HP500N/后面还有文字', warehouse_code='A01005000099',
+            category=self.category)
+        other_plant = Plant.objects.create(code='3020', name='昆山工厂')
+        target.plants.add(self.plant)
+        other_code.plants.add(self.plant)
+
+        def ids_for(query):
+            return [row['value'] for row in self._search(query)]
+
+        self.assertEqual(ids_for('pp*500n*3011'), [target.pk, other_code.pk])
+        self.assertEqual(ids_for('pp*500n*A01*3011'), [target.pk])
+        self.assertNotIn(other_code.pk, ids_for('pp*500n*A01*3011'))
+        self.assertNotIn(target.pk, ids_for('pp*500n*3020'))
+        self.assertIn(no_plant.pk, ids_for('pp*500n*'))
+        self.assertNotIn(target.pk, ids_for('上海'))
+
+        target.plants.add(other_plant)
+        self.assertEqual(ids_for('pp*500n*A01*3011'), [target.pk])
+        self.assertEqual(ids_for('3011'), [])
+
     def test_option_text_includes_price(self):
         """候选文案要带最新单价，且与其它附加信息一样用括号包裹。"""
         self.material.plants.add(self.plant)
