@@ -1,5 +1,4 @@
 {% load project_extras %}
-{{ stock_display|json_script:"bom-stock-map" }}
 <form method="post" action="{% url 'color_center:project_save' project.pk %}" id="bom-form">
     {% csrf_token %}
     <input type="hidden" name="formula_id" value="{{ selected_formula.pk }}">
@@ -56,10 +55,8 @@
                             {% endif %}
                         </td>
                         <td class="bom-stock">
-                            {% with raw_id=entry_form.instance.raw_material_id|default:entry_form.raw_material.value %}
-                                {% with qty=stock_display|get_item:raw_id %}
-                                    {% if qty is None %}-{% else %}{{ qty }}{% endif %}
-                                {% endwith %}
+                            {% with qty=stock_totals|get_item:entry_form.raw_material.value %}
+                                {% if qty is None %}-{% else %}{{ qty|floatformat:0 }}{% endif %}
                             {% endwith %}
                         </td>
                         <td>{{ entry_form.is_pre_mix }}</td>
