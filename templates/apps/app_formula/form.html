@@ -475,14 +475,6 @@
         </tr>
     </script>
 
-    <!-- Data bridge: test config metadata -->
-    <script>
-    window.testConfigMeta = {};
-    {% for config in test_formset.form.fields.test_config.queryset %}
-        window.testConfigMeta['{{ config.id }}'] = {type: '{{ config.data_type }}', options: {{ config.get_options_list|safe }}};
-    {% endfor %}
-    </script>
-
     <!-- Data bridge: API endpoints -->
     <script>
     window.FORMULA_MATERIAL_API_URL = "{% url 'material_api_search' %}";
@@ -512,5 +504,5 @@
 {% block extra_js %}
 <script src="{% static 'js/common/rgb_color_input.js' %}"></script>
 <script src="{% static 'js/common/card_table_scroll.js' %}"></script>
-<script src="{% static 'js/apps/app_formula/form.js' %}?v=2"></script>
+<script src="{% static 'js/apps/app_formula/form.js' %}?v=3"></script>
 {% endblock %}

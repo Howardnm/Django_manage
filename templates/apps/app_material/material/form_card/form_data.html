@@ -105,22 +105,19 @@
 </div>
 
 <script>
-    // 预加载所有 TestConfig 的数据类型信息
-    // 格式: { id: {type: 'NUMBER', options: ['A', 'B']} }
-    const testConfigMeta = {};
-    {% for config in data_formset.form.fields.test_config.queryset %}
-        testConfigMeta['{{ config.id }}'] = {
-            type: '{{ config.data_type }}',
-            options: {{ config.get_options_list|safe }}
-        };
-    {% endfor %}
+    function testConfigMetaFrom(selectElement, configId) {
+        const option = selectElement.tomselect && selectElement.tomselect.options[configId];
+        if (!option || !option.data_type) return null;
+        return {type: option.data_type, options: option.options || []};
+    }
 
     function toggleValueInput(selectElement) {
         const row = selectElement.closest('tr');
         const configId = selectElement.value;
         if (!configId) return;
 
-        const meta = testConfigMeta[configId] || {type: 'NUMBER', options: []};
+        const meta = testConfigMetaFrom(selectElement, configId);
+        if (!meta) return;
         const isSwitch = selectElement.dataset.initialized === 'true';
 
         // 三个控件组：数值 / 文本 / 选择 — 每组包含 [值, 最小值, 最大值]

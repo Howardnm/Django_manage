@@ -154,10 +154,13 @@ class AppMaterialConfig(AppConfig):
 
         register_autocomplete('test_config',
             lambda q: text_q(TestConfig.objects.select_related('category').only(
-                'pk', 'name', 'standard', 'condition', 'category__name'
+                'pk', 'name', 'standard', 'condition', 'category__name',
+                'data_type', 'options_config',
             ), q, 'name', 'standard'),
             lambda t: {'value': t.pk,
-                'text': f'[{t.category.name}] {t.name} - {t.standard}{f" ({t.condition})" if t.condition else ""}'})
+                'text': f'[{t.category.name}] {t.name} - {t.standard}{f" ({t.condition})" if t.condition else ""}',
+                'data_type': t.data_type,
+                'options': t.get_options_list()})
 
         register_autocomplete('characteristic',
             lambda q: text_q(MaterialCharacteristic.objects.only('pk', 'name'), q, 'name'),

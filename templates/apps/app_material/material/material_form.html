@@ -147,6 +147,11 @@
             if (window.TomSelect) {
                 // --- 1. 远程搜索（单选 + 多选）— 复用通用函数 tomselect_remote.js ---
                 initRemoteTomSelectAll(document, {apiUrl: "{% url 'repo_api_search' %}"});
+                document.querySelectorAll('[data-model="test_config"]').forEach(function (el) {
+                    if (el.tomselect) el.tomselect.destroy();
+                    initRemoteTomSelect(el, {apiUrl: "{% url 'material_api_search' %}"});
+                    el.tomselect.on('item_add', function () { toggleValueInput(el); });
+                });
 
                 // --- 3. 初始化本地多选的 Tom Select (胶囊样式) ---
                 document.querySelectorAll('.tomselect-multi-local').forEach(function (el) {
@@ -192,6 +197,10 @@
 
                     // 【关键】给新行里的下拉框应用 Tom Select（复用全局通用函数）
                     initLocalTomSelectAll(newRow);
+                    newRow.querySelectorAll('[data-model="test_config"]').forEach(function (el) {
+                        initRemoteTomSelect(el, {apiUrl: "{% url 'material_api_search' %}"});
+                        el.tomselect.on('item_add', function () { toggleValueInput(el); });
+                    });
                     if (window.bindFormulaTableDropdowns) {
                         bindFormulaTableDropdowns(newRow);
                     }

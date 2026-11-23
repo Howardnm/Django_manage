@@ -158,6 +158,11 @@ class WildcardAutocompleteTests(TestCase):
         self.assertEqual(self._search('material_type', '工程.料'), [])
         self.assertEqual(self._search('scenario', '汽车*'), ['汽车内饰'])
         self.assertEqual(self._search('characteristic', '耐?'), ['耐热', '耐磨'])
+        payload = self.client.get(reverse('material_api_search'), {
+            'model': 'test_config', 'q': '拉伸强度',
+        }).json()
+        self.assertEqual(payload[0]['data_type'], 'NUMBER')
+        self.assertEqual(payload[0]['options'], [])
         standards = self._search('test_config', 'ISO 52?')
         self.assertTrue(any('拉伸强度' in text for text in standards))
         self.assertFalse(any('密度' in text for text in standards))

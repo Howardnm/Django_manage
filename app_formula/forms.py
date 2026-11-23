@@ -195,7 +195,10 @@ class FormulaTestResultForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
         model = FormulaTestResult
         fields = ['test_config', 'value', 'value_text', 'test_date', 'remark']
         widgets = {
-            'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
+            'test_config': forms.Select(attrs={
+                'class': 'form-select remote-search', 'data-model': 'test_config',
+                'onchange': 'toggleValueInput(this)',
+            }),
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
             'test_date': forms.DateInput(format='%Y-%m-%d', attrs={'type': 'date'}),
@@ -205,9 +208,24 @@ class FormulaTestResultForm(_IsInvalidMixin, TablerFormMixin, forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # 【修改】不再清空 queryset，而是加载所有 TestConfig
-        # 因为字段不多，直接加载所有选项更方便
-        self.fields['test_config'].queryset = TestConfig.objects.select_related('category').all().order_by('category__order', 'order')
+        # 远程搜索只渲染当前选中项。整表 TestConfig 写进页面会随配置变多拖慢打开。
+        config_ids = set()
+        if self.data:
+            posted = self.data.get(self.add_prefix('test_config'))
+            if posted:
+                try:
+                    config_ids.add(int(posted))
+                except (TypeError, ValueError):
+                    pass
+        if self.instance and self.instance.pk and self.instance.test_config_id:
+            config_ids.add(self.instance.test_config_id)
+        initial_config = (kwargs.get('initial') or {}).get('test_config')
+        if initial_config:
+            config_ids.add(initial_config.pk if hasattr(initial_config, 'pk') else int(initial_config))
+        self.fields['test_config'].queryset = (
+            TestConfig.objects.filter(pk__in=config_ids) if config_ids
+            else TestConfig.objects.none()
+        )
         
         # 如果是编辑状态，且当前数据是文本类型，则显示文本框，隐藏数字框
         if self.instance and self.instance.pk:

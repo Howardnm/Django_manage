@@ -73,7 +73,10 @@ class RawMaterialPropertyForm(TablerFormMixin, forms.ModelForm):
         model = RawMaterialProperty
         fields = ['test_config', 'value', 'value_text', 'min_value', 'max_value', 'min_value_text', 'max_value_text', 'test_date', 'remark']
         widgets = {
-            'test_config': forms.Select(attrs={'class': 'form-select form-select-search', 'onchange': 'toggleValueInput(this)'}),
+            'test_config': forms.Select(attrs={
+                'class': 'form-select remote-search', 'data-model': 'test_config',
+                'onchange': 'toggleValueInput(this)',
+            }),
             'value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-number'}),
             'value_text': forms.TextInput(attrs={'class': 'form-control value-text', 'style': 'display:none;'}),
             'min_value': forms.NumberInput(attrs={'step': '0.001', 'class': 'form-control value-min'}),
@@ -86,7 +89,20 @@ class RawMaterialPropertyForm(TablerFormMixin, forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['test_config'].queryset = TestConfig.objects.select_related('category').order_by('category__order', 'order')
+        config_ids = set()
+        if self.data:
+            posted = self.data.get(self.add_prefix('test_config'))
+            if posted:
+                try:
+                    config_ids.add(int(posted))
+                except (TypeError, ValueError):
+                    pass
+        if self.instance and self.instance.pk and self.instance.test_config_id:
+            config_ids.add(self.instance.test_config_id)
+        self.fields['test_config'].queryset = (
+            TestConfig.objects.filter(pk__in=config_ids) if config_ids
+            else TestConfig.objects.none()
+        )
 
         # 所有 select 变体无条件隐藏，仅 SELECT 类型时打开
         self.fields['value_select'].widget.attrs['style'] = 'display:none;'

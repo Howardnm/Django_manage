@@ -17,7 +17,13 @@ function toggleValueInput(selectElement) {
     const configId = selectElement.value;
 
     if (!configId) return;
-    const meta = window.testConfigMeta[configId] || {type: 'NUMBER', options: []};
+    // 远程搜索结果带 data_type / options。页面初次已选的 option 没有这两项，
+    // 输入框的显隐由服务端渲好，这里不能拿默认的 NUMBER 覆盖。
+    const option = selectElement.tomselect && selectElement.tomselect.options[configId];
+    const meta = option && option.data_type
+        ? {type: option.data_type, options: option.options || []}
+        : (window.testConfigMeta && window.testConfigMeta[configId]);
+    if (!meta) return;
 
     valueInputs.forEach(el => el.style.display = 'none');
     textInputs.forEach(el => el.style.display = 'none');
@@ -140,6 +146,9 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             initRemoteTomSelect(el, {apiUrl: apiUrl});
             bindRawMaterialStock(el);
+            if (modelType === 'test_config' && el.tomselect) {
+                el.tomselect.on('item_add', function () { toggleValueInput(el); });
+            }
         });
         // 本地搜索已由 base.html 的 initLocalTomSelectAll 建好，这里一并绑
         bindFormulaTableDropdowns(document);
@@ -456,6 +465,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     initRemoteTomSelect(el, {apiUrl: apiUrl});
                     bindRawMaterialStock(el);
+                    if (modelType === 'test_config') {
+                        el.tomselect.on('item_add', function () { toggleValueInput(el); });
+                    }
                 });
                 bindFormulaTableDropdowns(newRowElement);
             }
