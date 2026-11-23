@@ -35,29 +35,62 @@ function initRemoteTomSelect(el, opts) {
     var responseKey = opts.responseKey !== undefined ? opts.responseKey : (el.getAttribute('data-response-key') || null);
     var isMulti = opts.multi || el.classList.contains('tomselect-multi-remote');
     var placeholder = opts.placeholder || el.getAttribute('placeholder') || '请输入关键词搜索...';
+    var requestId = 0;
+
+    function isWildcard(query) {
+        return query.indexOf('*') !== -1 || query.indexOf('?') !== -1;
+    }
 
     // ── 构造 TomSelect 配置 ──
     var config = {
         valueField: valueField,
         labelField: 'text',
-        searchField: 'text',
+        searchField: ['text', '_match'],
         copyClassesToDropdown: false,
         create: false,
         preload: 'focus',
         placeholder: placeholder,
+        // 空关键词也要请求。默认 shouldLoad 会把空串丢掉，聚焦和清空后就没有默认列表。
+        shouldLoad: function (query) {
+            if (!query) {
+                delete this.loadedSearches[''];
+            }
+            return true;
+        },
         onDropdownOpen: function () {
             if (this.dropdown_content) {
                 this.dropdown_content.style.maxHeight = '22rem';
             }
         },
         load: function (query, callback) {
+            var self = this;
+            var current = ++requestId;
             var url = apiUrl + '?model=' + modelType + '&q=' + encodeURIComponent(query);
             fetch(url)
                 .then(function (r) { return r.json(); })
                 .then(function (json) {
-                    callback(responseKey ? json[responseKey] : json);
+                    if (current !== requestId) {
+                        callback();
+                        return;
+                    }
+                    var rows = responseKey ? json[responseKey] : json;
+                    // 空关键词和通配符都先清掉未选项，避免上次结果混进这批。
+                    // 通配符结果若 id 已在池子里，addOption 不会覆盖，_match 写不进去。
+                    if (!query || isWildcard(query)) {
+                        self.clearOptions();
+                        if (isWildcard(query)) {
+                            (rows || []).forEach(function (row) { row._match = query; });
+                        }
+                    }
+                    callback(rows);
                 })
                 .catch(function () { callback(); });
+        },
+        score: function (query) {
+            if (!query || isWildcard(query)) {
+                return function () { return 1; };
+            }
+            return this.sifter.getScoreFunction(query, this.getSearchOptions());
         },
         render: {
             option: function (data, escape) {

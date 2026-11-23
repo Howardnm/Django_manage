@@ -12,11 +12,11 @@ class AppBasicResearchConfig(AppConfig):
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
         from app_basic_research.mixins import BasicResearchAccessMixin
         from app_basic_research.models import ResearchProject
-        from django.db.models import Q
+        from common_utils.text_search import text_q
 
         register_autocomplete('research_project',
-            lambda q: ResearchProject.objects.only('pk', 'code', 'name').filter(
-                Q(code__icontains=q) | Q(name__icontains=q)),
+            lambda q: text_q(
+                ResearchProject.objects.only('pk', 'code', 'name'), q, 'code', 'name'),
             lambda r: {'value': r.pk, 'text': f'{r.code} {r.name}'},
             access_filter=make_autocomplete_access_filter(BasicResearchAccessMixin),
         )

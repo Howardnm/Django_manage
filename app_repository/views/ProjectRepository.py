@@ -240,23 +240,25 @@ class RepoAutocompleteView(RepositoryAccessMixin, View):
         query = request.GET.get('q', '')
         data = []
 
+        from common_utils.text_search import text_q
+
         if model_type == 'customer':
-            qs = Customer.objects.filter(company_name__icontains=query)[:20]
+            qs = text_q(Customer.objects.all(), query, 'company_name')[:35]
             data = [{'value': item.pk, 'text': item.company_name} for item in qs]
         elif model_type == 'oem':
-            qs = OEM.objects.filter(Q(name__icontains=query) | Q(short_name__icontains=query))[:20]
+            qs = text_q(OEM.objects.all(), query, 'name', 'short_name')[:35]
             data = [{'value': item.pk, 'text': f"{item.name} ({item.short_name})" if item.short_name else item.name} for item in qs]
         elif model_type == 'salesperson':
-            qs = User.objects.filter(
-                Q(username__icontains=query) | Q(first_name__icontains=query) | Q(last_name__icontains=query),
-                is_staff=True
-            )[:20]
+            qs = text_q(
+                User.objects.filter(is_staff=True),
+                query, 'username', 'first_name', 'last_name',
+            )[:35]
             data = [{'value': item.pk, 'text': item.get_full_name() or item.username} for item in qs]
         elif model_type == 'scenario':
-            qs = ApplicationScenario.objects.filter(name__icontains=query)[:20]
+            qs = text_q(ApplicationScenario.objects.all(), query, 'name')[:35]
             data = [{'value': item.pk, 'text': item.name} for item in qs]
         elif model_type == 'characteristic':
-            qs = MaterialCharacteristic.objects.filter(name__icontains=query)[:20]
+            qs = text_q(MaterialCharacteristic.objects.all(), query, 'name')[:35]
             data = [{'value': item.pk, 'text': item.name} for item in qs]
 
         return JsonResponse(data, safe=False)

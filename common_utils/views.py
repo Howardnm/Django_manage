@@ -106,7 +106,7 @@ class MaterialAutocompleteView(LoginRequiredMixin, View):
                 'has_prev': page > 1,
             })
 
-        data = self._format_items(model_type, qs[:20])
+        data = self._format_items(model_type, qs[:35])
         return JsonResponse(data, safe=False)
 
 

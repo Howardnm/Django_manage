@@ -15,10 +15,10 @@ class AppProjectConfig(AppConfig):
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
         from app_project.mixins import ProjectAccessMixin
         from .models import Project
-        from django.db.models import Q
+        from common_utils.text_search import text_q
 
         register_autocomplete('commercial_project',
-            lambda q: Project.objects.only('pk', 'name').filter(name__icontains=q),
+            lambda q: text_q(Project.objects.only('pk', 'name'), q, 'name'),
             lambda p: {'value': p.pk, 'text': p.name},
             'project_detail',
             access_filter=make_autocomplete_access_filter(ProjectAccessMixin),

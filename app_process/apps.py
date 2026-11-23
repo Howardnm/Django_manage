@@ -10,10 +10,10 @@ class AppProcessConfig(AppConfig):
         from common_utils.autocomplete_registry import register_autocomplete, make_autocomplete_access_filter
         from app_process.mixins import ProcessAccessMixin
         from app_process.models import ProcessProfile
-        from django.db.models import Q
+        from common_utils.text_search import text_q
 
         register_autocomplete('process',
-            lambda q: ProcessProfile.objects.only('pk', 'name').filter(name__icontains=q),
+            lambda q: text_q(ProcessProfile.objects.only('pk', 'name'), q, 'name'),
             lambda p: {'value': p.pk, 'text': p.name},
             'process_profile_detail',
             access_filter=make_autocomplete_access_filter(ProcessAccessMixin),

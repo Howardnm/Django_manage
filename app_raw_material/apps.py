@@ -2,6 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from django.apps import AppConfig
 
+
 class AppRawMaterialConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'app_raw_material'
@@ -13,22 +14,22 @@ class AppRawMaterialConfig(AppConfig):
         from app_raw_material.mixins import RawMaterialAccessMixin, RawMaterialPickerAccessMixin
         from app_raw_material.models import RawMaterial
         from app_raw_material.services import RawMaterialPriceService
-        from django.db.models import Q
+        from common_utils.text_search import text_q
 
         def _build_raw_material_qs(query):
             """按 名称 / 型号 / 内部物料编码 模糊匹配。
 
             warehouse_code 已经在候选项文案里展示，必须一并参与匹配 ——
             原先只搜 name 与 model_name，导致「输编码搜不到」。
+            ``*`` / ``?`` 见 ``text_q``。
             """
-            return RawMaterial.objects.select_related('category').prefetch_related(
-                'plants'
-            ).only(
-                'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
-            ).filter(
-                Q(name__icontains=query)
-                | Q(model_name__icontains=query)
-                | Q(warehouse_code__icontains=query)
+            return text_q(
+                RawMaterial.objects.select_related('category').prefetch_related(
+                    'plants'
+                ).only(
+                    'pk', 'name', 'model_name', 'category__name', 'warehouse_code'
+                ),
+                query, 'name', 'model_name', 'warehouse_code',
             )
 
         def _format_raw_materials(materials):

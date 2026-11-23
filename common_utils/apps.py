@@ -19,7 +19,7 @@ class CommonUtilsConfig(AppConfig):
         """注册内置模型类型的自动补全处理器。"""
         from common_utils.autocomplete_registry import register_autocomplete
         from django.contrib.auth import get_user_model
-        from django.db.models import Q
+        from common_utils.text_search import text_q
 
         User = get_user_model()
 
@@ -35,9 +35,9 @@ class CommonUtilsConfig(AppConfig):
             return qs
 
         register_autocomplete('user',
-            lambda q: User.objects.only('pk', 'username', 'first_name').filter(
-                is_active=True,
-            ).filter(Q(username__icontains=q) | Q(first_name__icontains=q)),
+            lambda q: text_q(
+                User.objects.only('pk', 'username', 'first_name').filter(is_active=True),
+                q, 'username', 'first_name'),
             lambda u: {'value': u.pk, 'text': f'{u.first_name or u.username}'},
             access_filter=_user_access_filter,
         )

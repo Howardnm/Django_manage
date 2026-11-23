@@ -14,11 +14,14 @@ class AppMaterialConfig(AppConfig):
         from app_material.mixins import MaterialAccessMixin
         from app_material.models.material import (MaterialLibrary, ApplicationScenario, TestConfig,
                                                   MaterialCharacteristic, MaterialType)
-        from django.db.models import Prefetch, Q
+        from django.db.models import Prefetch
+
+        from common_utils.text_search import text_q
 
         register_autocomplete('material',
-            lambda q: MaterialLibrary.objects.only('pk', 'grade_name', 'manufacturer').filter(
-                Q(grade_name__icontains=q) | Q(manufacturer__icontains=q)),
+            lambda q: text_q(
+                MaterialLibrary.objects.only('pk', 'grade_name', 'manufacturer'),
+                q, 'grade_name', 'manufacturer'),
             lambda m: {'value': m.pk, 'text': f'{m.grade_name} ({m.manufacturer})'},
             'material_detail',
             access_filter=make_autocomplete_access_filter(MaterialAccessMixin),
@@ -31,10 +34,10 @@ class AppMaterialConfig(AppConfig):
             """
             grade_name = params.get('grade_name', '').strip()
             if grade_name:
-                qs = qs.filter(grade_name__icontains=grade_name)
+                qs = text_q(qs, grade_name, 'grade_name')
             manufacturer = params.get('manufacturer', '').strip()
             if manufacturer:
-                qs = qs.filter(manufacturer__icontains=manufacturer)
+                qs = text_q(qs, manufacturer, 'manufacturer')
             category_id = params.get('category_id', '').strip()
             if category_id.isdigit():
                 qs = qs.filter(category_id=category_id)
@@ -57,11 +60,11 @@ class AppMaterialConfig(AppConfig):
         # 导入数据选择器专用：与 'material' 同源查询，但额外吐出表格列所需字段。
         # 单独注册一个 key，避免改动 'material' 的契约（app_project/forms.py 的远程搜索在用它）。
         register_autocomplete('material_import',
-            lambda q: MaterialLibrary.objects.only(
+            lambda q: text_q(MaterialLibrary.objects.only(
                 'pk', 'grade_name', 'manufacturer',
                 'sap_material_code', 'material_color_name',
-            ).prefetch_related('characteristics', 'scenarios').filter(
-                Q(grade_name__icontains=q) | Q(manufacturer__icontains=q)),
+            ).prefetch_related('characteristics', 'scenarios'),
+                q, 'grade_name', 'manufacturer'),
             lambda m: {
                 'value': m.pk,
                 'text': m.grade_name,
@@ -81,10 +84,10 @@ class AppMaterialConfig(AppConfig):
             """项目表单成品材料选择器的具名筛选（SAP / 牌号 / 材料类型，AND）。"""
             sap_material_code = params.get('sap_material_code', '').strip()
             if sap_material_code:
-                qs = qs.filter(sap_material_code__icontains=sap_material_code)
+                qs = text_q(qs, sap_material_code, 'sap_material_code')
             grade_name = params.get('grade_name', '').strip()
             if grade_name:
-                qs = qs.filter(grade_name__icontains=grade_name)
+                qs = text_q(qs, grade_name, 'grade_name')
             category_id = params.get('category_id', '').strip()
             if category_id.isdigit():
                 qs = qs.filter(category_id=category_id)
@@ -128,7 +131,7 @@ class AppMaterialConfig(AppConfig):
             )
             q = (q or '').strip()
             if q:
-                qs = qs.filter(Q(grade_name__icontains=q) | Q(sap_material_code__icontains=q))
+                qs = text_q(qs, q, 'grade_name', 'sap_material_code')
             return qs
 
         # 项目表单选用成品材料。单独注册，避免改 material / material_import 的契约。
@@ -142,22 +145,22 @@ class AppMaterialConfig(AppConfig):
 
         # 材料类型：供搜索选择器的 remote-select 筛选字段使用
         register_autocomplete('material_type',
-            lambda q: MaterialType.objects.only('pk', 'name').filter(name__icontains=q),
+            lambda q: text_q(MaterialType.objects.only('pk', 'name'), q, 'name'),
             lambda t: {'value': t.pk, 'text': t.name})
 
         register_autocomplete('scenario',
-            lambda q: ApplicationScenario.objects.only('pk', 'name').filter(name__icontains=q),
+            lambda q: text_q(ApplicationScenario.objects.only('pk', 'name'), q, 'name'),
             lambda s: {'value': s.pk, 'text': s.name})
 
         register_autocomplete('test_config',
-            lambda q: TestConfig.objects.select_related('category').only(
+            lambda q: text_q(TestConfig.objects.select_related('category').only(
                 'pk', 'name', 'standard', 'condition', 'category__name'
-            ).filter(Q(name__icontains=q) | Q(standard__icontains=q)),
+            ), q, 'name', 'standard'),
             lambda t: {'value': t.pk,
                 'text': f'[{t.category.name}] {t.name} - {t.standard}{f" ({t.condition})" if t.condition else ""}'})
 
         register_autocomplete('characteristic',
-            lambda q: MaterialCharacteristic.objects.only('pk', 'name').filter(name__icontains=q),
+            lambda q: text_q(MaterialCharacteristic.objects.only('pk', 'name'), q, 'name'),
             lambda c: {'value': c.pk, 'text': c.name})
 
         # 注册附件配置

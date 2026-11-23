@@ -72,6 +72,23 @@ class RawMaterialAutocompleteTests(TestCase):
         self.assertEqual([r['value'] for r in self._search('PA66')], [self.material.pk])
         self.assertEqual([r['value'] for r in self._search('2600')], [self.material.pk])
 
+    def test_star_matches_any_length(self):
+        results = self._search('RM-000*')
+        self.assertEqual(
+            sorted(r['value'] for r in results),
+            sorted([self.material.pk, self.other.pk]))
+
+    def test_question_mark_matches_one_character(self):
+        results = self._search('RM-00012?')
+        self.assertEqual([r['value'] for r in results], [self.material.pk])
+
+    def test_star_in_the_middle(self):
+        results = self._search('RM*123')
+        self.assertEqual([r['value'] for r in results], [self.material.pk])
+
+    def test_dot_is_literal_not_any_character(self):
+        self.assertEqual(self._search('RM-000.23'), [])
+
     def test_option_text_includes_price(self):
         """候选文案要带最新单价，且与其它附加信息一样用括号包裹。"""
         self.material.plants.add(self.plant)
