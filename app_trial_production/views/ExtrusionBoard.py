@@ -16,6 +16,6 @@ class ExtrusionBoardView(ExtrusionTaskAccessMixin, TemplateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         now = timezone.now()
-        default_dt = now.replace(hour=8, minute=0, second=0, microsecond=0)
+        default_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
         context['default_schedule_time'] = default_dt.strftime('%Y-%m-%dT%H:%M')
         return context

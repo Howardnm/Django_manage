@@ -12,8 +12,8 @@
  *
  * 数据流:
  *   日历事件 → GET window.EVENTS_URL?start=xxx&end=xxx (FullCalendar 自动附加)
- *   领取排期 → POST window.SCHEDULE_URL → calendar.refetchEvents()
- *   取消排期 → POST /extrusion-board/{pk}/unschedule/ → reload
+ *   排期 / 取消排期 POST 结束后，syncBoard() 并行 GET 日历、待排产卡、统计数，再一次画上
+ *   失败时先 revert 临时事件，再 syncBoard()，不以浏览器里的拖拽结果为准
  *
  * 视图时间范围:
  *   周视图: 00:00-24:00 (业务时间)
@@ -25,7 +25,10 @@ document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
     var calendarEl = document.getElementById('extrusion-calendar');
-    var pendingPool = null;  // HTMX 卡片加载后由 htmx:afterSettle 赋值
+    var pendingPool = null;  // HTMX 卡片加载后由 mountPendingCard 赋值
+    var draggable = null;
+    var queuedEvents = null; // syncBoard 预取的事件，由 events() 同步消费
+    var boardLocked = false;
 
     // ===== 常量 =====
     var DEFAULT_DURATION_MS = 60 * 60 * 1000; // 默认排产时长 1 小时
@@ -53,51 +56,63 @@ document.addEventListener('DOMContentLoaded', function () {
                String(dateObj.getMinutes()).padStart(2, '0');
     }
 
-    // ===== HTMX 卡片刷新 =====
-    function refreshPendingCard() {
-        if (typeof htmx !== 'undefined') {
-            htmx.ajax('GET', window.CARD_REFRESH_URL, {
-                target: '#pending-orders-card',
-                swap: 'outerHTML',
-            });
+    function setCardBusy(card, locked) {
+        if (!card) return;
+        card.classList.toggle('pe-none', locked);
+        card.classList.toggle('board-busy', locked);
+        card.setAttribute('aria-busy', locked ? 'true' : 'false');
+        var overlay = card.querySelector(':scope > .board-busy-overlay');
+        if (locked) {
+            if (!overlay) {
+                overlay = document.createElement('div');
+                overlay.className = 'board-busy-overlay';
+                overlay.innerHTML = '<div class="text-muted"><span class="spinner-border spinner-border-sm me-2" role="status"></span>加载中</div>';
+                card.appendChild(overlay);
+            }
+        } else if (overlay) {
+            overlay.remove();
         }
     }
 
-    // ===== 懒加载统计指标 =====
-    function fetchStats() {
-        fetch(window.STATS_URL)
-            .then(function (r) { return r.json(); })
-            .then(function (data) {
-                document.getElementById('stat-pending-count').textContent = data.pending_count;
-                document.getElementById('stat-scheduled-count').textContent = data.scheduled_count;
-                document.getElementById('stat-in-progress-count').textContent = data.in_progress_count;
-            })
-            .catch(function () {
-                // 请求失败时保持占位符 —
-            });
+    function setBoardLocked(locked) {
+        boardLocked = locked;
+        setCardBusy(document.getElementById('pending-orders-card'), locked);
+        setCardBusy(calendarEl ? calendarEl.closest('.card') : null, locked);
     }
 
-    // ===== TomSelect 远程搜索配置（复用通用函数 initRemoteTomSelect） =====
-    var PENDING_TS_OPTS = {
-        apiUrl: '/trial-production/api/search/',
-        valueField: 'id',
-        responseKey: 'results',
-    };
+    function fetchJson(url) {
+        return fetch(url).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+        });
+    }
 
-    // ===== HTMX 事件：卡片替换前先销毁旧 TomSelect（清除 body 中的 .ts-dropdown 残留） =====
-    document.addEventListener('htmx:beforeSwap', function (e) {
-        destroyTomSelectAll(e.target);
-    });
+    function readError(r) {
+        return r.json().catch(function () { return {}; }).then(function (data) {
+            throw new Error((data && data.error) || ('HTTP ' + r.status));
+        });
+    }
 
-    // ===== HTMX 事件：卡片加载/刷新后初始化 TomSelect + Draggable =====
-    document.addEventListener('htmx:afterSettle', function () {
+    function paintStats(data) {
+        var pending = document.getElementById('stat-pending-count');
+        var scheduled = document.getElementById('stat-scheduled-count');
+        var inProgress = document.getElementById('stat-in-progress-count');
+        if (pending) pending.textContent = data.pending_count;
+        if (scheduled) scheduled.textContent = data.scheduled_count;
+        if (inProgress) inProgress.textContent = data.in_progress_count;
+    }
+
+    // ===== 懒加载统计指标（仅首屏；操作后走 syncBoard） =====
+    function fetchStats() {
+        fetchJson(window.STATS_URL).then(paintStats).catch(function () {});
+    }
+
+    function mountPendingCard() {
         var card = document.getElementById('pending-orders-card');
         if (!card) return;
 
-        // TomSelect 初始化
         initRemoteTomSelectAll(card, PENDING_TS_OPTS);
 
-        // Draggable 重建
         var newPool = document.getElementById('pending-pool');
         if (newPool && newPool !== pendingPool) {
             if (draggable) draggable.destroy();
@@ -114,6 +129,77 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             });
         }
+    }
+
+    function swapPendingCard(html) {
+        var card = document.getElementById('pending-orders-card');
+        if (!card) return;
+        destroyTomSelectAll(card);
+        var wrap = document.createElement('div');
+        wrap.innerHTML = html.trim();
+        var next = wrap.firstElementChild;
+        if (!next) return;
+        card.replaceWith(next);
+        if (typeof htmx !== 'undefined') htmx.process(next);
+        mountPendingCard();
+    }
+
+    // 并行取日历、待排产卡、统计数，到齐后再一起画。筛选/分页仍走 HTMX。
+    function syncBoard() {
+        setBoardLocked(true);
+        var view = calendar.view;
+        var eventsUrl = window.EVENTS_URL
+            + '?start=' + encodeURIComponent(view.activeStart.toISOString())
+            + '&end=' + encodeURIComponent(view.activeEnd.toISOString());
+        return Promise.all([
+            fetchJson(eventsUrl),
+            fetch(window.CARD_REFRESH_URL).then(function (r) {
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                return r.text();
+            }),
+            fetchJson(window.STATS_URL),
+        ]).then(function (results) {
+            queuedEvents = results[0];
+            calendar.refetchEvents();
+            swapPendingCard(results[1]);
+            paintStats(results[2]);
+        }).catch(function (err) {
+            queuedEvents = null;
+            showToast('刷新失败：' + (err.message || '请稍后重试'), 'error');
+        }).finally(function () {
+            setBoardLocked(false);
+        });
+    }
+
+    // POST 成功或失败后都刷新两卡。onError 里做 revert。
+    function finishBoardAction(request, onSuccess, onError) {
+        setBoardLocked(true);
+        return Promise.resolve(request).then(function (data) {
+            if (onSuccess) onSuccess(data);
+        }).catch(function (err) {
+            if (onError) onError(err);
+        }).then(function () {
+            return syncBoard();
+        }, function () {
+            return syncBoard();
+        });
+    }
+
+    // ===== TomSelect 远程搜索配置（复用通用函数 initRemoteTomSelect） =====
+    var PENDING_TS_OPTS = {
+        apiUrl: '/trial-production/api/search/',
+        valueField: 'id',
+        responseKey: 'results',
+    };
+
+    // ===== HTMX 事件：卡片替换前先销毁旧 TomSelect（清除 body 中的 .ts-dropdown 残留） =====
+    document.addEventListener('htmx:beforeSwap', function (e) {
+        destroyTomSelectAll(e.target);
+    });
+
+    // ===== HTMX 事件：筛选/分页替换卡片后，重新挂上 TomSelect + Draggable =====
+    document.addEventListener('htmx:afterSettle', function () {
+        mountPendingCard();
     });
 
     // ===== 发送排期请求（共用：start 必传，end 可选） =====
@@ -144,10 +230,24 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             body: body,
         }).then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
+            if (!r.ok) return readError(r);
             return r.json();
         }).then(function (data) {
             if (!data.success) throw new Error(data.error || '排期失败');
+            return data;
+        });
+    }
+
+    function postUnschedule(orderPk) {
+        var url = window.UNSCHEDULE_URL_PREFIX + orderPk + window.UNSCHEDULE_URL_SUFFIX;
+        return fetch(url, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': window.CSRF_TOKEN },
+        }).then(function (r) {
+            if (!r.ok) return readError(r);
+            return r.json();
+        }).then(function (data) {
+            if (!data.success) throw new Error(data.error || '取消排期失败');
             return data;
         });
     }
@@ -194,6 +294,12 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 事件数据源：函数模式，自动跟随视图日期范围请求
         events: function (fetchInfo, successCallback, failureCallback) {
+            if (queuedEvents) {
+                var data = queuedEvents;
+                queuedEvents = null;
+                successCallback(data);
+                return;
+            }
             var url = window.EVENTS_URL + '?start=' + encodeURIComponent(fetchInfo.startStr) +
                       '&end=' + encodeURIComponent(fetchInfo.endStr);
             fetch(url)
@@ -257,37 +363,47 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // ===== 场景一：日历内部拖拽 → 更新排产时间（含开始+结束） =====
         eventDrop: function (info) {
-            var orderPk = info.event.id;
             var newStartStr = info.event.startStr;
             var oldStartStr = info.oldEvent.startStr;
-            var newEndStr = info.event.endStr;
-
             if (newStartStr === oldStartStr) return;
+            if (boardLocked) {
+                info.revert();
+                return;
+            }
 
-            scheduleOrder(orderPk, newStartStr, newEndStr)
-                .then(function (data) {
-                    showToast(info.event.title + ' 已移至 ' + formatTime(new Date(data.date)), 'success');
-                })
-                .catch(function (err) {
+            var orderPk = info.event.id;
+            var newEndStr = info.event.endStr;
+            var title = info.event.title;
+            finishBoardAction(
+                scheduleOrder(orderPk, newStartStr, newEndStr),
+                function (data) {
+                    showToast(title + ' 已移至 ' + formatTime(new Date(data.date)), 'success');
+                },
+                function (err) {
                     info.revert();
                     showToast('移动失败：' + (err.message || '请稍后重试'), 'error');
-                });
+                }
+            );
         },
 
         // ===== 场景三：拉伸事件调整时长 → 持久化结束时间 =====
         eventResize: function (info) {
+            if (boardLocked) {
+                info.revert();
+                return;
+            }
             var orderPk = info.event.id;
-            var startStr = info.event.startStr;
-            var endStr = info.event.endStr;
-
-            scheduleOrder(orderPk, startStr, endStr)
-                .then(function () {
-                    showToast(info.event.title + ' 时长已更新', 'success');
-                })
-                .catch(function (err) {
+            var title = info.event.title;
+            finishBoardAction(
+                scheduleOrder(orderPk, info.event.startStr, info.event.endStr),
+                function () {
+                    showToast(title + ' 时长已更新', 'success');
+                },
+                function (err) {
                     info.revert();
                     showToast('更新失败：' + (err.message || '请稍后重试'), 'error');
-                });
+                }
+            );
         },
 
         // ===== 场景二：外部拖入 → 创建排期 =====
@@ -295,23 +411,19 @@ document.addEventListener('DOMContentLoaded', function () {
             var orderPk = info.event.id;
             var startStr = info.event.startStr;
             var endStr = info.event.endStr;
-            var draggedEl = info.draggedEl;
             var orderTitle = info.event.title;
+            info.revert();
+            if (boardLocked) return;
 
-            scheduleOrder(orderPk, startStr, endStr)
-                .then(function (data) {
-                    info.event.remove();
-                    calendar.refetchEvents();
-                    if (draggedEl) draggedEl.remove();
-                    refreshPendingCard();
-                    fetchStats();
-
+            finishBoardAction(
+                scheduleOrder(orderPk, startStr, endStr),
+                function (data) {
                     showToast((data.code || orderTitle) + ' 已排期', 'success');
-                })
-                .catch(function (err) {
-                    info.event.remove();
+                },
+                function (err) {
                     showToast('排期失败：' + (err.message || '请稍后重试'), 'error');
-                });
+                }
+            );
         },
 
         // ===== 点击事件 → 跳转详情 =====
@@ -325,34 +437,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // ===== 拖拽到待排产池 → 取消排期 =====
         eventDragStop: function (info) {
-            if (!pendingPool) return;
-            var pendingCard = pendingPool.closest('.card');
+            if (boardLocked || !pendingPool) return;
+            var pendingCard = document.getElementById('pending-orders-card');
             if (!pendingCard) return;
 
             var pendingRect = pendingCard.getBoundingClientRect();
             var mouseX = info.jsEvent.clientX;
             var mouseY = info.jsEvent.clientY;
-
-            if (mouseX >= pendingRect.left && mouseX <= pendingRect.right &&
-                mouseY >= pendingRect.top && mouseY <= pendingRect.bottom) {
-                var url = window.UNSCHEDULE_URL_PREFIX + info.event.id + window.UNSCHEDULE_URL_SUFFIX;
-                fetch(url, {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': window.CSRF_TOKEN },
-                }).then(function (r) {
-                    if (!r.ok) throw new Error('HTTP ' + r.status);
-                    return r.json();
-                }).then(function (data) {
-                    if (data.success) {
-                        info.event.remove();
-                        refreshPendingCard();
-                        fetchStats();
-                        showToast(data.code + ' 已取消排期', 'success');
-                    }
-                }).catch(function () {
-                    showToast('取消排期失败', 'error');
-                });
+            if (mouseX < pendingRect.left || mouseX > pendingRect.right ||
+                mouseY < pendingRect.top || mouseY > pendingRect.bottom) {
+                return;
             }
+
+            var orderPk = info.event.id;
+            var title = info.event.title;
+            finishBoardAction(
+                postUnschedule(orderPk),
+                function (data) {
+                    showToast((data.code || title) + ' 已取消排期', 'success');
+                },
+                function (err) {
+                    showToast('取消排期失败：' + (err.message || '请稍后重试'), 'error');
+                }
+            );
         },
 
         // ===== 悬浮弹窗：显示工单详细信息 =====
@@ -458,9 +565,6 @@ document.addEventListener('DOMContentLoaded', function () {
         popover.style.top = top + 'px';
     });
 
-    // ===== 外部拖拽：待排产池行 → 日历（HTMX 卡片加载后由 htmx:afterSettle 初始化） =====
-    var draggable = null;
-
     // ===== 领取排期 / 取消排期 按钮代理 =====
     document.addEventListener('click', function (e) {
         // --- 领取排期 ---
@@ -479,23 +583,24 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
+            if (boardLocked) return;
+
             scheduleBtn.disabled = true;
             var originalHtml = scheduleBtn.innerHTML;
             scheduleBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>排期中...';
 
-            // 领取按钮只有开始时间，后端自动补默认结束时间
-            scheduleOrder(orderPk, datetimeValue)
-                .then(function (data) {
-                    calendar.refetchEvents();
-                    refreshPendingCard();
-                    fetchStats();
+            // 领取：开始和结束都用输入时间。默认 0:00，两端都是 0:00 时按全天事件保存
+            finishBoardAction(
+                scheduleOrder(orderPk, datetimeValue, datetimeValue),
+                function (data) {
                     showToast((data.code || orderCode) + ' 已排期', 'success');
-                })
-                .catch(function (err) {
+                },
+                function (err) {
                     scheduleBtn.disabled = false;
                     scheduleBtn.innerHTML = originalHtml;
                     showToast('排期失败：' + (err.message || '请稍后重试'), 'error');
-                });
+                }
+            );
             return;
         }
 
@@ -504,29 +609,20 @@ document.addEventListener('DOMContentLoaded', function () {
         if (unscheduleBtn) {
             e.preventDefault();
             if (!confirm('确认取消排期？工单将退回待排产池。')) return;
+            if (boardLocked) return;
 
-            var url = unscheduleBtn.dataset.url;
-            var orderPk = unscheduleBtn.dataset.orderPk;
+            var unschedulePk = unscheduleBtn.dataset.orderPk;
             unscheduleBtn.disabled = true;
-
-            fetch(url, {
-                method: 'POST',
-                headers: { 'X-CSRFToken': window.CSRF_TOKEN },
-            }).then(function (r) {
-                if (!r.ok) throw new Error('HTTP ' + r.status);
-                return r.json();
-            }).then(function (data) {
-                if (data.success) {
-                    var event = calendar.getEventById(String(orderPk));
-                    if (event) event.remove();
-                    refreshPendingCard();
-                    fetchStats();
+            finishBoardAction(
+                postUnschedule(unschedulePk),
+                function (data) {
                     showToast(data.code + ' 已取消排期', 'success');
+                },
+                function (err) {
+                    unscheduleBtn.disabled = false;
+                    showToast('取消排期失败：' + (err.message || '请稍后重试'), 'error');
                 }
-            }).catch(function (err) {
-                unscheduleBtn.disabled = false;
-                showToast('取消排期失败', 'error');
-            });
+            );
             return;
         }
     });

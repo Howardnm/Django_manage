@@ -1,5 +1,5 @@
 {% load project_extras %}
-<div class="card-body border-bottom py-3">
+<div class="card-body border-bottom {{ filter_body_class|default:'py-3' }}">
     <form method="GET"
           {% if hx_url %}hx-get="{{ hx_url }}" hx-target="{{ hx_target|default:'#pending-orders-card' }}" hx-swap="outerHTML"{% endif %}
           class="row g-2 align-items-center">

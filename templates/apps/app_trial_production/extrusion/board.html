@@ -25,19 +25,19 @@
 </div>
 
 {# 统计卡片 — 懒加载 #}
-<div class="row row-cards mt-2 mb-4">
+<div class="row row-cards mt-2 mb-2">
     <div class="col-sm-6 col-lg-4">
         <div class="card card-sm">
-            <div class="card-body">
+            <div class="card-body py-2">
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <span class="bg-yellow text-white avatar">
+                        <span class="bg-yellow text-white avatar avatar-sm">
                             <i class="ti ti-inbox"></i>
                         </span>
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">待排产</div>
-                        <div class="h2 mb-0" id="stat-pending-count"><span class="text-muted">—</span></div>
+                        <div class="h3 mb-0" id="stat-pending-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -45,16 +45,16 @@
     </div>
     <div class="col-sm-6 col-lg-4">
         <div class="card card-sm">
-            <div class="card-body">
+            <div class="card-body py-2">
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <span class="bg-blue text-white avatar">
+                        <span class="bg-blue text-white avatar avatar-sm">
                             <i class="ti ti-calendar-check"></i>
                         </span>
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">已排期</div>
-                        <div class="h2 mb-0" id="stat-scheduled-count"><span class="text-muted">—</span></div>
+                        <div class="h3 mb-0" id="stat-scheduled-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -62,16 +62,16 @@
     </div>
     <div class="col-sm-6 col-lg-4">
         <div class="card card-sm">
-            <div class="card-body">
+            <div class="card-body py-2">
                 <div class="row align-items-center">
                     <div class="col-auto">
-                        <span class="bg-azure text-white avatar">
+                        <span class="bg-azure text-white avatar avatar-sm">
                             <i class="ti ti-player-play"></i>
                         </span>
                     </div>
                     <div class="col">
                         <div class="font-weight-medium">生产中</div>
-                        <div class="h2 mb-0" id="stat-in-progress-count"><span class="text-muted">—</span></div>
+                        <div class="h3 mb-0" id="stat-in-progress-count"><span class="text-muted">—</span></div>
                     </div>
                 </div>
             </div>
@@ -85,10 +85,10 @@
     <div hx-get="{% url 'trial_extrusion_board_pending_card' %}"
          hx-trigger="load"
          hx-swap="outerHTML">
-        <div class="card mb-4">
-            <div class="card-header">
-                <h3 class="card-title">
-                    <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
+        <div class="card card-sm mb-2">
+            <div class="card-header bg-yellow-lt py-1">
+                <h3 class="card-title text-yellow">
+                    <i class="ti ti-inbox me-2"></i>待排产工单
                 </h3>
             </div>
             <div class="card-body text-center py-5 text-muted">
@@ -98,10 +98,10 @@
     </div>
 
     {# ========== 排产日历 ========== #}
-    <div class="card">
-        <div class="card-header d-flex align-items-center">
-            <h3 class="card-title mb-0">
-                <i class="ti ti-calendar me-2 text-blue"></i>排产日历
+    <div class="card card-sm">
+        <div class="card-header bg-blue-lt py-1 d-flex align-items-center">
+            <h3 class="card-title text-blue mb-0">
+                <i class="ti ti-calendar me-2"></i>排产日历
             </h3>
             <span class="ms-auto small text-muted">
                 <span class="badge badge-dot bg-blue me-1"></span>待挤出

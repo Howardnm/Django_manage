@@ -122,6 +122,25 @@
 .fc-event-popover.active { opacity: 1; transform: translateY(0); }
 .fc-event-popover .fc-popover-label { min-width: 56px; }
 
+/* ===== 待排产卡：分页收紧（筛选条用 py-2，不覆盖 Bootstrap 工具类） ===== */
+#pending-orders-card > .card-footer {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+/* ===== 排期操作进行中 ===== */
+.board-busy { position: relative; }
+.board-busy-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.72);
+    pointer-events: auto;
+}
+
 /* ===== 待排产池拖拽行 ===== */
 .pending-drag-row { cursor: grab; user-select: none; }
 .pending-drag-row:active { cursor: grabbing; }

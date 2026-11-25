@@ -1,11 +1,11 @@
 {% load project_extras %}
 {% url 'trial_extrusion_board_pending_card' as card_url %}
 
-<div class="card mb-4" id="pending-orders-card">
+<div class="card card-sm mb-2" id="pending-orders-card">
     {# ── Header ── #}
-    <div class="card-header">
-        <h3 class="card-title">
-            <i class="ti ti-inbox me-2 text-yellow"></i>待排产工单
+    <div class="card-header bg-yellow-lt py-1">
+        <h3 class="card-title text-yellow">
+            <i class="ti ti-inbox me-2"></i>待排产工单
         </h3>
         <span class="text-muted small ms-auto">
             <i class="ti ti-grip-vertical me-1"></i>可拖拽工单至日历 / 选择时间点击"领取"排期
@@ -13,11 +13,11 @@
     </div>
 
     {# ── Filter bar — 复用公共筛选器模板 ── #}
-    {% include 'apps/list_modules/tools_search_filter.html' with hx_url=card_url hx_target='#pending-orders-card' %}
+    {% include 'apps/list_modules/tools_search_filter.html' with hx_url=card_url hx_target='#pending-orders-card' filter_body_class='py-2' %}
 
     {# ── Table ── #}
     <div class="table-responsive">
-        <table class="table table-hover table-vcenter card-table mb-0">
+        <table class="table table-sm table-hover table-vcenter card-table mb-0" style="font-size: 13px;">
             <thead>
                 <tr>
                     <th>工单号 / 实验单号</th>
