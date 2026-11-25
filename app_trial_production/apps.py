@@ -15,10 +15,16 @@ class AppTrialProductionConfig(AppConfig):
         from app_workflow.utils import related_object_router
         from app_trial_production.models import ProductionOrder
 
+        def _order_display_name(obj):
+            # 项目可空（SET_NULL）；无关联项目时仍只显示工单号
+            if obj.project_id:
+                return f"{obj.code} · {obj.project.name}"
+            return obj.code
+
         related_object_router.register(
             ProductionOrder,
             url_resolver=lambda obj: reverse('trial_order_detail', kwargs={'pk': obj.pk}),
-            display_name_resolver=lambda obj: obj.code,
+            display_name_resolver=_order_display_name,
             person_resolver=lambda obj: obj.creator,
         )
 
