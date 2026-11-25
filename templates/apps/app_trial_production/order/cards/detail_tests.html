@@ -1,0 +1,44 @@
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="card card-sm mb-2">
+            <div class="card-header bg-yellow-lt py-1 d-flex justify-content-between align-items-center">
+                <h3 class="card-title text-yellow">
+                    <i class="ti ti-test-pipe me-2"></i>测试需求
+                    {% if tests_pending %}<span class="badge bg-yellow-lt text-yellow">待触发</span>{% endif %}
+                </h3>
+                {% if testing_tasks %}
+                <a href="{% url 'material_testing:detail' testing_tasks.0.pk %}" class="btn btn-sm btn-outline-yellow">测试详情</a>
+                {% endif %}
+            </div>
+            <div class="formula-table-scroll">
+                <table class="table table-sm table-vcenter table-bordered card-table mb-0" style="font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>测试项</th>
+                            <th>标准</th>
+                            <th>条件</th>
+                            <th>单位</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in detail_test_items %}
+                        <tr>
+                            <td class="fw-bold">{{ item.name }}</td>
+                            <td>{{ item.standard|default:"-" }}</td>
+                            <td>{{ item.condition|default:"-" }}</td>
+                            <td>{{ item.unit|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

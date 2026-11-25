@@ -1,0 +1,55 @@
+{# name=trial_process_profile_params  path=orders/process-profiles/<int:pk>/params/ #}
+<div id="process-params">
+    <div class="row">
+        <div class="col-lg-6">
+            <div class="card card-sm mb-2" id="process-scheme-card"
+                 data-params-url="{% url 'trial_process_profile_params' 0 %}">
+                <div class="card-header bg-purple-lt py-1">
+                    <h3 class="card-title text-purple"><i class="ti ti-cpu me-2"></i>工艺方案</h3>
+                </div>
+                {% if params_form.non_field_errors %}
+                <div class="alert alert-danger m-2 mb-0">{{ params_form.non_field_errors }}</div>
+                {% endif %}
+                <div class="formula-table-scroll">
+                    <table class="table table-vcenter table-bordered card-table table-sm mb-0" style="font-size: 13px;">
+                        <tbody>
+                            <tr>
+                                <th class="text-nowrap" style="width: 6.5rem;">工艺方案</th>
+                                <td class="p-1">
+                                    {{ form.process_profile }}
+                                    <div class="input-group input-group-sm">
+                                        <input type="text" class="form-control form-control-sm search-picker-label"
+                                               readonly placeholder="请选择工艺方案"
+                                               value="{% if form.selected_profile %}{{ form.selected_profile.name }}{% endif %}">
+                                        <button type="button" class="btn btn-outline-purple"
+                                                data-bs-toggle="modal" data-bs-target="#modal-process-profile">选择</button>
+                                    </div>
+                                    {% if form.process_profile.errors %}
+                                    <div class="text-danger small">{{ form.process_profile.errors }}</div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">适用机台</th>
+                                <td class="p-1" id="process-scheme-machine">
+                                    {% if form.selected_profile.machine %}{{ form.selected_profile.machine }}{% else %}—{% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <th class="text-nowrap">螺杆组合</th>
+                                <td class="p-1" id="process-scheme-screw">
+                                    {% if form.selected_profile.screw_combination %}{{ form.selected_profile.screw_combination }}{% else %}—{% endif %}
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            {% include "apps/app_trial_production/cards/process_params/extruder.html" %}
+        </div>
+        <div class="col-lg-6">
+            {% include "apps/app_trial_production/cards/process_params/downstream.html" %}
+        </div>
+    </div>
+    {% include "apps/app_trial_production/cards/process_params/temperature.html" %}
+</div>

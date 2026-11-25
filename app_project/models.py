@@ -80,6 +80,7 @@ class Project(AbstractProjectFields):
 
     class Meta:
         verbose_name = "项目"
+        verbose_name_plural = verbose_name
         indexes = [
             models.Index(fields=['-created_at']),
             models.Index(fields=['current_stage']),
@@ -404,6 +405,7 @@ class ProjectMember(models.Model):
 
     class Meta:
         verbose_name = "项目成员"
+        verbose_name_plural = verbose_name
         unique_together = ('project', 'user')
 
 
@@ -448,6 +450,7 @@ class MemberScoreSnapshot(models.Model):
 
     class Meta:
         verbose_name = "成员成绩快照"
+        verbose_name_plural = verbose_name
         indexes = [
             models.Index(fields=['user', 'track', '-snapshot_at'], name='app_project_user_track_idx'),
             models.Index(fields=['project', 'track', '-snapshot_at'], name='app_project_proj_track_idx'),
@@ -466,6 +469,7 @@ class ProjectConfig(models.Model):
 
     class Meta:
         verbose_name = "项目全局配置"
+        verbose_name_plural = verbose_name
 
     def __str__(self):
         return "项目全局配置"
@@ -551,6 +555,7 @@ class NodeScoreRule(models.Model):
 
     class Meta:
         verbose_name = "绩效评分规则"
+        verbose_name_plural = verbose_name
 
     @property
     def status_css_class(self):

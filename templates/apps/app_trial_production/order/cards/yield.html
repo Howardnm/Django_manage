@@ -1,0 +1,70 @@
+{# 产量卡片。登记页 include 时 editable=True；详情页 include 时 editable=False。 #}
+{# formula_details：ProductionOrderFormulaDetail，调用方 select_related('formula')。 #}
+{# 可编辑态读取视图挂上的 finished_pellet_input / specimen_pellet_input 及对应 *_error。 #}
+{# POST 字段：finished_pellet_kg_<明细 pk>、specimen_pellet_kg_<明细 pk>。 #}
+<div class="card card-sm">
+    <div class="card-header bg-orange-lt py-1">
+        <h3 class="card-title text-orange">
+            <i class="ti ti-scale me-2"></i>产量
+            {% if formula_details %}<span class="ms-2">{{ formula_details.0.formula.name }}</span>{% endif %}
+        </h3>
+    </div>
+    <div class="table-responsive">
+        <table class="table table-vcenter card-table">
+            <thead>
+                <tr>
+                    <th>配方版本</th>
+                    <th class="text-end">计划产量 (kg)</th>
+                    <th style="min-width: 160px;">成品颗粒 (kg)</th>
+                    <th style="min-width: 160px;">样条颗粒 (kg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for fd in formula_details %}
+                <tr>
+                    <td>
+                        <span class="badge bg-azure-lt">v{{ fd.formula.version }}</span>
+                    </td>
+                    <td class="text-end">{{ fd.planned_quantity|floatformat:2 }}</td>
+                    <td>
+                        {% if editable %}
+                        <input type="number"
+                               class="form-control{% if fd.finished_pellet_error %} is-invalid{% endif %}"
+                               name="finished_pellet_kg_{{ fd.pk }}"
+                               value="{{ fd.finished_pellet_input }}"
+                               min="0" max="99999999.99" step="0.01"
+                               required inputmode="decimal"
+                               aria-label="v{{ fd.formula.version }} 成品颗粒">
+                        {% if fd.finished_pellet_error %}
+                        <div class="invalid-feedback d-block">{{ fd.finished_pellet_error }}</div>
+                        {% endif %}
+                        {% else %}
+                        <span class="d-block text-end">{{ fd.finished_pellet_kg|floatformat:2 }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if editable %}
+                        <input type="number"
+                               class="form-control{% if fd.specimen_pellet_error %} is-invalid{% endif %}"
+                               name="specimen_pellet_kg_{{ fd.pk }}"
+                               value="{{ fd.specimen_pellet_input }}"
+                               min="0" max="99999999.99" step="0.01"
+                               required inputmode="decimal"
+                               aria-label="v{{ fd.formula.version }} 样条颗粒">
+                        {% if fd.specimen_pellet_error %}
+                        <div class="invalid-feedback d-block">{{ fd.specimen_pellet_error }}</div>
+                        {% endif %}
+                        {% else %}
+                        <span class="d-block text-end">{{ fd.specimen_pellet_kg|floatformat:2 }}</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted py-4">没有可登记的配方明细</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>

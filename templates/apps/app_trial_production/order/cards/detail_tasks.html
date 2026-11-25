@@ -1,0 +1,71 @@
+{% if extrusion_task or color_task or injection_task or testing_tasks %}
+<div class="card card-sm mt-2 mb-2">
+    <div class="card-header bg-purple-lt py-1">
+        <h3 class="card-title"><i class="ti ti-list-check me-2"></i>子任务进度</h3>
+    </div>
+    <div class="card-body p-2">
+        <div class="row g-1">
+            {% if extrusion_task %}
+            <div class="col-2">
+                <div class="card card-sm border h-100">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">挤出任务</div>
+                            <span class="badge {{ extrusion_task.status_css_class }}">{{ extrusion_task.get_status_display }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if color_task %}
+            <div class="col-2">
+                <div class="card card-sm border h-100">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">配色任务</div>
+                            <span class="badge {{ color_task.status_css_class }}">{{ color_task.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'color_center:project' order.project_id %}{% if color_formula_redirect %}?{{ color_formula_redirect }}{% endif %}" class="btn btn-sm btn-outline-orange ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% if injection_task %}
+            <div class="col-2">
+                <div class="card card-sm border h-100">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">注塑任务</div>
+                            <span class="badge {{ injection_task.status_css_class }}">{{ injection_task.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            {% for tt in testing_tasks %}
+            <div class="col-2">
+                <div class="card card-sm border h-100">
+                    <div class="card-body py-2 d-flex align-items-center">
+                        <div>
+                            <div class="text-muted small">测试任务</div>
+                            <span class="badge {{ tt.status_css_class }}">{{ tt.get_status_display }}</span>
+                        </div>
+                        <a href="{% url 'material_testing:detail' tt.pk %}" class="btn btn-sm btn-outline-yellow ms-auto px-2">
+                            <i class="ti ti-arrow-right"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}

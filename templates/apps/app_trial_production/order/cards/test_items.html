@@ -1,0 +1,35 @@
+<div class="card card-sm mb-2">
+    <div class="card-header bg-yellow-lt py-1">
+        <h3 class="card-title text-yellow"><i class="ti ti-test-pipe me-2"></i>测试需求</h3>
+    </div>
+    <div class="card-body py-2">
+        {% if grouped_test_items %}
+        <div class="test-masonry">
+            {% for group in grouped_test_items %}
+            <div class="test-masonry-item">
+                <div class="card card-sm">
+                    <div class="card-header bg-muted-lt py-1">
+                        <strong>{{ group.category.name }}</strong>
+                    </div>
+                    <div class="card-body py-2">
+                        {% for item in group.items %}
+                        <label class="form-check mb-1" style="cursor:pointer; font-size:13px;">
+                            <input type="checkbox" name="test_items" value="{{ item.pk }}"
+                                   class="form-check-input" {% if item.pk in existing_test_item_ids %}checked{% endif %}>
+                            <span class="fw-bold">{{ item.name }}</span>
+                            <span class="text-muted small d-block">
+                                {{ item.standard }}{% if item.condition %} / {{ item.condition }}{% endif %}
+                                {% if item.unit %}({{ item.unit }}){% endif %}
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="text-center text-muted py-3">暂无可用测试项目</div>
+        {% endif %}
+    </div>
+</div>

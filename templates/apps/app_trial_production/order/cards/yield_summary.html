@@ -1,0 +1,52 @@
+<div class="card card-sm">
+    <div class="card-header bg-cyan-lt py-1 d-flex justify-content-between align-items-center">
+        <h3 class="card-title">
+            <i class="ti ti-package me-2"></i>产量
+        </h3>
+        {% if extrusion_task and extrusion_task.status == 'COMPLETED' %}
+        <span class="badge bg-green-lt">已完成</span>
+        {% else %}
+        <span class="badge bg-secondary-lt">未完成</span>
+        {% endif %}
+    </div>
+    <div class="card-body p-2">
+        {% for fd in formula_details %}
+        {% with total=fd.finished_pellet_kg|add:fd.specimen_pellet_kg %}
+        <div class="border rounded p-2 mb-2 {% if forloop.last %}mb-0{% endif %}"
+             data-yield-summary="{{ fd.pk }}" data-planned="{{ fd.planned_quantity }}">
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-azure-lt">v{{ fd.formula.version }}</span>
+                <span class="small fw-bold">{{ fd.formula.name|truncatechars:20 }}</span>
+            </div>
+            <div class="d-flex gap-2 text-center small">
+                <div class="flex-fill bg-light rounded p-1">
+                    <div class="text-muted">计划</div>
+                    <div class="fw-bold">{{ fd.planned_quantity|floatformat:1 }}</div>
+                </div>
+                <div class="flex-fill bg-blue-lt rounded p-1">
+                    <div class="text-muted">成品</div>
+                    <div class="fw-bold text-green" data-yield-finished>{{ fd.finished_pellet_kg|floatformat:1 }}</div>
+                </div>
+                <div class="flex-fill bg-orange-lt rounded p-1">
+                    <div class="text-muted">样条</div>
+                    <div class="fw-bold text-orange" data-yield-specimen>{{ fd.specimen_pellet_kg|floatformat:1 }}</div>
+                </div>
+                <div class="flex-fill bg-light rounded p-1">
+                    <div class="text-muted">合计</div>
+                    <div class="fw-bold" data-yield-total>{{ total|floatformat:1 }}</div>
+                </div>
+            </div>
+            {% if fd.planned_quantity > 0 %}
+            <div class="progress progress-sm mt-1" style="height: 3px;">
+                <div class="progress-bar {% if total > fd.planned_quantity %}bg-danger{% elif total == fd.planned_quantity %}bg-green{% else %}bg-primary{% endif %}"
+                     data-yield-bar
+                     style="width: {% widthratio total|floatformat:0 fd.planned_quantity|floatformat:0 100 %}%"></div>
+            </div>
+            {% endif %}
+        </div>
+        {% endwith %}
+        {% empty %}
+        <div class="text-center text-muted small py-2">暂无配方产量</div>
+        {% endfor %}
+    </div>
+</div>

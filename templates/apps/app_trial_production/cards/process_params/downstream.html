@@ -1,0 +1,52 @@
+{# AbstractExtrusionParams.PARAM_FIELDS 其余项：喂料与后处理 #}
+<div class="card card-sm mb-2">
+    <div class="card-header bg-purple-lt py-1">
+        <h3 class="card-title text-purple"><i class="ti ti-assembly me-2"></i>喂料与后处理</h3>
+    </div>
+    {% if not editable and not process_params %}
+    <div class="card-body text-center text-muted py-2 small">暂无工艺参数</div>
+    {% else %}
+    <div class="formula-table-scroll">
+    <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mb-0" style="font-size: 13px;">
+        <tbody>
+            <tr>
+                <td class="fw-bold text-nowrap">主喂料转速</td>
+                <td class="p-1">{% if editable %}{{ params_form.main_feeder_speed }}{% else %}{{ process_params.main_feeder_speed|default_if_none:"—" }}{% endif %}</td>
+                <td class="fw-bold text-nowrap">侧喂料转速</td>
+                <td class="p-1">{% if editable %}{{ params_form.side_feeder_speed }}{% else %}{{ process_params.side_feeder_speed|default_if_none:"—" }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-nowrap">液体泵注</td>
+                <td class="p-1">{% if editable %}{{ params_form.liquid_pump_speed }}{% else %}{{ process_params.liquid_pump_speed|default_if_none:"—" }}{% endif %}</td>
+                <td class="fw-bold text-nowrap">总产量 (kg/h)</td>
+                <td class="p-1">{% if editable %}{{ params_form.throughput }}{% else %}{{ process_params.throughput|default_if_none:"—" }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-nowrap">切粒方式</td>
+                <td class="p-1">{% if editable %}{{ params_form.cooling_method }}{% else %}{{ process_params.get_cooling_method_display|default:"—" }}{% endif %}</td>
+                <td class="fw-bold text-nowrap">料条根数</td>
+                <td class="p-1">{% if editable %}{{ params_form.strand_count }}{% else %}{{ process_params.strand_count|default_if_none:"—" }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-nowrap">冷却水温 (℃)</td>
+                <td class="p-1">{% if editable %}{{ params_form.water_temp }}{% else %}{{ process_params.water_temp|default_if_none:"—" }}{% endif %}</td>
+                <td class="fw-bold text-nowrap">过水长度 (m)</td>
+                <td class="p-1">{% if editable %}{{ params_form.water_bath_length }}{% else %}{{ process_params.water_bath_length|default_if_none:"—" }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-nowrap">风刀压力 (MPa)</td>
+                <td class="p-1">{% if editable %}{{ params_form.air_knife_pressure }}{% else %}{{ process_params.air_knife_pressure|default_if_none:"—" }}{% endif %}</td>
+                <td class="fw-bold text-nowrap">切粒转速</td>
+                <td class="p-1">{% if editable %}{{ params_form.pelletizing_speed }}{% else %}{{ process_params.pelletizing_speed|default_if_none:"—" }}{% endif %}</td>
+            </tr>
+            <tr>
+                <td class="fw-bold text-nowrap">过滤网目数</td>
+                <td class="p-1">{% if editable %}{{ params_form.screen_mesh }}{% else %}{{ process_params.screen_mesh|default:"—" }}{% endif %}</td>
+                <td></td>
+                <td></td>
+            </tr>
+        </tbody>
+    </table>
+    </div>
+    {% endif %}
+</div>

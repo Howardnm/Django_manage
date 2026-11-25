@@ -1,0 +1,91 @@
+{% load project_extras %}
+{% if mold_formset and trial_formulas %}
+<div class="card card-sm mb-2" id="mold-matrix-card"
+     data-formula-count="{{ trial_formulas|length }}"
+     data-formula-pks="[{% for f in trial_formulas %}{{ f.pk }}{% if not forloop.last %},{% endif %}{% endfor %}]">
+    <div class="card-header bg-purple-lt py-1">
+        <h3 class="card-title text-purple"><i class="ti ti-mold me-2"></i>注塑需求</h3>
+    </div>
+
+    {{ mold_formset.management_form }}
+
+    <div class="formula-table-scroll">
+        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm mold-matrix" id="mold-matrix-table" style="font-size: 13px; table-layout: auto;">
+            <thead>
+                <tr>
+                    <th style="width: 30%; min-width: 200px;">模具</th>
+                    <th style="width: 60px;">穴数</th>
+                    {% for f in trial_formulas %}
+                    <th>
+                        <span class="badge bg-azure-lt">V{{ f.version }}</span>
+                        <div class="text-muted small">{{ f.name|truncatechars:12 }}</div>
+                    </th>
+                    {% endfor %}
+                    <th style="width:50px;">操作</th>
+                </tr>
+            </thead>
+            <tbody id="mold-matrix-body">
+                {% for form in mold_formset %}
+                <tr class="mold-row" data-row-index="{{ forloop.counter0 }}">
+                    {{ form.id }}
+                    <td>{{ form.mold }}</td>
+                    <td class="cavity-cell text-center text-muted">—</td>
+                    {% for f in trial_formulas %}
+                    {% with row_qtys=variant_qty_map|get_item:forloop.parentloop.counter0 %}
+                    <td>
+                        <input type="number"
+                               name="variant_qty_{{ forloop.parentloop.counter0 }}_{{ f.pk }}"
+                               class="form-control form-control-sm qty-input text-center"
+                               min="0" value="{{ row_qtys|get_item:f.pk|default:'0' }}"
+                               placeholder="0"
+                               data-formula-pk="{{ f.pk }}">
+                    </td>
+                    {% endwith %}
+                    {% endfor %}
+                    <td style="display:none;">{{ form.DELETE }}</td>
+                    <td>
+                        <button type="button" class="btn btn-sm btn-ghost-danger delete-mold-row-btn" title="删除此行">
+                            <i class="ti ti-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="card-footer py-2">
+        <button type="button" class="btn btn-sm btn-ghost-purple" id="add-mold-row">
+            <i class="ti ti-plus me-1"></i>新增模具
+        </button>
+        <div class="rounded bg-warning-lt text-warning mb-0 mt-2 px-2 py-1 small d-flex align-items-center gap-2">
+            <i class="ti ti-info-circle"></i>
+            <span>填写每个配方版本的<strong>样条数量需求</strong>。数量为 0 则该配方版本不创建注塑需求</span>
+        </div>
+    </div>
+</div>
+
+<script type="text/template" id="mold-row-template">
+    <tr class="mold-row" data-row-index="__PREFIX__">
+        <input type="hidden" name="mold-__PREFIX__-id" id="id_mold-__PREFIX__-id">
+        <td>{{ mold_formset.empty_form.mold }}</td>
+        <td class="cavity-cell text-center text-muted">—</td>
+        {% for f in trial_formulas %}
+        <td>
+            <input type="number"
+                   name="variant_qty___PREFIX___{{ f.pk }}"
+                   class="form-control form-control-sm qty-input text-center"
+                   min="0" value="0" placeholder="0"
+                   data-formula-pk="{{ f.pk }}">
+        </td>
+        {% endfor %}
+        <td style="display:none;">
+            <input type="checkbox" name="mold-__PREFIX__-DELETE" id="id_mold-__PREFIX__-DELETE">
+        </td>
+        <td>
+            <button type="button" class="btn btn-sm btn-ghost-danger delete-mold-row-btn" title="删除此行">
+                <i class="ti ti-trash"></i>
+            </button>
+        </td>
+    </tr>
+</script>
+{% endif %}

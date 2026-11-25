@@ -1,0 +1,82 @@
+<!-- BOM明细 & 配料表 -->
+{% if merged_bom_rows %}
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="card card-sm mb-2">
+            <div class="card-header bg-orange-lt py-1 d-flex justify-content-between align-items-center">
+                <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM明细 & 配料表</h3>
+                <span class="badge bg-orange-lt">{{ formulas|length }} 个版本</span>
+            </div>
+            <div class="formula-table-scroll">
+                <table class="table table-vcenter table-bordered card-table bom-table text-nowrap">
+                    <thead>
+                        <tr>
+                            <th rowspan="2">喂料口</th>
+                            <th rowspan="2">原材料类型</th>
+                            <th rowspan="2">原材料</th>
+                            {% for col in bom_formula_columns %}
+                            <th colspan="2" class="text-center">
+                                <span class="badge bg-azure-lt">v{{ col.version }}</span>
+                                {% if col.needs_color %}<span class="badge bg-orange-lt ms-1">需配色</span>{% endif %}
+                                {% if col.planned_qty %}<div class="mt-1"><span class="badge bg-green-lt">{{ col.planned_qty }} kg</span></div>{% endif %}
+                            </th>
+                            {% endfor %}
+                            <th rowspan="2" class="bg-green-lt">合计</th>
+                            <th rowspan="2">共混信息</th>
+                            <th rowspan="2">分秤</th>
+                            <th rowspan="2">备注</th>
+                        </tr>
+                        <tr>
+                            {% for col in bom_formula_columns %}
+                            <th class="bg-info-lt">比例</th>
+                            <th>配料(kg)</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in merged_bom_rows %}
+                        <tr>
+                            <td><span class="badge bg-secondary-lt">{{ row.feeding_port }}</span></td>
+                            <td><span class="badge bg-blue-lt">{{ row.raw_material.category.name }}</span></td>
+                            <td class="fw-bold">{{ row.raw_material.name }}
+                                <span class="text-muted small">({{ row.raw_material.model_name }})</span>
+                                {% if row.alt_label %}<span class="badge bg-orange-lt ms-1">{{ row.alt_label }}</span>{% endif %}
+                            </td>
+                            {% for col in row.pct_columns %}
+                            <td class="pct-cell fw-bold bg-info-lt">{{ col.value|default:"-" }}</td>
+                            <td class="pct-cell fw-bold">{{ col.feeding_qty|floatformat:3 }}</td>
+                            {% endfor %}
+                            <td class="pct-cell fw-bold bg-green-lt">{{ row.row_total|floatformat:3 }}</td>
+                            <td class="text-center">
+                                {% if row.is_pre_mix %}
+                                <span class="badge bg-purple-lt">共混{{ row.pre_mix_order }} ({{ row.pre_mix_time }}s)</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if row.weighing_scale %}
+                                <span class="badge bg-azure-lt">{{ row.weighing_scale }}</span>
+                                {% else %}-{% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if row.is_tail %}<span class="badge bg-orange-lt">尾料回掺</span>{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot>
+                        <tr class="bg-green-lt">
+                            <td colspan="3" class="fw-bold text-end">合计</td>
+                            {% for col in bom_formula_columns %}
+                            <td class="pct-cell fw-bold text-muted">-</td>
+                            <td class="pct-cell fw-bold">{{ col.total|floatformat:3 }}</td>
+                            {% endfor %}
+                            <td class="pct-cell fw-bold">{{ bom_grand_total|floatformat:3 }}</td>
+                            <td colspan="3"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

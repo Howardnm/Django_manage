@@ -1,0 +1,52 @@
+<!-- 注塑模具需求矩阵 -->
+{% if mold_matrix %}
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="card card-sm mb-2">
+            <div class="card-header bg-azure-lt py-1 d-flex justify-content-between align-items-center">
+                <h3 class="card-title">注塑模具需求{% if mold_matrix.is_pending %} <span class="badge bg-yellow-lt text-yellow">待触发</span>{% endif %}</h3>
+                {% if injection_task %}
+                <a href="{% url 'mold_injection:task_detail' injection_task.pk %}" class="btn btn-sm btn-outline-blue">注塑详情</a>
+                {% endif %}
+            </div>
+            <div class="formula-table-scroll">
+                <table class="table table-sm card-table table-vcenter table-bordered bom-table text-nowrap" style="font-size: 13px;">
+                    <thead>
+                        <tr>
+                            <th>模具</th>
+                            <th>标准</th>
+                            {% for f in mold_matrix.formulas %}
+                            <th class="text-center"><span class="badge bg-azure-lt">v{{ f.version }}</span></th>
+                            {% endfor %}
+                            <th class="text-center bg-muted-lt">合计</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in mold_matrix.mold_rows %}
+                        <tr>
+                            <td class="fw-bold">{{ row.mold.name }} <span class="text-muted small">({{ row.mold.mold_code }})</span></td>
+                            <td><span class="badge bg-secondary-lt">{{ row.mold.get_standard_display }}</span></td>
+                            {% for cell in row.cells %}
+                            <td class="text-center fw-bold">{{ cell.qty|default:"-" }}</td>
+                            {% endfor %}
+                            <td class="text-center bg-muted-lt fw-bold">{{ row.row_total }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    {% if mold_matrix.mold_rows|length > 1 %}
+                    <tfoot>
+                        <tr class="bg-green-lt">
+                            <td colspan="2" class="fw-bold text-end">合计</td>
+                            {% for ft in mold_matrix.formula_totals %}
+                            <td class="text-center fw-bold">{{ ft.total }}</td>
+                            {% endfor %}
+                            <td class="text-center fw-bold">{{ mold_matrix.grand_total }}</td>
+                        </tr>
+                    </tfoot>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}

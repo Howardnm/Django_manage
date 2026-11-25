@@ -64,6 +64,7 @@ class MetricCategory(models.Model):
     class Meta:
         ordering = ['order']
         verbose_name = "指标分类"
+        verbose_name_plural = verbose_name
 
 # ==========================================
 # 5. 测试配置项
@@ -91,6 +92,7 @@ class TestConfig(models.Model):
 
     class Meta:
         verbose_name = "测试配置项"
+        verbose_name_plural = verbose_name
         ordering = ['category__order', 'order']
 
 # ==========================================
@@ -163,6 +165,7 @@ class MaterialLibrary(models.Model):
         indexes = [models.Index(fields=['-created_at']), models.Index(fields=['category'])]
         ordering = ['-created_at']
         verbose_name = "材料库"
+        verbose_name_plural = verbose_name
 
 
 # ==========================================

@@ -1,0 +1,34 @@
+{# AbstractExtrusionParams.PARAM_FIELDS 前 6 项：主机 #}
+<div class="card card-sm mb-2">
+    <div class="card-header bg-purple-lt py-1">
+        <h3 class="card-title text-purple"><i class="ti ti-engine me-2"></i>主机运行参数</h3>
+    </div>
+    {% if not editable and not process_params %}
+    <div class="card-body text-center text-muted py-2 small">暂无工艺参数</div>
+    {% else %}
+    <div class="formula-table-scroll">
+        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center mb-0" style="font-size: 13px;">
+            <thead>
+                <tr>
+                    <th>螺杆转速<br><span class="fw-normal">rpm</span></th>
+                    <th>主机扭矩<br><span class="fw-normal">%</span></th>
+                    <th>主机电流<br><span class="fw-normal">A</span></th>
+                    <th>熔体压力<br><span class="fw-normal">MPa</span></th>
+                    <th>熔体温度<br><span class="fw-normal">℃</span></th>
+                    <th>真空度<br><span class="fw-normal">MPa</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="p-1">{% if editable %}{{ params_form.screw_speed }}{% else %}{{ process_params.screw_speed|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.torque }}{% else %}{{ process_params.torque|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.current }}{% else %}{{ process_params.current|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.melt_pressure }}{% else %}{{ process_params.melt_pressure|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.melt_temp }}{% else %}{{ process_params.melt_temp|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.vacuum }}{% else %}{{ process_params.vacuum|default_if_none:"—" }}{% endif %}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>

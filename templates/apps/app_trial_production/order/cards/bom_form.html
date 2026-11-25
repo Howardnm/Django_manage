@@ -1,0 +1,103 @@
+{% load project_extras %}
+{% if trial_formulas %}
+<div class="card card-sm mb-2" id="feeding-table-card">
+    <div class="card-header bg-orange-lt py-1 d-flex justify-content-between align-items-center">
+        <h3 class="card-title text-orange"><i class="ti ti-list me-2"></i>BOM明细 & 配料表</h3>
+        <span>总计划产量: <strong id="total-planned-qty">0</strong> kg</span>
+    </div>
+    <div class="formula-table-scroll">
+        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm bom-table" style="font-size:13px;">
+            <thead>
+                <tr>
+                    <th rowspan="2">喂料口</th>
+                    <th rowspan="2">原材料类型</th>
+                    <th rowspan="2">原材料</th>
+                    {% for f in trial_formulas %}
+                    <th colspan="2" class="text-center">
+                        <span class="badge bg-azure-lt">v{{ f.version }}</span>
+                        <input type="number" name="planned_qty_{{ f.pk }}"
+                               class="form-control form-control-sm planned-qty text-center mt-1"
+                               min="0" step="0.1"
+                               value="{% with fd=formula_details_map|get_item:f.pk %}{% if fd and fd.planned_quantity %}{{ fd.planned_quantity }}{% else %}0{% endif %}{% endwith %}"
+                               placeholder="0"
+                               data-formula-pk="{{ f.pk }}"
+                               style="width: 5.5rem; margin: 0 auto;">
+                    </th>
+                    {% endfor %}
+                    <th rowspan="2" class="bg-green-lt">合计</th>
+                    <th rowspan="2">共混信息</th>
+                    <th rowspan="2">分秤</th>
+                    <th rowspan="2">备注</th>
+                </tr>
+                <tr>
+                    {% for f in trial_formulas %}
+                    <th class="bg-info-lt">比例</th>
+                    <th>配料(kg)</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody id="feeding-table-body">
+                {% for row in merged_bom_rows %}
+                <tr class="feeding-row" data-row="{{ forloop.counter0 }}">
+                    <td><span class="badge bg-secondary-lt">{{ row.feeding_port }}</span></td>
+                    <td><span class="badge bg-blue-lt">{{ row.raw_material.category.name }}</span></td>
+                    <td class="fw-bold">{{ row.raw_material.name }}
+                        <span class="text-muted small">({{ row.raw_material.model_name }})</span>
+                        {% if row.alt_label %}<span class="badge bg-orange-lt ms-1">{{ row.alt_label }}</span>{% endif %}
+                    </td>
+                    {% for col in row.pct_columns %}
+                    <td class="pct-cell fw-bold bg-info-lt">{{ col.value|default:"-" }}</td>
+                    <td class="pct-cell fw-bold feeding-qty-cell"
+                         data-row="{{ forloop.parentloop.counter0 }}"
+                         data-formula-pk="{{ col.formula_pk }}">{% if col.feeding_qty %}{{ col.feeding_qty }}{% else %}-{% endif %}</td>
+                    {% endfor %}
+                    <td class="pct-cell fw-bold feeding-row-total bg-green-lt" data-row="{{ forloop.counter0 }}">-</td>
+                    <td>
+                        {% if row.is_pre_mix %}
+                        <span class="badge bg-purple-lt">共混{{ row.pre_mix_order }} ({{ row.pre_mix_time }}s)</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if row.weighing_scale %}
+                        <span class="badge bg-azure-lt">{{ row.weighing_scale }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                    <td>
+                        {% if row.is_tail %}<span class="badge bg-orange-lt">尾料回掺</span>{% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="99" class="text-center text-muted py-2">暂无 BOM</td></tr>
+                {% endfor %}
+            </tbody>
+            <tfoot id="feeding-total-foot" style="display:none;">
+                <tr class="bg-green-lt">
+                    <td colspan="3" class="fw-bold text-end">合计</td>
+                    {% for f in trial_formulas %}
+                    <td class="pct-cell fw-bold text-muted bg-green-lt">-</td>
+                    <td class="pct-cell fw-bold feeding-formula-total bg-green-lt" data-formula-pk="{{ f.pk }}">0</td>
+                    {% endfor %}
+                    <td class="pct-cell fw-bold bg-green-lt" id="feeding-grand-total">0</td>
+                    <td colspan="3"></td>
+                </tr>
+            </tfoot>
+            <tfoot>
+                <tr>
+                    <td colspan="3" class="fw-bold text-end">需要配色</td>
+                    {% for f in trial_formulas %}
+                    <td colspan="2" class="text-center">
+                        <label class="form-check form-check-inline mb-0">
+                            <input type="checkbox" name="needs_color_{{ f.pk }}"
+                                   class="form-check-input needs-color-cb"
+                                   data-formula-pk="{{ f.pk }}"
+                                   {% with fd=formula_details_map|get_item:f.pk %}{% if fd and fd.needs_color_matching %}checked{% endif %}{% endwith %}>
+                        </label>
+                    </td>
+                    {% endfor %}
+                    <td colspan="4"></td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endif %}

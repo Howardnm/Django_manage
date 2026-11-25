@@ -11,6 +11,7 @@ class ExternalMemberActivity(models.Model):
 
     class Meta:
         verbose_name = "外部行为日志"
+        verbose_name_plural = verbose_name
         ordering = ['-timestamp']
 
     def __str__(self):

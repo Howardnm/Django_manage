@@ -1,0 +1,53 @@
+{# 字段顺序 = AbstractExtrusionParams.TEMP_FIELDS #}
+<style>
+    .temp-table input[type="number"] {
+        -moz-appearance: textfield;
+        text-align: center;
+        padding-left: 2px;
+        padding-right: 2px;
+    }
+    .temp-table input[type="number"]::-webkit-outer-spin-button,
+    .temp-table input[type="number"]::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+        margin: 0;
+    }
+</style>
+<div class="card card-sm mb-2">
+    <div class="card-header bg-red-lt py-1">
+        <h3 class="card-title text-red"><i class="ti ti-thermometer me-2"></i>温度控制 (℃)</h3>
+    </div>
+    {% if not editable and not process_params %}
+    <div class="card-body text-center text-muted py-2 small">暂无工艺参数</div>
+    {% else %}
+    <div class="formula-table-scroll">
+        <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center mb-0 temp-table" style="font-size: 13px;">
+            <thead>
+                <tr>
+                    <th class="w-1">区段</th>
+                    <th>一区</th><th>二区</th><th>三区</th><th>四区</th><th>五区</th><th>六区</th>
+                    <th>七区</th><th>八区</th><th>九区</th><th>十区</th><th>十一区</th><th>十二区</th>
+                    <th class="text-red">机头</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="fw-bold text-nowrap">{% if editable %}设定{% else %}工艺{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_1 }}{% else %}{{ process_params.temp_zone_1|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_2 }}{% else %}{{ process_params.temp_zone_2|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_3 }}{% else %}{{ process_params.temp_zone_3|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_4 }}{% else %}{{ process_params.temp_zone_4|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_5 }}{% else %}{{ process_params.temp_zone_5|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_6 }}{% else %}{{ process_params.temp_zone_6|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_7 }}{% else %}{{ process_params.temp_zone_7|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_8 }}{% else %}{{ process_params.temp_zone_8|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_9 }}{% else %}{{ process_params.temp_zone_9|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_10 }}{% else %}{{ process_params.temp_zone_10|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_11 }}{% else %}{{ process_params.temp_zone_11|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_zone_12 }}{% else %}{{ process_params.temp_zone_12|default_if_none:"—" }}{% endif %}</td>
+                    <td class="p-1">{% if editable %}{{ params_form.temp_head }}{% else %}{{ process_params.temp_head|default_if_none:"—" }}{% endif %}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</div>

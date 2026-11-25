@@ -143,6 +143,7 @@ class ResearchProjectNode(models.Model):
 
     class Meta:
         verbose_name = "预研进度节点"
+        verbose_name_plural = verbose_name
         ordering = ['order']
 
     def __str__(self):

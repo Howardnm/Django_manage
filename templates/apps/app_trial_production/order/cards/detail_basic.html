@@ -1,0 +1,103 @@
+<div class="card card-sm mb-2">
+    <div class="card-header bg-blue-lt py-1">
+        <h3 class="card-title text-blue">基本信息</h3>
+    </div>
+    <div class="card-body p-0">
+        <table class="table table-sm table-vcenter table-bordered card-table mb-0" style="font-size: 13px;">
+            <tbody>
+                <tr>
+                    <td class="fw-bold text-nowrap" style="width: 7rem;">工单号</td>
+                    <td class="fw-bold">{{ order.code }}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">SAP编码</td>
+                    <td class="fw-bold">{% if order.sap_material_code %}{{ order.sap_material_code }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">实验单号</td>
+                    <td>
+                        <span class="fw-bold">{{ order.trial_code }}</span>
+                        <span class="text-muted small ms-2">({{ formulas|length }} 个配方版本)</span>
+                    </td>
+                </tr>
+                {% with first_formula=formulas.0 %}
+                <tr>
+                    <td class="fw-bold text-nowrap">配方颜色</td>
+                    <td>
+                        {% if first_formula.material_color_name or first_formula.pantone_code or first_formula.rgb_value %}
+                        <div class="d-flex align-items-center gap-3 flex-wrap">
+                            {% if first_formula.material_color_name %}
+                            <span class="fw-bold">{{ first_formula.material_color_name }}</span>
+                            {% endif %}
+                            {% if first_formula.pantone_code %}
+                            <span class="badge bg-purple-lt">{{ first_formula.pantone_code }}</span>
+                            {% endif %}
+                            {% if first_formula.rgb_value %}
+                            <span class="d-inline-block rounded" style="width:18px;height:18px;background-color:{{ first_formula.rgb_value }};border:1px solid #d0d5dd;"></span>
+                            {% endif %}
+                        </div>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                {% endwith %}
+                <tr>
+                    <td class="fw-bold text-nowrap">关联项目</td>
+                    <td>
+                        {% if order.project %}
+                        <span class="fw-bold">{{ order.project.name }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">牌号</td>
+                    <td>
+                        {% if order.project.material %}
+                        <span class="fw-bold">{{ order.project.material.grade_name }}</span>
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">项目节点</td>
+                    <td>
+                        {% if order.project_node %}
+                        <span class="badge bg-purple-lt">{{ order.project_node.get_stage_display }}</span>
+                        {% if order.project_node.round %}<span class="small ms-1">Round {{ order.project_node.round }}</span>{% endif %}
+                        {% else %}-{% endif %}
+                    </td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">跳过挤出</td>
+                    <td>{% if order.skip_extrusion %}是{% else %}否{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">竞品公司</td>
+                    <td>{% if order.competitor_company %}{{ order.competitor_company }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">竞品品牌</td>
+                    <td>{% if order.competitor_brand %}{{ order.competitor_brand }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">竞品型号/牌号</td>
+                    <td>{% if order.competitor_model %}{{ order.competitor_model }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">关联客户</td>
+                    <td>{% if order.customer %}{{ order.customer }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">创建人</td>
+                    <td>{{ order.creator.realname|default:order.creator.username }}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">创建时间</td>
+                    <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+                <tr>
+                    <td class="fw-bold text-nowrap">更新时间</td>
+                    <td>{{ order.updated_at|date:"Y-m-d H:i" }}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
