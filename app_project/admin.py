@@ -10,9 +10,9 @@ from django.utils import timezone
 from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models import (
-    Project, ProjectNode, ProjectMember, NodeScoreRule, ProjectConfig,
-    ProjectFieldChange, MemberScoreSnapshot, FailureReason, FeedbackType,
-    ProjectStage,
+    Project, ProjectNode, ProjectMember, ProjectSalesMember, NodeScoreRule,
+    ProjectConfig, ProjectFieldChange, MemberScoreSnapshot, FailureReason,
+    FeedbackType, BusinessSegment, ProjectStage,
 )
 
 
@@ -99,13 +99,17 @@ class ProjectMemberInline(admin.TabularInline):
     model = ProjectMember
     extra = 1
 
+class ProjectSalesMemberInline(admin.TabularInline):
+    model = ProjectSalesMember
+    extra = 1
+
 @admin.register(Project)
 class ProjectAdmin(admin.ModelAdmin):
     list_display = ['code', 'name', 'manager', 'current_stage', 'progress_percent', 'is_terminated', 'created_at']
     list_filter = ['current_stage', 'is_terminated', 'manager']
     search_fields = ['code', 'name', 'description']
     search_help_text = '项目编码 / 项目名称 / 描述'
-    inlines = [ProjectMemberInline, ProjectNodeInline]
+    inlines = [ProjectMemberInline, ProjectSalesMemberInline, ProjectNodeInline]
     change_list_template = 'admin/app_project/project/change_list.html'
 
     def get_urls(self):
@@ -117,6 +121,17 @@ class ProjectAdmin(admin.ModelAdmin):
             ),
         ]
         return custom + super().get_urls()
+
+    def get_deleted_objects(self, objs, request):
+        """变更记录不许在自己的菜单里删，但不挡住随项目级联删除。"""
+        deleted_objects, model_count, perms_needed, protected = super().get_deleted_objects(
+            objs, request,
+        )
+        field_change_label = str(ProjectFieldChange._meta.verbose_name)
+        perms_needed = {
+            name for name in perms_needed if str(name) != field_change_label
+        }
+        return deleted_objects, model_count, perms_needed, protected
 
     def export_projects_view(self, request):
         """现查现组，字节放进响应。不写盘，也不把表留在 admin 实例上。"""
@@ -228,6 +243,30 @@ class ProjectFieldChangeAdmin(admin.ModelAdmin):
     def submission_comment_preview(self, obj):
         return obj.submission_comment[:50] + '…' if len(obj.submission_comment) > 50 else obj.submission_comment
     submission_comment_preview.short_description = '提交意见'
+
+
+class _LookupAdmin(admin.ModelAdmin):
+    """名称 / 编码 / 排序 / 说明 / 是否启用，三个字典共用。"""
+
+    list_display = ['name', 'code', 'order', 'is_active']
+    list_filter = ['is_active']
+    search_fields = ['name', 'code']
+    ordering = ['order', 'name']
+
+
+@admin.register(FailureReason)
+class FailureReasonAdmin(_LookupAdmin):
+    pass
+
+
+@admin.register(FeedbackType)
+class FeedbackTypeAdmin(_LookupAdmin):
+    pass
+
+
+@admin.register(BusinessSegment)
+class BusinessSegmentAdmin(_LookupAdmin):
+    pass
 
 
 @admin.register(MemberScoreSnapshot)
