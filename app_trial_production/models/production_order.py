@@ -106,8 +106,6 @@ class ProductionOrder(models.Model):
     extrusion_scheduled_end = models.DateTimeField("挤出排产结束时间", null=True, blank=True, help_text="计划结束时间，为空则默认开始时间+1小时")
     status = models.CharField("工单状态", max_length=30, choices=Status.choices, default=Status.DRAFT)
     workflow_instance = models.ForeignKey('app_workflow.WorkflowInstance', on_delete=models.SET_NULL, null=True, blank=True, related_name='production_orders', verbose_name="关联审批流程")
-    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="审批人", related_name='approved_production_orders')
-    approved_at = models.DateTimeField("审批通过时间", null=True, blank=True)
     test_items = models.ManyToManyField('app_material.TestConfig', blank=True, verbose_name="待触发测试项目", related_name="pending_production_orders", help_text="注塑完成后触发创建 TestingTask 时使用")
     remark = models.TextField("备注", blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)

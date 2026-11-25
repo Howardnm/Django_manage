@@ -1,4 +1,15 @@
 /* BOM 配料表通用样式 */
+
+/* 表格宽于卡片时在卡片内横滚，不把页面撑出横向滚动条。
+   与配方页 form.css、工单编辑页 mold_matrix.css 同一规则。 */
+.formula-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+.formula-table-scroll .ts-control > input {
+    min-width: 0;
+}
+
 .bom-table th, .bom-table td {
     padding: 4px 8px;
     font-size: 13px;

@@ -21,6 +21,12 @@
     overflow-wrap: anywhere;
     word-break: keep-all;
 }
+
+/* ── 压低行高；第 3 表三段紧挨成一张表 ── */
+
+.print-process + .print-process { margin-top: -1px; }
+/* 温度数字与其他表同字号，固定列宽，不把相邻单元格撑开 */
+.print-temp td { white-space: nowrap; overflow: hidden; }
 {% endblock %}
 
 {% block print_content %}
@@ -53,54 +59,60 @@
     </div>
 
     {# ═══════════════════════════════════════════════════ #}
-    {#  头部信息表（8 列：4 组 标签 | 值）                 #}
+    {#  第 1 表：基本信息 + 生产要点（8 列）               #}
     {# ═══════════════════════════════════════════════════ #}
-    <table class="table table-bordered table-sm mt-3 mb-3" style="table-layout:fixed;font-size:10px;">
+    <table class="table table-bordered table-sm print-compact mt-3 mb-2" style="table-layout:fixed;font-size:10px;">
         <colgroup>
-            <col style="width:9%;"><col style="width:16%;">
-            <col style="width:9%;"><col style="width:16%;">
-            <col style="width:9%;"><col style="width:16%;">
-            <col style="width:9%;"><col style="width:16%;">
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
         </colgroup>
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center">工单编号</td>
             <td class="text-start ps-2 fw-bold">{{ header_info.order_code }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">项目名称</td>
-            <td class="text-start ps-2">{{ header_info.project_name|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.project_name|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">创建人</td>
-            <td class="text-start ps-2">{{ header_info.creator_display }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.creator_display }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">部门/工作组</td>
-            <td class="text-start ps-2">{{ header_info.creator_dept_path|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.creator_dept_path|default:'—' }}</td>
         </tr>
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center">产品大类</td>
-            <td class="text-start ps-2">{{ header_info.material_category|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">材料</td>
-            <td class="text-start ps-2">{{ header_info.material_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">牌号</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.material_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">色名</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.material_color_name|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">SAP编码</td>
-            <td class="text-start ps-2">{{ header_info.sap_code|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.sap_code|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">日期</td>
-            <td class="text-start ps-2">{{ header_info.created_date|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.created_date|default:'—' }}</td>
         </tr>
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center">客户</td>
-            <td class="text-start ps-2">{{ header_info.customer|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.customer|default:'—' }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">项目阶段</td>
-            <td class="text-start ps-2">{{ header_info.project_stage|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">样品总量</td>
-            <td class="text-start ps-2 fw-bold">{{ header_info.total_planned_qty|floatformat:1 }} KG</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.project_stage|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">计划产量</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.total_planned_qty|floatformat:1 }} kg</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">机台</td>
-            <td class="text-start ps-2">{{ header_info.machine_name|default:'—' }}</td>
+            <td class="text-start ps-2 fw-bold">{{ header_info.machine_name|default:'—' }}</td>
         </tr>
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center">是否需要色粉</td>
-            <td class="text-start ps-2">{{ header_info.needs_color_display|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">色名</td>
-            <td class="text-start ps-2">{{ header_info.material_color_name|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">潘通</td>
-            <td class="text-start ps-2">{{ header_info.pantone_code|default:'—' }}</td>
-            <td class="print-label-bg fw-bold text-nowrap text-center">RGB</td>
-            <td class="text-start ps-2" style="font-family:monospace;">{{ header_info.rgb_value|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">干燥温度</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.drying_temperature|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">干燥时间</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.drying_duration|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">套内膜袋密封</td>
+            <td class="text-start ps-2 fw-bold">{% if post_processing.inner_bag_sealing %}是{% else %}否{% endif %}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">存放位置</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.storage_location|default:'—' }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">包装说明</td>
+            <td colspan="3" class="text-start ps-2 fw-bold">{{ post_processing.packaging_desc|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">备注</td>
+            <td colspan="3" class="text-start ps-2 fw-bold">{{ post_processing.remark|default:'—' }}</td>
         </tr>
     </table>
 
@@ -120,7 +132,9 @@
 
         {# ── 配方编号 ── #}
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="6">原材料信息</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="2">原材料信息</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">实验单号</td>
+            <td class="text-start ps-1 fw-bold" colspan="3">{{ header_info.trial_code|default:'—' }}</td>
             {% for formula in page.formulas %}
             <td colspan="2" class="print-label-bg fw-bold text-center">v{{ formula.version }}</td>
             {% endfor %}
@@ -183,89 +197,128 @@
     </table>
 
     {# ═══════════════════════════════════════════════════ #}
-    {#  后处理表（加工 / 包装 / 注塑）                     #}
+    {#  第 3 表：工艺参数（主机 / 喂料与后处理 / 温度）     #}
+    {#  列数不同，分成三段紧挨的表，打印上看起来是一张表   #}
     {# ═══════════════════════════════════════════════════ #}
-    <table class="table table-bordered table-sm mb-3" style="table-layout:fixed;font-size:10px;">
-
-        {# ── 工艺方案 ── #}
+    {% if not process_params %}
+    <table class="table table-bordered table-sm print-compact mb-2" style="table-layout:fixed;font-size:10px;">
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">工艺方案</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.profile_name|default:'—' }}
-            </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">适用机台</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.profile_machine|default:'—' }}
-            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">主机运行参数</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">工艺方案</td>
+            <td class="text-start ps-2 fw-bold" colspan="2">{{ post_processing.profile_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">螺杆组合</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.profile_screw|default:'—' }}</td>
         </tr>
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">螺杆组合</td>
-            <td colspan="
-                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
-            " class="text-start ps-2">
-                {{ post_processing.profile_screw|default:'—' }}
-            </td>
+            <td colspan="6" class="text-center text-muted">暂无工艺参数</td>
         </tr>
-
-        {# ── 说明 ── #}
+    </table>
+    {% else %}
+    <table class="table table-bordered table-sm print-compact print-process mb-0" style="table-layout:fixed;font-size:10px;">
         <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">说明</td>
-            <td colspan="
-                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
-            " class="text-start ps-2">
-                {{ post_processing.remark|default:'—' }}
-            </td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">主机运行参数</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">工艺方案</td>
+            <td class="text-start ps-2 fw-bold" colspan="2">{{ post_processing.profile_name|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">螺杆组合</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.profile_screw|default:'—' }}</td>
         </tr>
-
-        {# ── 包装前处理 ── #}
-        <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3" rowspan="2">包装前处理</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                干燥温度：{{ post_processing.drying_temperature|default:'—' }}
-            </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">干燥时间</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.drying_duration|default:'—' }}
-            </td>
+        <tr class="print-label-bg">
+            <td class="fw-bold text-center text-nowrap">螺杆转速 rpm</td>
+            <td class="fw-bold text-center text-nowrap">主机扭矩 %</td>
+            <td class="fw-bold text-center text-nowrap">主机电流 A</td>
+            <td class="fw-bold text-center text-nowrap">熔体压力 MPa</td>
+            <td class="fw-bold text-center text-nowrap">熔体温度 ℃</td>
+            <td class="fw-bold text-center text-nowrap">真空度 MPa</td>
         </tr>
         <tr>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                套内膜袋密封：{% if post_processing.inner_bag_sealing %}是{% else %}否{% endif %}
-            </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">存放位置</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.storage_location|default:'—' }}
-            </td>
+            <td class="text-center fw-bold">{{ process_params.screw_speed }}</td>
+            <td class="text-center fw-bold">{{ process_params.torque }}</td>
+            <td class="text-center fw-bold">{{ process_params.current }}</td>
+            <td class="text-center fw-bold">{{ process_params.melt_pressure }}</td>
+            <td class="text-center fw-bold">{{ process_params.melt_temp }}</td>
+            <td class="text-center fw-bold">{{ process_params.vacuum }}</td>
         </tr>
-
-        {# ── 注塑温度 / 注塑前处理 ── #}
-        <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">注塑温度</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.injection_temperature|default:'—' }}
-            </td>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">注塑前处理</td>
-            <td colspan="{{ page.formula_count }}" class="text-start ps-2">
-                {{ post_processing.injection_pretreatment|default:'—' }}
-            </td>
-        </tr>
-
-        {# ── 包装说明 ── #}
-        <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="3">包装说明</td>
-            <td colspan="
-                {% with fc=page.formula_count %}{{ fc|add:fc|add:3 }}{% endwith %}
-            " class="text-start ps-2">
-                {{ post_processing.packaging_desc|default:'—' }}
-            </td>
-        </tr>
-
     </table>
 
-    {# ── 注塑需求模具矩阵（独立表格，不挤压）── #}
+    <table class="table table-bordered table-sm print-compact print-process mb-0" style="table-layout:fixed;font-size:10px;">
+        <colgroup>
+            <col style="width:13%;"><col style="width:12%;">
+            <col style="width:13%;"><col style="width:12%;">
+            <col style="width:13%;"><col style="width:12%;">
+            <col style="width:13%;"><col style="width:12%;">
+        </colgroup>
+        <tr>
+            <td class="print-label-bg fw-bold text-center" colspan="8">喂料与后处理</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">主喂料转速</td>
+            <td class="text-center fw-bold">{{ process_params.main_feeder_speed }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">侧喂料转速</td>
+            <td class="text-center fw-bold">{{ process_params.side_feeder_speed }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">液体泵注</td>
+            <td class="text-center fw-bold">{{ process_params.liquid_pump_speed }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">总产量 kg/h</td>
+            <td class="text-center fw-bold">{{ process_params.throughput }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">切粒方式</td>
+            <td class="text-center fw-bold">{{ process_params.cooling_method }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">料条根数</td>
+            <td class="text-center fw-bold">{{ process_params.strand_count }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">冷却水温 ℃</td>
+            <td class="text-center fw-bold">{{ process_params.water_temp }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">过水长度 m</td>
+            <td class="text-center fw-bold">{{ process_params.water_bath_length }}</td>
+        </tr>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center">风刀压力 MPa</td>
+            <td class="text-center fw-bold">{{ process_params.air_knife_pressure }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">切粒转速</td>
+            <td class="text-center fw-bold">{{ process_params.pelletizing_speed }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">过滤网目数</td>
+            <td class="text-center fw-bold">{{ process_params.screen_mesh }}</td>
+            <td class="print-label-bg"></td>
+            <td></td>
+        </tr>
+    </table>
+
+    <table class="table table-bordered table-sm print-compact print-process print-temp mb-2" style="table-layout:fixed;font-size:10px;">
+        <tr>
+            <td class="print-label-bg fw-bold text-center" colspan="14">温度控制 (℃)</td>
+        </tr>
+        <tr class="print-label-bg">
+            <td class="fw-bold text-center text-nowrap">区段</td>
+            {% for zone in process_params.temps %}
+            <td class="fw-bold text-center text-nowrap">{{ zone.label }}</td>
+            {% endfor %}
+        </tr>
+        <tr>
+            <td class="fw-bold text-center text-nowrap">工艺</td>
+            {% for zone in process_params.temps %}
+            <td class="text-center fw-bold">{{ zone.value }}</td>
+            {% endfor %}
+        </tr>
+    </table>
+    {% endif %}
+
+    {# ── 注塑需求：标题与注塑温度、注塑前处理同一行；无模具时也保留这行 ── #}
+    <table class="table table-bordered table-sm print-compact {% if mold_matrix and mold_matrix.mold_rows %}mb-0{% else %}mb-2{% endif %}" style="table-layout:fixed;font-size:10px;">
+        <colgroup>
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
+            <col style="width:11%;"><col style="width:14%;">
+        </colgroup>
+        <tr>
+            <td class="print-label-bg fw-bold text-nowrap text-center" colspan="2">注塑需求</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">注塑温度</td>
+            <td class="text-start ps-2 fw-bold">{{ post_processing.injection_temperature|default:'—' }}</td>
+            <td class="print-label-bg fw-bold text-nowrap text-center">注塑前处理</td>
+            <td colspan="3" class="text-start ps-2 fw-bold">{{ post_processing.injection_pretreatment|default:'—' }}</td>
+        </tr>
+    </table>
     {% if mold_matrix and mold_matrix.mold_rows %}
-    <div class="fw-bold text-center print-label-bg py-1" style="font-size:10px;border:1px solid #808080;border-bottom:none;">注塑需求</div>
-    <table class="table table-bordered table-sm mb-3" style="font-size:10px;">
+    <table class="table table-bordered table-sm mb-2" style="font-size:10px;margin-top:-1px;">
         <tr class="print-label-bg">
             <td class="fw-bold text-start" style="width:12%;">模具</td>
             <td class="fw-bold text-start" style="width:8%;">标准</td>

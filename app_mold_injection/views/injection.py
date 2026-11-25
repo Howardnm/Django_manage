@@ -4,6 +4,7 @@ from django.db.models import Count
 from django.views.generic import ListView, DetailView, View
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
+from app_formula.models import LabFormula
 from app_mold_injection.mixins import InjectionTaskAccessMixin
 from app_mold_injection.models import InjectionTask
 from app_mold_injection.forms import InjectionCompleteForm
@@ -19,6 +20,28 @@ INJECTION_STATUS_TABS = [
     {'value': 'PENDING', 'label': '未注塑', 'icon': 'ti ti-clock'},
     {'value': 'COMPLETED', 'label': '已完成', 'icon': 'ti ti-check'},
 ]
+
+
+def _order_material_types(order):
+    """工单关联配方的基材类型，按版本顺序去重。
+
+    与测试任务详情同一数据源：实验单号 + 项目下的全部配方版本。
+    """
+    if order is None:
+        return []
+    seen = set()
+    material_types = []
+    formulas = LabFormula.objects.filter(
+        code=order.trial_code,
+        project=order.project,
+    ).select_related('material_type').order_by('version')
+    for formula in formulas:
+        material_type = formula.material_type
+        if material_type.pk in seen:
+            continue
+        seen.add(material_type.pk)
+        material_types.append(material_type)
+    return material_types
 
 
 def _build_mold_formula_matrix(mold_requirements):
@@ -122,6 +145,7 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
         ctx['mold_matrix_formulas'] = formulas
         ctx['mold_matrix_rows'] = matrix_rows
         ctx['has_mold_requirements'] = len(matrix_rows) > 0
+        ctx['material_types'] = _order_material_types(task.production_order)
 
         ctx['show_complete_btn'] = task.status == 'PENDING'
         ctx['complete_form'] = InjectionCompleteForm(instance=task)

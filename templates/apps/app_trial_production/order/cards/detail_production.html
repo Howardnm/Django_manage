@@ -44,7 +44,7 @@
                 </tr>
                 <tr>
                     <td class="fw-bold text-nowrap">挤出操作员</td>
-                    <td>{{ order.extruder_operator.realname|default:"-" }}</td>
+                    <td>{% if order.extruder_operator %}{{ order.extruder_operator.realname|default:order.extruder_operator.username }}{% else %}-{% endif %}</td>
                 </tr>
                 <tr>
                     <td class="fw-bold text-nowrap">干燥温度</td>
@@ -73,18 +73,6 @@
                 <tr>
                     <td class="fw-bold text-nowrap">存放位置</td>
                     <td>{% if order.storage_location %}{{ order.storage_location }}{% else %}-{% endif %}</td>
-                </tr>
-                <tr>
-                    <td class="fw-bold text-nowrap">审批人</td>
-                    <td>
-                        {% if order.approved_by %}
-                        {{ order.approved_by.realname|default:order.approved_by.username }}
-                        {% else %}-{% endif %}
-                    </td>
-                </tr>
-                <tr>
-                    <td class="fw-bold text-nowrap">审批通过时间</td>
-                    <td>{% if order.approved_at %}{{ order.approved_at|date:"m-d H:i" }}{% else %}-{% endif %}</td>
                 </tr>
                 <tr>
                     <td class="fw-bold text-nowrap">完成时间</td>

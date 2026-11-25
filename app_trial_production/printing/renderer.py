@@ -73,6 +73,7 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
         # 共享数据
         header_info = self._build_header_info()
         post_processing = self._build_post_processing()
+        process_params = self._build_process_params()
         mold_matrix = self._build_mold_matrix(formulas)
         signatures = self._build_signatures()
 
@@ -114,6 +115,7 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
             'formulas': formulas,
             'header_info': header_info,
             'post_processing': post_processing,
+            'process_params': process_params,
             'mold_matrix': mold_matrix,
             'signatures': signatures,
             'total_pages': len(pages),
@@ -184,6 +186,7 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
 
         return {
             'order_code': order.code or '',
+            'trial_code': order.trial_code or '',
             'project_name': project.name if project else '',
             'creator_display': self._get_user_display(order.creator),
             'creator_dept_path': self._get_creator_dept_path(order.creator),
@@ -433,6 +436,65 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
             'packaging_desc': order.packaging_desc or '',
             'storage_location': order.storage_location or '',
             'remark': order.remark or '',
+        }
+
+    # ═══════════════════════════════════════════════════════
+    #  工艺参数（主机 / 喂料与后处理 / 温度）
+    # ═══════════════════════════════════════════════════════
+
+    # 与详情卡温度表头一致，顺序 = AbstractExtrusionParams.TEMP_FIELDS
+    _TEMP_ZONE_LABELS = (
+        '一区', '二区', '三区', '四区', '五区', '六区',
+        '七区', '八区', '九区', '十区', '十一区', '十二区', '机头',
+    )
+
+    @staticmethod
+    def _show_param(value) -> str:
+        """工艺数值：0 照印；None / 空串印「—」。不用模板 default，避免把 0 吃掉。"""
+        if value is None or value == '':
+            return '—'
+        if isinstance(value, float):
+            return f'{value:g}'
+        return str(value)
+
+    def _build_process_params(self) -> dict[str, Any] | None:
+        """工单工艺参数。无 OrderProcessParams 时返回 None。"""
+        from app_process.models import AbstractExtrusionParams
+
+        # 反向 OneToOne 不存在时抛 RelatedObjectDoesNotExist（AttributeError 子类）
+        params = getattr(self.order, 'process_params', None)
+        if params is None:
+            return None
+
+        show = self._show_param
+        temps = [
+            {'label': label, 'value': show(getattr(params, field))}
+            for label, field in zip(
+                self._TEMP_ZONE_LABELS, AbstractExtrusionParams.TEMP_FIELDS, strict=True,
+            )
+        ]
+        cooling = (
+            params.get_cooling_method_display() if params.cooling_method else ''
+        )
+        return {
+            'screw_speed': show(params.screw_speed),
+            'torque': show(params.torque),
+            'current': show(params.current),
+            'melt_pressure': show(params.melt_pressure),
+            'melt_temp': show(params.melt_temp),
+            'vacuum': show(params.vacuum),
+            'main_feeder_speed': show(params.main_feeder_speed),
+            'side_feeder_speed': show(params.side_feeder_speed),
+            'liquid_pump_speed': show(params.liquid_pump_speed),
+            'throughput': show(params.throughput),
+            'cooling_method': cooling or '—',
+            'strand_count': show(params.strand_count),
+            'water_temp': show(params.water_temp),
+            'water_bath_length': show(params.water_bath_length),
+            'air_knife_pressure': show(params.air_knife_pressure),
+            'pelletizing_speed': show(params.pelletizing_speed),
+            'screen_mesh': show(params.screen_mesh),
+            'temps': temps,
         }
 
     # ═══════════════════════════════════════════════════════

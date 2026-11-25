@@ -74,6 +74,30 @@
                             <td><a href="{% url 'trial_order_detail' testing_task.production_order.pk %}">{{ testing_task.production_order.code }}</a></td>
                         </tr>
                         <tr>
+                            <td class="fw-bold text-nowrap">关联项目</td>
+                            <td>
+                                {% if testing_task.production_order.project %}
+                                <a href="{% url 'project_detail' testing_task.production_order.project.pk %}">{{ testing_task.production_order.project.name }}</a>
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-nowrap">注塑温度</td>
+                            <td class="fw-bold">
+                                {% if testing_task.production_order.injection_temperature is not None %}
+                                {{ testing_task.production_order.injection_temperature }}℃
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <td class="fw-bold text-nowrap align-top">注塑前处理</td>
+                            <td class="fw-bold">
+                                {% if testing_task.production_order.injection_pretreatment %}
+                                {{ testing_task.production_order.injection_pretreatment|linebreaksbr }}
+                                {% else %}-{% endif %}
+                            </td>
+                        </tr>
+                        <tr>
                             <td class="fw-bold text-nowrap">测试员</td>
                             <td>{{ testing_task.assigned_to.realname|default:"-" }}</td>
                         </tr>

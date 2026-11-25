@@ -351,7 +351,7 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
         return qs.select_related(
             'project__material', 'project_node', 'process_profile',
             'process_profile__machine', 'process_profile__screw_combination',
-            'creator', 'extruder_operator', 'approved_by', 'workflow_instance',
+            'creator', 'extruder_operator', 'workflow_instance',
         ).prefetch_related(
             'formula_details__formula',
         )
@@ -898,7 +898,8 @@ class ProductionOrderPrintView(OrderManageAccessMixin, DetailView):
             'process_profile',
             'process_profile__machine',
             'process_profile__screw_combination',
-            'creator', 'extruder_operator', 'approved_by',
+            'process_params',
+            'creator', 'extruder_operator',
         ).prefetch_related(
             'formula_details__formula',
             'mold_requirements__mold',

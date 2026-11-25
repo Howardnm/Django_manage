@@ -51,11 +51,11 @@ class AbstractExtrusionParams(models.Model):
     """挤出工艺参数抽象基类 — 定义挤出生产中的全部可记录参数"""
 
     COOLING_CHOICES = [
-        ('WATER_STRAND', '水冷拉条 (Water Strand)'),
-        ('WATER_RING', '水环热切 (Water Ring)'),
-        ('UNDERWATER', '水下切粒 (Underwater)'),
-        ('AIR_STRAND', '风冷拉条 (Air Strand)'),
-        ('AIR_FACE', '风冷热切 (Air Face)'),
+        ('WATER_STRAND', '水冷拉条'),
+        ('WATER_RING', '水环热切'),
+        ('UNDERWATER', '水下切粒'),
+        ('AIR_STRAND', '风冷拉条'),
+        ('AIR_FACE', '风冷热切'),
     ]
 
     # ── A. 温度控制 (13 个区段) ──
