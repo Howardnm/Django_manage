@@ -79,7 +79,7 @@
                 </div>
                 {% if active_formulas|length > 1 %}
                     <a href="?stage={{ active_stage }}&round={{ active_round }}&compare=1"
-                       class="btn btn-sm btn-outline-secondary py-0" style="font-size: 12px;">
+                       class="btn btn-sm btn-purple py-0" style="font-size: 12px;">
                         <i class="ti ti-columns me-1"></i>对比
                     </a>
                 {% endif %}
@@ -94,7 +94,7 @@
                                 <i class="ti ti-file-text text-muted flex-shrink-0" style="font-size: 13px;"></i>
                                 <span class="text-muted flex-fill text-start fw-medium">{{ group.code }}</span>
                                 <span class="badge bg-primary-lt text-primary flex-shrink-0" style="font-size: 10px;">{{ group.formulas|length }}版本</span>
-                                <a href="{% url 'formula_edit' group.formulas.0.pk %}" class="btn btn-sm btn-ghost-secondary py-0 px-1 flex-shrink-0" style="font-size: 12px; line-height: 1;" title="批量编辑" onclick="event.stopPropagation();">
+                                <a href="{% url 'formula_edit' group.formulas.0.pk %}" class="btn btn-sm btn-primary py-0 px-1 flex-shrink-0" style="font-size: 12px; line-height: 1;" title="批量编辑" onclick="event.stopPropagation();">
                                     <i class="ti ti-edit"></i>
                                 </a>
                                 <i class="ti ti-chevron-down text-muted flex-shrink-0" style="font-size: 12px; transition: transform .2s;"></i>
@@ -299,8 +299,8 @@
             {% endif %}
 
             <!-- BOM 表 -->
-            <div class="card mb-3">
-                <div class="card-header bg-orange-lt">
+            <div class="card card-sm mb-2">
+                <div class="card-header bg-orange-lt py-1">
                     <h3 class="card-title text-orange">
                         <i class="ti ti-list me-2"></i>BOM 明细
                         {% if selected_formula.cost is not None %}
@@ -366,8 +366,8 @@
 
             {% if selected_formula.color_powder_bom %}
             <!-- 色粉BOM -->
-            <div class="card mb-3">
-                <div class="card-header bg-orange-lt d-flex justify-content-between align-items-center">
+            <div class="card card-sm mb-2">
+                <div class="card-header bg-orange-lt py-1 d-flex justify-content-between align-items-center">
                     <h3 class="card-title text-orange mb-0">
                         <i class="ti ti-palette me-2"></i>色粉配比BOM
                         <span class="badge bg-green-lt ms-1">已填写</span>
@@ -433,11 +433,11 @@
             {% include 'apps/app_project/detail/_test_result_tabs.html' with formula=selected_formula %}
 
             <!-- 工艺方案 -->
-            <div class="card mb-3">
-                <div class="card-header bg-cyan-lt">
+            <div class="card card-sm mb-2">
+                <div class="card-header bg-cyan-lt py-1">
                     <h3 class="card-title text-cyan"><i class="ti ti-settings-cog me-2"></i>关联工艺方案</h3>
                 </div>
-                <div class="card-body">
+                <div class="card-body py-2">
                     {% if selected_formula.process %}
                         <a href="{% url 'process_profile_detail' selected_formula.process.pk %}"
                            class="btn btn-outline-cyan" target="_blank">

@@ -67,15 +67,8 @@ function initFormsetMode(totalForms) {
     // 穴数初始化：页面加载时为已有行填充穴数
     refreshAllCavityCells();
 
-    // TomSelect 初始化：已有行（复刻 app_formula BOM 表格模式）
-    if (window.TomSelect && typeof initLocalTomSelectAll === 'function') {
-        setTimeout(function () {
-            initLocalTomSelectAll(tbody);
-            if (window.bindFormulaTableDropdowns) {
-                bindFormulaTableDropdowns(tbody);
-            }
-        }, 50);
-    }
+    // 已有行的 TomSelect 由 base.html 建好，下拉挂到 body 由页面末尾的
+    // bindFormulaTableDropdowns(document) 统一处理，这里不再对 tbody 单独绑。
 
     // 模具切换时更新穴数（事件委托，兼容原生 select 和 TomSelect）
     tbody.addEventListener('change', function (e) {

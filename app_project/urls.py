@@ -2,7 +2,8 @@ from django.urls import path
 from .views.Project import ProjectListView, ProjectCreateView, ProjectUpdateView, ProjectDetailView, ProjectFieldChangeDetailView
 from .views.ProjectFormulaProcess import (
     ProjectFormulaProcessView, CompetitorOrderCreateView,
-    FormulaMeanWritebackView, FormulaTestReturnView,
+    FormulaMeanWritebackView, FormulaMeanWritebackLegacyRedirectView,
+    FormulaTestReturnView,
 )
 from .views.ProjectNode import *
 from .views.ProjectReport import ProjectReportExportView
@@ -21,7 +22,8 @@ urlpatterns = [
     path('<int:pk>/', ProjectDetailView.as_view(), name='project_detail'),
     path('<int:pk>/formula-process/', ProjectFormulaProcessView.as_view(), name='project_formula_process'),
     path('<int:pk>/formula-process/competitor/create/', CompetitorOrderCreateView.as_view(), name='project_competitor_order_create'),
-    path('<int:pk>/formula-process/mean-writeback/<int:formula_pk>/', FormulaMeanWritebackView.as_view(), name='project_formula_mean_writeback'),
+    path('<int:pk>/formula-process/mean-writeback/<int:formula_pk>/', FormulaMeanWritebackLegacyRedirectView.as_view(), name='project_formula_mean_writeback_legacy'),
+    path('<int:pk>/formula-process/mean-writeback/<str:formula_code>/', FormulaMeanWritebackView.as_view(), name='project_formula_mean_writeback'),
     path('<int:pk>/formula-process/test-return/<int:formula_pk>/<int:order_pk>/', FormulaTestReturnView.as_view(), name='project_formula_test_return'),
     path('<int:pk>/edit/', ProjectUpdateView.as_view(), name='project_edit'),
     path('field-change/<int:pk>/detail/', ProjectFieldChangeDetailView.as_view(), name='project_field_change_detail'),

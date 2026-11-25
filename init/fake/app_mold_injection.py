@@ -5,7 +5,6 @@ app_mold_injection 伪数据生成器
   - MoldType：模具台账 — 不依赖其他模块，独立创建
   - InjectionTask：注塑任务 — 读取 ctx.production_orders，为 EXTRUDING 之后的工单创建
   - MoldRequirement + MoldRequirementFormulaDetail：模具需求矩阵 — 一个注塑任务下挂多个模具
-  - SampleInventory(type=SPECIMEN)：注塑产出的样条样品
 """
 
 import random
@@ -27,7 +26,6 @@ def run(ctx: FakeContext) -> None:
     from app_mold_injection.models import (
         MoldType, InjectionTask, MoldRequirement, MoldRequirementFormulaDetail,
     )
-    from app_trial_production.models import SampleInventory
 
     mold_defs = [
         ("ISO-527-1A", "ISO", "TEST_SPECIMEN", "ISO 527-2 1A 哑铃型拉伸样条", 1),
@@ -82,12 +80,11 @@ def run(ctx: FakeContext) -> None:
 
         it = InjectionTask.objects.create(
             production_order=po,
-            source='ORDER',
             operator=injection_op,
             status=(
                 'COMPLETED'
                 if po.status in ['TESTING', 'COMPLETED']
-                else random.choice(['PENDING', 'IN_PROGRESS', 'COMPLETED'])
+                else random.choice(['PENDING', 'COMPLETED'])
             ),
             injection_params_note=f"注塑参数-{po.code}" if random.random() < 0.5 else "",
             started_at=timezone.now(),
@@ -107,25 +104,6 @@ def run(ctx: FakeContext) -> None:
                 mold_requirement=mr,
                 formula=formula,
                 specimen_quantity=random.choice([5, 10, 20, 50]),
-            )
-
-        # SampleInventory(SPECIMEN) — 注塑产出的样条
-        for mold in pick(mold_types, random.randint(1, 3)):
-            qty_produced = random.randint(10, 100)
-            sub_type = 'TESTED' if po.status in ['TESTING', 'COMPLETED'] else 'FOR_TESTING'
-            SampleInventory.objects.create(
-                type='SPECIMEN',
-                sub_type=sub_type,
-                status='IN_LAB',
-                production_order=po,
-                formula=formula,
-                trial_code=po.trial_code,
-                specimen_count=qty_produced,
-                specimen_qualified=int(qty_produced * random.uniform(0.85, 1.0)),
-                storage_location=f"样条柜-{random.choice(['X', 'Y', 'Z'])}",
-                batch_label=f"BATCH-{po.code}-{mold.mold_code}",
-                injection_task=it,
-                mold=mold,
             )
 
     ctx.injection_orders = injection_tasks

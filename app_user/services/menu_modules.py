@@ -139,7 +139,6 @@ class MenuModule:
             "module_access_code": "trial_production.dashboard",
             "sub_items": [
                 {"name": "排产总览", "url_name": "trial_dashboard"},
-                {"name": "成品颗粒库存", "url_name": "trial_sample_list"},
                 {"name": "排产日历", "url_name": "trial_scheduling_calendar"},
             ],
         }
@@ -182,7 +181,6 @@ class MenuModule:
             "module_access_code": "mold_injection.task",
             "sub_items": [
                 {"name": "注塑任务", "url_name": "mold_injection:task_list"},
-                {"name": "样品库存", "url_name": "mold_injection:sample_list"},
                 {"name": "模具台账", "url_name": "mold_injection:mold_list"},
             ],
         }
@@ -197,7 +195,6 @@ class MenuModule:
             "module_access_code": "material_testing",
             "sub_items": [
                 {"name": "测试任务", "url_name": "material_testing:list"},
-                {"name": "样条库存", "url_name": "material_testing:specimens"},
             ],
         }
 

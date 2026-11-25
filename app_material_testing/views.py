@@ -22,13 +22,6 @@ TEST_ORDER_STATUS_TABS = [
     {'value': 'RESULTS_WRITTEN_BACK', 'label': '已回写', 'icon': 'ti ti-file-check'},
 ]
 
-# 样条库存子类型筛选 Tab
-SPECIMEN_SUB_TYPE_TABS = [
-    {'value': '', 'label': '全部样条', 'icon': 'ti ti-filter'},
-    {'value': 'FOR_TESTING', 'label': '待测试样条', 'icon': 'ti ti-microscope'},
-    {'value': 'CONSUMED', 'label': '已消耗', 'icon': 'ti ti-check'},
-]
-
 
 class TestingTaskListView(TestingTaskAccessMixin, ListView):
     """测试任务列表"""
@@ -255,7 +248,7 @@ class WriteBackView(TestingAccessMixin, View):
             return redirect('material_testing:detail', pk=pk)
 
         try:
-            written = TestingTaskService.write_back_results(task)
+            written = TestingTaskService.write_back_results(task, request.user)
             if written:
                 messages.success(request, f'已将 {written} 条测试结果回写到配方')
             else:
@@ -278,75 +271,9 @@ class ForceCompleteWriteBackView(TestingAccessMixin, View):
             return redirect('material_testing:detail', pk=pk)
 
         try:
-            written = TestingTaskService.force_complete_and_writeback(task)
+            written = TestingTaskService.force_complete_and_writeback(task, request.user)
             messages.success(request, f'测试任务已手动完成，回写 {written} 条测试结果')
         except InvalidStateTransition as e:
             logger.exception(f"Force complete failed for task {task.pk}")
             messages.error(request, f'手动完成失败：{e}')
         return redirect('material_testing:detail', pk=pk)
-
-
-# ── 样条库存（测试中心管辖） ──────────────────────────────────────────
-
-class TestingSampleListView(TestingAccessMixin, View):
-    """
-    测试中心样条库存列表 — 全部样条（FOR_TESTING + TESTED），按工单分组表格呈现。
-
-    设计说明: 此视图位于 app_material_testing 而非 app_trial_production，因为:
-    1. 它服务于测试团队的工作流（测试人员查看待测试样条）
-    2. 权限模型使用 TestingAccessMixin (identity_required=TESTING_TEAM)
-    3. 底层数据模型(SampleInventory)属于排产模块，通过服务层调用实现数据访问
-    4. 子类型筛选(FOR_TESTING/CONSUMED)体现测试领域的关注点
-    """
-
-    template_name = 'apps/app_material_testing/specimens.html'
-    paginate_by = 20
-    permission_required = 'app_material_testing.view_testingtask'
-
-    def _get_filtered_qs(self, request):
-        from app_trial_production.models import SampleInventory
-        from app_trial_production.filters import SampleInventoryFilter
-
-        qs = SampleInventory.objects.select_related(
-            'production_order',
-            'production_order__project',
-            'formula',
-            'mold',
-            'injection_task',
-        ).prefetch_related('injection_tasks')
-
-        # Hard-code 范围：所有样条
-        qs = qs.filter(type='SPECIMEN')
-
-        self.filter = SampleInventoryFilter(request.GET, queryset=qs)
-        qs = self.filter.qs
-
-        # 子类型/状态筛选（默认全部样条）
-        sub_type_param = request.GET.get('sub_type', '')
-        if sub_type_param == 'FOR_TESTING':
-            qs = qs.filter(sub_type='FOR_TESTING', status='IN_LAB')
-        elif sub_type_param == 'CONSUMED':
-            qs = qs.filter(status='CONSUMED')
-
-        return qs.order_by('-created_at')
-
-    def get(self, request):
-        from django.core.paginator import Paginator
-        from app_trial_production.services import SampleInventoryService
-
-        samples_qs = self._get_filtered_qs(request)
-        order_groups, _ = SampleInventoryService.build_order_groups(samples_qs)
-
-        page_num = int(request.GET.get('page', 1))
-        paginator = Paginator(order_groups, self.paginate_by)
-        page_obj = paginator.get_page(page_num)
-
-        context = {
-            'order_groups': order_groups,
-            'page_obj': page_obj,
-            'paginator': paginator,
-            'filter': self.filter,
-            'current_sub_type': request.GET.get('sub_type', ''),
-            'sub_type_tabs': SPECIMEN_SUB_TYPE_TABS,
-        }
-        return render(request, self.template_name, context)

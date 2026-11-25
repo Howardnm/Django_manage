@@ -55,60 +55,15 @@ class MoldType(models.Model):
 
 
 class InjectionTask(models.Model):
-    """
-    注塑任务 — 支持双渠道来源。
-    渠道A：随排产工单的挤出产出取样注塑。
-    渠道B：从样品库已有颗粒取料独立注塑（如竞争对手样品分析）。
-    """
+    """注塑任务 — 由排产工单在挤出并登记产量后触发。"""
 
     class Status(models.TextChoices):
-        PENDING = 'PENDING', '待生产'
-        IN_PROGRESS = 'IN_PROGRESS', '注塑中'
+        PENDING = 'PENDING', '未注塑'
         COMPLETED = 'COMPLETED', '已完成'
 
-    class Source(models.TextChoices):
-        ORDER = 'ORDER', '排产工单产出'
-        INVENTORY = 'INVENTORY', '样品库取料'
-
-    # ---- 渠道A：随排产工单 ----
-    production_order = models.OneToOneField(
-        'app_trial_production.ProductionOrder',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='injection_task',
-        verbose_name="关联排产单",
-        help_text="一张排产单只对应一张注塑任务",
-    )
-
-    # ---- 渠道标识 ----
-    source = models.CharField("来源渠道", max_length=20, choices=Source.choices, default=Source.ORDER)
-
-    # ---- 渠道B：独立注塑 — 从样品库取料 ----
-    sample_inventory = models.ForeignKey(
-        'app_trial_production.SampleInventory',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='injection_tasks',
-        verbose_name="物料来源(样品库)",
-        help_text="从样品库取料注塑打样（渠道B）",
-    )
-    source_project = models.ForeignKey(
-        'app_project.Project',
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='injection_tasks_from_source',
-        verbose_name="关联项目(渠道B)",
-        help_text="渠道B关联的项目，用于后期关联测试结果",
-    )
-
+    production_order = models.OneToOneField('app_trial_production.ProductionOrder', on_delete=models.CASCADE, related_name='injection_task', verbose_name="关联排产单", help_text="一张排产单只对应一张注塑任务，删除工单时一并删除")
     # ---- 操作员与工艺 ----
-    operator = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True, blank=True,
-        related_name='injection_tasks',
-        verbose_name="注塑操作员",
-    )
+    operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='injection_tasks', verbose_name="注塑操作员")
     injection_params_note = models.TextField("注塑工艺备注", blank=True)
 
     status = models.CharField("任务状态", max_length=20, choices=Status.choices, default=Status.PENDING)
@@ -123,46 +78,26 @@ class InjectionTask(models.Model):
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=['status']),
-            models.Index(fields=['source']),
             models.Index(fields=['-created_at']),
         ]
 
     def __str__(self):
-        source_label = self.get_source_display()
-        return f"注塑任务 [{self.get_status_display()}] ({source_label})"
+        order_code = self.production_order.code if self.production_order_id else '-'
+        return f"{order_code} 注塑任务 [{self.get_status_display()}]"
 
     @property
     def status_css_class(self):
         return {
             self.Status.PENDING: 'bg-secondary-lt',
-            self.Status.IN_PROGRESS: 'bg-blue-lt',
             self.Status.COMPLETED: 'bg-green-lt',
         }.get(self.status, 'bg-secondary-lt')
 
 
 class MoldRequirement(models.Model):
     """模具需求 — 一行对应一个模具，配方版本注塑次数由 formula_details 子表存储"""
-    injection_task = models.ForeignKey(
-        InjectionTask,
-        on_delete=models.CASCADE,
-        null=True, blank=True,
-        related_name='mold_requirements',
-        verbose_name="所属注塑任务",
-    )
-    production_order = models.ForeignKey(
-        'app_trial_production.ProductionOrder',
-        on_delete=models.CASCADE,
-        null=True, blank=True,
-        related_name='mold_requirements',
-        verbose_name="关联工单",
-        help_text="工单规划阶段即创建，injection_task 创建后关联",
-    )
-    mold = models.ForeignKey(
-        MoldType,
-        on_delete=models.PROTECT,
-        related_name='mold_requirements',
-        verbose_name="使用模具",
-    )
+    injection_task = models.ForeignKey(InjectionTask, on_delete=models.CASCADE, null=True, blank=True, related_name='mold_requirements', verbose_name="所属注塑任务")
+    production_order = models.ForeignKey('app_trial_production.ProductionOrder', on_delete=models.CASCADE, related_name='mold_requirements', verbose_name="关联工单", help_text="工单规划阶段即创建，injection_task 创建后关联")
+    mold = models.ForeignKey(MoldType, on_delete=models.PROTECT, related_name='mold_requirements', verbose_name="使用模具")
     order = models.PositiveIntegerField("排序", default=0)
 
     class Meta:
@@ -178,9 +113,8 @@ class MoldRequirement(models.Model):
 
     def clean(self):
         super().clean()
-        # production_order 在 _save_mold_matrix() 保存时设置，表单验证阶段尚未关联；
-        # 数据库级 CheckConstraint(mold_req_has_production_order) 确保不会出现无工单的记录。
-        # 此处仅做跨字段一致性校验：injection_task 存在时 production_order 必须存在。
+        # production_order 不可空。创建页表单不包含该字段，空值只出现在未保存的表单实例上，
+        # 落库由 _save_mold_matrix() 传入工单。此处只校验：有注塑任务时工单不能为空。
         if self.injection_task_id and not self.production_order_id:
             raise ValidationError('关联注塑任务时，工单不能为空')
 
@@ -193,19 +127,8 @@ class MoldRequirement(models.Model):
 
 class MoldRequirementFormulaDetail(models.Model):
     """模具需求-配方明细 — 每个配方版本的注塑次数"""
-    mold_requirement = models.ForeignKey(
-        MoldRequirement,
-        on_delete=models.CASCADE,
-        related_name='formula_details',
-        verbose_name="所属模具需求",
-    )
-    formula = models.ForeignKey(
-        'app_formula.LabFormula',
-        on_delete=models.PROTECT,
-        null=True, blank=True,
-        verbose_name="对应配方版本",
-        help_text="渠道A（排产工单）必填；渠道B（样品库取料）可为空",
-    )
+    mold_requirement = models.ForeignKey(MoldRequirement, on_delete=models.CASCADE, related_name='formula_details', verbose_name="所属模具需求")
+    formula = models.ForeignKey('app_formula.LabFormula', on_delete=models.PROTECT, null=True, blank=True, verbose_name="对应配方版本", help_text="排产工单下的配方版本", )
     specimen_quantity = models.PositiveIntegerField("计划制样数量", default=0)
 
     class Meta:

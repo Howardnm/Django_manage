@@ -45,7 +45,6 @@
                         <th>关联项目</th>
                         <th>操作员</th>
                         <th>状态</th>
-                        <th>颗粒分拨</th>
                         <th>开始时间</th>
                         <th>完成时间</th>
                         <th>
@@ -73,9 +72,6 @@
                         <td class="text-muted">{{ task.operator.realname|default:"-" }}</td>
                         <td>
                             <span class="badge {{ task.status_css_class }}">{{ task.get_status_display }}</span>
-                        </td>
-                        <td>
-                            <span class="badge {{ task.pellet_split_css_class }}">{{ task.pellet_split_label }}</span>
                         </td>
                         <td class="fw-bold">{{ task.started_at|date:"m-d H:i"|default:"-" }}</td>
                         <td class="fw-bold">{{ task.completed_at|date:"m-d H:i"|default:"-" }}</td>

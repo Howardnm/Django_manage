@@ -11,14 +11,6 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
 
-    source = django_filters.ChoiceFilter(
-        choices=InjectionTask.Source.choices,
-        widget=forms.Select(attrs={
-            'class': 'form-select form-select-search',
-            'placeholder': '来源渠道',
-        }),
-    )
-
     sort = django_filters.OrderingFilter(
         fields=(
             ('created_at', 'created_at'),
@@ -30,7 +22,7 @@ class InjectionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
 
     class Meta:
         model = InjectionTask
-        fields = ['q', 'source', 'start_date', 'end_date']
+        fields = ['q', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

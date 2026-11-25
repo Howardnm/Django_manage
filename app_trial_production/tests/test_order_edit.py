@@ -13,6 +13,7 @@ from django.urls import reverse
 
 from app_material.models import MaterialType
 from app_formula.models import LabFormula
+from app_process.models import ProcessProfile
 from app_project.models import Project
 from app_trial_production.models import (
     ProductionOrder, ProductionOrderFormulaDetail)
@@ -32,9 +33,11 @@ class OrderEditPlannedQuantityTests(TestCase):
             code='T-8000', name='配方v2', material_type=self.mt,
             creator=self.user, version=2)
 
+        self.profile = ProcessProfile.objects.create(name='标准挤出', creator=self.user)
         self.order = ProductionOrder.objects.create(
             code='TP-8000', trial_code='T-8000',
-            status=ProductionOrder.Status.DRAFT, creator=self.user)
+            status=ProductionOrder.Status.DRAFT, creator=self.user,
+            process_profile=self.profile)
         self.fd1 = ProductionOrderFormulaDetail.objects.create(
             production_order=self.order, formula=self.v1, planned_quantity=Decimal('25'))
         self.fd2 = ProductionOrderFormulaDetail.objects.create(
@@ -44,6 +47,7 @@ class OrderEditPlannedQuantityTests(TestCase):
     def _post(self, **quantities):
         """quantities 键为 "planned_qty_<fd.formula_id>"，缺省表示不提交该字段。"""
         data = {
+            'process_profile': self.profile.pk,
             'mold-TOTAL_FORMS': '0',
             'mold-INITIAL_FORMS': '0',
             'mold-MIN_NUM_FORMS': '0',
@@ -134,6 +138,7 @@ class OrderCreatePlannedQuantityTests(TestCase):
         self.v2 = LabFormula.objects.create(
             code=self.trial_code, name='配方v2', material_type=self.mt,
             project=self.project, creator=self.user, version=2)
+        self.profile = ProcessProfile.objects.create(name='标准挤出', creator=self.user)
         self.client.force_login(self.user)
 
         # 创建页的 trial_formulas 取自 session（不是 POST），
@@ -148,6 +153,7 @@ class OrderCreatePlannedQuantityTests(TestCase):
     def _post(self, **quantities):
         data = {
             'quantity_planned': '25',
+            'process_profile': self.profile.pk,
             'trial_code': self.trial_code,
             'project_id': self.project.pk,
             'mold-TOTAL_FORMS': '0',

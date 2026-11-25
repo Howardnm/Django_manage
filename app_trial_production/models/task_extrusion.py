@@ -1,10 +1,9 @@
 from django.db import models
 from django.conf import settings
-from app_process.models import AbstractExtrusionParams
 
 
-class ExtrusionTask(AbstractExtrusionParams):
-    """挤出任务 — 记录实际运行参数，字段结构继承自 AbstractExtrusionParams"""
+class ExtrusionTask(models.Model):
+    """挤出任务 — 只跟踪状态与时间。工艺参数在工单的 process_params 上。"""
 
     class Status(models.TextChoices):
         PENDING = 'PENDING', '待生产'
@@ -23,9 +22,6 @@ class ExtrusionTask(AbstractExtrusionParams):
     started_at = models.DateTimeField("开始时间", null=True, blank=True)
     completed_at = models.DateTimeField("完成时间", null=True, blank=True)
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
-
-    # ---- 颗粒分拨 ----
-    pellet_split_completed = models.BooleanField("颗粒分拨已完成", default=False)
 
     class Meta:
         verbose_name = "挤出任务"
@@ -49,11 +45,3 @@ class ExtrusionTask(AbstractExtrusionParams):
             self.Status.IN_PROGRESS: 'bg-azure-lt',
             self.Status.COMPLETED: 'bg-green-lt',
         }.get(self.status, 'bg-secondary-lt')
-
-    @property
-    def pellet_split_label(self):
-        return '已分拨' if self.pellet_split_completed else '未分拨'
-
-    @property
-    def pellet_split_css_class(self):
-        return 'bg-green-lt' if self.pellet_split_completed else 'bg-secondary-lt'

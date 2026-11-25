@@ -1,6 +1,8 @@
 import logging
+from decimal import Decimal
+
 from django.db import transaction
-from django.utils import timezone
+from django.db.models import Sum
 
 from common_utils.state_machine import StateMachine
 from app_trial_production.models import ProductionOrder
@@ -22,16 +24,26 @@ class ProductionOrderService:
 
         调用方负责确认 ``order.status == DRAFT``。
 
-        为什么不直接 ``order.delete()``：``MoldRequirement.production_order`` 是
-        ``null=True`` + ``CASCADE``，而 Django 的 Collector 在无法延迟约束检查的后端
-        （MySQL）上，会先把该外键置空再删父行 —— ``DELETE`` 之前先执行
-        ``UPDATE ... SET production_order_id = NULL``，这一步立刻撞上
-        ``MoldRequirement`` 的 ``CheckConstraint(mold_req_has_production_order)``，
-        抛 IntegrityError。先把模具需求显式删掉，collector 就收集不到子对象，
-        也就不会发出那条 UPDATE。（PostgreSQL 可延迟约束检查，不受影响。）
+        ``MoldRequirement.production_order`` 已是不可空 CASCADE，直接
+        ``order.delete()`` 也会级联删掉模具需求。这里仍先显式删除，不依赖收集器顺序。
         """
         order.mold_requirements.all().delete()
         order.delete()
+
+    @staticmethod
+    def record_actual_quantity(order):
+        """把各配方版本已落库的成品颗粒与样条颗粒合计写入工单实际产量。
+
+        调用方负责事务。完成挤出时在明细 save 之后、任务完成之前调用。
+        """
+        totals = order.formula_details.aggregate(
+            finished=Sum('finished_pellet_kg'),
+            specimen=Sum('specimen_pellet_kg'),
+        )
+        finished = totals['finished'] or Decimal('0')
+        specimen = totals['specimen'] or Decimal('0')
+        order.quantity_actual = finished + specimen
+        order.save(update_fields=['quantity_actual'])
 
     @staticmethod
     @transaction.atomic
@@ -137,11 +149,10 @@ class ProductionOrderService:
     @staticmethod
     @transaction.atomic
     def accept_order(order, user=None):
-        """审批通过后接单 — 变更状态并创建下游任务。
+        """审批通过后接单。
 
-        正常流程：ACCEPTED → 创建 ExtrusionTask(PENDING)
-        竞品工单（skip_extrusion=True）：ACCEPTED → 直接创建 InjectionTask → INJECTION_MOLDING
-        正常流程：ACCEPTED → 等待排产 → 排产时自动创建 ExtrusionTask(PENDING)
+        正常流程：只改成已发单，挤出任务等排产时再创建。
+        竞品工单（skip_extrusion=True）：跳过挤出，直接创建注塑或测试任务。
         """
         StateMachine.transition(order, 'ACCEPTED', user)
 
@@ -177,20 +188,13 @@ class ProductionOrderService:
         from app_trial_production.models import ExtrusionTask
         from app_color_center.models import ColorMatchingTask
 
-        # 获取已有挤出任务（accept_order 已创建 PENDING），推进到 IN_PROGRESS
+        # 排产时已创建 PENDING 任务；这里推进到 IN_PROGRESS
         extrusion_task, _ = ExtrusionTask.objects.get_or_create(
             production_order=order,
             defaults={'status': 'PENDING'},
         )
         if extrusion_task.status == 'PENDING':
-            extrusion_task.operator = user
-            extrusion_task.save(update_fields=['operator'])
             StateMachine.transition(extrusion_task, 'IN_PROGRESS', user)
-        elif extrusion_task.status == 'IN_PROGRESS':
-            # 操作员可能不同，更新为当前操作员
-            if extrusion_task.operator_id != user.pk:
-                extrusion_task.operator = user
-                extrusion_task.save(update_fields=['operator'])
 
         # 创建配色任务
         needs_color = order.formula_details.filter(
@@ -245,7 +249,7 @@ class ProductionOrderService:
         """
         # 使用 select_for_update 锁定工单行，防止并发推进。
         # 所有调用方（ExtrusionTaskService / ColorMatchingTaskService /
-        # InjectionTaskService / TestingTaskService / SampleInventoryService）
+        # InjectionTaskService / TestingTaskService）
         # 均在 @transaction.atomic 装饰的方法内调用此方法，行锁正常工作。
         order = ProductionOrder.objects.select_for_update().get(pk=order.pk)
 
@@ -253,15 +257,10 @@ class ProductionOrderService:
             return
 
         if order.status == ProductionOrder.Status.EXTRUDING:
-            # 挤出完成 + 颗粒分拨完成 → 触发下游任务
+            # 挤出完成（产量已随完成挤出一起写入）→ 触发下游任务
             # 配色任务独立并行，不构成屏障
             ext = getattr(order, 'extrusion_task', None)
-            ext_done = ext and ext.status == 'COMPLETED'
-            if not ext_done:
-                return
-
-            # 颗粒分拨是注塑/测试的前置条件
-            if not ext.pellet_split_completed:
+            if not ext or ext.status != 'COMPLETED':
                 return
 
             if order.mold_requirements.filter(injection_task__isnull=True).exists():
@@ -271,17 +270,6 @@ class ProductionOrderService:
                 logger.info(f"Order {order.code} advanced to INJECTION_MOLDING (injection created)")
             elif order.test_items.exists():
                 # 无注塑，直接触发测试任务 → 推进到测试阶段
-                # 此路径无注塑任务，FOR_INJECTION 颗粒不会被消耗，标记为已消耗
-                from app_trial_production.models import SampleInventory
-                cleaned = SampleInventory.objects.filter(
-                    production_order=order,
-                    type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
-                ).update(status='CONSUMED', updated_at=timezone.now())
-                if cleaned:
-                    logger.info(
-                        f"Order {order.code} advancing to TESTING without injection: "
-                        f"marked {cleaned} FOR_INJECTION pellets as CONSUMED"
-                    )
                 # 跳过注塑 → 配色任务无需继续
                 from app_color_center.models import ColorMatchingTask
                 ColorMatchingTask.objects.filter(
@@ -294,17 +282,6 @@ class ProductionOrderService:
             else:
                 # 无后续任务 → 直接完成
                 StateMachine.transition(order, 'COMPLETED')
-                # 无注塑环节 → 遗留的 FOR_INJECTION 颗粒标记为已消耗
-                from app_trial_production.models import SampleInventory
-                cleaned = SampleInventory.objects.filter(
-                    production_order=order,
-                    type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
-                ).update(status='CONSUMED', updated_at=timezone.now())
-                if cleaned:
-                    logger.info(
-                        f"Order {order.code} completed without injection: "
-                        f"marked {cleaned} FOR_INJECTION pellets as CONSUMED"
-                    )
                 # 跳过注塑 → 配色任务无需继续
                 from app_color_center.models import ColorMatchingTask
                 ColorMatchingTask.objects.filter(
@@ -323,17 +300,6 @@ class ProductionOrderService:
                     logger.info(f"Order {order.code} advanced to TESTING (testing created)")
                 else:
                     StateMachine.transition(order, 'COMPLETED')
-                    # 无测试环节 → 注塑产出的样条直接标记为已消耗
-                    from app_trial_production.models import SampleInventory
-                    cleaned = SampleInventory.objects.filter(
-                        production_order=order,
-                        type='SPECIMEN', status='IN_LAB',
-                    ).update(status='CONSUMED', updated_at=timezone.now())
-                    if cleaned:
-                        logger.info(
-                            f"Order {order.code} completed without testing: "
-                            f"marked {cleaned} specimens as CONSUMED"
-                        )
                     logger.info(f"Order {order.code} advanced to COMPLETED (no testing needed)")
 
         elif order.status == ProductionOrder.Status.TESTING:
@@ -359,10 +325,7 @@ class ProductionOrderService:
 
         task, created = InjectionTask.objects.get_or_create(
             production_order=order,
-            defaults={
-                'source': 'ORDER',
-                'status': 'PENDING',
-            },
+            defaults={'status': 'PENDING'},
         )
         if not created:
             logger.info(
@@ -371,20 +334,6 @@ class ProductionOrderService:
             )
         # 将规划阶段的 MoldRequirement 关联到注塑任务
         plans.update(injection_task=task)
-
-        # 将工单下未关联的 FOR_INJECTION 颗粒链接到该注塑任务
-        from app_trial_production.models import SampleInventory
-        linked = SampleInventory.objects.filter(
-            production_order=order,
-            type='PELLET',
-            sub_type='FOR_INJECTION',
-            status='IN_LAB',
-            injection_task__isnull=True,
-        ).update(injection_task=task, updated_at=timezone.now())
-        if linked:
-            logger.info(
-                f"Linked {linked} FOR_INJECTION samples to InjectionTask {task.pk}"
-            )
 
         logger.info(
             f"InjectionTask {task.pk} created from {plans.count()} mold plans "

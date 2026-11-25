@@ -4,7 +4,7 @@ from django.db.models import Q
 
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_project.models import Project
-from .models import ProductionOrder, ExtrusionTask, SampleInventory
+from .models import ProductionOrder, ExtrusionTask
 
 
 class ProductionOrderFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
@@ -143,63 +143,3 @@ class ExtrusionTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filter
         )
 
 
-class SampleInventoryFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
-    """样品库存筛选器 — 各模块视图 hard-code type/sub_type 范围，此处只保留通用筛选"""
-
-    q = django_filters.CharFilter(method='filter_search', label='搜索')
-
-    # status 保留为隐藏字段（由各模块视图的状态 Tab 控制）
-    status = django_filters.ChoiceFilter(
-        choices=SampleInventory.Status.choices, widget=forms.HiddenInput,
-    )
-
-    project = django_filters.ModelChoiceFilter(
-        field_name='production_order__project',
-        queryset=Project.objects.all(),
-        empty_label='检索项目名称',
-        widget=forms.Select(attrs={
-            'class': 'form-select remote-search',
-            'data-model': 'project',
-            'placeholder': '检索项目名称',
-        }),
-    )
-
-    storage_location = django_filters.CharFilter(
-        field_name='storage_location', lookup_expr='icontains',
-        widget=forms.TextInput(attrs={
-            'class': 'form-control',
-            'placeholder': '存放位置',
-        }),
-    )
-
-    sort = django_filters.OrderingFilter(
-        fields=(
-            ('created_at', 'created_at'),
-            ('trial_code', 'trial_code'),
-            ('quantity', 'quantity'),
-            ('specimen_count', 'specimen_count'),
-        ),
-        widget=forms.HiddenInput,
-    )
-
-    class Meta:
-        model = SampleInventory
-        fields = ['q', 'status', 'project',
-                  'storage_location', 'start_date', 'end_date']
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'q' in self.filters:
-            self.filters['q'].field.widget.attrs['placeholder'] = (
-                '检索工单号 / 实验单号 / 批次号'
-            )
-
-    def filter_search(self, queryset, name, value):
-        if not value:
-            return queryset
-        return queryset.filter(
-            Q(trial_code__icontains=value) |
-            Q(batch_number__icontains=value) |
-            Q(formula__name__icontains=value) |
-            Q(production_order__code__icontains=value)
-        )

@@ -14,7 +14,6 @@ class AppMoldInjectionConfig(AppConfig):
         from app_mold_injection.models import InjectionTask
 
         StateMachine.register(InjectionTask, {
-            'PENDING': ['IN_PROGRESS'],
-            'IN_PROGRESS': ['COMPLETED'],
+            'PENDING': ['COMPLETED'],
             'COMPLETED': [],
         })

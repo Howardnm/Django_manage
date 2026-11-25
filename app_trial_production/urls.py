@@ -15,15 +15,10 @@ from .views.ExtrusionBoardApi import (
 from .views.ExtrusionTask import (
     ExtrusionTaskListView, ExtrusionTaskDetailView,
     ExtrusionTaskStartView, ExtrusionRecordFormView,
-    ExtrusionTaskCompleteView,
-)
-from .views.SampleInventory import (
-    SampleInventoryListView, SampleInventoryDetailView,
-    SapEntryView,
-    OrderSampleDetailView,
 )
 from .views.PelletSplit import PelletSplitView
 from .views.Autocomplete import TrialAutocompleteView
+from .views.process_profile_params import ProcessProfileParamsView
 from .views.SchedulingCalendar import SchedulingCalendarView
 from .views.SchedulingCalendarApi import SchedulingCalendarEventsView
 
@@ -33,6 +28,11 @@ urlpatterns = [
 
     # Production Orders
     path('orders/create/', ProductionOrderCreateView.as_view(), name='trial_order_create'),
+    path(
+        'orders/process-profiles/<int:pk>/params/',
+        ProcessProfileParamsView.as_view(),
+        name='trial_process_profile_params',
+    ),
     path('orders/initiate/', ProductionOrderInitiateView.as_view(), name='trial_order_initiate'),
     path('orders/<int:pk>/', ProductionOrderDetailView.as_view(), name='trial_order_detail'),
     path('orders/<int:pk>/print/', ProductionOrderPrintView.as_view(), name='trial_order_print'),
@@ -54,7 +54,6 @@ urlpatterns = [
     path('orders/<int:pk>/extrusion/', ExtrusionTaskDetailView.as_view(), name='trial_extrusion_detail'),
     path('orders/<int:pk>/extrusion/start/', ExtrusionTaskStartView.as_view(), name='trial_extrusion_start'),
     path('orders/<int:pk>/extrusion/record/', ExtrusionRecordFormView.as_view(), name='trial_extrusion_record'),
-    path('orders/<int:pk>/extrusion/complete/', ExtrusionTaskCompleteView.as_view(), name='trial_extrusion_complete'),
 
     # Pellet Split (挤出后颗粒分拨)
     path('orders/<int:pk>/split/', PelletSplitView.as_view(), name='trial_pellet_split'),
@@ -62,13 +61,6 @@ urlpatterns = [
     # Readonly Scheduling Calendar (只读排产日历)
     path('calendar/', SchedulingCalendarView.as_view(), name='trial_scheduling_calendar'),
     path('calendar/events/', SchedulingCalendarEventsView.as_view(), name='trial_scheduling_calendar_events'),
-
-    # Sample Inventory
-    path('samples/', SampleInventoryListView.as_view(), name='trial_sample_list'),
-
-    path('samples/order/<int:order_pk>/', OrderSampleDetailView.as_view(), name='trial_sample_order_detail'),
-    path('samples/<int:pk>/', SampleInventoryDetailView.as_view(), name='trial_sample_detail'),
-    path('samples/<int:pk>/sap-entry/', SapEntryView.as_view(), name='trial_sample_sap_entry'),
 
     # API
     path('api/search/', TrialAutocompleteView.as_view(), name='trial_api_search'),

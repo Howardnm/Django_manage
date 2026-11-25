@@ -6,10 +6,13 @@ from django.urls import path, include
 from django.shortcuts import render
 from debug_toolbar.toolbar import debug_toolbar_urls
 
-# 自定义 Admin 站点标题
+from Django_manage.admin_order import install_admin_app_order
+
+# 自定义 Admin 站点标题与首页分组顺序
 admin.site.site_header = "项目管理系统后台"
 admin.site.site_title = "项目管理系统"
 admin.site.index_title = "欢迎使用项目管理系统"
+install_admin_app_order(admin.site)
 
 def permission_denied_view(request):
     return render(request, 'permission_denied.html', status=403)

@@ -6,8 +6,7 @@ app_trial_production 伪数据生成器【重构版】
     ↓
   ProductionOrder（工单号 TP{YYYYMMDD}-{NN}）
     ├── ProductionOrderFormulaDetail（配方明细）
-    ├── ExtrusionTask（挤出任务，ACCEPTED 之后）
-    └── SampleInventory(type=PELLET)（颗粒分拨，挤出完成后）
+    └── ExtrusionTask（挤出任务，ACCEPTED 之后）
 
   ⚠ 下游模块由独立脚本生成：
     - app_color_center     → ColorMatchingTask（配色任务）
@@ -16,7 +15,6 @@ app_trial_production 伪数据生成器【重构版】
 """
 
 import random
-from decimal import Decimal
 from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -43,7 +41,7 @@ def run(ctx: FakeContext) -> None:
         config.save()
 
     # =====================================================================
-    # 2. ProductionOrder + ExtrusionTask + SampleInventory(PELLET)
+    # 2. ProductionOrder + ExtrusionTask
     # =====================================================================
     candidate_formulas = [
         f for f in ctx.formulas
@@ -54,7 +52,7 @@ def run(ctx: FakeContext) -> None:
 
     from app_trial_production.models import (
         ProductionOrder, ProductionOrderFormulaDetail,
-        ExtrusionTask, SampleInventory,
+        ExtrusionTask,
     )
 
     extruder_op = _get_or_create_operator("extruder_op", "EXTRUSION_OPERATOR", ctx)
@@ -157,37 +155,10 @@ def run(ctx: FakeContext) -> None:
                 extrusion_task.recorded_by = extruder_op
                 extrusion_task.save()
 
-        # --- SampleInventory(PELLET) 颗粒分拨（EXTRUDING 及之后） ---
-        if target_status in AT_LEAST_EXTRUDING:
-            actual_qty = po.quantity_actual or Decimal('25')
-            # 颗粒成品
-            SampleInventory.objects.create(
-                type='PELLET', sub_type='FINISHED',
-                status=random.choice(['IN_LAB', 'IN_LAB', 'SAP_STORED']),
-                production_order=po, formula=f,
-                trial_code=po.trial_code,
-                batch_number=f"{po.code}-V{f.version}",
-                quantity=round(actual_qty * Decimal('0.6'), 1),
-                packaging_desc=f"25kg/包 x {max(1, int(float(actual_qty * Decimal('0.6')) / 25) + 1)}包",
-                storage_location=f"样品库-{random.choice(['A', 'B', 'C'])}区",
-            )
-            # 待打样颗粒
-            SampleInventory.objects.create(
-                type='PELLET', sub_type='FOR_INJECTION',
-                status='IN_LAB',
-                production_order=po, formula=f,
-                trial_code=po.trial_code,
-                batch_number=f"{po.code}-V{f.version}",
-                quantity=round(actual_qty * Decimal('0.4'), 1),
-                packaging_desc="待注塑打样",
-                storage_location=f"样品库-{random.choice(['A', 'B', 'C'])}区",
-            )
-
     ctx.production_orders = production_orders
 
     print(f"  production_orders={len(production_orders)}, "
-          f"extrusion_tasks={ExtrusionTask.objects.count()}, "
-          f"pellet_samples={SampleInventory.objects.filter(type='PELLET').count()}")
+          f"extrusion_tasks={ExtrusionTask.objects.count()}")
 
 
 # ---------------------------------------------------------------------------

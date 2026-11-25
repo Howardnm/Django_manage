@@ -115,6 +115,22 @@ class TestingTaskStatusMachineTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, TestingTask.Status.IN_PROGRESS)
 
+    def test_fill_partial_does_not_assign_tester(self):
+        self.task.assigned_to = None
+        self.task.save(update_fields=['assigned_to'])
+        TestingTaskService.fill_results(self.task, [
+            self._mat(self.tc1, self.f1, '10.5'),
+        ], self.user)
+        self.task.refresh_from_db()
+        self.assertIsNone(self.task.assigned_to_id)
+
+    def test_fill_full_assigns_tester(self):
+        self.task.assigned_to = None
+        self.task.save(update_fields=['assigned_to'])
+        TestingTaskService.fill_results(self.task, self._full_matrix(), self.user)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assigned_to_id, self.user.pk)
+
     def test_fill_full_reaches_completed(self):
         TestingTaskService.fill_results(self.task, self._full_matrix(), self.user)
         self.task.refresh_from_db()
@@ -177,6 +193,13 @@ class TestingTaskStatusMachineTests(TestCase):
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
 
+    def test_writeback_overwrites_tester(self):
+        other = _make_user('writer')
+        TestingTaskService.fill_results(self.task, self._full_matrix(), self.user)
+        TestingTaskService.write_back_results(self.task, other)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assigned_to_id, other.pk)
+
     def test_writeback_after_terminal_is_noop(self):
         TestingTaskService.fill_results(self.task, self._full_matrix(), self.user)
         TestingTaskService.write_back_results(self.task)
@@ -208,6 +231,14 @@ class TestingTaskStatusMachineTests(TestCase):
         self.assertEqual(written, 0)
         self.task.refresh_from_db()
         self.assertEqual(self.task.status, TestingTask.Status.RESULTS_WRITTEN_BACK)
+
+    def test_force_complete_assigns_tester(self):
+        other = _make_user('forcer')
+        self.task.assigned_to = None
+        self.task.save(update_fields=['assigned_to'])
+        TestingTaskService.force_complete_and_writeback(self.task, other)
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.assigned_to_id, other.pk)
 
     # ── 测试退回 ──
 

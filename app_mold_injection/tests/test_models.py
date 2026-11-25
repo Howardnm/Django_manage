@@ -1,6 +1,12 @@
 """MoldType / InjectionTask model tests."""
+from django.contrib.auth import get_user_model
 from django.test import TestCase
+
 from app_mold_injection.models import MoldType, InjectionTask
+from app_mold_injection.services import InjectionTaskService
+from app_trial_production.models import ProductionOrder
+
+User = get_user_model()
 
 
 class MoldTypeTests(TestCase):
@@ -29,16 +35,25 @@ class MoldTypeTests(TestCase):
 
 class InjectionTaskTests(TestCase):
     def test_defaults(self):
-        """默认状态 PENDING，默认来源 ORDER"""
+        """默认状态 PENDING"""
         task = InjectionTask()
         self.assertEqual(task.status, InjectionTask.Status.PENDING)
-        self.assertEqual(task.source, InjectionTask.Source.ORDER)
 
     def test_status_css_class(self):
         """各状态 CSS class 映射"""
         task = InjectionTask(status=InjectionTask.Status.PENDING)
         self.assertEqual(task.status_css_class, 'bg-secondary-lt')
-        task.status = InjectionTask.Status.IN_PROGRESS
-        self.assertEqual(task.status_css_class, 'bg-blue-lt')
         task.status = InjectionTask.Status.COMPLETED
         self.assertEqual(task.status_css_class, 'bg-green-lt')
+
+    def test_complete_assigns_operator(self):
+        user = User.objects.create_user(
+            username='injector', email='injector@trial.dev', password='x')
+        order = ProductionOrder.objects.create(creator=user, code='PO-INJ')
+        task = InjectionTask.objects.create(production_order=order)
+
+        InjectionTaskService.complete_task(task, user)
+
+        task.refresh_from_db()
+        self.assertEqual(task.operator_id, user.pk)
+        self.assertEqual(task.status, InjectionTask.Status.COMPLETED)

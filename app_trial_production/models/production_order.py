@@ -220,6 +220,8 @@ class ProductionOrderFormulaDetail(models.Model):
     production_order = models.ForeignKey(ProductionOrder, on_delete=models.CASCADE, related_name='formula_details', verbose_name="关联工单")
     formula = models.ForeignKey('app_formula.LabFormula', on_delete=models.PROTECT, verbose_name="配方版本")
     planned_quantity = models.DecimalField("计划产量(kg)", max_digits=10, decimal_places=2, default=0)
+    finished_pellet_kg = models.DecimalField("成品颗粒(kg)", max_digits=10, decimal_places=2, default=0)
+    specimen_pellet_kg = models.DecimalField("样条颗粒(kg)", max_digits=10, decimal_places=2, default=0)
     needs_color_matching = models.BooleanField("需要配色", default=False)
 
     class Meta:

@@ -16,8 +16,7 @@ logger = logging.getLogger(__name__)
 # 注塑任务状态筛选 Tab
 INJECTION_STATUS_TABS = [
     {'value': 'ALL', 'label': '全部状态', 'icon': 'ti ti-filter'},
-    {'value': 'PENDING', 'label': '待生产', 'icon': 'ti ti-clock'},
-    {'value': 'IN_PROGRESS', 'label': '注塑中', 'icon': 'ti ti-injection'},
+    {'value': 'PENDING', 'label': '未注塑', 'icon': 'ti ti-clock'},
     {'value': 'COMPLETED', 'label': '已完成', 'icon': 'ti ti-check'},
 ]
 
@@ -65,8 +64,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
         if qs is None:
             qs = self.model.objects.all()
         qs = qs.select_related(
-            'production_order', 'production_order__project', 'source_project',
-            'sample_inventory',
+            'production_order', 'production_order__project',
         ).prefetch_related(
             'mold_requirements__mold',
         ).annotate(
@@ -77,10 +75,7 @@ class InjectionTaskListView(InjectionTaskAccessMixin, ListView):
 
         # 状态 tab 筛选（卡片头部 tab，非 django_filters 字段）
         status_param = self.request.GET.get('status', '')
-        valid_statuses = {s.value for s in InjectionTask.Status}
-        if status_param == 'ALL':
-            pass  # 显示全部状态
-        elif status_param in valid_statuses:
+        if status_param in ('PENDING', 'COMPLETED'):
             qs = qs.filter(status=status_param)
 
         if not self.request.GET.get('sort'):
@@ -109,10 +104,9 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
             return self.model.objects.all()
         return qs.select_related(
             'production_order', 'production_order__project',
-            'sample_inventory', 'source_project', 'operator',
+            'operator',
         ).prefetch_related(
             'mold_requirements__mold', 'mold_requirements__formula_details__formula',
-            'output_specimens__mold',
         )
 
     def get_object(self, queryset=None):
@@ -129,170 +123,35 @@ class InjectionDetailView(InjectionTaskAccessMixin, DetailView):
         ctx['mold_matrix_rows'] = matrix_rows
         ctx['has_mold_requirements'] = len(matrix_rows) > 0
 
-        ctx['show_start_btn'] = task.status == 'PENDING'
-        ctx['show_complete_btn'] = task.status == 'IN_PROGRESS'
-        ctx['has_output_specimens'] = task.output_specimens.exists()
-        ctx['source_css_class'] = 'purple' if task.source == 'INVENTORY' else 'cyan'
-
-        # ── 样条产出矩阵 — 模具 × 配方 ──
-        if ctx['has_output_specimens']:
-            specimens = list(task.output_specimens.select_related('mold', 'formula'))
-            # 收集所有出现过的配方版本（排序列）
-            out_formula_map = {}
-            for sp in specimens:
-                if sp.formula_id and sp.formula_id not in out_formula_map:
-                    out_formula_map[sp.formula_id] = sp.formula
-            out_formulas = sorted(out_formula_map.values(), key=lambda f: f.version)
-
-            # 按模具分组，构建矩阵行（跳过 mold_id 为空的无效数据）
-            mold_specimens = {}
-            for sp in specimens:
-                if not sp.mold_id or not sp.mold:
-                    continue
-                mold_key = sp.mold_id
-                if mold_key not in mold_specimens:
-                    mold_specimens[mold_key] = {
-                        'mold': sp.mold,
-                        'cells': {},
-                        'storage_location': sp.storage_location or '',
-                        'batch_label': sp.batch_label or '',
-                    }
-                if sp.formula_id:
-                    mold_specimens[mold_key]['cells'][sp.formula_id] = sp
-
-            out_matrix_rows = []
-            grand_total_count = 0
-            grand_total_qualified = 0
-            formula_totals = {f.pk: {'count': 0, 'qualified': 0} for f in out_formulas}
-
-            for entry in mold_specimens.values():
-                row = {'mold': entry['mold'], 'cells': [], 'row_total_count': 0,
-                       'row_total_qualified': 0, 'storage_location': entry['storage_location'],
-                       'batch_label': entry['batch_label']}
-                for f in out_formulas:
-                    sp = entry['cells'].get(f.pk)
-                    count = sp.specimen_count or 0 if sp else 0
-                    qualified = sp.specimen_qualified or 0 if sp else 0
-                    row['cells'].append({'formula_pk': f.pk, 'count': count, 'qualified': qualified})
-                    row['row_total_count'] += count
-                    row['row_total_qualified'] += qualified
-                    formula_totals[f.pk]['count'] += count
-                    formula_totals[f.pk]['qualified'] += qualified
-                grand_total_count += row['row_total_count']
-                grand_total_qualified += row['row_total_qualified']
-                out_matrix_rows.append(row)
-
-            # 转为列表格式，模板可直接 .count / .qualified 访问
-            out_formula_totals = [
-                {'formula_pk': f.pk, 'count': formula_totals[f.pk]['count'],
-                 'qualified': formula_totals[f.pk]['qualified']}
-                for f in out_formulas
-            ]
-
-            ctx['out_formulas'] = out_formulas
-            ctx['out_matrix_rows'] = out_matrix_rows
-            ctx['out_formula_totals'] = out_formula_totals
-            ctx['out_grand_total_count'] = grand_total_count
-            ctx['out_grand_total_qualified'] = grand_total_qualified
-            ctx['out_matrix_colspan'] = 3 + len(out_formulas) * 2 + 2
-
+        ctx['show_complete_btn'] = task.status == 'PENDING'
+        ctx['complete_form'] = InjectionCompleteForm(instance=task)
         return ctx
 
 
-class InjectionStartView(InjectionTaskAccessMixin, View):
-    """开始注塑任务"""
+class InjectionCompleteView(InjectionTaskAccessMixin, View):
+    """完成注塑任务"""
+    template_name = 'apps/app_mold_injection/injection/complete.html'
     permission_required = 'app_mold_injection.change_injectiontask'
+
+    def get(self, request, pk):
+        return redirect('mold_injection:task_detail', pk=pk)
 
     def post(self, request, pk):
         task = get_object_or_404(InjectionTask, pk=pk)
         if task.status != 'PENDING':
-            messages.warning(request, '任务状态不允许开始')
-            return redirect('mold_injection:task_detail', pk=pk)
-
-        try:
-            InjectionTaskService.start_task(task, request.user)
-            messages.success(request, '注塑任务已开始')
-        except InvalidStateTransition as e:
-            logger.exception(f"Injection start failed: pk={pk}")
-            messages.error(request, f'注塑任务启动失败：{e}')
-        return redirect('mold_injection:task_detail', pk=pk)
-
-
-class InjectionCompleteView(InjectionTaskAccessMixin, View):
-    """完成注塑任务 — 含样条产出"""
-    template_name = 'apps/app_mold_injection/injection/complete.html'
-    permission_required = 'app_mold_injection.change_injectiontask'
-
-    @staticmethod
-    def _build_matrix_context(task):
-        """构建模具 × 配方矩阵上下文，供 GET 和 POST(form invalid) 共用。"""
-        formulas, base_rows = _build_mold_formula_matrix(
-            task.mold_requirements.all())
-        is_inventory_source = (task.source == InjectionTask.Source.INVENTORY)
-
-        matrix_rows = []
-        for row in base_rows:
-            if formulas:
-                cells = [
-                    {'formula': f, 'formula_key': f.pk, 'planned_qty': qty}
-                    for f, qty in zip(formulas, row['quantities'])
-                ]
-            else:
-                cells = [{'formula': None, 'formula_key': 'none', 'planned_qty': row['total']}]
-            matrix_rows.append({'mold': row['mold'], 'cells': cells})
-
-        return {
-            'formulas': formulas,
-            'matrix_rows': matrix_rows,
-            'is_inventory_source': is_inventory_source,
-            'has_mold_requirements': len(matrix_rows) > 0,
-        }
-
-    def get(self, request, pk):
-        task = get_object_or_404(
-            InjectionTask.objects.prefetch_related(
-                'mold_requirements__mold', 'mold_requirements__formula_details__formula',
-            ),
-            pk=pk,
-        )
-        matrix_ctx = self._build_matrix_context(task)
-        return render(request, self.template_name, {
-            'injection_task': task,
-            'form': InjectionCompleteForm(instance=task),
-            'mold_matrix_formulas': matrix_ctx['formulas'],
-            'mold_matrix_rows': matrix_ctx['matrix_rows'],
-            'is_inventory_source': matrix_ctx['is_inventory_source'],
-            'has_mold_requirements': matrix_ctx['has_mold_requirements'],
-        })
-
-    def post(self, request, pk):
-        task = get_object_or_404(
-            InjectionTask.objects.prefetch_related(
-                'mold_requirements__mold', 'mold_requirements__formula_details__formula',
-            ),
-            pk=pk,
-        )
-        if task.status != 'IN_PROGRESS':
             messages.warning(request, '当前任务状态不允许完成')
             return redirect('mold_injection:task_detail', pk=pk)
 
         form = InjectionCompleteForm(request.POST, instance=task)
         if not form.is_valid():
-            matrix_ctx = self._build_matrix_context(task)
-            return render(request, self.template_name, {
-                'injection_task': task,
-                'form': form,
-                'mold_matrix_formulas': matrix_ctx['formulas'],
-                'mold_matrix_rows': matrix_ctx['matrix_rows'],
-                'is_inventory_source': matrix_ctx['is_inventory_source'],
-                'has_mold_requirements': matrix_ctx['has_mold_requirements'],
-            })
+            messages.error(request, '备注未通过校验，注塑任务未完成')
+            return redirect('mold_injection:task_detail', pk=pk)
 
-        specimen_outputs = InjectionTaskService.parse_specimen_outputs(task, request.POST)
         task.remark = form.cleaned_data.get('remark', '')
         try:
-            InjectionTaskService.complete_task(task, request.user, specimen_outputs)
-            messages.success(request, '注塑任务已完成，样条已入库')
+            task.save(update_fields=['remark'])
+            InjectionTaskService.complete_task(task, request.user)
+            messages.success(request, '注塑任务已完成')
         except InvalidStateTransition as e:
             logger.exception(f"Injection complete failed: pk={pk}")
             messages.error(request, f'注塑任务完成失败：{e}')

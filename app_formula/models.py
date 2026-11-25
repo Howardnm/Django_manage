@@ -258,6 +258,7 @@ class FormulaBOM(AbstractBOMEntry):
 
     class Meta:
         verbose_name = "BOM明细"
+        verbose_name_plural = verbose_name
         ordering = ['feeding_port', 'weighing_scale', 'raw_material__category__order', 'raw_material__name']
 
     @property
@@ -280,9 +281,9 @@ class FormulaTestResult(models.Model):
     test_config = models.ForeignKey(TestConfig, on_delete=models.PROTECT, verbose_name="测试项目")
     production_order = models.ForeignKey(
         'app_trial_production.ProductionOrder',
-        on_delete=models.SET_NULL, null=True, blank=True,
+        on_delete=models.CASCADE, null=True, blank=True,
         verbose_name="来源工单",
-        help_text="从哪个生产工单回写的结果；为空表示手动录入",
+        help_text="从哪个生产工单回写的结果，删除工单时一并删除；为空表示手动录入",
     )
 
     # 【修改】改为 DecimalField，保留3位小数
@@ -307,6 +308,7 @@ class FormulaTestResult(models.Model):
 
     class Meta:
         verbose_name = "实验测试结果"
+        verbose_name_plural = verbose_name
         indexes = [
             models.Index(fields=['formula']),
             models.Index(fields=['test_config']),

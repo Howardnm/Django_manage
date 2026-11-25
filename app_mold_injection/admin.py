@@ -12,9 +12,9 @@ class MoldRequirementFormulaDetailInline(admin.TabularInline):
 
 @admin.register(InjectionTask)
 class InjectionTaskAdmin(admin.ModelAdmin):
-    list_display = ['id', 'production_order', 'source', 'status', 'operator', 'created_at']
-    list_filter = ['status', 'source']
-    search_fields = ['production_order__code', 'sample_inventory__trial_code']
+    list_display = ['id', 'production_order', 'status', 'operator', 'created_at']
+    list_filter = ['status']
+    search_fields = ['production_order__code']
 
 
 @admin.register(MoldRequirement)

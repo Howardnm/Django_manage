@@ -188,7 +188,7 @@ def print_summary(ctx: FakeContext) -> None:
     from app_form_management.models import FormTemplate, FormSubmission
     from app_notification.models import Notification
     from app_trial_production.models import (
-        ProductionOrder, ProductionOrderFormulaDetail, ExtrusionTask, SampleInventory,
+        ProductionOrder, ProductionOrderFormulaDetail, ExtrusionTask,
     )
     from app_mold_injection.models import MoldType, InjectionTask, MoldRequirement, MoldRequirementFormulaDetail
     from app_color_center.models import ColorMatchingTask
@@ -226,7 +226,6 @@ def print_summary(ctx: FakeContext) -> None:
         ("ExtrusionTask", ExtrusionTask.objects.count()),
         ("ColorMatchingTask", ColorMatchingTask.objects.count()),
         ("InjectionTask", InjectionTask.objects.count()),
-        ("SampleInventory", SampleInventory.objects.count()),
         ("TestingTask", TestingTask.objects.count()),
         ("TrialTestResult", TrialTestResult.objects.count()),
         ("FormTemplate", FormTemplate.objects.count()),

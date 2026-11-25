@@ -43,6 +43,30 @@
     vertical-align: middle;
 }
 
+/* 工单信息、工艺方案、工艺参数：输入框高度对齐配方 BOM */
+#process-scheme-card .form-control,
+#process-scheme-card .form-select,
+#process-params .form-control,
+#process-params .form-select,
+.order-info-table .form-control,
+.order-info-table .form-select {
+    padding: 2px 6px;
+    font-size: 12px;
+    height: auto;
+    min-height: 28px;
+}
+#process-scheme-card .ts-wrapper.form-select,
+#process-params .ts-wrapper.form-select {
+    padding: 0;
+}
+#process-scheme-card .ts-wrapper .ts-control,
+#process-params .ts-wrapper .ts-control {
+    padding: 2px 6px;
+    font-size: 12px;
+    min-height: 28px;
+    height: auto;
+}
+
 /* 宽表横滚，下拉由 card_table_scroll.js 挂到 body */
 .formula-table-scroll {
     max-width: 100%;

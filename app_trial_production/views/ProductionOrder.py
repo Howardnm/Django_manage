@@ -3,7 +3,6 @@ import logging
 from dataclasses import dataclass
 
 from django.db import transaction
-from django.db.models import Sum
 from django.forms import modelformset_factory
 from django.utils.safestring import mark_safe
 from django.views.generic import DetailView, CreateView, UpdateView, View
@@ -21,14 +20,90 @@ from app_trial_production.mixins import (
     TrialProductionAccessMixin, RndAccessMixin, ExtrusionTaskAccessMixin,
     OrderManageAccessMixin,
 )
-from app_trial_production.models import ProductionOrder, SampleInventory, TrialProductionConfig
+from app_trial_production.models import ProductionOrder, TrialProductionConfig
 from app_trial_production.forms import (
     ProductionOrderForm, ProductionOrderUpdateForm, MoldRequirementRowFormSet,
+    OrderProcessParamsForm,
 )
 from app_trial_production.services import ProductionOrderService
 from common_utils.state_machine import InvalidStateTransition
 
 logger = logging.getLogger(__name__)
+
+_ORDER_EXTRA_FIELDS = (
+    'drying_temperature', 'drying_duration', 'inner_bag_sealing',
+    'injection_temperature', 'injection_pretreatment',
+)
+
+
+def _existing_process_params(order):
+    """一对一反查。没有子表时返回 None，而不是抛异常。"""
+    if order is None or not getattr(order, 'pk', None):
+        return None
+    from django.core.exceptions import ObjectDoesNotExist
+    try:
+        return order.process_params
+    except ObjectDoesNotExist:
+        return None
+
+
+def _build_params_form(request, order=None, profile=None):
+    """创建/编辑页的工艺参数表。已保存的值优先于方案预填。"""
+    from app_process.models import AbstractExtrusionParams
+    instance = _existing_process_params(order)
+    if request.method == 'POST':
+        return OrderProcessParamsForm(request.POST, instance=instance)
+    if instance is not None:
+        return OrderProcessParamsForm(instance=instance)
+    initial = {}
+    if profile is not None:
+        for name in AbstractExtrusionParams.ALL_PARAM_FIELDS:
+            initial[name] = getattr(profile, name)
+    return OrderProcessParamsForm(initial=initial)
+
+
+def _process_profile_picker():
+    from django.urls import reverse
+    from common_utils.search_picker_config import SearchPickerConfig
+    return SearchPickerConfig.for_custom_url(
+        modal_id='modal-process-profile',
+        modal_title='选择工艺方案',
+        search_url=reverse('trial_api_search'),
+        display_mode='table',
+        search_mode='multi',
+        modal_size='lg',
+        submit_on_confirm=False,
+        initial_search=True,
+        search_model='process_profile',
+        confirm_text='确认选择',
+        search_fields=[
+            {'name': 'name', 'type': 'text', 'label': '方案名称', 'placeholder': '名称，支持 * 和 ?'},
+            {'name': 'process_type', 'type': 'text', 'label': '工艺类型', 'placeholder': '如：双螺杆挤出'},
+            {
+                'name': 'material_type', 'type': 'remote-select', 'label': '适用材料类型',
+                'model': 'material_type', 'api_url': reverse('common_autocomplete'),
+                'value_field': 'value', 'placeholder': '选择材料类型',
+            },
+            {
+                'name': 'machine', 'type': 'remote-select', 'label': '适用机台',
+                'model': 'machinemodel', 'api_url': reverse('process_api_search'),
+                'value_field': 'value', 'placeholder': '选择机台',
+            },
+        ],
+        table_columns=[
+            {'key': 'text', 'title': '方案名称'},
+            {'key': 'process_type', 'title': '工艺类型', 'width': '140px'},
+            {'key': 'materials', 'title': '适用材料类型'},
+            {'key': 'machine', 'title': '适用机台'},
+            {'key': 'screw', 'title': '螺杆组合'},
+        ],
+    )
+
+
+def _apply_order_extras(order, cleaned):
+    for name in _ORDER_EXTRA_FIELDS:
+        setattr(order, name, cleaned.get(name))
+    order.save(update_fields=[*_ORDER_EXTRA_FIELDS, 'updated_at'])
 
 
 # ---- 共享辅助函数 ----
@@ -279,7 +354,6 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
             'creator', 'extruder_operator', 'approved_by', 'workflow_instance',
         ).prefetch_related(
             'formula_details__formula',
-            'sample_inventories',
         )
 
     def get_context_data(self, **kwargs):
@@ -293,9 +367,20 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
         context['extrusion_task'] = ext
         context['color_task'] = color
         context['injection_task'] = injection
+        from django.core.exceptions import ObjectDoesNotExist
+        try:
+            context['process_params'] = order.process_params
+        except ObjectDoesNotExist:
+            context['process_params'] = None
 
         # 测试任务
-        context['testing_tasks'] = order.testing_tasks.all()
+        testing_tasks = order.testing_tasks.all()
+        context['testing_tasks'] = testing_tasks
+        detail_test_items = list(
+            order.test_items.select_related('category').order_by('category__order', 'order', 'name')
+        )
+        context['detail_test_items'] = detail_test_items
+        context['tests_pending'] = bool(detail_test_items) and not testing_tasks.exists()
 
         # 配色任务跳转定位参数：首个需配色且带 project_node 的配方
         context['color_formula_redirect'] = ''
@@ -322,6 +407,7 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
         context['formulas'] = formulas
         details_map = {fd.formula_id: fd for fd in order.formula_details.all()}
         context['formula_pairs'] = [(f, details_map.get(f.pk)) for f in formulas]
+        context['formula_details'] = list(order.formula_details.all())
         context['has_any_color_matching'] = any(
             fd.needs_color_matching for fd in details_map.values())
 
@@ -351,36 +437,6 @@ class ProductionOrderDetailView(OrderManageAccessMixin, DetailView):
                 context['mold_matrix'] = self._build_mold_matrix(
                     plans, formulas, is_pending=True)
 
-        # 是否已完成颗粒分拨（控制分拨按钮显隐 + 注塑任务触发屏障）
-        context['has_pellet_splits'] = ext.pellet_split_completed if ext else False
-
-        # 配方粒度的分拨明细
-        existing_splits = SampleInventory.objects.filter(
-            production_order=order, type='PELLET',
-        ).values('formula_id', 'sub_type', 'batch_number').annotate(
-            total_qty=Sum('quantity'),
-        )
-        split_map = {}
-        batch_map = {}
-        for s in existing_splits:
-            key = (s['formula_id'], s['sub_type'])
-            split_map[key] = float(s['total_qty'] or 0)
-            if s['batch_number']:
-                batch_map[s['formula_id']] = s['batch_number']
-
-        formula_split_summaries = []
-        for fd in details_map.values():
-            finished_qty = split_map.get((fd.formula_id, 'FINISHED'), 0)
-            for_injection_qty = split_map.get((fd.formula_id, 'FOR_INJECTION'), 0)
-            formula_split_summaries.append({
-                'formula': fd.formula,
-                'planned_qty': float(fd.planned_quantity or 0),
-                'finished_qty': finished_qty,
-                'for_injection_qty': for_injection_qty,
-                'total_split': finished_qty + for_injection_qty,
-                'batch_number': batch_map.get(fd.formula_id, ''),
-            })
-        context['formula_split_summaries'] = formula_split_summaries
 
         # 操作权限：复用 ExtrusionTaskAccessMixin 的动态角色配置
         context['can_start_extrusion'] = order.can_start_extrusion and \
@@ -497,6 +553,11 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
 
         # 测试项目分组
         context['grouped_test_items'] = _build_grouped_test_items()
+        context['params_form'] = _build_params_form(
+            self.request,
+            profile=getattr(context.get('form'), 'selected_profile', None),
+        )
+        context['search_picker'] = _process_profile_picker()
         return context
 
 
@@ -546,6 +607,11 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 '计划产量合计必须大于 0 —— 请至少为一个配方版本填写计划产量。')
             return self.form_invalid(form)
 
+        params_form = _build_params_form(self.request)
+        if not params_form.is_valid():
+            messages.error(self.request, '请检查工艺参数')
+            return self.form_invalid(form)
+
         with transaction.atomic():
             # 委托 Service 创建工单
             self.object = ProductionOrderService.create_order(
@@ -561,6 +627,10 @@ class ProductionOrderCreateView(RndAccessMixin, CreateView):
                 storage_location=form.cleaned_data.get('storage_location', ''),
                 remark=form.cleaned_data.get('remark', ''),
             )
+
+            _apply_order_extras(self.object, form.cleaned_data)
+            params_form.instance.production_order = self.object
+            params_form.save()
 
             # 保存模具矩阵
             _save_mold_matrix(
@@ -643,6 +713,12 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
 
         # 测试项目分组
         context['grouped_test_items'] = _build_grouped_test_items()
+        context['params_form'] = _build_params_form(
+            self.request,
+            order=self.object,
+            profile=getattr(context.get('form'), 'selected_profile', None),
+        )
+        context['search_picker'] = _process_profile_picker()
 
         return context
 
@@ -670,8 +746,15 @@ class ProductionOrderUpdateView(RndAccessMixin, UpdateView):
                 '计划产量合计必须大于 0 —— 请至少为一个配方版本填写计划产量。')
             return self.form_invalid(form)
 
+        params_form = _build_params_form(self.request, order=self.object)
+        if not params_form.is_valid():
+            messages.error(self.request, '请检查工艺参数')
+            return self.form_invalid(form)
+
         with transaction.atomic():
             order = form.save()
+            params_form.instance.production_order = order
+            params_form.save()
 
             # 更新配方明细 & 计划总产量
             total_qty = 0
@@ -820,7 +903,6 @@ class ProductionOrderPrintView(OrderManageAccessMixin, DetailView):
             'formula_details__formula',
             'mold_requirements__mold',
             'mold_requirements__formula_details',
-            'sample_inventories',
         )
 
     def get(self, request, *args, **kwargs):

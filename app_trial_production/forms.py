@@ -1,14 +1,58 @@
 from django import forms
 from django.forms import BaseModelFormSet, modelformset_factory, ValidationError
 from common_utils.filters import TablerFormMixin
+from app_process.models import AbstractExtrusionParams, ProcessProfile
 from .models import (
-    ProductionOrder, ExtrusionTask,
-    SampleInventory,
+    ProductionOrder, ExtrusionTask, OrderProcessParams,
 )
 from app_mold_injection.models import MoldRequirement
 
 
-class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
+def _process_profile_widget():
+    return forms.HiddenInput(attrs={'class': 'search-picker-value'})
+
+
+def _coerce_pk(value):
+    if value in (None, ''):
+        return None
+    if hasattr(value, 'pk'):
+        value = value.pk
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class _ProcessProfileRemoteMixin:
+    """工艺方案必填。弹窗写入隐藏域，GET 只保留当前选中项供校验显示名称。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        field = self.fields['process_profile']
+        field.required = True
+        field.widget.use_required_attribute = lambda initial: False
+
+        if self.data:
+            selected_id = _coerce_pk(self.data.get(self.add_prefix('process_profile')))
+        else:
+            selected_id = _coerce_pk(getattr(self.instance, 'process_profile_id', None))
+            if not selected_id and self.initial:
+                selected_id = _coerce_pk(self.initial.get('process_profile'))
+            if selected_id:
+                field.queryset = ProcessProfile.objects.filter(pk=selected_id)
+            else:
+                field.queryset = ProcessProfile.objects.none()
+
+        self.selected_profile = None
+        if selected_id:
+            self.selected_profile = (
+                ProcessProfile.objects.select_related('machine', 'screw_combination')
+                .filter(pk=selected_id)
+                .first()
+            )
+
+
+class ProductionOrderForm(_ProcessProfileRemoteMixin, TablerFormMixin, forms.ModelForm):
     """创建生产工单表单"""
     class Meta:
         model = ProductionOrder
@@ -20,20 +64,20 @@ class ProductionOrderForm(TablerFormMixin, forms.ModelForm):
         ]
         widgets = {
             'quantity_planned': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '自动从成品材料预填'}),
-            'process_profile': forms.Select(attrs={'class': 'form-select'}),
-            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：80'}),
-            'drying_duration': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5', 'placeholder': '如：2'}),
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '自动从成品材料预填'}),
+            'process_profile': _process_profile_widget(),
+            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：80'}),
+            'drying_duration': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.5', 'placeholder': '如：2'}),
             'inner_bag_sealing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：230'}),
-            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '如：80℃烘干2小时'}),
-            'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
-            'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：230'}),
+            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 1, 'placeholder': '如：80℃烘干2小时'}),
+            'packaging_desc': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：25kg/袋'}),
+            'storage_location': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：A区货架3层'}),
+            'remark': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 1}),
         }
 
 
-class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
+class ProductionOrderUpdateForm(_ProcessProfileRemoteMixin, TablerFormMixin, forms.ModelForm):
     """编辑生产工单"""
     class Meta:
         model = ProductionOrder
@@ -44,25 +88,44 @@ class ProductionOrderUpdateForm(TablerFormMixin, forms.ModelForm):
             'packaging_desc', 'storage_location', 'remark',
         ]
         widgets = {
-            'sap_material_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '自动从成品材料预填'}),
-            'process_profile': forms.Select(attrs={'class': 'form-select'}),
-            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：80'}),
-            'drying_duration': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.5', 'placeholder': '如：2'}),
+            'sap_material_code': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '自动从成品材料预填'}),
+            'process_profile': _process_profile_widget(),
+            'drying_temperature': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：80'}),
+            'drying_duration': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'step': '0.5', 'placeholder': '如：2'}),
             'inner_bag_sealing': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': '如：230'}),
-            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': '如：80℃烘干2小时'}),
-            'packaging_desc': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：25kg/袋'}),
-            'storage_location': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '如：A区货架3层'}),
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            'injection_temperature': forms.NumberInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：230'}),
+            'injection_pretreatment': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 1, 'placeholder': '如：80℃烘干2小时'}),
+            'packaging_desc': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：25kg/袋'}),
+            'storage_location': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': '如：A区货架3层'}),
+            'remark': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 1}),
         }
 
 
 # ---- 挤出任务 ----
 
-class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
-    """挤出生产记录表单"""
+class OrderProcessParamsForm(TablerFormMixin, forms.ModelForm):
+    """工单工艺参数 — 创建/编辑时填写，挤出任务只读。
+
+    未提交的项用模型默认值，避免只改了几个温区时其余必填数字把整单拦住。
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+
+    def clean(self):
+        cleaned = super().clean()
+        for name in self.fields:
+            if cleaned.get(name) not in (None, ''):
+                continue
+            model_field = self._meta.model._meta.get_field(name)
+            if model_field.has_default():
+                cleaned[name] = model_field.get_default()
+        return cleaned
+
     class Meta:
-        model = ExtrusionTask
+        model = OrderProcessParams
         fields = [
             # 温度参数
             'temp_zone_1', 'temp_zone_2', 'temp_zone_3', 'temp_zone_4',
@@ -76,30 +139,27 @@ class ExtrusionRecordForm(TablerFormMixin, forms.ModelForm):
             # 后处理参数
             'throughput', 'cooling_method', 'strand_count', 'water_temp',
             'water_bath_length', 'air_knife_pressure', 'pelletizing_speed', 'screen_mesh',
-            # 备注
-            'remark',
         ]
         widgets = {
-            **{f: forms.NumberInput(attrs={'class': 'form-control'})
-               for f in ExtrusionTask.TEMP_FIELDS},
-            'screw_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            'torque': forms.NumberInput(attrs={'class': 'form-control'}),
-            'current': forms.NumberInput(attrs={'class': 'form-control'}),
-            'melt_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
-            'melt_temp': forms.NumberInput(attrs={'class': 'form-control'}),
-            'vacuum': forms.NumberInput(attrs={'class': 'form-control'}),
-            'main_feeder_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            'side_feeder_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            'liquid_pump_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            'throughput': forms.NumberInput(attrs={'class': 'form-control'}),
-            'cooling_method': forms.Select(attrs={'class': 'form-select'}),
-            'strand_count': forms.NumberInput(attrs={'class': 'form-control'}),
-            'water_temp': forms.NumberInput(attrs={'class': 'form-control'}),
-            'water_bath_length': forms.NumberInput(attrs={'class': 'form-control'}),
-            'air_knife_pressure': forms.NumberInput(attrs={'class': 'form-control'}),
-            'pelletizing_speed': forms.NumberInput(attrs={'class': 'form-control'}),
-            'screen_mesh': forms.TextInput(attrs={'class': 'form-control'}),
-            'remark': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
+            **{f: forms.NumberInput(attrs={'class': 'form-control form-control-sm'})
+               for f in AbstractExtrusionParams.TEMP_FIELDS},
+            'screw_speed': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'torque': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'current': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'melt_pressure': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'melt_temp': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'vacuum': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'main_feeder_speed': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'side_feeder_speed': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'liquid_pump_speed': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'throughput': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'cooling_method': forms.Select(attrs={'class': 'form-select form-select-sm'}),
+            'strand_count': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'water_temp': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'water_bath_length': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'air_knife_pressure': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'pelletizing_speed': forms.NumberInput(attrs={'class': 'form-control form-control-sm'}),
+            'screen_mesh': forms.TextInput(attrs={'class': 'form-control form-control-sm'}),
         }
 
 
@@ -225,33 +285,5 @@ MoldRequirementRowFormSet = modelformset_factory(
 )
 
 
-class SapEntryForm(TablerFormMixin, forms.ModelForm):
-    """SAP 入库表单 — 单样品/批量通用，字段非必填（由 Service 层处理实际保存）"""
-    class Meta:
-        model = SampleInventory
-        fields = ['sap_material_code', 'sap_batch_number',
-                  'sap_warehouse_date', 'sap_storage_location']
-        widgets = {
-            'sap_material_code': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'SAP物料编码',
-            }),
-            'sap_batch_number': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'SAP批次号',
-            }),
-            'sap_warehouse_date': forms.DateInput(attrs={
-                'class': 'form-control', 'type': 'date',
-            }),
-            'sap_storage_location': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': '如: WH-A-03',
-            }),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for f in self.fields.values():
-            f.required = False
 
 

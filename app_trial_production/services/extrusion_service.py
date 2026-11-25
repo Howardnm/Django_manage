@@ -16,10 +16,7 @@ class ExtrusionTaskService:
     @staticmethod
     @transaction.atomic
     def start_task(task, user):
-        """开始挤出任务"""
-        if not task.operator_id:
-            task.operator = user
-            task.save(update_fields=['operator'])
+        """开始挤出任务。操作员留到完成挤出时再写。"""
         StateMachine.transition(task, 'IN_PROGRESS', user)
 
         # 同步推进工单状态
@@ -29,36 +26,22 @@ class ExtrusionTaskService:
 
     @staticmethod
     @transaction.atomic
-    def save_record(task, params, user):
-        """
-        保存挤出参数记录（不改变状态）。
-
-        Args:
-            task: ExtrusionTask 实例
-            params: dict 包含所有参数字段
-            user: 记录人
-        """
-        for field in task.ALL_PARAM_FIELDS:
-            if field in params:
-                setattr(task, field, params[field])
-
-        if 'remark' in params:
-            task.remark = params['remark']
-
-        task.recorded_by = user
-        task.save()
-
-    @staticmethod
-    @transaction.atomic
     def complete_task(task, user):
         """
         完成挤出任务 → 调用并行屏障检查。
-        实际产量由后续颗粒分拨汇总得出，不在此处写入。
+        实际产量不在此处写入，由 ProductionOrderService.record_actual_quantity
+        在颗粒分拨保存后汇总。操作员取本次完成的用户。
         """
+        task.operator = user
+        task.save(update_fields=['operator'])
+        order = task.production_order
+        order.extruder_operator = user
+        order.save(update_fields=['extruder_operator'])
+
         StateMachine.transition(task, 'COMPLETED', user)
 
         from .order_service import ProductionOrderService
-        ProductionOrderService.check_and_advance(task.production_order)
+        ProductionOrderService.check_and_advance(order)
 
 
 def build_extrusion_calendar_events(start_str, end_str):

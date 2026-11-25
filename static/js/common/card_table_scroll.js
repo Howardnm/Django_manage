@@ -45,9 +45,18 @@ function placeFormulaDropdown(ts) {
     }
 }
 
+function formulaScrollSelects(root) {
+    // 调用方有时传入表格或新行，滚动容器是它们的祖先，不在内部。
+    var found = [];
+    root.querySelectorAll('select').forEach(function (el) {
+        if (el.closest('.formula-table-scroll')) found.push(el);
+    });
+    return found;
+}
+
 function bindFormulaTableDropdowns(root) {
     if (!root) return;
-    root.querySelectorAll('.formula-table-scroll select').forEach(function (el) {
+    formulaScrollSelects(root).forEach(function (el) {
         var ts = el.tomselect;
         if (!ts || ts._formulaPortal) return;
         ts._formulaPortal = true;

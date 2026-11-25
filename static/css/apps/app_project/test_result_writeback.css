@@ -18,6 +18,18 @@
     min-height: 28px;
 }
 
+.formula-table-scroll {
+    max-width: 100%;
+    overflow-x: auto;
+}
+#data-table {
+    width: max-content;
+    min-width: 100%;
+}
+.formula-table-scroll .ts-control > input {
+    min-width: 0;
+}
+
 #data-table .ts-wrapper .ts-control {
     padding: 2px 6px;
     font-size: 12px;
@@ -29,7 +41,26 @@
     vertical-align: middle;
 }
 
-#data-table th {
+#data-table th,
+#order-matrix th {
     padding: 4px 6px;
     white-space: nowrap;
+}
+
+#order-matrix {
+    width: max-content;
+    min-width: 100%;
+    font-size: 13px;
+}
+
+#data-table td.version-start,
+#data-table th.version-start,
+#order-matrix td.version-start,
+#order-matrix th.version-start {
+    border-left-width: 2px;
+}
+
+#order-matrix .mean-col {
+    background: rgba(101, 84, 192, 0.06);
+    font-weight: 600;
 }

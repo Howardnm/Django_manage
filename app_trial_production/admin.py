@@ -3,8 +3,7 @@ from django.utils.html import format_html
 from django.utils.safestring import mark_safe
 from .models import (
     ProductionOrder, ProductionOrderFormulaDetail,
-    ExtrusionTask,
-    SampleInventory, TrialProductionConfig,
+    ExtrusionTask, OrderProcessParams, TrialProductionConfig,
 )
 
 
@@ -28,12 +27,10 @@ class ExtrusionTaskAdmin(admin.ModelAdmin):
     search_fields = ['production_order__code', 'production_order__trial_code']
 
 
-@admin.register(SampleInventory)
-class SampleInventoryAdmin(admin.ModelAdmin):
-    list_display = ['trial_code', 'type', 'sub_type', 'status', 'quantity',
-                    'specimen_count', 'storage_location']
-    list_filter = ['type', 'sub_type', 'status']
-    search_fields = ['trial_code']
+@admin.register(OrderProcessParams)
+class OrderProcessParamsAdmin(admin.ModelAdmin):
+    list_display = ['production_order', 'cooling_method', 'screw_speed']
+    search_fields = ['production_order__code']
 
 
 @admin.register(TrialProductionConfig)

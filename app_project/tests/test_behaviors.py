@@ -307,7 +307,7 @@ class MeanWritebackTests(TestCase):
 
     def _url(self):
         return reverse('project_formula_mean_writeback',
-                       kwargs={'pk': self.project.pk, 'formula_pk': self.formula.pk})
+                       kwargs={'pk': self.project.pk, 'formula_code': self.formula.code})
 
     def _post(self, data):
         """带上表单标记字段 —— 视图靠它区分"用户删光了行"与"请求被裁剪"。"""
@@ -331,7 +331,7 @@ class MeanWritebackTests(TestCase):
     def test_submitting_unrelated_row_keeps_manual_only_value(self):
         """提交不涉及的行时，纯手动录入的测试项必须原样保留。"""
         resp = self._post({
-            f'num_{self.tc_order.pk}': '55.5',
+            f'num_{self.formula.pk}_{self.tc_order.pk}': '55.5',
         })
         self.assertEqual(resp.status_code, 302)
 
@@ -344,7 +344,7 @@ class MeanWritebackTests(TestCase):
     def test_clearing_value_removes_manual_entry(self):
         """清空某一项的值 = 移除该测试项的手动录入记录。"""
         resp = self._post({
-            f'txt_{self.tc_manual.pk}': '',
+            f'txt_{self.formula.pk}_{self.tc_manual.pk}': '',
         })
         self.assertEqual(resp.status_code, 302)
         self.assertIsNone(self._manual_value(self.tc_manual))
@@ -352,7 +352,7 @@ class MeanWritebackTests(TestCase):
     def test_can_add_new_test_item(self):
         """新增行：提交一个此前不存在的测试项目。"""
         resp = self._post({
-            f'num_{self.tc_new.pk}': '12.3',
+            f'num_{self.formula.pk}_{self.tc_new.pk}': '12.3',
         })
         self.assertEqual(resp.status_code, 302)
         created = FormulaTestResult.objects.filter(
@@ -363,7 +363,7 @@ class MeanWritebackTests(TestCase):
 
     def test_writeback_does_not_touch_order_results(self):
         """工单回写的结果不属于本页管辖范围，不得被改动。"""
-        self._post({f'num_{self.tc_order.pk}': '1.0'})
+        self._post({f'num_{self.formula.pk}_{self.tc_order.pk}': '1.0'})
         order_result = FormulaTestResult.objects.get(
             formula=self.formula, test_config=self.tc_order, production_order__isnull=False)
         self.assertEqual(order_result.value, Decimal('50.000'))
@@ -397,18 +397,19 @@ class MeanWritebackTests(TestCase):
         self.assertNotIn('form-select-sm', html)
 
     def test_page_columns_match_formula_edit_card(self):
-        """填写卡片的列与实验单编辑页的「测试结果」卡片对齐，另加各工单原始值。"""
+        """填写卡与实验单编辑页对齐；工单原始值在上面的对照卡里，按版本分列。"""
         resp = self.client.get(self._url())
         self.assertEqual(resp.status_code, 200)
-        for header in ('测试项目', '各工单原始值', '数值 / 结果', '测试日期', '备注', '删除'):
+        for header in ('测试项目', '数值 / 结果', '测试日期', '备注', '删除', '工单测试结果', '均值'):
             self.assertContains(resp, header)
+        self.assertNotContains(resp, '各工单原始值')
         # 对齐编辑页后的表格样式（原回写页用的是另一套 card-table table-sm small）
         self.assertContains(resp, 'table-bordered card-table text-nowrap table-sm text-center')
 
     def test_saves_test_date_and_remark(self):
         """测试日期与备注是编辑页有的字段，回写页必须一并保存。"""
         resp = self._post({
-            f'num_{self.tc_order.pk}': '55.5',
+            f'num_{self.formula.pk}_{self.tc_order.pk}': '55.5',
             f'date_{self.tc_order.pk}': '2026-09-16',
             f'rem_{self.tc_order.pk}': '复测',
         })
@@ -430,7 +431,7 @@ class MeanWritebackTests(TestCase):
 
         resp = self.client.get(self._url())
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, f'name="txt_{select_config.pk}"')
+        self.assertContains(resp, f'name="txt_{self.formula.pk}_{select_config.pk}"')
         self.assertContains(resp, '<option value="V-0" selected>')
 
     def test_select_type_value_is_saved(self):
@@ -438,7 +439,7 @@ class MeanWritebackTests(TestCase):
             category=self.tc_order.category, name='阻燃等级', standard='UL94',
             data_type='SELECT', options_config='V-0,V-1,V-2', order=6)
         resp = self._post({
-            f'txt_{select_config.pk}': 'V-1',
+            f'txt_{self.formula.pk}_{select_config.pk}': 'V-1',
         })
         self.assertEqual(resp.status_code, 302)
         saved = FormulaTestResult.objects.get(
@@ -461,7 +462,7 @@ class MeanWritebackTests(TestCase):
         前端改下拉时会补上 orig_{新pk}={原pk} 隐藏域，这里照此构造。
         """
         resp = self._post({
-            f'num_{self.tc_new.pk}': '12.3',
+            f'num_{self.formula.pk}_{self.tc_new.pk}': '12.3',
             f'orig_{self.tc_new.pk}': str(self.tc_manual.pk),
         })
         self.assertEqual(resp.status_code, 302)
@@ -481,7 +482,7 @@ class MeanWritebackTests(TestCase):
             formula=self.formula, test_config=other, production_order=None, value_text='合格')
 
         self._post({
-            f'num_{self.tc_new.pk}': '12.3',
+            f'num_{self.formula.pk}_{self.tc_new.pk}': '12.3',
             f'orig_{self.tc_new.pk}': str(self.tc_manual.pk),
         })
 
@@ -494,6 +495,121 @@ class MeanWritebackTests(TestCase):
         self.assertEqual(resp.status_code, 302)
         self.assertEqual(self._manual_value(self.tc_manual), '合格',
                          '被拒时不得删除任何记录')
+
+    def test_legacy_pk_url_redirects_to_code(self):
+        """旧的版本主键地址跳到实验单号，同一张单的各版本按钮才是同一个地址。"""
+        url = reverse('project_formula_mean_writeback_legacy',
+                      kwargs={'pk': self.project.pk, 'formula_pk': self.formula.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.url, self._url())
+
+    def _add_version(self):
+        return LabFormula.objects.create(
+            code=self.formula.code, name='配方', material_type=self.mt,
+            project=self.project, creator=self.user, version=2)
+
+    def test_existing_manual_value_is_not_replaced_by_mean(self):
+        """已有手动值时，输入框保持原值；均值只出现在只读对照卡。"""
+        FormulaTestResult.objects.create(
+            formula=self.formula, test_config=self.tc_order,
+            production_order=None, value=Decimal('40.000'))
+
+        html = self.client.get(self._url()).content.decode('utf-8')
+        self.assertIn(
+            f'name="num_{self.formula.pk}_{self.tc_order.pk}"', html)
+        self.assertIn('value="40.000"', html)
+        self.assertNotIn('value="50.000"', html)
+        self.assertIn('>50.000<', html)
+
+    def test_empty_manual_prefills_that_versions_mean(self):
+        """该版本没有手动值时，用这一版自己的工单均值预填，不影响已有值的版本。"""
+        FormulaTestResult.objects.create(
+            formula=self.formula, test_config=self.tc_order,
+            production_order=None, value=Decimal('40.000'))
+        other = self._add_version()
+        order = ProductionOrder.objects.create(
+            code='TP-6001', trial_code=other.code, creator=self.user)
+        ProductionOrderFormulaDetail.objects.create(
+            production_order=order, formula=other, planned_quantity=10)
+        FormulaTestResult.objects.create(
+            formula=other, test_config=self.tc_order,
+            production_order=order, value=Decimal('48.000'))
+
+        html = self.client.get(self._url()).content.decode('utf-8')
+        self.assertIn('>v2<', html)
+        self.assertIn('value="40.000"', html)
+        self.assertIn(
+            f'name="num_{other.pk}_{self.tc_order.pk}"', html)
+        self.assertIn('value="48.000"', html)
+
+    def test_saving_one_version_does_not_change_another(self):
+        """只提交一个版本的格子，不改其它版本的手动值，也不改工单结果。"""
+        FormulaTestResult.objects.create(
+            formula=self.formula, test_config=self.tc_order,
+            production_order=None, value=Decimal('40.000'))
+        other = self._add_version()
+        FormulaTestResult.objects.create(
+            formula=other, test_config=self.tc_manual,
+            production_order=None, value_text='良好')
+
+        resp = self._post({
+            f'txt_{other.pk}_{self.tc_manual.pk}': '改过',
+            f'date_{self.tc_manual.pk}': '2026-09-16',
+            f'rem_{self.tc_manual.pk}': '仅v2',
+        })
+        self.assertEqual(resp.status_code, 302)
+
+        kept = FormulaTestResult.objects.get(
+            formula=self.formula, test_config=self.tc_order,
+            production_order__isnull=True)
+        self.assertEqual(kept.value, Decimal('40.000'))
+        updated = FormulaTestResult.objects.get(
+            formula=other, test_config=self.tc_manual,
+            production_order__isnull=True)
+        self.assertEqual(updated.value_text, '改过')
+        self.assertEqual(updated.test_date, date(2026, 9, 16))
+        self.assertEqual(updated.remark, '仅v2')
+        self.assertEqual(self._manual_value(self.tc_manual), '合格')
+        order_result = FormulaTestResult.objects.get(
+            formula=self.formula, test_config=self.tc_order,
+            production_order__isnull=False)
+        self.assertEqual(order_result.value, Decimal('50.000'))
+
+    def test_shared_date_is_written_to_each_filled_version(self):
+        """日期和备注是整行一份，写进这一行每个有值的版本。"""
+        other = self._add_version()
+        resp = self._post({
+            f'num_{self.formula.pk}_{self.tc_new.pk}': '1.5',
+            f'num_{other.pk}_{self.tc_new.pk}': '2.5',
+            f'date_{self.tc_new.pk}': '2026-10-01',
+            f'rem_{self.tc_new.pk}': '同行',
+        })
+        self.assertEqual(resp.status_code, 302)
+        for formula, expected in ((self.formula, '1.5'), (other, '2.5')):
+            saved = FormulaTestResult.objects.get(
+                formula=formula, test_config=self.tc_new,
+                production_order__isnull=True)
+            self.assertEqual(saved.value, Decimal(expected))
+            self.assertEqual(saved.test_date, date(2026, 10, 1))
+            self.assertEqual(saved.remark, '同行')
+
+    def test_renaming_removes_the_old_item_on_every_version(self):
+        """改测试项目会清掉该实验单全部版本上的原手动记录。"""
+        other = self._add_version()
+        FormulaTestResult.objects.create(
+            formula=other, test_config=self.tc_manual,
+            production_order=None, value_text='良好')
+
+        self._post({
+            f'num_{self.formula.pk}_{self.tc_new.pk}': '12.3',
+            f'orig_{self.tc_new.pk}': str(self.tc_manual.pk),
+        })
+
+        self.assertFalse(FormulaTestResult.objects.filter(
+            formula=other, test_config=self.tc_manual,
+            production_order__isnull=True).exists())
+        self.assertIsNone(self._manual_value(self.tc_manual))
 
 
 class OrgLeaderProjectAccessTests(TestCase):

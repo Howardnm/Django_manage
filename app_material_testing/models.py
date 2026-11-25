@@ -8,7 +8,7 @@ class TestingTask(models.Model):
     class Status(models.TextChoices):
         PENDING = 'PENDING', '待测试'
         IN_PROGRESS = 'IN_PROGRESS', '测试中'
-        COMPLETED = 'COMPLETED', '已完成'
+        COMPLETED = 'COMPLETED', '已填写'
         RESULTS_WRITTEN_BACK = 'RESULTS_WRITTEN_BACK', '已回写'
 
     production_order = models.ForeignKey(
@@ -53,8 +53,8 @@ class TestingTask(models.Model):
         return {
             self.Status.PENDING: 'bg-secondary-lt',
             self.Status.IN_PROGRESS: 'bg-yellow-lt',
-            self.Status.COMPLETED: 'bg-green-lt',
-            self.Status.RESULTS_WRITTEN_BACK: 'bg-info-lt',
+            self.Status.COMPLETED: 'bg-azure-lt',
+            self.Status.RESULTS_WRITTEN_BACK: 'bg-green-lt',
         }.get(self.status, 'bg-secondary-lt')
 
 

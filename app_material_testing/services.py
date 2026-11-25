@@ -71,10 +71,14 @@ class TestingTaskService:
 
         complete = TestingTaskService._is_complete(task)
         if complete:
+            already_completed = task.status == TestingTask.Status.COMPLETED
             if task.status == TestingTask.Status.PENDING:
                 StateMachine.transition(task, TestingTask.Status.IN_PROGRESS, user)
             if task.status == TestingTask.Status.IN_PROGRESS:
                 StateMachine.transition(task, TestingTask.Status.COMPLETED, user)
+            if user and not already_completed and task.status == TestingTask.Status.COMPLETED:
+                task.assigned_to = user
+                task.save(update_fields=['assigned_to'])
         else:
             if task.status == TestingTask.Status.PENDING:
                 StateMachine.transition(task, TestingTask.Status.IN_PROGRESS, user)
@@ -129,29 +133,14 @@ class TestingTaskService:
         return written
 
     @staticmethod
-    def _consume_specimens_and_advance(task):
-        """标记工单待测试样条为已消耗，并检查工单推进。"""
-        from app_trial_production.models import SampleInventory
-        from django.utils import timezone as tz
-
-        consumed = SampleInventory.objects.filter(
-            production_order=task.production_order,
-            type='SPECIMEN',
-            sub_type='FOR_TESTING',
-            status='IN_LAB',
-        ).update(status='CONSUMED', updated_at=tz.now())
-        if consumed:
-            logger.info(
-                f"Marked {consumed} specimens as CONSUMED "
-                f"for order {task.production_order.code}"
-            )
-
+    def _advance_order(task):
+        """检查并推进关联排产工单。"""
         from app_trial_production.services.order_service import ProductionOrderService
         ProductionOrderService.check_and_advance(task.production_order)
 
     @staticmethod
     @transaction.atomic
-    def write_back_results(task):
+    def write_back_results(task, user=None):
         """
         将测试结果回写到 FormulaTestResult（可覆盖）。
 
@@ -173,18 +162,21 @@ class TestingTaskService:
             if task.status == TestingTask.Status.IN_PROGRESS:
                 StateMachine.transition(task, TestingTask.Status.COMPLETED)
             StateMachine.transition(task, TestingTask.Status.RESULTS_WRITTEN_BACK)
-            TestingTaskService._consume_specimens_and_advance(task)
+            if user:
+                task.assigned_to = user
+                task.save(update_fields=['assigned_to'])
+            TestingTaskService._advance_order(task)
 
         logger.info(f"TestingTask {task.pk} wrote back {written} results")
         return written
 
     @staticmethod
     @transaction.atomic
-    def force_complete_and_writeback(task):
+    def force_complete_and_writeback(task, user=None):
         """
         手动过掉：覆盖回写所有有值条目并强制推进到终态，不做完整性校验。
 
-        供测试员手动结束数据缺失的任务，复用同一套回写 + 样条消耗 + 工单推进逻辑。
+        供测试员手动结束数据缺失的任务，复用同一套回写与工单推进逻辑。
 
         Returns:
             int: 本次覆盖到配方库的有值条目数（终态则 0）
@@ -199,7 +191,10 @@ class TestingTaskService:
         if task.status == TestingTask.Status.IN_PROGRESS:
             StateMachine.transition(task, TestingTask.Status.COMPLETED)
         StateMachine.transition(task, TestingTask.Status.RESULTS_WRITTEN_BACK)
-        TestingTaskService._consume_specimens_and_advance(task)
+        if user:
+            task.assigned_to = user
+            task.save(update_fields=['assigned_to'])
+        TestingTaskService._advance_order(task)
 
         logger.info(f"TestingTask {task.pk} force completed, wrote back {written} results")
         return written
@@ -210,7 +205,7 @@ class TestingTaskService:
         """把已完成或已回写的测试任务退回测试中，供测试中心重新填写。
 
         保留 TrialTestResult 的数值，只清完成时间并把「已回写」标记复位。
-        不删除配方上的 FormulaTestResult，不回滚工单，不恢复已消耗样条。
+        不删除配方上的 FormulaTestResult，不回滚工单。
         """
         returnable = (
             TestingTask.Status.COMPLETED,

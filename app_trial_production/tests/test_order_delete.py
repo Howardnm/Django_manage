@@ -1,18 +1,16 @@
 """草稿工单删除的回归测试。
 
-针对 MySQL 上的一个隐蔽行为：MoldRequirement.production_order 是
-null=True + CASCADE，Django 的 Collector 在无法延迟约束检查的后端上会先
-`UPDATE ... SET production_order_id = NULL` 再删父行 —— 这一步会撞上
-MoldRequirement 的 CheckConstraint(mold_req_has_production_order)。
-直接把带模具矩阵的草稿工单 order.delete() 会抛 IntegrityError。
+MoldRequirement.production_order 是不可空 CASCADE，与测试任务相同。
+直接 order.delete() 应删掉模具需求及其配方明细，不能先把外键置空。
 """
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from app_material.models import MaterialType
-from app_formula.models import LabFormula
-from app_mold_injection.models import MoldRequirement, MoldType
+from app_material.models import MaterialType, MetricCategory, TestConfig
+from app_formula.models import FormulaTestResult, LabFormula
+from app_mold_injection.models import (
+    InjectionTask, MoldRequirement, MoldRequirementFormulaDetail, MoldType)
 from app_trial_production.models import (
     ProductionOrder, ProductionOrderFormulaDetail)
 from app_trial_production.services import ProductionOrderService
@@ -33,12 +31,14 @@ class DraftOrderDeleteTests(TestCase):
             status=ProductionOrder.Status.DRAFT, creator=self.user)
         ProductionOrderFormulaDetail.objects.create(
             production_order=self.order, formula=self.formula, planned_quantity=10)
-        mold = MoldType.objects.create(
+        self.mold = MoldType.objects.create(
             name='样条模具', mold_code='M-5000',
             mold_type=MoldType.MoldTypeChoices.TEST_SPECIMEN,
             standard=MoldType.Standard.ISO)
-        MoldRequirement.objects.create(
-            production_order=self.order, mold=mold, order=0)
+        requirement = MoldRequirement.objects.create(
+            production_order=self.order, mold=self.mold, order=0)
+        MoldRequirementFormulaDetail.objects.create(
+            mold_requirement=requirement, formula=self.formula, specimen_quantity=2)
         self.client.force_login(self.user)
 
     def test_delete_draft_with_mold_requirements(self):
@@ -46,7 +46,31 @@ class DraftOrderDeleteTests(TestCase):
         ProductionOrderService.delete_draft(self.order)
         self.assertFalse(ProductionOrder.objects.filter(pk=self.order.pk).exists())
         self.assertFalse(MoldRequirement.objects.exists())
+        self.assertFalse(MoldRequirementFormulaDetail.objects.exists())
         self.assertFalse(ProductionOrderFormulaDetail.objects.exists())
+        self.assertTrue(MoldType.objects.filter(pk=self.mold.pk).exists())
+
+    def test_order_delete_cascades_mold_requirements(self):
+        """不可空 CASCADE：直接删工单，不先把模具需求的工单外键置空。"""
+        injection = InjectionTask.objects.create(production_order=self.order)
+        category = MetricCategory.objects.create(name='力学', order=1)
+        config = TestConfig.objects.create(
+            category=category, name='拉伸强度', standard='ISO 527', data_type='NUMBER')
+        written = FormulaTestResult.objects.create(
+            formula=self.formula, test_config=config, production_order=self.order,
+            value='1.500')
+        manual = FormulaTestResult.objects.create(
+            formula=self.formula, test_config=config, value='2.000')
+
+        self.order.delete()
+
+        self.assertFalse(ProductionOrder.objects.filter(pk=self.order.pk).exists())
+        self.assertFalse(MoldRequirement.objects.exists())
+        self.assertFalse(MoldRequirementFormulaDetail.objects.exists())
+        self.assertFalse(InjectionTask.objects.filter(pk=injection.pk).exists())
+        self.assertFalse(FormulaTestResult.objects.filter(pk=written.pk).exists())
+        self.assertTrue(FormulaTestResult.objects.filter(pk=manual.pk).exists())
+        self.assertTrue(MoldType.objects.filter(pk=self.mold.pk).exists())
 
     def test_delete_draft_view(self):
         """「删除草稿」按钮走通同一路径。"""

@@ -1,173 +1,142 @@
 import logging
+import re
+from decimal import Decimal
 
-from django import forms as django_forms
-from django.views.generic import View
-from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.db.models import Sum
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.generic import View
 
 from app_trial_production.mixins import ExtrusionTaskAccessMixin
-from app_trial_production.models import SampleInventory
-from app_trial_production.forms import PelletSplitForm
-from app_trial_production.services import SampleInventoryService
+from app_trial_production.services import ExtrusionTaskService, ProductionOrderService
+from app_trial_production.models import ExtrusionTask, ProductionOrder
 
 logger = logging.getLogger(__name__)
 
+# 与 ProductionOrderFormulaDetail 的 Decimal(max_digits=10, decimal_places=2) 对齐。
+# 模板 input name 必须与这两个函数一致：finished_pellet_kg_<pk> / specimen_pellet_kg_<pk>
+_KG_QUANT = Decimal('0.01')
+_KG_PATTERN = re.compile(r'^\d{1,8}(?:\.\d{1,2})?$')
+
+
+def _finished_field(detail_pk):
+    return f'finished_pellet_kg_{detail_pk}'
+
+
+def _specimen_field(detail_pk):
+    return f'specimen_pellet_kg_{detail_pk}'
+
+
+def _parse_kg(raw):
+    """必填，且为不小于 0、最多两位小数的数字。失败返回 (None, 错误文案)。"""
+    text = '' if raw is None else str(raw).strip()
+    if not text:
+        return None, '必填'
+    if not _KG_PATTERN.fullmatch(text):
+        return None, '须为不小于 0 的数字，最多两位小数'
+    return Decimal(text).quantize(_KG_QUANT), ''
+
+
+def _format_kg(value):
+    return format(Decimal(value).quantize(_KG_QUANT), 'f')
+
 
 class PelletSplitView(ExtrusionTaskAccessMixin, View):
-    """挤出后颗粒分拨 — 仅挤出操作员"""
+    """产量登记 — 挤出完成后填写每个配方版本的成品颗粒与样条颗粒。"""
+
     template_name = 'apps/app_trial_production/pellet/split.html'
 
-    def _resolve_order(self):
+    def _resolve_order(self, pk):
         if not hasattr(self, '_order'):
-            from app_trial_production.models import ProductionOrder
-            self._order = get_object_or_404(ProductionOrder, pk=self.kwargs['pk'])
+            self._order = get_object_or_404(
+                ProductionOrder.objects.select_related('extrusion_task'),
+                pk=pk,
+            )
         return self._order
 
-    def _get_formulas(self):
-        from app_formula.models import LabFormula
-        order = self._resolve_order()
-        return LabFormula.objects.filter(
-            code=order.trial_code, project=order.project,
-        ).order_by('version')
+    def _formula_details(self, order):
+        return list(
+            order.formula_details.select_related('formula').order_by('formula__version', 'pk')
+        )
+
+    def _in_progress_task_or_redirect(self, request, order):
+        task = order.extrusion_task if hasattr(order, 'extrusion_task') else None
+        if task is None or task.status != ExtrusionTask.Status.IN_PROGRESS:
+            messages.warning(request, '挤出任务未开始，不能完成挤出')
+            return None, redirect('trial_order_detail', pk=order.pk)
+        return task, None
+
+    def _bind(self, details, data=None):
+        """回显公斤数。POST 时校验，并把行级错误挂到明细上供卡片读取。"""
+        valid = True
+        for fd in details:
+            if data is None:
+                fd.finished_pellet_input = _format_kg(fd.finished_pellet_kg)
+                fd.specimen_pellet_input = _format_kg(fd.specimen_pellet_kg)
+                fd.finished_pellet_error = ''
+                fd.specimen_pellet_error = ''
+                continue
+            finished_raw = data.get(_finished_field(fd.pk), '')
+            specimen_raw = data.get(_specimen_field(fd.pk), '')
+            fd.finished_pellet_input = str(finished_raw).strip()
+            fd.specimen_pellet_input = str(specimen_raw).strip()
+            finished, finished_error = _parse_kg(fd.finished_pellet_input)
+            specimen, specimen_error = _parse_kg(fd.specimen_pellet_input)
+            fd.finished_pellet_error = finished_error
+            fd.specimen_pellet_error = specimen_error
+            fd.finished_pellet_value = finished
+            fd.specimen_pellet_value = specimen
+            if finished_error or specimen_error:
+                valid = False
+        return valid
+
+    def _render(self, request, order, details):
+        task = order.extrusion_task if hasattr(order, 'extrusion_task') else None
+        return render(request, self.template_name, {
+            'production_order': order,
+            'formula_details': details,
+            'extrusion_task': task,
+        })
 
     def get(self, request, pk):
-        order = self._resolve_order()
-        formulas = self._get_formulas()
-
-        # 配方明细（计划产量）+ 已分拨汇总
-        formula_details = order.formula_details.select_related('formula').order_by('formula__version')
-        existing_splits = SampleInventory.objects.filter(
-            production_order=order, type='PELLET',
-        ).values('formula_id', 'sub_type').annotate(
-            total_qty=Sum('quantity'),
-        )
-        split_map = {}
-        for s in existing_splits:
-            key = (s['formula_id'], s['sub_type'])
-            split_map[key] = float(s['total_qty'] or 0)
-
-        formula_summaries = []
-        for fd in formula_details:
-            finished_qty = split_map.get((fd.formula_id, 'FINISHED'), 0)
-            for_injection_qty = split_map.get((fd.formula_id, 'FOR_INJECTION'), 0)
-            formula_summaries.append({
-                'formula': fd.formula,
-                'planned_qty': float(fd.planned_quantity or 0),
-                'finished_qty': finished_qty,
-                'for_injection_qty': for_injection_qty,
-                'total_split': finished_qty + for_injection_qty,
-            })
-
-        # 按「配方版本 × 分拨类型」排列组合预设所有行
-        _formulas = formulas
-        extra_rows = len(formulas) * 2
-
-        initial_data = []
-        for f in formulas:
-            initial_data.append({'formula': f.pk, 'sub_type': 'FINISHED'})
-            initial_data.append({'formula': f.pk, 'sub_type': 'FOR_INJECTION'})
-
-        class _SplitForm(PelletSplitForm):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.fields['formula'].queryset = _formulas
-
-        DynamicFormSet = django_forms.formset_factory(
-            _SplitForm, extra=0, can_delete=True,
-        )
-        formset = DynamicFormSet(initial=initial_data)
-
-        # 将标签注入每个 form 实例，供模板读取
-        idx = 0
-        for f in formulas:
-            formset.forms[idx].row_label = {'version': f.version, 'type_label': '颗粒成品', 'type_css': 'bg-green-lt'}
-            idx += 1
-            formset.forms[idx].row_label = {'version': f.version, 'type_label': '待打样颗粒', 'type_css': 'bg-orange-lt'}
-            idx += 1
-
-        return render(request, self.template_name, {
-            'production_order': order,
-            'formset': formset,
-            'formulas': formulas,
-            'formula_summaries': formula_summaries,
-        })
+        order = self._resolve_order(pk)
+        _task, bounce = self._in_progress_task_or_redirect(request, order)
+        if bounce:
+            return bounce
+        details = self._formula_details(order)
+        self._bind(details)
+        return self._render(request, order, details)
 
     def post(self, request, pk):
-        order = self._resolve_order()
-        formulas = self._get_formulas()
+        order = self._resolve_order(pk)
+        task, bounce = self._in_progress_task_or_redirect(request, order)
+        if bounce:
+            return bounce
+        if task.operator_id and task.operator_id != request.user.pk and not request.user.is_superuser:
+            messages.error(request, '您不是该任务分配的挤出操作员')
+            return redirect('trial_order_detail', pk=order.pk)
 
-        _formulas = formulas
+        details = self._formula_details(order)
+        if not details:
+            messages.warning(request, '该工单没有配方明细，无法登记产量')
+            return self._render(request, order, details)
 
-        class _SplitForm(PelletSplitForm):
-            def __init__(self, *args, **kwargs):
-                super().__init__(*args, **kwargs)
-                self.fields['formula'].queryset = _formulas
+        if not self._bind(details, request.POST):
+            messages.error(request, '请修正标红的产量后再提交')
+            return self._render(request, order, details)
 
-        DynamicFormSet = django_forms.formset_factory(
-            _SplitForm, extra=1, can_delete=True,
-        )
-        formset = DynamicFormSet(request.POST)
+        try:
+            with transaction.atomic():
+                for fd in details:
+                    fd.finished_pellet_kg = fd.finished_pellet_value
+                    fd.specimen_pellet_kg = fd.specimen_pellet_value
+                    fd.save(update_fields=['finished_pellet_kg', 'specimen_pellet_kg'])
+                ProductionOrderService.record_actual_quantity(order)
+                ExtrusionTaskService.complete_task(task, request.user)
+        except Exception:
+            logger.exception('Yield register failed for order %s', order.pk)
+            messages.error(request, '完成挤出失败，请稍后重试')
+            return self._render(request, order, details)
 
-        # 构建配方分拨概览（error 重渲染时需要）
-        formula_details = order.formula_details.select_related('formula').order_by('formula__version')
-        existing_splits = SampleInventory.objects.filter(
-            production_order=order, type='PELLET',
-        ).values('formula_id', 'sub_type').annotate(total_qty=Sum('quantity'))
-        split_map = {}
-        for s in existing_splits:
-            key = (s['formula_id'], s['sub_type'])
-            split_map[key] = float(s['total_qty'] or 0)
-        formula_summaries = []
-        for fd in formula_details:
-            finished_qty = split_map.get((fd.formula_id, 'FINISHED'), 0)
-            for_injection_qty = split_map.get((fd.formula_id, 'FOR_INJECTION'), 0)
-            formula_summaries.append({
-                'formula': fd.formula,
-                'planned_qty': float(fd.planned_quantity or 0),
-                'finished_qty': finished_qty,
-                'for_injection_qty': for_injection_qty,
-                'total_split': finished_qty + for_injection_qty,
-            })
-
-        if formset.is_valid():
-            splits = []
-            for form in formset:
-                if form.cleaned_data and not form.cleaned_data.get('DELETE'):
-                    qty = form.cleaned_data.get('quantity')
-                    if qty is None:
-                        continue
-                    splits.append({
-                        'formula_id': form.cleaned_data.get('formula').pk if form.cleaned_data.get('formula') else None,
-                        'sub_type': form.cleaned_data['sub_type'],
-                        'quantity': qty,
-                    })
-
-            if not splits:
-                messages.warning(request, '请至少填写一条分拨明细（含数量和类型）')
-            else:
-                try:
-                    SampleInventoryService.create_pellet_batch(order, splits)
-                except ValueError as e:
-                    logger.exception(f"Pellet split failed for order {order.code}")
-                    messages.error(request, f'分拨操作失败：{e}')
-                else:
-                    messages.success(request, f'已创建 {len(splits)} 条颗粒样品入库记录')
-                    return redirect('trial_order_detail', pk=pk)
-
-        # 校验失败留在本页：重新渲染，注入 row_label 供模板使用
-        idx = 0
-        for f in formulas:
-            if idx < len(formset.forms):
-                formset.forms[idx].row_label = {'version': f.version, 'type_label': '颗粒成品', 'type_css': 'bg-green-lt'}
-            idx += 1
-            if idx < len(formset.forms):
-                formset.forms[idx].row_label = {'version': f.version, 'type_label': '待打样颗粒', 'type_css': 'bg-orange-lt'}
-            idx += 1
-
-        return render(request, self.template_name, {
-            'production_order': order,
-            'formset': formset,
-            'formulas': formulas,
-            'formula_summaries': formula_summaries,
-        })
+        messages.success(request, '挤出已完成')
+        return redirect('trial_order_detail', pk=order.pk)

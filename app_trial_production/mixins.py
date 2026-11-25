@@ -76,11 +76,3 @@ class RndAccessMixin(TrialProductionAccessMixin):
             return
         from django.core.exceptions import PermissionDenied
         raise PermissionDenied("您不是该项目的负责人或成员，无权操作此项目")
-
-
-class SampleInventoryAccessMixin(TrialProductionAccessMixin):
-    """样品库存 — 研发工程师 + 操作员可访问。"""
-
-    module_code = 'trial_production.sample_inventory'
-    module_name = '样品库存'
-    module_description = '样品库存。研发工程师 + 操作员可访问。'

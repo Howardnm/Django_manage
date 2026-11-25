@@ -19,15 +19,17 @@
                 </ol>
             </nav>
         </div>
-        <h2 class="page-title">
+        <h2 class="page-title mt-3">
             <i class="ti ti-calculator me-2"></i>测试数据回写
-            <span class="text-muted ms-2">{{ formula.code }} v{{ formula.version }}</span>
+            <span class="text-muted ms-2">{{ formula.code }}</span>
+            {% for item in formulas %}
+            <span class="badge bg-azure-lt ms-1">v{{ item.version }}</span>
+            {% endfor %}
         </h2>
     </div>
 </div>
 
 <div class="container-xl mt-3">
-    {# 配方 + 工单信息 #}
     <div class="card mb-3">
         <div class="card-body">
             <div class="row g-2 small">
@@ -41,123 +43,144 @@
                 </div>
                 <div class="col-md-4">
                     <span class="text-muted">汇总工单：</span>
-                    {% for code in order_codes %}
-                    <span class="badge bg-blue-lt text-blue me-1">{{ code }}</span>
-                    {% empty %}
-                    <span class="text-muted">—</span>
+                    {% for col in version_columns %}
+                    <span class="me-2">
+                        <span class="text-muted">v{{ col.formula.version }}</span>
+                        {% for order in col.orders %}
+                        <span class="badge bg-blue-lt text-blue me-1">{{ order.code }}</span>
+                        {% empty %}
+                        <span class="text-muted">—</span>
+                        {% endfor %}
+                    </span>
                     {% endfor %}
                 </div>
             </div>
         </div>
     </div>
 
+    <div class="card card-sm mb-3">
+        <div class="card-header bg-purple-lt py-1">
+            <h3 class="card-title text-purple"><i class="ti ti-chart-bar me-2"></i>工单测试结果</h3>
+        </div>
+        <div class="formula-table-scroll">
+            <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="order-matrix">
+                <thead>
+                <tr>
+                    <th rowspan="2" style="min-width: 220px;">测试项目</th>
+                    {% for col in version_columns %}
+                    <th colspan="{{ col.span }}" class="version-start">v{{ col.formula.version }}</th>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    {% for col in version_columns %}
+                        {% for order in col.orders %}
+                        <th class="{% if forloop.first %}version-start{% endif %}">{{ order.code }}</th>
+                        {% endfor %}
+                        <th class="mean-col{% if not col.orders %} version-start{% endif %}">均值</th>
+                    {% endfor %}
+                </tr>
+                </thead>
+                <tbody>
+                {% for row in rows %}
+                <tr>
+                    <td class="text-start" title="{{ row.test_config }}">{{ row.test_config.name }}</td>
+                    {% for cell in row.order_cells %}
+                    <td class="{% if cell.version_start %}version-start{% endif %}{% if cell.is_mean %} mean-col{% endif %}">{{ cell.text }}</td>
+                    {% endfor %}
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="{{ order_colspan }}" class="text-center text-muted py-4">暂无工单或手动测试数据</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
     <form method="POST">
         {% csrf_token %}
-        {% comment %}
-        标记字段：本页表单是"整体覆盖"语义（未提交的行视为被移除），
-        没有它就无法区分"用户删光了所有行"和"请求被裁剪/构造"，
-        后者会导致手动录入数据被整体清空。
-        {% endcomment %}
         <input type="hidden" name="writeback_form" value="1">
 
-        {% comment %}
-        卡片结构与样式一比一复制自成品材料编辑页的「物性指标」卡片
-        （templates/apps/app_material/material/form_card/form_data.html），
-        只去掉最小值/最大值两列，另加一列「各工单原始值」展示聚合来源。
-        注意：表格**不能**套 table-responsive —— 它有 overflow-x:auto，
-        会把 TomSelect 的下拉面板裁掉。
-        {% endcomment %}
-        <div class="card mb-3">
-            <div class="card-header bg-purple-lt">
+        <div class="card card-sm mb-2">
+            <div class="card-header bg-purple-lt py-1">
                 <h3 class="card-title text-purple"><i class="ti ti-flask me-2"></i>测试结果</h3>
             </div>
-            <div>
-                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="data-table" style="font-size: 13px; table-layout: auto;">
+            <div class="formula-table-scroll">
+                <table class="table table-vcenter table-bordered card-table text-nowrap table-sm text-center" id="data-table">
                     <thead>
                     <tr>
-                        <th style="width: 550px;">测试项目</th>
-                        <th style="width: auto;">各工单原始值</th>
-                        <th style="width: auto;">数值 / 结果</th>
-                        <th style="width: 110px;">测试日期</th>
-                        <th style="width: 100px;">备注</th>
-                        <th style="width: 50px;">删除</th>
+                        <th rowspan="2" style="min-width: 280px;">测试项目</th>
+                        <th colspan="{{ formulas|length }}" style="min-width: 140px;">数值 / 结果</th>
+                        <th rowspan="2" style="min-width: 130px;">测试日期</th>
+                        <th rowspan="2" style="min-width: 120px;">备注</th>
+                        <th rowspan="2" style="width: 50px;">删除</th>
+                    </tr>
+                    <tr>
+                        {% for item in formulas %}
+                        <th class="version-start">v{{ item.version }}</th>
+                        {% endfor %}
                     </tr>
                     </thead>
                     <tbody id="writeback-rows">
                     {% for row in rows %}
-                        {% comment %}
-                        data-persisted：库里已存在的行。删除时须"清空值 + 隐藏"而不是摘掉
-                        DOM —— 摘掉就不会随表单提交，服务端无从得知要清掉这一项。
-                        {% endcomment %}
-                        <tr class="writeback-row" data-persisted="1">
-                            <td>
-                                <select class="form-select form-select-search writeback-config" style="width: 550px;">
-                                    {% for tc in all_test_configs %}
-                                    <option value="{{ tc.pk }}" {% if tc.pk == row.test_config.pk %}selected{% endif %}>{{ tc }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% comment %}
-                                记住本行原本对应的测试项（data-origin）。只有用户真改了下拉时
-                                才由 JS 补上 name=orig_{新pk}，服务端据此移除原测试项的记录 ——
-                                这样"改测试项目"能正确迁移，未提交的行依旧不受影响。
-                                {% endcomment %}
-                                <input type="hidden" class="writeback-origin" data-origin="{{ row.test_config.pk }}">
-                            </td>
-                            <td>
-                                {% for ov in row.order_values %}
-                                <span class="badge bg-secondary-lt me-1 mb-1" title="{{ ov.code }}">
-                                    {% if row.data_type == 'NUMBER' %}{{ ov.value|floatformat:2 }}{% else %}{{ ov.text }}{% endif %}
-                                </span>
-                                {% empty %}
-                                <span class="text-muted">—</span>
+                    <tr class="writeback-row" data-persisted="1">
+                        <td>
+                            <select class="form-select form-select-search writeback-config">
+                                {% for tc in all_test_configs %}
+                                <option value="{{ tc.pk }}" {% if tc.pk == row.test_config.pk %}selected{% endif %}>{{ tc }}</option>
                                 {% endfor %}
-                            </td>
-                            <td class="writeback-value-cell">
-                                {% if row.data_type == 'NUMBER' %}
-                                <input type="number" step="0.001" class="form-control value-number"
-                                       name="num_{{ row.test_config.pk }}"
-                                       value="{{ row.agg_value|default:'' }}">
-                                {% elif row.data_type == 'SELECT' %}
-                                <select class="form-select value-select" name="txt_{{ row.test_config.pk }}">
-                                    <option value=""></option>
-                                    {% for opt in row.test_config.get_options_list %}
-                                    <option value="{{ opt }}" {% if opt == row.agg_text %}selected{% endif %}>{{ opt }}</option>
-                                    {% endfor %}
-                                </select>
-                                {% else %}
-                                <input type="text" class="form-control value-text"
-                                       name="txt_{{ row.test_config.pk }}"
-                                       value="{{ row.agg_text }}">
-                                {% endif %}
-                            </td>
-                            <td>
-                                <input type="date" class="form-control"
-                                       name="date_{{ row.test_config.pk }}"
-                                       value="{{ row.test_date|date:'Y-m-d' }}">
-                            </td>
-                            <td>
-                                <input type="text" class="form-control"
-                                       name="rem_{{ row.test_config.pk }}"
-                                       value="{{ row.remark }}" maxlength="50" placeholder="备注">
-                            </td>
-                            <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-writeback-row"
-                                        title="清除该测试项的值"><i class="ti ti-trash"></i></button>
-                            </td>
-                        </tr>
+                            </select>
+                            <input type="hidden" class="writeback-origin" data-origin="{{ row.test_config.pk }}">
+                        </td>
+                        {% for editor in row.editors %}
+                        <td class="writeback-value-cell version-start" data-formula="{{ editor.formula_id }}">
+                            {% if row.data_type == 'NUMBER' %}
+                            <input type="number" step="0.001" class="form-control value-number"
+                                   name="num_{{ editor.formula_id }}_{{ row.test_config.pk }}"
+                                   value="{{ editor.input_value }}">
+                            {% elif row.data_type == 'SELECT' %}
+                            <select class="form-select value-select" name="txt_{{ editor.formula_id }}_{{ row.test_config.pk }}">
+                                <option value=""></option>
+                                {% for opt in row.test_config.get_options_list %}
+                                <option value="{{ opt }}" {% if opt == editor.input_text %}selected{% endif %}>{{ opt }}</option>
+                                {% endfor %}
+                            </select>
+                            {% else %}
+                            <input type="text" class="form-control value-text"
+                                   name="txt_{{ editor.formula_id }}_{{ row.test_config.pk }}"
+                                   value="{{ editor.input_text }}">
+                            {% endif %}
+                        </td>
+                        {% endfor %}
+                        <td>
+                            <input type="date" class="form-control"
+                                   name="date_{{ row.test_config.pk }}"
+                                   value="{{ row.test_date|date:'Y-m-d' }}">
+                        </td>
+                        <td>
+                            <input type="text" class="form-control"
+                                   name="rem_{{ row.test_config.pk }}"
+                                   value="{{ row.remark }}" maxlength="50" placeholder="备注">
+                        </td>
+                        <td class="text-center">
+                            <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-writeback-row"
+                                    title="清除该测试项的值"><i class="ti ti-trash"></i></button>
+                        </td>
+                    </tr>
                     {% empty %}
-                        <tr id="writeback-empty-row">
-                            <td colspan="6" class="text-center text-muted py-4">
-                                <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
-                                暂无测试数据 — 点下方「添加测试项」开始录入
-                            </td>
-                        </tr>
+                    <tr id="writeback-empty-row">
+                        <td colspan="{{ formulas|length|add:4 }}" class="text-center text-muted py-4">
+                            <i class="ti ti-mood-empty fs-2 d-block mb-2"></i>
+                            暂无测试数据 — 点下方「添加测试项」开始录入
+                        </td>
+                    </tr>
                     {% endfor %}
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer">
-                <button type="button" class="btn btn-ghost-purple" id="add-writeback-row">
+            <div class="card-footer py-2">
+                <button type="button" class="btn btn-sm btn-ghost-purple" id="add-writeback-row">
                     <i class="ti ti-plus me-1"></i> 添加测试项
                 </button>
             </div>
@@ -172,28 +195,24 @@
     </form>
 </div>
 
-{% comment %}
-新增行的骨架：选中测试项目后由 JS 按 data_type 生成值控件并补上各字段的 name。
-控件 class 与上面现存行保持一致（基础尺寸，不写 -sm）。
-{% endcomment %}
 <script type="text/template" id="writeback-empty-row-template">
     <tr class="writeback-row">
         <td>
-            <select class="form-select form-select-search writeback-config" style="width: 550px;">
+            <select class="form-select form-select-search writeback-config">
                 <option value=""></option>
                 {% for tc in all_test_configs %}
                 <option value="{{ tc.pk }}">{{ tc }}</option>
                 {% endfor %}
             </select>
         </td>
-        <td class="text-muted">—</td>
-        <td class="writeback-value-cell">
+        {% for item in formulas %}
+        <td class="writeback-value-cell version-start" data-formula="{{ item.pk }}">
             <input type="text" class="form-control" disabled placeholder="请先选择测试项目">
         </td>
+        {% endfor %}
         <td><input type="date" class="form-control writeback-date" disabled></td>
         <td>
-            <input type="text" class="form-control writeback-remark"
-                   disabled maxlength="50" placeholder="备注">
+            <input type="text" class="form-control writeback-remark" disabled maxlength="50" placeholder="备注">
         </td>
         <td class="text-center">
             <button type="button" class="btn btn-sm btn-ghost-danger btn-icon remove-writeback-row"
@@ -202,10 +221,10 @@
     </tr>
 </script>
 
-{# Data bridge：测试项目元数据，供 JS 生成对应类型的值控件 #}
 {{ writeback_config_meta|json_script:"writeback-config-meta" }}
 {% endblock %}
 
 {% block extra_js %}
+<script src="{% static 'js/common/card_table_scroll.js' %}?v=2"></script>
 <script src="{% static 'js/apps/app_project/test_result_writeback.js' %}"></script>
 {% endblock %}

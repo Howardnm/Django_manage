@@ -1,8 +1,8 @@
-"""ProductionOrder / ExtrusionTask / SampleInventory model tests."""
+"""ProductionOrder / ExtrusionTask model tests."""
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 from app_trial_production.models import (
-    ProductionOrder, ExtrusionTask, SampleInventory, TrialProductionConfig,
+    ProductionOrder, ExtrusionTask, TrialProductionConfig,
 )
 
 User = get_user_model()
@@ -51,29 +51,3 @@ class TrialProductionConfigTests(TestCase):
         self.assertEqual(config.pk, 1)
         config2 = TrialProductionConfig.get()
         self.assertEqual(config.pk, config2.pk)
-
-
-class SampleInventoryTests(TestCase):
-    def setUp(self):
-        self.user = User.objects.create_user(username='testuser', email='tp_samples@trial.dev', password='test')
-
-    def test_can_sap_entry(self):
-        """仅 FINISHED 颗粒 IN_LAB 状态可 SAP 入库"""
-        order = ProductionOrder.objects.create(creator=self.user)
-        sample = SampleInventory.objects.create(
-            type='PELLET', sub_type='FINISHED', status='IN_LAB',
-            production_order=order, quantity=10,
-        )
-        self.assertTrue(sample.can_sap_entry)
-
-        sample.sub_type = 'FOR_INJECTION'
-        self.assertFalse(sample.can_sap_entry)
-
-    def test_is_reserved_for_injection(self):
-        """FOR_INJECTION 颗粒关联注塑任务后标记为预留"""
-        order = ProductionOrder.objects.create(creator=self.user)
-        sample = SampleInventory.objects.create(
-            type='PELLET', sub_type='FOR_INJECTION', status='IN_LAB',
-            production_order=order, quantity=5,
-        )
-        self.assertFalse(sample.is_reserved_for_injection)
