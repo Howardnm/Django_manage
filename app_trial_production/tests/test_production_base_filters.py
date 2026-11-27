@@ -40,10 +40,10 @@ class ProductionBaseFilterTests(TestCase):
     def _pks(self, filterset):
         return set(filterset.qs.values_list('pk', flat=True))
 
-    def test_unset_base_keeps_orders_without_base(self):
+    def test_pending_order_filter_shows_every_base(self):
+        """不选基地等于全部，含未填基地的工单。"""
         found = self._pks(PendingOrderFilter({}, queryset=ProductionOrder.objects.all()))
-        self.assertIn(self.order_none.pk, found)
-        self.assertIn(self.order_a.pk, found)
+        self.assertEqual(found, {self.order_a.pk, self.order_b.pk, self.order_none.pk})
 
     def test_pending_order_filter(self):
         found = self._pks(

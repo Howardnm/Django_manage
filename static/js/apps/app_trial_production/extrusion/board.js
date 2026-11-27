@@ -132,6 +132,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!card) return;
 
         initRemoteTomSelectAll(card, PENDING_TS_OPTS);
+        initLocalTomSelectAll(card);
 
         var newPool = document.getElementById('pending-pool');
         if (newPool && newPool !== pendingPool) {
@@ -155,6 +156,7 @@ document.addEventListener('DOMContentLoaded', function () {
         var card = document.getElementById('pending-orders-card');
         if (!card) return;
         destroyTomSelectAll(card);
+        destroyLocalTomSelectAll(card);
         var wrap = document.createElement('div');
         wrap.innerHTML = html.trim();
         var next = wrap.firstElementChild;
@@ -215,6 +217,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== HTMX 事件：卡片替换前先销毁旧 TomSelect（清除 body 中的 .ts-dropdown 残留） =====
     document.addEventListener('htmx:beforeSwap', function (e) {
         destroyTomSelectAll(e.target);
+        destroyLocalTomSelectAll(e.target);
     });
 
     // ===== HTMX 事件：筛选/分页替换卡片后，重新挂上 TomSelect + Draggable =====

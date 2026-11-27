@@ -85,7 +85,7 @@ class PendingOrderFilter(TablerFilterMixin, django_filters.FilterSet):
     production_base = django_filters.ModelChoiceFilter(
         queryset=Subsidiary.objects.order_by('name'),
         label='生产基地',
-        empty_label='生产基地',
+        empty_label='',
         widget=forms.Select(attrs={
             'class': 'form-select form-select-search',
             'placeholder': '生产基地',
