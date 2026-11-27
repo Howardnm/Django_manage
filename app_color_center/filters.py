@@ -5,12 +5,23 @@ from django.db.models import Q
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_trial_production.models import ProductionOrder
 from app_project.models import Project
+from app_user.models import Subsidiary
 
 
 class ColorTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """配色任务列表筛选器 — 按工单维度"""
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    production_base = django_filters.ModelChoiceFilter(
+        queryset=Subsidiary.objects.order_by('name'),
+        label='生产基地',
+        empty_label='生产基地',
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-search',
+            'placeholder': '生产基地',
+        }),
+    )
 
     sort = django_filters.OrderingFilter(
         fields=(('created_at', 'created_at'), ('code', 'code')),
@@ -19,7 +30,7 @@ class ColorTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.Fi
 
     class Meta:
         model = ProductionOrder
-        fields = ['q', 'start_date', 'end_date']
+        fields = ['q', 'production_base', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

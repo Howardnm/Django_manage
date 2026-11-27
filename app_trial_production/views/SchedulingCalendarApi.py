@@ -4,7 +4,9 @@ from django.http import JsonResponse
 from django.views import View
 
 from app_trial_production.mixins import DashboardAccessMixin
-from app_trial_production.services.extrusion_service import build_extrusion_calendar_events
+from app_trial_production.services.extrusion_service import (
+    build_extrusion_calendar_events, production_base_id_from_request,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,5 +25,6 @@ class SchedulingCalendarEventsView(DashboardAccessMixin, View):
         events = build_extrusion_calendar_events(
             request.GET.get('start', ''),
             request.GET.get('end', ''),
+            production_base_id_from_request(request),
         )
         return JsonResponse(events, safe=False)

@@ -9,8 +9,8 @@ from .models import (
 
 @admin.register(ProductionOrder)
 class ProductionOrderAdmin(admin.ModelAdmin):
-    list_display = ['code', 'trial_code', 'project', 'status', 'creator', 'created_at']
-    list_filter = ['status']
+    list_display = ['code', 'trial_code', 'project', 'status', 'production_base', 'creator', 'created_at']
+    list_filter = ['status', 'production_base']
     search_fields = ['code', 'trial_code']
 
 

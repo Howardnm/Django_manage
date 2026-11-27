@@ -19,6 +19,28 @@
 
 <div class="row row-cards mt-2">
     <div class="col-12">
+        <div class="card mb-3">
+            <div class="card-body py-3">
+                <form id="calendar-base-form" class="row g-2 align-items-center">
+                    <div class="col-auto">
+                        <div class="filter-select" style="width: 150px;">
+                            <select id="calendar-base-filter" name="production_base" class="form-select form-select-search" placeholder="全部基地">
+                                <option value="">全部基地</option>
+                                {% for base in subsidiaries %}
+                                <option value="{{ base.pk }}">{{ base.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-auto ms-auto">
+                        <button type="submit" class="btn btn-primary btn-icon" aria-label="查询" title="点击查询">
+                            <i class="ti ti-search"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
         {# ========== 只读排产日历 ========== #}
         <div class="card">
             <div class="card-header d-flex align-items-center">

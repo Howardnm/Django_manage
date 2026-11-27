@@ -17,7 +17,7 @@ class TrialDashboardView(DashboardAccessMixin, ListView):
         if qs is None:
             qs = self.model.objects.all()
         qs = qs.select_related(
-            'project', 'creator', 'process_profile',
+            'project', 'creator', 'production_base', 'process_profile',
         ).prefetch_related('formula_details__formula').annotate(
             formula_count=Count('formula_details'),
         )

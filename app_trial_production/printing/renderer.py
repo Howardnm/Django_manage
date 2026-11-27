@@ -190,6 +190,9 @@ class TrialProductionSheetRenderer(BasePrintRenderer):
             'project_name': project.name if project else '',
             'creator_display': self._get_user_display(order.creator),
             'creator_dept_path': self._get_creator_dept_path(order.creator),
+            'production_base': (
+                order.production_base.name if order.production_base_id else ''
+            ),
             'material_category': (
                 material.category.name
                 if material and material.category else ''

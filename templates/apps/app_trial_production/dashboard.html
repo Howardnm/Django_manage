@@ -149,6 +149,7 @@
                     <th>排产时间</th>
                     <th>状态</th>
                     <th>创建人</th>
+                    <th>生产基地</th>
                     <th><a href="?{% url_replace sort='created_at'|sort_toggle:current_sort %}" class="table-sort-header text-reset">创建时间</a></th>
                     <th>操作</th>
                 </tr>
@@ -193,6 +194,7 @@
                     </td>
                     <td><span class="badge {{ order.status_css_class }}">{{ order.get_status_display }}</span></td>
                     <td class="text-muted">{{ order.creator.realname|default:order.creator.username }}</td>
+                    <td class="text-muted">{{ order.production_base|default:"-" }}</td>
                     <td class="text-muted small">{{ order.created_at|date:"Y-m-d H:i" }}</td>
                     <td>
                         <a href="{% url 'trial_order_detail' order.pk %}" class="btn btn-sm btn-icon btn-ghost-primary" title="查看详情">
@@ -201,7 +203,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="11" class="text-center py-4 text-muted">暂无工单数据</td></tr>
+                <tr><td colspan="12" class="text-center py-4 text-muted">暂无工单数据</td></tr>
                 {% endfor %}
             </tbody>
         </table>

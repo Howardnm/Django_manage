@@ -90,6 +90,10 @@
                     <td>{{ order.creator.realname|default:order.creator.username }}</td>
                 </tr>
                 <tr>
+                    <td class="fw-bold text-nowrap">生产基地</td>
+                    <td>{% if order.production_base %}{{ order.production_base }}{% else %}-{% endif %}</td>
+                </tr>
+                <tr>
                     <td class="fw-bold text-nowrap">创建时间</td>
                     <td>{{ order.created_at|date:"Y-m-d H:i" }}</td>
                 </tr>

@@ -44,12 +44,19 @@ class ExtrusionTaskService:
         ProductionOrderService.check_and_advance(order)
 
 
-def build_extrusion_calendar_events(start_str, end_str):
+def production_base_id_from_request(request):
+    """日历筛选参数。空或非数字视为不过滤。"""
+    raw = request.GET.get('production_base') or ''
+    return int(raw) if raw.isdigit() else None
+
+
+def build_extrusion_calendar_events(start_str, end_str, production_base_id=None):
     """构建挤出排产 FullCalendar 事件列表 — 可写工作台与只读看板共用。
 
     Args:
         start_str: FullCalendar 附带的时间范围起点（可选）。
         end_str: FullCalendar 附带的时间范围终点（可选）。
+        production_base_id: 只返回该基地的工单。空则全部，含未填基地的。
     Returns:
         list[dict]: FullCalendar 事件负载。
     """
@@ -60,8 +67,11 @@ def build_extrusion_calendar_events(start_str, end_str):
         # COMPLETED 也纳入：全流程已完成但已挤出的工单仍需在日历上可见（与 EXTRUSION_DISPLAY_MAP 一致）
         status__in=['ACCEPTED', 'EXTRUDING', 'INJECTION_MOLDING', 'TESTING', 'COMPLETED'],
         extrusion_scheduled_date__isnull=False,
-    ).select_related(
-        'project', 'extrusion_task', 'process_profile',
+    )
+    if production_base_id:
+        qs = qs.filter(production_base_id=production_base_id)
+    qs = qs.select_related(
+        'project', 'production_base', 'extrusion_task', 'process_profile',
     ).prefetch_related(
         'formula_details__formula__material_type',
     )
@@ -132,6 +142,7 @@ def build_extrusion_calendar_events(start_str, end_str):
             'extendedProps': {
                 'trial_code': order.trial_code,
                 'project_name': order.project.name if order.project else '',
+                'production_base': order.production_base.name if order.production_base_id else '',
                 'process_profile_name': order.process_profile.name if order.process_profile else '',
                 'created_at': order.created_at.strftime('%Y-%m-%d %H:%M'),
                 'quantity': str(order.quantity_planned),

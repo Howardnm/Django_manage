@@ -78,7 +78,7 @@ class BuildEventsFunctionTests(TestCase):
         self.assertIn('editable', ev)
         # 关键字段齐全
         for key in ('trial_code', 'quantity', 'formula_count', 'needs_color',
-                    'project_name', 'process_profile_name', 'created_at',
+                    'project_name', 'production_base', 'process_profile_name', 'created_at',
                     'material_type_name', 'rgb_value'):
             self.assertIn(key, ev['extendedProps'])
 
@@ -94,6 +94,26 @@ class BuildEventsFunctionTests(TestCase):
         _make_scheduled_order('TP-all', timezone.now())
         events = build_extrusion_calendar_events('', '')
         self.assertEqual(len(events), 1)
+
+    def test_production_base_filters_events(self):
+        """传入基地只返回该基地；不传则全部，含未填基地的工单。"""
+        from app_user.models import Subsidiary
+        base_a = Subsidiary.objects.create(name='日历基地A')
+        base_b = Subsidiary.objects.create(name='日历基地B')
+        now = timezone.now()
+        order_a = _make_scheduled_order('TP-A', now, production_base=base_a)
+        _make_scheduled_order('TP-B', now, production_base=base_b)
+        _make_scheduled_order('TP-N', now)
+        titles = {
+            event['title']
+            for event in build_extrusion_calendar_events(self.range_start, self.range_end)
+        }
+        self.assertEqual(titles, {'TP-A', 'TP-B', 'TP-N'})
+        only_a = build_extrusion_calendar_events(
+            self.range_start, self.range_end, order_a.production_base_id,
+        )
+        self.assertEqual([event['title'] for event in only_a], ['TP-A'])
+        self.assertEqual(only_a[0]['extendedProps']['production_base'], '日历基地A')
 
     def test_invalid_range_ignored(self):
         """非法时间范围不报错，退化为不过滤。"""

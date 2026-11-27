@@ -4,12 +4,24 @@ from django.db.models import Q
 
 from common_utils.filters import TablerFilterMixin, DateRangeFilterMixin
 from app_material_testing.models import TestingTask
+from app_user.models import Subsidiary
 
 
 class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.FilterSet):
     """测试任务筛选器 — 状态筛选由列表卡片头部 tab 承载，不在此处作为下拉。"""
 
     q = django_filters.CharFilter(method='filter_search', label='搜索')
+
+    production_base = django_filters.ModelChoiceFilter(
+        field_name='production_order__production_base',
+        queryset=Subsidiary.objects.order_by('name'),
+        label='生产基地',
+        empty_label='生产基地',
+        widget=forms.Select(attrs={
+            'class': 'form-select form-select-search',
+            'placeholder': '生产基地',
+        }),
+    )
 
     sort = django_filters.OrderingFilter(
         fields=(
@@ -22,7 +34,7 @@ class TestingTaskFilter(TablerFilterMixin, DateRangeFilterMixin, django_filters.
 
     class Meta:
         model = TestingTask
-        fields = ['q', 'start_date', 'end_date']
+        fields = ['q', 'production_base', 'start_date', 'end_date']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -24,6 +24,26 @@
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
+    function pendingBaseValue() {
+        var baseEl = document.querySelector('#pending-orders-card [name="production_base"]');
+        return baseEl && baseEl.value ? baseEl.value : '';
+    }
+
+    function appendBaseParam(url) {
+        var baseId = pendingBaseValue();
+        if (baseId) {
+            url += '&production_base=' + encodeURIComponent(baseId);
+        }
+        return url;
+    }
+
+    function pendingCardQuery() {
+        var form = document.querySelector('#pending-orders-card form');
+        if (!form) return '';
+        var qs = new URLSearchParams(new FormData(form)).toString();
+        return qs ? ('?' + qs) : '';
+    }
+
     var calendarEl = document.getElementById('extrusion-calendar');
     var pendingPool = null;  // HTMX 卡片加载后由 mountPendingCard 赋值
     var draggable = null;
@@ -148,12 +168,12 @@ document.addEventListener('DOMContentLoaded', function () {
     function syncBoard() {
         setBoardLocked(true);
         var view = calendar.view;
-        var eventsUrl = window.EVENTS_URL
+        var eventsUrl = appendBaseParam(window.EVENTS_URL
             + '?start=' + encodeURIComponent(view.activeStart.toISOString())
-            + '&end=' + encodeURIComponent(view.activeEnd.toISOString());
+            + '&end=' + encodeURIComponent(view.activeEnd.toISOString()));
         return Promise.all([
             fetchJson(eventsUrl),
-            fetch(window.CARD_REFRESH_URL).then(function (r) {
+            fetch(window.CARD_REFRESH_URL + pendingCardQuery()).then(function (r) {
                 if (!r.ok) throw new Error('HTTP ' + r.status);
                 return r.text();
             }),
@@ -200,6 +220,7 @@ document.addEventListener('DOMContentLoaded', function () {
     // ===== HTMX 事件：筛选/分页替换卡片后，重新挂上 TomSelect + Draggable =====
     document.addEventListener('htmx:afterSettle', function () {
         mountPendingCard();
+        if (calendar) calendar.refetchEvents();
     });
 
     // ===== 发送排期请求（共用：start 必传，end 可选） =====
@@ -300,8 +321,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 successCallback(data);
                 return;
             }
-            var url = window.EVENTS_URL + '?start=' + encodeURIComponent(fetchInfo.startStr) +
-                      '&end=' + encodeURIComponent(fetchInfo.endStr);
+            var url = appendBaseParam(window.EVENTS_URL + '?start=' + encodeURIComponent(fetchInfo.startStr) +
+                      '&end=' + encodeURIComponent(fetchInfo.endStr));
             fetch(url)
                 .then(function (r) { return r.json(); })
                 .then(successCallback)
@@ -345,6 +366,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             'data-formula-count="' + formulaCount + '" ' +
                             'data-needs-color="' + (props.needs_color ? '1' : '0') + '" ' +
                             'data-project-name="' + (props.project_name || '') + '" ' +
+                            'data-production-base="' + (props.production_base || '') + '" ' +
                             'data-process-profile="' + (props.process_profile_name || '') + '" ' +
                             'data-created-at="' + (props.created_at || '') + '" ' +
                             'data-stage-node="' + (props.stage_node || '') + '" ' +
@@ -472,6 +494,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var formulaCount = card.dataset.formulaCount || '0';
             var needsColor = card.dataset.needsColor === '1';
             var projectName = card.dataset.projectName || '-';
+            var productionBase = card.dataset.productionBase || '-';
             var stageNode = card.dataset.stageNode || '-';
             var processProfile = card.dataset.processProfile || '-';
             var createdAt = card.dataset.createdAt || '-';
@@ -512,6 +535,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配色需求</span><span class="badge bg-orange-lt">' + (needsColor ? '需配色' : '无需配色') + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">工艺方案</span><span class="badge bg-green-lt">' + processProfile + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">关联项目</span><span class="fw-bold">' + projectName + '</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">生产基地</span><span class="fw-bold">' + productionBase + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">项目阶段</span><span class="badge bg-blue-lt">' + stageNode + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">创建时间</span><span class="fw-bold">' + createdAt + '</span></div>';
 

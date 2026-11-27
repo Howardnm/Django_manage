@@ -43,6 +43,35 @@ class ProductionOrderTests(TestCase):
         order = ProductionOrder.objects.create(creator=self.user)
         self.assertEqual(order.status_css_class, 'bg-secondary-lt')
 
+    def test_production_base_copied_from_creator(self):
+        """创建时把创建人当前基地抄到工单上"""
+        from app_user.models import Subsidiary
+        base = Subsidiary.objects.create(name='上海基地', code='SH')
+        self.user.subsidiary = base
+        self.user.save(update_fields=['subsidiary'])
+        order = ProductionOrder.objects.create(creator=self.user)
+        self.assertEqual(order.production_base_id, base.pk)
+
+    def test_production_base_null_when_creator_has_none(self):
+        """创建人没填基地时工单基地留空，不拦截创建"""
+        order = ProductionOrder.objects.create(creator=self.user)
+        self.assertIsNone(order.production_base_id)
+
+    def test_production_base_not_refreshed_after_creator_moves(self):
+        """创建人以后调动，再保存工单不改已记录的基地"""
+        from app_user.models import Subsidiary
+        old = Subsidiary.objects.create(name='旧基地')
+        new = Subsidiary.objects.create(name='新基地')
+        self.user.subsidiary = old
+        self.user.save(update_fields=['subsidiary'])
+        order = ProductionOrder.objects.create(creator=self.user)
+        self.user.subsidiary = new
+        self.user.save(update_fields=['subsidiary'])
+        order.remark = 'edited'
+        order.save()
+        order.refresh_from_db()
+        self.assertEqual(order.production_base_id, old.pk)
+
 
 class TrialProductionConfigTests(TestCase):
     def test_singleton_get(self):

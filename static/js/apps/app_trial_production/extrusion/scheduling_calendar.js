@@ -17,6 +17,14 @@
 document.addEventListener('DOMContentLoaded', function () {
     'use strict';
 
+    function appendBaseParam(url) {
+        var baseEl = document.getElementById('calendar-base-filter');
+        if (baseEl && baseEl.value) {
+            url += '&production_base=' + encodeURIComponent(baseEl.value);
+        }
+        return url;
+    }
+
     var calendarEl = document.getElementById('scheduling-calendar');
 
     // ===== FullCalendar 初始化（只读） =====
@@ -61,8 +69,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         // 事件数据源：函数模式，自动跟随视图日期范围请求
         events: function (fetchInfo, successCallback, failureCallback) {
-            var url = window.EVENTS_URL + '?start=' + encodeURIComponent(fetchInfo.startStr) +
-                      '&end=' + encodeURIComponent(fetchInfo.endStr);
+            var url = appendBaseParam(window.EVENTS_URL + '?start=' + encodeURIComponent(fetchInfo.startStr) +
+                      '&end=' + encodeURIComponent(fetchInfo.endStr));
             fetch(url)
                 .then(function (r) { return r.json(); })
                 .then(successCallback)
@@ -103,6 +111,7 @@ document.addEventListener('DOMContentLoaded', function () {
                             'data-formula-count="' + (props.formula_count || 0) + '" ' +
                             'data-needs-color="' + (props.needs_color ? '1' : '0') + '" ' +
                             'data-project-name="' + (props.project_name || '') + '" ' +
+                            'data-production-base="' + (props.production_base || '') + '" ' +
                             'data-process-profile="' + (props.process_profile_name || '') + '" ' +
                             'data-created-at="' + (props.created_at || '') + '" ' +
                             'data-stage-node="' + (props.stage_node || '') + '" ' +
@@ -137,6 +146,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var formulaCount = card.dataset.formulaCount || '0';
             var needsColor = card.dataset.needsColor === '1';
             var projectName = card.dataset.projectName || '-';
+            var productionBase = card.dataset.productionBase || '-';
             var stageNode = card.dataset.stageNode || '-';
             var processProfile = card.dataset.processProfile || '-';
             var createdAt = card.dataset.createdAt || '-';
@@ -177,6 +187,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">配色需求</span><span class="badge bg-orange-lt">' + (needsColor ? '需配色' : '无需配色') + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">工艺方案</span><span class="badge bg-green-lt">' + processProfile + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">关联项目</span><span class="fw-bold">' + projectName + '</span></div>' +
+                '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">生产基地</span><span class="fw-bold">' + productionBase + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">项目阶段</span><span class="badge bg-blue-lt">' + stageNode + '</span></div>' +
                 '<div class="d-flex align-items-center gap-2 mb-1"><span class="fc-popover-label fw-bold">创建时间</span><span class="fw-bold">' + createdAt + '</span></div>';
 
@@ -188,6 +199,14 @@ document.addEventListener('DOMContentLoaded', function () {
             popover.classList.remove('active');
         },
     });
+
+    var baseForm = document.getElementById('calendar-base-form');
+    if (baseForm) {
+        baseForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+            calendar.refetchEvents();
+        });
+    }
 
     calendar.render();
 

@@ -101,6 +101,7 @@ class ProductionOrder(models.Model):
     injection_pretreatment = models.TextField("注塑前处理", blank=True, help_text="注塑前的预处理要求，如烘干条件等")
     process_profile = models.ForeignKey('app_process.ProcessProfile', on_delete=models.SET_NULL, null=True, blank=True, related_name='production_orders', verbose_name="工艺方案")
     creator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, verbose_name="创建人", related_name='created_production_orders')
+    production_base = models.ForeignKey('app_user.Subsidiary', on_delete=models.SET_NULL, null=True, blank=True, related_name='trial_production_orders', verbose_name="生产基地", help_text="创建时取创建人所属子公司/基地，之后不随人员调动变化")
     extruder_operator = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, verbose_name="挤出操作员", related_name='extruder_orders')
     extrusion_scheduled_date = models.DateTimeField("挤出排产开始时间", null=True, blank=True, help_text="操作员在日历中拖拽排期的开始时间")
     extrusion_scheduled_end = models.DateTimeField("挤出排产结束时间", null=True, blank=True, help_text="计划结束时间，为空则默认开始时间+1小时")
@@ -127,7 +128,7 @@ class ProductionOrder(models.Model):
         return f"{self.code} [{self.trial_code}]"
 
     def save(self, *args, **kwargs):
-        """保存时自动生成工单号（如 TP20250623-05）"""
+        """保存时自动生成工单号，并在创建时快照创建人基地。"""
         if not self.code:
             today_str = timezone.now().strftime('%Y%m%d')
             prefix = f"TP{today_str}"
@@ -141,6 +142,14 @@ class ProductionOrder(models.Model):
                 except (ValueError, IndexError):
                     seq = 1
             self.code = f"{prefix}-{seq:02d}"
+        # 只在插入且未指定基地时写入。之后创建人调动、工单再保存，都不刷新。
+        if self._state.adding and not self.production_base_id and self.creator_id:
+            from django.contrib.auth import get_user_model
+            self.production_base_id = (
+                get_user_model().objects.filter(pk=self.creator_id)
+                .values_list('subsidiary_id', flat=True)
+                .first()
+            )
         super().save(*args, **kwargs)
 
     # ---- Status check properties ----

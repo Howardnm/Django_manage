@@ -4,6 +4,7 @@ from django.shortcuts import render
 from django.views import View
 
 from app_trial_production.mixins import DashboardAccessMixin
+from app_user.models import Subsidiary
 
 logger = logging.getLogger(__name__)
 
@@ -21,4 +22,6 @@ class SchedulingCalendarView(DashboardAccessMixin, View):
     enforce_dept_isolation = False
 
     def get(self, request):
-        return render(request, 'apps/app_trial_production/extrusion/scheduling_calendar.html', {})
+        return render(request, 'apps/app_trial_production/extrusion/scheduling_calendar.html', {
+            'subsidiaries': Subsidiary.objects.order_by('name'),
+        })

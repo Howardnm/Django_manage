@@ -12,7 +12,9 @@ from app_trial_production.mixins import ExtrusionTaskAccessMixin
 from app_trial_production.models import ProductionOrder
 from app_trial_production.filters import PendingOrderFilter
 from app_trial_production.services import ProductionOrderService
-from app_trial_production.services.extrusion_service import build_extrusion_calendar_events
+from app_trial_production.services.extrusion_service import (
+    build_extrusion_calendar_events, production_base_id_from_request,
+)
 from app_trial_production.utils.extrusion import is_all_day_event
 from common_utils.state_machine import InvalidStateTransition
 
@@ -27,6 +29,7 @@ class ExtrusionEventsApiView(ExtrusionTaskAccessMixin, View):
         events = build_extrusion_calendar_events(
             request.GET.get('start', ''),
             request.GET.get('end', ''),
+            production_base_id_from_request(request),
         )
         return JsonResponse(events, safe=False)
 
