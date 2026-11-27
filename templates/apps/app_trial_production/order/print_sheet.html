@@ -43,7 +43,7 @@
     {# ── 打印时间 ── #}
     <div class="text-muted mb-2" style="font-size:8px;">打印时间：{% now "Y-m-d H:i" %}</div>
 
-    {# ── 页眉：Logo 左 + 标题中 ── #}
+    {# ── 页眉：Logo 左 + 标题中 + 页码右（基地名称紧挨页码左侧，无值不占位）── #}
     <div class="d-flex align-items-center mb-3">
         <div style="width:25%;">
             {% if company_logo_url %}
@@ -51,8 +51,11 @@
             {% endif %}
         </div>
         <div class="flex-grow-1 text-center fs-3 fw-bold">试 验 工 程 单</div>
-        <div style="width:25%;" class="text-end">
-            <span class="fw-bold" style="font-size:14px;border:1px solid #808080;padding:2px 8px;">
+        <div style="width:25%;" class="d-flex align-items-center justify-content-end gap-2">
+            {% if header_info.production_base %}
+            <span class="fw-bold text-end" style="font-size:13px;line-height:1.2;">{{ header_info.production_base }}</span>
+            {% endif %}
+            <span class="fw-bold text-nowrap" style="font-size:14px;border:1px solid #808080;padding:2px 8px;">
                 {{ forloop.counter }} / {{ total_pages }}
             </span>
         </div>
@@ -77,10 +80,6 @@
             <td class="text-start ps-2 fw-bold">{{ header_info.creator_display }}</td>
             <td class="print-label-bg fw-bold text-nowrap text-center">部门/工作组</td>
             <td class="text-start ps-2 fw-bold">{{ header_info.creator_dept_path|default:'—' }}</td>
-        </tr>
-        <tr>
-            <td class="print-label-bg fw-bold text-nowrap text-center">生产基地</td>
-            <td class="text-start ps-2 fw-bold" colspan="7">{{ header_info.production_base|default:'—' }}</td>
         </tr>
         <tr>
             <td class="print-label-bg fw-bold text-nowrap text-center">牌号</td>
