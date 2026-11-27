@@ -645,7 +645,8 @@ createApp({
         }
 
         async function loadAll() {
-            if (!sapCode.value.trim()) {
+            const code = sapCode.value.trim()
+            if (!code) {
                 ElementPlus.ElMessage.warning("请输入成品编码")
                 return
             }
@@ -660,13 +661,39 @@ createApp({
             loading.value = true
             setProgress("正在查询成品配方", 5)
             try {
-                const tree = await api(
-                    `/api/material/finished-boms/?sap_code=${encodeURIComponent(sapCode.value.trim())}`,
-                )
-                material.value = tree.material
-                loadedProjects = tree.projects
+                let tree = null
+                try {
+                    tree = await api(
+                        `/api/material/finished-boms/?sap_code=${encodeURIComponent(code)}`,
+                    )
+                } catch (error) {
+                    if (error.status !== 404) throw error
+                }
+                if (tree) {
+                    material.value = tree.material
+                    loadedProjects = tree.projects
+                } else {
+                    material.value = {
+                        id: null,
+                        grade_name: "",
+                        sap_material_code: code,
+                        localMissing: true,
+                    }
+                    loadedProjects = []
+                    localTree.value = []
+                    setProgress("正在查询 SAP 物料描述", 10)
+                    try {
+                        const named = await api(`/api/sap/materials/?matnr=${encodeURIComponent(code)}`)
+                        const row = (named.results || [])[0]
+                        if (row && row.maktx) {
+                            material.value = { ...material.value, grade_name: row.maktx }
+                        }
+                    } catch (error) {
+                        // 描述拿不到不阻断后面的 BOM 查询
+                    }
+                }
                 setProgress("正在查询 SAP BOM 列表", 15)
-                const sap = await loadSap(tree.material.sap_material_code)
+                const sap = await loadSap(material.value.sap_material_code)
                 loadedDetails = sap.details
                 loadedPlants = sap.plantsData
                 setProgress("正在计算同步标记", 96)

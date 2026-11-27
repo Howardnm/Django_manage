@@ -83,12 +83,12 @@
             <el-progress :percentage="loadPercent" :stroke-width="8"></el-progress>
             <p class="hint">{{ loadText }}</p>
         </div>
-        <p class="hint" v-if="material">{{ material.grade_name }} · {{ material.sap_material_code }}。✓ 表示组件占比一致（占比精确到 6 位小数）。单位 PC 的行不参与对比。其它不是 KG 或 G 的单位，整张 BOM 不参与对比。</p>
+        <p class="hint" v-if="material"><template v-if="material.localMissing">本地没有该成品，右侧为 SAP 端 BOM。 </template><template v-if="material.grade_name">{{ material.grade_name }} · </template>{{ material.sap_material_code }}。✓ 表示组件占比一致（占比精确到 6 位小数）。单位 PC 的行不参与对比。其它不是 KG 或 G 的单位，整张 BOM 不参与对比。</p>
     </el-card>
 
     <div class="columns" v-loading="loading">
         <el-card class="tree-card" shadow="never" header="成品配方">
-            <el-empty v-if="!localTree.length" description="输入成品编码后查询"></el-empty>
+            <el-empty v-if="!localTree.length" :description="material && material.localMissing ? '本地没有该成品' : '输入成品编码后查询'"></el-empty>
             <el-tree
                 v-else
                 :key="treeKey"
@@ -332,6 +332,6 @@
 <script src="{% static 'element-plus-2.13.7/dist/index.full.js' %}"></script>
 <script src="{% static 'element-plus-2.13.7/dist/locale/zh-cn.js' %}"></script>
 <script>window.__FINISHED_BOM_SAP_CODE__ = "{{ initial_sap_code|escapejs }}";</script>
-<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=27"></script>
+<script src="{% static 'apps/app_material/finished_bom_sync.js' %}?v=28"></script>
 </body>
 </html>
