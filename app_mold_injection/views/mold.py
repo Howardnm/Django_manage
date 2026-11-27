@@ -3,6 +3,7 @@ from django.urls import reverse_lazy
 from app_mold_injection.mixins import MoldManageAccessMixin
 from app_mold_injection.models import MoldType
 from app_mold_injection.forms import MoldTypeForm
+from app_mold_injection.filters import MoldTypeFilter
 
 
 class MoldTypeListView(MoldManageAccessMixin, ListView):
@@ -15,7 +16,14 @@ class MoldTypeListView(MoldManageAccessMixin, ListView):
 
     def get_queryset(self):
         # 模具台账不做 L4/L5 数据隔离，纯模块准入（L1+L2+L3）把关。
-        return self.model.objects.all()
+        qs = self.model.objects.all()
+        self.filter = MoldTypeFilter(self.request.GET, queryset=qs)
+        return self.filter.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = getattr(self, 'filter', None)
+        return context
 
 
 class MoldTypeCreateView(MoldManageAccessMixin, CreateView):
